@@ -203,20 +203,20 @@ export function MemoryGameUI() {
           </div>
 
           {/* 3D Simon Arcade Pad Matrix */}
-          <div className="relative w-full max-w-[280px] aspect-square p-3 bg-black/80 rounded-[3rem] border border-white/10 shadow-2xl flex items-center justify-center">
-            <div className="grid grid-cols-2 gap-3 w-full h-full">
+          <div className="relative w-full max-w-[300px] aspect-square rounded-full bg-black border-[10px] border-[#18181b] shadow-[0_0_40px_rgba(0,0,0,0.8)] flex items-center justify-center p-2">
+            <div className="grid grid-cols-2 w-full h-full gap-3 bg-black">
               {/* RED PAD (Top Left) */}
               <button
                 onClick={() => handleColorClick("red")}
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Red Pad"
-                className={`relative rounded-tl-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                className={`relative rounded-tl-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
                   activeColor === "red"
-                    ? "bg-gradient-to-br from-red-400 via-red-500 to-red-600 border-white shadow-[0_0_60px_#f87171] scale-[0.97] ring-4 ring-white/80 z-20"
-                    : "bg-gradient-to-br from-red-900/60 via-red-950 to-[#180505] border-red-500/30 hover:border-red-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                    ? "bg-gradient-to-br from-red-400 via-red-500 to-red-600 border-white shadow-[inset_0_4px_15px_rgba(255,255,255,0.4),0_0_50px_rgba(239,68,68,0.8)] z-20 ring-4 ring-white/50"
+                    : "bg-gradient-to-br from-red-800/80 via-red-950 to-[#180505] border-red-500/30 hover:bg-red-800/90 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
                 }`}
               >
-                <div className="absolute top-3 left-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+                <div className="absolute top-1/4 left-1/4 w-10 h-10 rounded-full bg-white/10 blur-[8px] pointer-events-none" />
               </button>
 
               {/* GREEN PAD (Top Right) */}
@@ -224,13 +224,13 @@ export function MemoryGameUI() {
                 onClick={() => handleColorClick("green")}
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Green Pad"
-                className={`relative rounded-tr-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                className={`relative rounded-tr-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
                   activeColor === "green"
-                    ? "bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 border-white shadow-[0_0_60px_#34d399] scale-[0.97] ring-4 ring-white/80 z-20"
-                    : "bg-gradient-to-br from-emerald-900/60 via-emerald-950 to-[#05180d] border-emerald-500/30 hover:border-emerald-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                    ? "bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 border-white shadow-[inset_0_4px_15px_rgba(255,255,255,0.4),0_0_50px_rgba(16,185,129,0.8)] z-20 ring-4 ring-white/50"
+                    : "bg-gradient-to-br from-emerald-800/80 via-emerald-950 to-[#05180d] border-emerald-500/30 hover:bg-emerald-800/90 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
                 }`}
               >
-                <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+                <div className="absolute top-1/4 right-1/4 w-10 h-10 rounded-full bg-white/10 blur-[8px] pointer-events-none" />
               </button>
 
               {/* BLUE PAD (Bottom Left) */}
@@ -238,13 +238,13 @@ export function MemoryGameUI() {
                 onClick={() => handleColorClick("blue")}
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Blue Pad"
-                className={`relative rounded-bl-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                className={`relative rounded-bl-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
                   activeColor === "blue"
-                    ? "bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 border-white shadow-[0_0_60px_#60a5fa] scale-[0.97] ring-4 ring-white/80 z-20"
-                    : "bg-gradient-to-br from-blue-900/60 via-blue-950 to-[#050b18] border-blue-500/30 hover:border-blue-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                    ? "bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 border-white shadow-[inset_0_4px_15px_rgba(255,255,255,0.4),0_0_50px_rgba(59,130,246,0.8)] z-20 ring-4 ring-white/50"
+                    : "bg-gradient-to-br from-blue-800/80 via-blue-950 to-[#050b18] border-blue-500/30 hover:bg-blue-800/90 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
                 }`}
               >
-                <div className="absolute bottom-3 left-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+                <div className="absolute bottom-1/4 left-1/4 w-10 h-10 rounded-full bg-white/10 blur-[8px] pointer-events-none" />
               </button>
 
               {/* YELLOW PAD (Bottom Right) */}
@@ -252,20 +252,20 @@ export function MemoryGameUI() {
                 onClick={() => handleColorClick("yellow")}
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Yellow Pad"
-                className={`relative rounded-br-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                className={`relative rounded-br-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
                   activeColor === "yellow"
-                    ? "bg-gradient-to-br from-amber-300 via-amber-400 to-amber-500 border-white shadow-[0_0_60px_#fbbf24] scale-[0.97] ring-4 ring-white/80 z-20"
-                    : "bg-gradient-to-br from-amber-900/60 via-amber-950 to-[#181205] border-amber-500/30 hover:border-amber-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                    ? "bg-gradient-to-br from-amber-300 via-amber-400 to-amber-500 border-white shadow-[inset_0_4px_15px_rgba(255,255,255,0.4),0_0_50px_rgba(245,158,11,0.8)] z-20 ring-4 ring-white/50"
+                    : "bg-gradient-to-br from-amber-800/80 via-amber-950 to-[#181205] border-amber-500/30 hover:bg-amber-800/90 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
                 }`}
               >
-                <div className="absolute bottom-3 right-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+                <div className="absolute bottom-1/4 right-1/4 w-10 h-10 rounded-full bg-white/10 blur-[8px] pointer-events-none" />
               </button>
             </div>
 
             {/* Center Digital LED Console Hub */}
-            <div className="absolute w-24 h-24 rounded-full bg-gradient-to-b from-[#18181b] to-[#09090b] border-4 border-[#27272a] shadow-2xl flex flex-col items-center justify-center pointer-events-none z-30">
-              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">STAGE</span>
-              <span className="text-2xl font-black text-accent-green font-mono">
+            <div className="absolute w-[110px] h-[110px] rounded-full bg-gradient-to-b from-[#18181b] to-[#09090b] border-[10px] border-black shadow-[0_0_30px_rgba(0,0,0,1)] flex flex-col items-center justify-center pointer-events-none z-30">
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest mt-1">STAGE</span>
+              <span className="text-3xl font-black text-accent-green font-mono">
                 {String(gameState.level).padStart(2, "0")}
               </span>
             </div>
