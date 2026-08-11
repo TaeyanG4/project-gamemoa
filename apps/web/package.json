@@ -1,0 +1,41 @@
+{
+  "name": "@gamemoa/web",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@gamemoa/auth": "workspace:*",
+    "@gamemoa/core": "workspace:*",
+    "@gamemoa/db": "workspace:*",
+    "@gamemoa/game-reaction-time": "workspace:*",
+    "@gamemoa/game-sdk": "workspace:*",
+    "@gamemoa/shared": "workspace:*",
+    "@gamemoa/ui": "workspace:*",
+    "@react-router/cloudflare": "^7.7.0",
+    "lucide-react": "^0.513.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router": "^7.7.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.0.0",
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "@react-router/dev": "^7.7.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.3.0",
+    "vitest": "^3.2.0",
+    "wrangler": "^4.14.0"
+  },
+  "scripts": {
+    "dev": "react-router dev",
+    "build": "react-router build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint app/",
+    "test": "echo 'no tests yet' && exit 0",
+    "preview": "wrangler dev",
+    "deploy": "wrangler deploy"
+  }
+}

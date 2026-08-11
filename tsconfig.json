@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./apps/web" },
+    { "path": "./packages/auth" },
+    { "path": "./packages/core" },
+    { "path": "./packages/db" },
+    { "path": "./packages/game-sdk" },
+    { "path": "./packages/shared" },
+    { "path": "./packages/ui" },
+    { "path": "./games/reaction-time" }
+  ]
+}

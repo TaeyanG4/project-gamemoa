@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": ".",
+    "rootDirs": [".", "./.react-router/types"]
+  },
+  "include": ["app", ".react-router"],
+  "exclude": ["node_modules"]
+}
