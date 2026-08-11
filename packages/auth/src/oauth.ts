@@ -23,10 +23,9 @@ export function getGoogleOAuthUrl(clientId: string): string {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    response_type: "code",
+    response_type: "token",
     scope: OAUTH_CONFIG.google.scope,
-    access_type: "offline",
-    prompt: "consent",
+    prompt: "select_account",
   });
   return `${OAUTH_CONFIG.google.authorizationUrl}?${params.toString()}`;
 }
@@ -36,8 +35,9 @@ export function getDiscordOAuthUrl(clientId: string): string {
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: redirectUri,
-    response_type: "code",
+    response_type: "token",
     scope: OAUTH_CONFIG.discord.scope,
+    prompt: "consent",
   });
   return `${OAUTH_CONFIG.discord.authorizationUrl}?${params.toString()}`;
 }

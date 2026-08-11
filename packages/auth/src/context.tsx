@@ -3,7 +3,9 @@ import {
   type AuthUser, 
   type AuthProvider as ProviderType, 
   getStoredUser, 
-  loginWithProvider, 
+  startRealOAuthFlow,
+  getEnvClientId,
+  setEnvClientIdOverride,
   logoutUser 
 } from "./authService.js";
 
@@ -13,8 +15,10 @@ export interface AuthContextValue {
   isLoginModalOpen: boolean;
   openLoginModal: () => void;
   closeLoginModal: () => void;
-  loginWithGoogle: () => void;
-  loginWithDiscord: () => void;
+  loginWithGoogle: () => boolean;
+  loginWithDiscord: () => boolean;
+  getClientId: (provider: ProviderType) => string | null;
+  setClientId: (provider: ProviderType, clientId: string) => void;
   logout: () => void;
 }
 
@@ -34,16 +38,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const openLoginModal = () => setIsLoginModalOpen(true);
   const closeLoginModal = () => setIsLoginModalOpen(false);
 
-  const loginWithGoogle = () => {
-    const loggedIn = loginWithProvider("google");
-    setUser(loggedIn);
-    closeLoginModal();
+  const loginWithGoogle = (): boolean => {
+    return startRealOAuthFlow("google");
   };
 
-  const loginWithDiscord = () => {
-    const loggedIn = loginWithProvider("discord");
-    setUser(loggedIn);
-    closeLoginModal();
+  const loginWithDiscord = (): boolean => {
+    return startRealOAuthFlow("discord");
+  };
+
+  const getClientId = (provider: ProviderType): string | null => {
+    return getEnvClientId(provider);
+  };
+
+  const setClientId = (provider: ProviderType, clientId: string): void => {
+    setEnvClientIdOverride(provider, clientId);
   };
 
   const logout = () => {
@@ -61,6 +69,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         closeLoginModal,
         loginWithGoogle,
         loginWithDiscord,
+        getClientId,
+        setClientId,
         logout,
       }}
     >
