@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router";
-import { Search, Menu, Gamepad2, Bookmark, User, Command } from "lucide-react";
+import { Search, Menu, Gamepad2, Bookmark, User, Command, LogOut, Trophy } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@gamemoa/auth";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -8,7 +9,9 @@ interface HeaderProps {
 
 export function Header({ onToggleMobileSidebar }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const navigate = useNavigate();
+  const { user, isAuthenticated, openLoginModal, logout } = useAuth();
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +21,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full backdrop-blur-xl bg-surface/90 border-b border-border/80 transition-all select-none">
+    <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-surface/90 border-b border-border/80 transition-all select-none">
       <div className="w-full px-4 h-16 flex items-center justify-between gap-4">
         {/* Left: Mobile Toggle & Brand Logo */}
         <div className="flex items-center gap-3">
@@ -40,7 +43,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           </Link>
         </div>
 
-        {/* Center: Search Bar (CrazyGames Style) */}
+        {/* Center: Search Bar */}
         <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md hidden sm:flex items-center relative">
           <Search className="w-4 h-4 text-text-muted absolute left-3.5 pointer-events-none" />
           <input
@@ -56,7 +59,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           </div>
         </form>
 
-        {/* Right: Quick Actions */}
+        {/* Right: Quick Actions & Auth */}
         <div className="flex items-center gap-2.5">
           <Link
             to="/games?category=favorites"
@@ -66,10 +69,78 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
             <Bookmark className="w-5 h-5" />
           </Link>
 
-          <button className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-brand to-brand-dark rounded-full hover:shadow-lg hover:shadow-brand/30 hover:scale-105 transition-all cursor-pointer">
-            <User className="w-4 h-4" />
-            <span>로그인</span>
-          </button>
+          {isAuthenticated && user ? (
+            <div className="relative">
+              <button
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-2 p-1.5 pl-3 rounded-full bg-surface-raised border border-border hover:border-brand/50 transition-all cursor-pointer shadow-sm"
+              >
+                <span className="text-xs font-bold text-text-primary max-w-[100px] truncate hidden md:inline">
+                  {user.name}
+                </span>
+                <div className="w-7 h-7 rounded-full bg-brand text-white font-black text-xs flex items-center justify-center overflow-hidden border border-brand/40">
+                  {user.image ? (
+                    <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    user.name.slice(0, 2)
+                  )}
+                </div>
+              </button>
+
+              {/* User Dropdown Menu */}
+              {showUserDropdown && (
+                <div 
+                  className="absolute right-0 mt-2 w-56 bg-surface-raised border border-border rounded-2xl shadow-2xl py-2 flex flex-col z-50 animate-in fade-in zoom-in-95 duration-150"
+                  onMouseLeave={() => setShowUserDropdown(false)}
+                >
+                  <div className="px-4 py-3 border-b border-border/60">
+                    <p className="text-xs font-bold text-text-primary truncate">{user.name}</p>
+                    <p className="text-[11px] text-text-muted truncate">{user.email}</p>
+                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand border border-brand/20 capitalize">
+                      {user.provider} 계정
+                    </div>
+                  </div>
+
+                  <Link
+                    to="/profile"
+                    onClick={() => setShowUserDropdown(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
+                  >
+                    <User className="w-4 h-4 text-brand-light" />
+                    <span>내 프로필 & 기록</span>
+                  </Link>
+
+                  <Link
+                    to="/ranking"
+                    onClick={() => setShowUserDropdown(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
+                  >
+                    <Trophy className="w-4 h-4 text-accent-yellow" />
+                    <span>명예의 전당</span>
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      logout();
+                      setShowUserDropdown(false);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-accent-red hover:bg-accent-red/10 transition-colors w-full text-left border-t border-border/40 mt-1 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>로그아웃</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={openLoginModal}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-brand to-brand-dark rounded-full hover:shadow-lg hover:shadow-brand/30 hover:scale-105 transition-all cursor-pointer"
+            >
+              <User className="w-4 h-4" />
+              <span>로그인</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

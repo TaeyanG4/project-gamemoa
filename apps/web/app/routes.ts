@@ -5,4 +5,5 @@ export default [
   route("games", "routes/games.tsx"),
   route("games/:slug", "routes/game-slug.tsx"),
   route("ranking", "routes/ranking.tsx"),
+  route("profile", "routes/profile.tsx"),
 ] satisfies RouteConfig;

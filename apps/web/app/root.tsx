@@ -8,6 +8,8 @@ import {
 
 import "./app.css";
 import { Layout } from "./components/layout/Layout";
+import { AuthProvider } from "@gamemoa/auth";
+import { LoginModal } from "./components/ui/LoginModal";
 
 export default function App() {
   return (
@@ -24,9 +26,12 @@ export default function App() {
         <Links />
       </head>
       <body className="bg-surface text-text-primary antialiased">
-        <Layout>
-          <Outlet />
-        </Layout>
+        <AuthProvider>
+          <Layout>
+            <Outlet />
+          </Layout>
+          <LoginModal />
+        </AuthProvider>
         <ScrollRestoration />
         <Scripts />
       </body>
