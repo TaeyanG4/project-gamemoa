@@ -1,11 +1,39 @@
-import { useState, useEffect } from "react";
-import { Play, RotateCcw, Brain } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Play, RotateCcw, Brain, Trophy, Zap, Volume2 } from "lucide-react";
 import { 
   type MemoryColor, 
   generateNextColor, 
   evaluateGrade, 
   createInitialState 
 } from "../engine/memoryEngine";
+
+const COLOR_FREQS: Record<MemoryColor, number> = {
+  red: 261.63,   // C4
+  green: 329.63, // E4
+  blue: 392.00,  // G4
+  yellow: 523.25,// C5
+};
+
+function playTone(freq: number, duration = 0.3) {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  } catch {
+    // Ignore audio context autoplay blocks gracefully
+  }
+}
 
 export function MemoryGameUI() {
   const [gameState, setGameState] = useState(createInitialState());
@@ -31,23 +59,23 @@ export function MemoryGameUI() {
     const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     async function playSequence() {
-      // 400ms initial delay before starting sequence playback
-      await sleep(400);
+      await sleep(500);
 
       for (let i = 0; i < gameState.sequence.length; i++) {
         if (isCancelled) return;
 
         const color = gameState.sequence[i];
 
-        // 1. Turn ON highlight
+        // 1. Turn ON highlight & sound
         setActiveColor(color);
-        await sleep(550);
+        playTone(COLOR_FREQS[color], 0.35);
+        await sleep(500);
 
         if (isCancelled) return;
 
-        // 2. Turn OFF highlight (gap between flashes for repeated colors)
+        // 2. Turn OFF highlight (gap between flashes)
         setActiveColor(null);
-        await sleep(250);
+        await sleep(200);
       }
 
       if (!isCancelled) {
@@ -67,13 +95,14 @@ export function MemoryGameUI() {
     if (gameState.status !== "user-turn") return;
 
     setActiveColor(color);
-    setTimeout(() => setActiveColor(null), 250);
+    playTone(COLOR_FREQS[color], 0.25);
+    setTimeout(() => setActiveColor(null), 200);
 
     const expectedColor = gameState.sequence[gameState.userIndex];
 
     if (color !== expectedColor) {
       // Game Over
-      const grade = evaluateGrade(gameState.level - 1);
+      playTone(150, 0.5); // Low error tone
       const newBest = Math.max(gameState.bestLevel, gameState.level - 1);
       
       setGameState((prev) => ({
@@ -96,7 +125,7 @@ export function MemoryGameUI() {
           level: prev.level + 1,
           bestLevel: Math.max(prev.bestLevel, prev.level),
         }));
-      }, 500);
+      }, 600);
     } else {
       setGameState((prev) => ({ ...prev, userIndex: prev.userIndex + 1 }));
     }
@@ -105,20 +134,24 @@ export function MemoryGameUI() {
   const grade = evaluateGrade(gameState.level - 1);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto p-6 bg-surface-raised rounded-3xl border border-border shadow-2xl select-none">
+    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto p-6 md:p-8 bg-gradient-to-b from-[#18181b] via-[#0f0f12] to-[#09090b] rounded-[2.5rem] border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] select-none">
       {/* Header Info */}
-      <div className="flex items-center justify-between w-full mb-6 pb-4 border-b border-border/60">
-        <div className="flex items-center gap-2">
-          <Brain className="w-6 h-6 text-accent-green" />
-          <span className="font-extrabold text-lg text-text-primary">순서 기억력</span>
+      <div className="flex items-center justify-between w-full mb-6 pb-4 border-b border-white/10">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-accent-green/10 text-accent-green border border-accent-green/20">
+            <Brain className="w-5 h-5" />
+          </div>
+          <span className="font-black text-lg tracking-tight text-white">순서 기억력 패드</span>
         </div>
 
-        <div className="flex items-center gap-3 text-xs font-bold">
-          <div className="px-3 py-1.5 rounded-xl bg-surface border border-border/80 text-text-secondary">
-            단계: <span className="text-accent-green text-sm">{gameState.level}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end px-3 py-1 rounded-xl bg-black/40 border border-white/10">
+            <span className="text-[10px] text-text-muted font-bold uppercase">Level</span>
+            <span className="text-sm font-black text-accent-green">{gameState.level}</span>
           </div>
-          <div className="px-3 py-1.5 rounded-xl bg-surface border border-border/80 text-text-secondary">
-            최고: <span className="text-brand-light text-sm">{gameState.bestLevel}</span>
+          <div className="flex flex-col items-end px-3 py-1 rounded-xl bg-black/40 border border-white/10">
+            <span className="text-[10px] text-text-muted font-bold uppercase">Best</span>
+            <span className="text-sm font-black text-accent-yellow">{gameState.bestLevel}</span>
           </div>
         </div>
       </div>
@@ -126,122 +159,144 @@ export function MemoryGameUI() {
       {/* Main Play Area */}
       {gameState.status === "idle" && (
         <div className="flex flex-col items-center gap-6 py-10 text-center">
-          <div className="w-20 h-20 rounded-full bg-accent-green/10 text-accent-green flex items-center justify-center shadow-lg shadow-accent-green/20">
-            <Brain className="w-10 h-10" />
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-accent-green/20 to-brand/20 text-accent-green flex items-center justify-center border border-accent-green/30 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
+              <Brain className="w-12 h-12" />
+            </div>
+            <div className="absolute -bottom-1 -right-1 p-2 rounded-full bg-brand text-white shadow-lg">
+              <Zap className="w-4 h-4" />
+            </div>
           </div>
-          <h3 className="text-2xl font-black text-text-primary">순서 기억력 테스트</h3>
-          <p className="text-sm text-text-secondary max-w-xs leading-relaxed">
-            화면에 깜빡이는 색상 순서를 잘 기억하고 순서대로 똑같이 누르세요!
-          </p>
+
+          <div className="flex flex-col gap-1">
+            <h3 className="text-2xl font-black text-white">아케이드 순서 기억력</h3>
+            <p className="text-xs text-text-secondary max-w-xs leading-relaxed">
+              깜빡이는 4색 아케이드 패드의 패턴을 기억하고 순서대로 눌러보세요!
+            </p>
+          </div>
+
           <button
             onClick={startNewGame}
-            className="flex items-center gap-2 px-8 py-3.5 bg-accent-green text-white font-extrabold rounded-2xl shadow-xl shadow-accent-green/30 hover:scale-105 transition-all cursor-pointer"
+            className="flex items-center gap-2.5 px-8 py-4 bg-gradient-to-r from-accent-green via-emerald-500 to-teal-500 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-accent-green/30 hover:scale-105 transition-all cursor-pointer border border-white/20"
           >
             <Play className="w-5 h-5 fill-current" />
-            게임 시작
+            <span>게임 시작</span>
           </button>
         </div>
       )}
 
       {(gameState.status === "showing" || gameState.status === "user-turn") && (
         <div className="flex flex-col items-center gap-6 w-full py-2">
-          {/* Status Notification Badge */}
-          <div className="h-9 flex items-center justify-center px-5 rounded-full bg-surface border border-border text-xs font-black shadow-inner">
+          {/* Status Indicator Bar */}
+          <div className="h-10 flex items-center justify-center px-6 rounded-full bg-black/60 border border-white/10 text-xs font-black shadow-inner tracking-wide">
             {gameState.status === "showing" ? (
-              activeColor === "red" ? (
-                <span className="text-red-400 animate-bounce">🔴 빨간색!</span>
-              ) : activeColor === "green" ? (
-                <span className="text-emerald-400 animate-bounce">🟢 초록색!</span>
-              ) : activeColor === "blue" ? (
-                <span className="text-blue-400 animate-bounce">🔵 파란색!</span>
-              ) : activeColor === "yellow" ? (
-                <span className="text-amber-400 animate-bounce">🟡 노란색!</span>
-              ) : (
-                <span className="text-text-muted animate-pulse">👀 순서를 잘 기억하세요...</span>
-              )
+              <span className="text-accent-yellow animate-pulse flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-accent-yellow animate-ping" />
+                👀 패턴 관찰 중...
+              </span>
             ) : (
-              <span className="text-accent-green">
+              <span className="text-accent-green flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-accent-green" />
                 👉 순서대로 누르세요 ({gameState.userIndex + 1} / {gameState.sequence.length})
               </span>
             )}
           </div>
 
-          {/* 4-Color Grid */}
-          <div className="grid grid-cols-2 gap-4 w-full max-w-xs aspect-square p-2">
-            {/* Red Button */}
-            <button
-              onClick={() => handleColorClick("red")}
-              disabled={gameState.status !== "user-turn"}
-              className={`rounded-3xl border-2 transition-all duration-200 cursor-pointer flex items-center justify-center font-black text-lg ${
-                activeColor === "red"
-                  ? "bg-red-500 border-white text-white shadow-[0_0_40px_rgba(239,68,68,0.9)] scale-105 ring-4 ring-white z-10"
-                  : "bg-red-950/40 border-red-500/30 text-red-400 hover:bg-red-900/50"
-              }`}
-            >
-              RED
-            </button>
+          {/* 3D Simon Arcade Pad Matrix */}
+          <div className="relative w-full max-w-[280px] aspect-square p-3 bg-black/80 rounded-[3rem] border border-white/10 shadow-2xl flex items-center justify-center">
+            <div className="grid grid-cols-2 gap-3 w-full h-full">
+              {/* RED PAD (Top Left) */}
+              <button
+                onClick={() => handleColorClick("red")}
+                disabled={gameState.status !== "user-turn"}
+                aria-label="Red Pad"
+                className={`relative rounded-tl-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                  activeColor === "red"
+                    ? "bg-gradient-to-br from-red-400 via-red-500 to-red-600 border-white shadow-[0_0_60px_#f87171] scale-[0.97] ring-4 ring-white/80 z-20"
+                    : "bg-gradient-to-br from-red-900/60 via-red-950 to-[#180505] border-red-500/30 hover:border-red-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                }`}
+              >
+                <div className="absolute top-3 left-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+              </button>
 
-            {/* Green Button */}
-            <button
-              onClick={() => handleColorClick("green")}
-              disabled={gameState.status !== "user-turn"}
-              className={`rounded-3xl border-2 transition-all duration-200 cursor-pointer flex items-center justify-center font-black text-lg ${
-                activeColor === "green"
-                  ? "bg-emerald-500 border-white text-white shadow-[0_0_40px_rgba(16,185,129,0.9)] scale-105 ring-4 ring-white z-10"
-                  : "bg-emerald-950/40 border-emerald-500/30 text-emerald-400 hover:bg-emerald-900/50"
-              }`}
-            >
-              GREEN
-            </button>
+              {/* GREEN PAD (Top Right) */}
+              <button
+                onClick={() => handleColorClick("green")}
+                disabled={gameState.status !== "user-turn"}
+                aria-label="Green Pad"
+                className={`relative rounded-tr-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                  activeColor === "green"
+                    ? "bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 border-white shadow-[0_0_60px_#34d399] scale-[0.97] ring-4 ring-white/80 z-20"
+                    : "bg-gradient-to-br from-emerald-900/60 via-emerald-950 to-[#05180d] border-emerald-500/30 hover:border-emerald-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                }`}
+              >
+                <div className="absolute top-3 right-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+              </button>
 
-            {/* Blue Button */}
-            <button
-              onClick={() => handleColorClick("blue")}
-              disabled={gameState.status !== "user-turn"}
-              className={`rounded-3xl border-2 transition-all duration-200 cursor-pointer flex items-center justify-center font-black text-lg ${
-                activeColor === "blue"
-                  ? "bg-blue-500 border-white text-white shadow-[0_0_40px_rgba(59,130,246,0.9)] scale-105 ring-4 ring-white z-10"
-                  : "bg-blue-950/40 border-blue-500/30 text-blue-400 hover:bg-blue-900/50"
-              }`}
-            >
-              BLUE
-            </button>
+              {/* BLUE PAD (Bottom Left) */}
+              <button
+                onClick={() => handleColorClick("blue")}
+                disabled={gameState.status !== "user-turn"}
+                aria-label="Blue Pad"
+                className={`relative rounded-bl-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                  activeColor === "blue"
+                    ? "bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 border-white shadow-[0_0_60px_#60a5fa] scale-[0.97] ring-4 ring-white/80 z-20"
+                    : "bg-gradient-to-br from-blue-900/60 via-blue-950 to-[#050b18] border-blue-500/30 hover:border-blue-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                }`}
+              >
+                <div className="absolute bottom-3 left-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+              </button>
 
-            {/* Yellow Button */}
-            <button
-              onClick={() => handleColorClick("yellow")}
-              disabled={gameState.status !== "user-turn"}
-              className={`rounded-3xl border-2 transition-all duration-200 cursor-pointer flex items-center justify-center font-black text-lg ${
-                activeColor === "yellow"
-                  ? "bg-amber-400 border-white text-slate-950 shadow-[0_0_40px_rgba(245,158,11,0.9)] scale-105 ring-4 ring-white z-10"
-                  : "bg-amber-950/40 border-amber-500/30 text-amber-400 hover:bg-amber-900/50"
-              }`}
-            >
-              YELLOW
-            </button>
+              {/* YELLOW PAD (Bottom Right) */}
+              <button
+                onClick={() => handleColorClick("yellow")}
+                disabled={gameState.status !== "user-turn"}
+                aria-label="Yellow Pad"
+                className={`relative rounded-br-[3rem] border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
+                  activeColor === "yellow"
+                    ? "bg-gradient-to-br from-amber-300 via-amber-400 to-amber-500 border-white shadow-[0_0_60px_#fbbf24] scale-[0.97] ring-4 ring-white/80 z-20"
+                    : "bg-gradient-to-br from-amber-900/60 via-amber-950 to-[#181205] border-amber-500/30 hover:border-amber-400/60 shadow-[inset_0_4px_12px_rgba(255,255,255,0.1)]"
+                }`}
+              >
+                <div className="absolute bottom-3 right-3 w-6 h-6 rounded-full bg-white/10 blur-[2px] pointer-events-none" />
+              </button>
+            </div>
+
+            {/* Center Digital LED Console Hub */}
+            <div className="absolute w-24 h-24 rounded-full bg-gradient-to-b from-[#18181b] to-[#09090b] border-4 border-[#27272a] shadow-2xl flex flex-col items-center justify-center pointer-events-none z-30">
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest">STAGE</span>
+              <span className="text-2xl font-black text-accent-green font-mono">
+                {String(gameState.level).padStart(2, "0")}
+              </span>
+            </div>
           </div>
         </div>
       )}
 
       {gameState.status === "game-over" && (
-        <div className="flex flex-col items-center gap-6 py-8 text-center animate-in zoom-in-95 duration-200">
-          <div className="px-4 py-1.5 rounded-full bg-accent-red/10 text-accent-red border border-accent-red/30 text-xs font-bold">
-            틀렸습니다!
+        <div className="flex flex-col items-center gap-6 py-6 text-center animate-in zoom-in-95 duration-200">
+          <div className="px-4 py-1 rounded-full bg-accent-red/20 text-accent-red border border-accent-red/30 text-xs font-black">
+            게임 종료!
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-4xl font-black text-text-primary">
+            <span className="text-5xl font-black text-white">
               Level {gameState.level - 1}
             </span>
-            <span className="text-xs text-text-muted">달성 등급: {grade}등급</span>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <span className="text-xs text-text-muted">달성 등급:</span>
+              <span className="px-3 py-0.5 rounded-lg bg-brand/20 text-brand-light font-black border border-brand/30">
+                {grade}등급
+              </span>
+            </div>
           </div>
 
           <button
             onClick={startNewGame}
-            className="flex items-center gap-2 px-8 py-3.5 bg-brand text-white font-extrabold rounded-2xl shadow-xl shadow-brand/30 hover:scale-105 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-8 py-3.5 bg-brand text-white font-extrabold rounded-2xl shadow-xl shadow-brand/30 hover:scale-105 transition-all cursor-pointer border border-white/20"
           >
             <RotateCcw className="w-5 h-5" />
-            다시 도전하기
+            <span>다시 도전하기</span>
           </button>
         </div>
       )}
