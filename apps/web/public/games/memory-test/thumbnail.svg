@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <defs>
+    <linearGradient id="mem-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="20" fill="url(#mem-bg)"/>
+  <rect x="20" y="20" width="26" height="26" rx="6" fill="#f43f5e"/>
+  <rect x="54" y="20" width="26" height="26" rx="6" fill="#10b981"/>
+  <rect x="20" y="54" width="26" height="26" rx="6" fill="#3b82f6"/>
+  <rect x="54" y="54" width="26" height="26" rx="6" fill="#f59e0b"/>
+</svg>

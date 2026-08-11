@@ -6,6 +6,7 @@
     "@gamemoa/auth": "workspace:*",
     "@gamemoa/core": "workspace:*",
     "@gamemoa/db": "workspace:*",
+    "@gamemoa/game-memory-test": "workspace:*",
     "@gamemoa/game-reaction-time": "workspace:*",
     "@gamemoa/game-sdk": "workspace:*",
     "@gamemoa/shared": "workspace:*",

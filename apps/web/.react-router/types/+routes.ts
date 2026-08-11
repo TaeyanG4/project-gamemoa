@@ -22,12 +22,15 @@ type Pages = {
       "slug": string;
     };
   };
+  "/ranking": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/games" | "/games/:slug";
+    page: "/" | "/games" | "/games/:slug" | "/ranking";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -41,6 +44,10 @@ type RouteFiles = {
     id: "routes/game-slug";
     page: "/games/:slug";
   };
+  "routes/ranking.tsx": {
+    id: "routes/ranking";
+    page: "/ranking";
+  };
 };
 
 type RouteModules = {
@@ -48,4 +55,5 @@ type RouteModules = {
   "routes/home": typeof import("./app/routes/home.tsx");
   "routes/games": typeof import("./app/routes/games.tsx");
   "routes/game-slug": typeof import("./app/routes/game-slug.tsx");
+  "routes/ranking": typeof import("./app/routes/ranking.tsx");
 };

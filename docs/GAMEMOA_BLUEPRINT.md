@@ -1,9 +1,32 @@
 # GAMEMOA — Architecture & Vibe Coding Blueprint
 
-> 기준일: 2026-08-11  
+> 기준일: 2026-08-12  
 > 목적: 미니게임 모음 사이트 **gamemoa**를 AI 코딩 모델이 일관된 방향으로 구현할 수 있도록 하는 실행 가능한 설계 명세서  
-> 우선순위: **싱글 플레이 게임 모음 → 로그인/기록/랭킹 → 멀티플레이 확장**  
-> 초기 인프라: **Cloudflare Workers 기반**
+> 현재 우선순위: **싱글 플레이 게임 확장 → 로컬 품질/테스트 안정화 → 기록/DB → 로그인/웹호스팅 → 멀티플레이**  
+> 개발 전략: **로컬 우선(local-first)**. Cloudflare Workers는 목표 런타임으로 유지하지만 실제 웹 호스팅/production 배포와 OAuth 로그인은 후순위다.
+
+---
+
+## 현재 구현 상태 — 2026-08-12
+
+`PROGRESS.md`와 `ARCHITECTURE.md`의 **완료 상태**를 기준으로 정리했다. 향후 Phase 순서는 이 Blueprint의 최신 로드맵을 우선한다:
+
+```text
+Phase 0 Repository Foundation       ✅ 완료
+Phase 1 Web Shell / Landing / UI    ✅ 완료
+Phase 2 Game SDK + Reaction Time    ✅ 완료 (Reaction Time unit test 19개 통과)
+다음 우선순위                        ▶ 추가 싱글 플레이 게임 + 로컬 품질 안정화
+```
+
+현재 운영 원칙:
+
+- 기존 Phase 0~2를 다시 scaffold하지 않는다.
+- 현재 저장소의 구현을 읽고 이어서 확장한다.
+- **웹 호스팅/production 배포는 후순위**다.
+- **Google/Discord 로그인도 후순위**다.
+- 사용자 요청 없이 production Cloudflare resource, OAuth secret, realtime infrastructure를 만들지 않는다.
+- Windows에서 발생했던 `esbuild` 상위 디렉터리 접근 문제의 workaround를 새 프로젝트에 자동 복제하지 않는다.
+- 새 Windows 프로젝트는 짧은 SSD 경로(예: `F:\dev\<project>`)를 우선하고, `subst X:` 같은 가상 드라이브는 진단 후 임시 workaround로만 사용한다.
 
 ---
 
@@ -18,16 +41,16 @@
 3. 개별 게임은 `apps/web` 내부 구현을 직접 import하지 않는다.
 4. 공통 계약은 `packages/game-sdk`에 정의한다.
 5. Cloudflare 종속 코드는 adapter/infrastructure 계층에 가둔다.
-6. 인증은 Better Auth를 사용하며 초기에는 **Google + Discord만 노출**한다.
-7. 이메일/비밀번호 로그인은 구현하지 않는다.
+6. 현재 Phase에서는 게임 확장과 로컬 안정화를 우선하며, **로그인/production 배포는 사용자가 명시적으로 요청하기 전까지 구현하지 않는다.**
+7. 인증 Phase에 진입하면 Better Auth를 사용하고 **Google + Discord만 노출**하며 이메일/비밀번호 로그인은 구현하지 않는다.
 8. 사용자 입력, API payload, 게임 score payload는 Zod로 런타임 검증한다.
 9. 멀티플레이 서버 상태를 브라우저를 신뢰해 판정하지 않는다.
-10. DB 스키마 변경은 migration 파일로만 수행한다.
-11. production migration은 backward-compatible한 **expand → deploy → contract** 방식으로 수행한다.
-12. 모든 PR은 lint/typecheck/test/build를 통과해야 한다.
+10. DB Phase에 진입한 뒤 스키마 변경은 migration 파일로만 수행한다.
+11. production migration이 실제로 시작되면 backward-compatible한 **expand → deploy → contract** 방식을 사용한다.
+12. 모든 변경은 적용 가능한 lint/typecheck/test/build를 통과해야 한다.
 13. `main` 직접 push를 금지하고 GitHub branch protection을 사용한다.
 14. production secret은 Git에 저장하지 않는다.
-15. CI/CD 배포 주체는 GitHub Actions 하나로 통일하고 Cloudflare Workers Builds의 자동 production deploy는 끈다.
+15. production 배포 Phase에 진입하면 CI/CD 배포 주체는 GitHub Actions 하나로 통일하고 Cloudflare Workers Builds의 자동 production deploy는 끈다.
 
 ### SHOULD
 
@@ -57,33 +80,31 @@
 
 **gamemoa는 설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼이다.**
 
-## 1.2 1차 목표
+## 1.2 현재 1차 목표 — 로컬 싱글 플레이 제품 완성도
 
-- 랜딩페이지
-- 게임 탐색
-- 싱글 플레이
-- Google 로그인
-- Discord 로그인
-- 최근 플레이
-- 개인 최고 기록
-- 게임별 랭킹
-- 즐겨찾기
-- 기본 프로필
+- 랜딩페이지와 게임 탐색 유지/개선
+- 싱글 플레이 게임 수 확장
+- Reaction Time 포함 각 게임의 완성도 개선
+- 공통 GameShell / Game SDK 재사용성 강화
 - 반응형 웹
-- Cloudflare 배포
-- CI/CD
+- 접근성
+- 오류/로딩/빈 상태
+- 로컬 개발 경험 안정화
+- lint / typecheck / test / build 안정화
 
-## 1.3 2차 목표
+## 1.3 후속 목표 — 서버 기능 / 운영
 
-- 로컬 멀티
-- 온라인 방 생성/참가
-- 초대 링크
-- 실시간 상태 동기화
-- 시즌 랭킹
-- 업적
-- 친구/팔로우
-- 게임 추천
-- 관리자 도구
+순서는 제품 필요에 따라 조정할 수 있지만 기본 우선순위는 다음이다.
+
+1. D1 + Drizzle 기반 기록/점수/랭킹
+2. 최근 플레이 / 개인 최고 기록 / 즐겨찾기
+3. Better Auth 기반 Google + Discord 로그인
+4. 기본 프로필
+5. Cloudflare 웹 호스팅 / staging / production CI/CD
+6. 로컬 멀티
+7. 온라인 방 생성/참가
+8. 초대 링크 / 실시간 상태 동기화
+9. 시즌 랭킹 / 업적 / 친구 / 추천 / 관리자 도구
 
 ## 1.4 비목표(MVP)
 
@@ -103,6 +124,8 @@
 ## 2.1 전체 형태
 
 **Modular Monolith + Game Plugin Architecture + Cloudflare Edge Adapter**
+
+현재는 **로컬 개발 가능한 web app + game packages**를 중심으로 운용한다. Cloudflare Edge Adapter는 목표 아키텍처로 유지하되 production hosting은 후순위다.
 
 초기에는 서비스 수를 늘리지 않는다.
 
@@ -226,6 +249,8 @@ Zustand를 모든 상태의 기본 저장소로 사용하지 않는다.
 
 ## 3.4 데이터
 
+> **현재 상태: 후속 Phase.** 추가 게임/로컬 안정화가 우선이며, 데이터 영속성이 실제 작업 목표가 되기 전에는 스키마를 확장하지 않는다.
+
 - Cloudflare D1
 - Drizzle ORM
 - Drizzle Kit migrations
@@ -245,6 +270,8 @@ Zustand를 모든 상태의 기본 저장소로 사용하지 않는다.
 정적 게임 manifest는 DB가 아니라 코드 registry로 시작한다.
 
 ## 3.5 인증
+
+> **현재 상태: 후순위.** 사용자가 로그인 구현을 명시적으로 요청하기 전에는 OAuth provider 연결, secret 설정, 로그인 UI 확장을 진행하지 않는다.
 
 - Better Auth
 - Google OAuth
@@ -654,6 +681,8 @@ MVP:
 ---
 
 # 8. 인증 설계
+
+> **Deferred:** 이 장은 향후 로그인 Phase용 목표 설계다. 현재 싱글 플레이/로컬 품질 작업에서는 구현하지 않는다.
 
 ## 8.1 provider
 
@@ -1247,6 +1276,8 @@ Turnstile client token만 보고 통과시키지 말고 server-side validation�
 
 # 16. Cloudflare 리소스
 
+> **Deferred 운영 인프라:** 현재는 로컬 개발이 기본이다. 실제 resource 생성/바인딩/production 배포는 사용자가 웹 호스팅 작업을 시작하라고 명시한 뒤 수행한다.
+
 ## MVP
 
 ```text
@@ -1316,6 +1347,8 @@ websocket disconnect
 ---
 
 # 18. CI/CD 설계
+
+> **현재 적용 범위:** CI의 lint/typecheck/test/build 안정화는 계속 유지한다. staging/production deploy, production D1 migration, OAuth smoke, Cloudflare secret 연결은 웹 호스팅 Phase까지 보류한다.
 
 ## 18.1 Git 전략
 
@@ -1739,18 +1772,17 @@ result screen
 
 # 27. 구현 단계
 
-## Phase 0 — Repository foundation
+## Phase 0 — Repository Foundation — ✅ Complete
 
 - pnpm workspace
 - Turborepo
 - TypeScript strict
 - ESLint/Prettier
 - apps/web
-- packages/*
-- CI
-- Cloudflare staging/prod config
+- packages/* skeleton
+- CI baseline
 
-완료 기준:
+검증 기준:
 
 ```text
 pnpm lint
@@ -1759,59 +1791,154 @@ pnpm test
 pnpm build
 ```
 
-전부 성공.
-
-## Phase 1 — Landing + Catalog
+## Phase 1 — Landing + Catalog / Web Shell — ✅ Complete
 
 - design tokens
 - header/footer
 - hero
-- featured
-- game cards
+- featured/game cards
 - `/games`
-- responsive
-- SEO metadata
+- responsive shell
+- 기본 SEO/UI 구조
 
-## Phase 2 — Game SDK + First Game
+## Phase 2 — Game SDK + Reaction Time — ✅ Complete
 
-- game-sdk
+- game-sdk contract
 - registry
 - GameShell
-- reaction-time
-- result model
+- `games/reaction-time`
+- score/result model
+- Reaction Time unit tests 19개 통과
 
-## Phase 3 — Auth
+## Phase 3 — Additional Single-player Games — ▶ NEXT
 
-- Better Auth
-- D1
-- Google
-- Discord
-- profile
+우선 구현 후보:
 
-## Phase 4 — Score
+1. Memory Test / Memory Card
+2. Typing Test / Typing Speed
+3. Number Guess / Up Down
+4. 이후 2048-like / Simple Snake
 
+규칙:
+
+- 기존 Game SDK / GameShell을 먼저 재사용한다.
+- 게임 하나마다 독립 package + manifest + rules + score strategy + tests를 갖는다.
+- DB/auth/hosting을 이 Phase에 끌어오지 않는다.
+- 첫 목표는 게임 수와 플러그인 확장성 검증이다.
+
+## Phase 4 — Local Product Polish & Stability
+
+- 게임 공통 loading/error/empty 상태
+- keyboard / focus / reduced motion
+- 모바일 입력/레이아웃
+- 결과 화면 / retry / share UX
+- catalog 검색/필터 개선
+- dev/build/test 안정화
+- Windows 개발환경 재현성 정리
+- 필요 시 localStorage 기반 임시 로컬 기록은 허용하되 server persistence 계약과 혼동하지 않는다.
+
+## Phase 5 — Score / Persistence Backend — Planned
+
+- Cloudflare D1 + Drizzle
 - game session
 - result validation
 - personal best
 - leaderboard
 - history
-
-## Phase 5 — Product polish
-
 - favorites
-- loading skeleton
-- error states
-- share
-- accessibility
-- observability
 
-## Phase 6 — Multiplayer foundation
+이 Phase는 로컬 D1 개발로 시작할 수 있으며 production hosting을 요구하지 않는다.
+
+## Phase 6 — Authentication — Deferred
+
+- Better Auth
+- Google
+- Discord
+- profile
+
+**사용자가 로그인 작업을 명시적으로 시작하기 전까지 구현하지 않는다.**
+
+## Phase 7 — Web Hosting / Release Pipeline — Deferred
+
+- Cloudflare staging / production environment
+- Worker deploy
+- production D1 binding/migration
+- GitHub Actions CD
+- stable staging OAuth smoke
+- production secret setup
+
+**사용자가 웹 호스팅/배포를 시작하기 전까지 실제 production resource를 만들지 않는다.**
+
+## Phase 8 — Multiplayer Foundation — Future
 
 - apps/realtime
 - Durable Object Room
 - WebSocket Hibernation
 - versioned protocol
 - reconnect
+
+---
+
+# 27.1 Windows / Vibe Coding Stability Rules
+
+## Workspace path
+
+새 Windows 프로젝트는 가능하면 **SSD의 짧은 영문 경로**에 둔다.
+
+권장 예:
+
+```text
+F:\dev\gamemoa
+F:\dev\project-name
+```
+
+피한다:
+
+```text
+Desktop / Documents / Downloads
+OneDrive 동기화 폴더
+과도하게 깊은 경로
+특수문자가 많은 경로
+```
+
+현재 저장소에서 Windows `esbuild` 상위 디렉터리 접근 문제가 해결되었다고 해서 그 workaround를 모든 새 프로젝트에 복제하지 않는다.
+
+- `subst X:`: 기본 해결책 금지, 진단 후 임시 사용만 허용
+- `fixPath`: 범용 코드로 확산 금지
+- `node-linker=hoisted`: 실제 pnpm 호환 문제가 확인될 때만 프로젝트 단위로 사용
+- 임시 mapping / workaround는 제거 절차와 이유를 문서화
+
+## 동일 오류 반복 제한
+
+```text
+동일 오류 1회: 원인 가설 수립
+동일 오류 2회: 동일 명령 반복 중단 + 환경/config 조사
+동일 오류 3회: 새로운 가설/증거 없이는 재시도 금지
+```
+
+조사 체크리스트:
+
+```text
+cwd
+workspace root
+Node version
+pnpm version
+esbuild / Vite / framework version
+pnpm-workspace.yaml
+root tsconfig
+vite/react-router/wrangler config
+Windows file permission / symlink / drive mapping
+```
+
+`Goal Verification` 또는 build/test를 동일한 근거 없이 반복하는 것을 완료 노력으로 간주하지 않는다.
+
+## Long-running task cleanup
+
+`pnpm dev`, Vite dev server, watch mode 등은 종료되지 않는 것이 정상이다.
+
+- 검증 목적으로 시작한 서버는 검증 후 종료한다.
+- 사용자가 계속 서버를 쓰겠다고 한 경우에만 background task로 남긴다.
+- 작업 완료 보고에 실행 중 task가 남아 있는지 명시한다.
 
 ---
 
@@ -2015,7 +2142,7 @@ client version
 
 # 34. 공식 문서 참고 링크
 
-기술 선택은 2026-08-11 기준으로 아래 공식 문서를 근거로 한다.
+기술 선택은 2026-08-12 기준으로 아래 공식 문서를 참고한다.
 
 - Cloudflare React Router guide  
   https://developers.cloudflare.com/workers/framework-guides/web-apps/react-router/
@@ -2063,48 +2190,48 @@ client version
 
 # 35. 다음 구현 Prompt
 
-아래 프롬프트를 새 코딩 세션의 첫 요청으로 사용한다.
+현재 다음 구현 기본 프롬프트는 Phase 3 기준으로 사용한다.
 
 ```text
-이 저장소는 gamemoa 미니게임 플랫폼이다.
+이 저장소는 GAMEMOA 미니게임 플랫폼이다.
 
-먼저 루트의 GAMEMOA_BLUEPRINT.md와 AGENTS.md를 끝까지 읽고,
-두 문서를 구현 규칙으로 취급해.
+먼저 루트의 GAMEMOA_BLUEPRINT.md, AGENTS.md, PROGRESS.md, ARCHITECTURE.md를 끝까지 읽고
+현재 구현 상태를 기준으로 작업해.
+
+중요:
+- Phase 0 Repository Foundation은 이미 완료됐다.
+- Phase 1 Web Shell/Landing도 이미 완료됐다.
+- Phase 2 Game SDK + Reaction Time도 이미 완료됐다.
+- 기존 파일을 다시 scaffold하거나 처음부터 재작성하지 마.
+- 웹 호스팅/production Cloudflare 배포는 아직 하지 마.
+- Google/Discord 로그인도 아직 구현하지 마.
+- production D1/resource/secret을 만들지 마.
 
 이번 작업 목표:
-Phase 0 Repository Foundation만 구축한다.
+Phase 3의 다음 싱글 플레이 게임 1개를 기존 아키텍처에 맞게 vertical slice로 구현한다.
 
-요구사항:
-- pnpm workspace + Turborepo
-- TypeScript strict
-- React Router Framework Mode
-- Cloudflare Vite Plugin
-- apps/web
-- packages/core, shared, ui, game-sdk, auth, db skeleton
-- games/reaction-time skeleton
-- ESLint + Prettier
-- Vitest
-- Cloudflare Workers test integration을 적용 가능한 구조
-- GitHub Actions ci.yml
-- staging/production을 고려한 wrangler config skeleton
-- 실제 OAuth secret이나 실제 Cloudflare resource ID는 넣지 말고 placeholder를 사용
-- 아직 로그인 기능, DB schema 구현, 실제 게임 로직은 만들지 말 것
+작업 순서:
+1. 현재 game-sdk / GameShell / registry / reaction-time 구조 분석
+2. 변경 범위 요약
+3. 새 games/<slug> package 생성
+4. manifest / rules / score strategy / Game component 구현
+5. lazy registry 등록
+6. unit/render smoke test 추가
+7. 모바일/키보드/오류 상태 확인
+8. lint/typecheck/test/build 실행
 
-완료 조건:
-pnpm install
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm build
+반복 오류 규칙:
+- 같은 root cause 오류를 새로운 가설 없이 2회 이상 반복 실행하지 마.
+- 두 번째 동일 실패부터 환경/경로/config를 조사해.
+- pnpm dev 같은 장기 실행 서버는 검증 후 종료해.
 
-가 모두 성공해야 한다.
-
-작업 후:
-1. 생성/변경 파일 요약
-2. 아키텍처 경계 준수 여부
-3. 남은 placeholder
-4. 실행 명령
-을 보고해.
+완료 후 보고:
+1. 생성/변경 파일
+2. 주요 구현 결정
+3. 실행한 검증과 결과
+4. 남은 TODO
+5. architecture boundary 영향
+6. 실행 중으로 남아 있는 task 여부
 ```
 
 ---
