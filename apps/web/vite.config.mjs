@@ -7,12 +7,11 @@ export default defineConfig({
   server: {
     fs: {
       strict: false,
-      allow: ["."],
     },
   },
   plugins: [
     tailwindcss(),
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
     reactRouter(),
+    cloudflare({ viteEnvironment: { name: "ssr" } }),
   ],
 });
