@@ -1,3 +1,5 @@
+import { getGoogleOAuthUrl, getDiscordOAuthUrl } from "./oauth.js";
+
 export type AuthProvider = "google" | "discord";
 
 export interface AuthUser {
@@ -28,6 +30,35 @@ export function setStoredUser(user: AuthUser | null): void {
   } else {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
   }
+}
+
+export function getEnvClientId(provider: AuthProvider): string | null {
+  if (typeof window === "undefined") return null;
+
+  // Read from Vite import.meta.env or localStorage override
+  const overrideKey = `gamemoa_override_${provider}_client_id`;
+  const override = localStorage.getItem(overrideKey);
+  if (override && override.trim()) return override.trim();
+
+  if (provider === "google") {
+    return (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ?? null;
+  } else {
+    return (import.meta as any).env?.VITE_DISCORD_CLIENT_ID ?? null;
+  }
+}
+
+export function setEnvClientIdOverride(provider: AuthProvider, clientId: string): void {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  localStorage.setItem(`gamemoa_override_${provider}_client_id`, clientId.trim());
+}
+
+export function startRealOAuthFlow(provider: AuthProvider): boolean {
+  const clientId = getEnvClientId(provider);
+  if (!clientId) return false;
+
+  const url = provider === "google" ? getGoogleOAuthUrl(clientId) : getDiscordOAuthUrl(clientId);
+  window.location.href = url;
+  return true;
 }
 
 export const MOCK_GOOGLE_USER: AuthUser = {

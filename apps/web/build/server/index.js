@@ -1,4 +1,4 @@
-import { a, s, b, c, e, f, i, p, d, r, g, h } from "./assets/server-build-C6RX9bx5.js";
+import { a, s, b, c, e, f, i, p, d, r, g, h } from "./assets/server-build-BILu4xLA.js";
 import "react/jsx-runtime";
 import "react-router";
 import "react-dom/server";
