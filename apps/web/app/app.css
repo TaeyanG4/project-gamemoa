@@ -4,23 +4,46 @@
   --color-brand: #6366f1;
   --color-brand-light: #818cf8;
   --color-brand-dark: #4f46e5;
-  --color-surface: #0f0f14;
-  --color-surface-raised: #1a1a24;
-  --color-surface-overlay: #252532;
-  --color-text-primary: #f0f0f5;
-  --color-text-secondary: #9ca3af;
-  --color-text-muted: #6b7280;
-  --color-accent-green: #22c55e;
-  --color-accent-red: #ef4444;
-  --color-accent-yellow: #eab308;
+  --color-surface: #0b0d14;
+  --color-surface-raised: #141a26;
+  --color-surface-overlay: #1e2638;
+  --color-surface-sidebar: #0f131f;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-accent-green: #10b981;
+  --color-accent-red: #f43f5e;
+  --color-accent-yellow: #f59e0b;
   --color-accent-blue: #3b82f6;
-  --color-border: #2a2a3a;
+  --color-accent-purple: #a855f7;
+  --color-border: #1e293b;
+  --color-border-subtle: #182030;
 }
 
 body {
   background-color: var(--color-surface);
   color: var(--color-text-primary);
   font-family: "Inter", system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar for Sleek Gaming Vibe */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-overlay);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-brand);
 }
 
 @media (prefers-reduced-motion: reduce) {

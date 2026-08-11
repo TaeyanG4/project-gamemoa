@@ -1,161 +1,139 @@
-import { Link } from "react-router";
-import { MonitorSmartphone, Timer, Trophy, ArrowRight, Play } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Link, useSearchParams } from "react-router";
+import { MonitorSmartphone, Timer, Trophy, ArrowRight, Gamepad2, Sparkles } from "lucide-react";
 import { gameManifests } from "../features/catalog/registry";
 import { GameCard } from "../components/ui/GameCard";
+import { HeroSpotlight } from "../components/ui/HeroSpotlight";
+import { CategoryChips } from "../components/ui/CategoryChips";
+
+export function meta() {
+  return [
+    { title: "gamemoa — 심심할 틈 없이, 게임을 한곳에" },
+    { name: "description", content: "설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼" },
+  ];
+}
 
 export default function Home() {
-  const featuredGames = gameManifests.slice(0, 3);
+  const [searchParams] = useSearchParams();
+  const initialCategory = searchParams.get("category") || "all";
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+
+  const featuredGame = gameManifests[0];
+
+  const filteredGames = useMemo(() => {
+    if (selectedCategory === "all") return gameManifests;
+    if (selectedCategory === "popular") return gameManifests;
+    if (selectedCategory === "reaction") {
+      return gameManifests.filter(g => g.modes.includes("single") || g.slug.includes("reaction"));
+    }
+    if (selectedCategory === "brain") {
+      return gameManifests.filter(g => g.modes.includes("single"));
+    }
+    if (selectedCategory === "arcade") {
+      return gameManifests;
+    }
+    return gameManifests;
+  }, [selectedCategory]);
 
   return (
-    <div className="flex flex-col w-full">
-      {/* Hero Section */}
-      <section className="relative w-full pt-20 pb-32 overflow-hidden flex flex-col items-center justify-center min-h-[85vh]">
-        <div className="absolute inset-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--color-surface-raised)_0%,_var(--color-surface)_100%)] -z-10" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-brand/20 blur-[120px] rounded-full mix-blend-screen pointer-events-none -z-10" />
-        
-        <div className="container mx-auto px-4 flex flex-col items-center text-center z-10 max-w-4xl">
-          <span className="px-4 py-1.5 rounded-full bg-brand/10 text-brand text-sm font-bold tracking-widest mb-8 border border-brand/20 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
-            PLAY. SCORE. AGAIN.
-          </span>
-          
-          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 whitespace-pre-line leading-[1.1]">
-            <span className="text-text-primary">심심할 틈 없이,</span>
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-brand">
-              게임을 한곳에.
+    <div className="flex flex-col w-full px-4 md:px-8 py-6 gap-10 max-w-7xl mx-auto">
+      {/* MiniGame.com Style Hero Spotlight Banner */}
+      {featuredGame && (
+        <section className="w-full">
+          <HeroSpotlight game={featuredGame} />
+        </section>
+      )}
+
+      {/* Category Chips Bar & Catalog Grid Section (CrazyGames High-Density Style) */}
+      <section className="flex flex-col gap-6 w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
+          <div className="flex items-center gap-2.5">
+            <Gamepad2 className="w-6 h-6 text-brand" />
+            <h2 className="text-2xl font-black text-text-primary tracking-tight">미니게임 라인업</h2>
+            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
+              {filteredGames.length}개
             </span>
-          </h1>
+          </div>
+
+          {/* Category Pills Bar */}
+          <div className="w-full sm:w-auto">
+            <CategoryChips 
+              selectedCategory={selectedCategory} 
+              onSelectCategory={setSelectedCategory} 
+            />
+          </div>
+        </div>
+
+        {/* High Density Game Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+          {filteredGames.map((game) => (
+            <GameCard key={game.slug} {...game} />
+          ))}
+
+          {filteredGames.length === 0 && (
+            <div className="col-span-full py-16 text-center text-text-muted bg-surface-raised rounded-3xl border border-border border-dashed">
+              해당 카테고리에 준비된 게임이 없습니다.
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Why Gamemoa Grid (Feature Highlights) */}
+      <section className="py-8 w-full border-t border-border/40">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-brand/40 transition-all group shadow-md">
+            <div className="p-3.5 rounded-xl bg-brand/10 text-brand mb-4 group-hover:scale-110 transition-transform">
+              <MonitorSmartphone className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold mb-2 text-text-primary">1초 무설치 시작</h3>
+            <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
+              웹 브라우저만 열면 즉시 시작됩니다. 로딩도, 앱 다운로드도 없습니다.
+            </p>
+          </div>
           
-          <p className="text-lg md:text-xl text-text-secondary mb-12 max-w-2xl leading-relaxed whitespace-pre-line">
-            설치 없이 바로 즐기는 가벼운 미니게임.
-            {"\n"}짧게 한 판, 기록을 깨고, 다시 도전하세요.
-          </p>
+          <div className="p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-green/40 transition-all group shadow-md">
+            <div className="p-3.5 rounded-xl bg-accent-green/10 text-accent-green mb-4 group-hover:scale-110 transition-transform">
+              <Timer className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold mb-2 text-text-primary">초단위 숏폼 게임</h3>
+            <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
+              30초 내외의 빠른 라운드로 부담 없이 짧게 즐길 수 있는 게임들로 구성되어 있습니다.
+            </p>
+          </div>
           
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Link 
-              to="/games" 
-              className="flex items-center justify-center gap-2 px-8 py-4 bg-brand text-white rounded-full font-bold text-lg hover:bg-brand-dark hover:scale-105 transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] cursor-pointer"
-            >
-              <Play className="w-5 h-5 fill-current" />
-              지금 바로 플레이
-            </Link>
-            <Link 
-              to="/games" 
-              className="flex items-center justify-center gap-2 px-8 py-4 bg-surface-raised text-text-primary border border-border rounded-full font-bold text-lg hover:bg-surface-overlay transition-colors cursor-pointer"
-            >
-              게임 둘러보기
-            </Link>
+          <div className="p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-yellow/40 transition-all group shadow-md">
+            <div className="p-3.5 rounded-xl bg-accent-yellow/10 text-accent-yellow mb-4 group-hover:scale-110 transition-transform">
+              <Trophy className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold mb-2 text-text-primary">정밀 기록 측정</h3>
+            <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
+              밀리초(ms) 단위의 최고 기록을 측정하고 자신의 신기록에 계속 도전해 보세요.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Featured Games Section */}
-      <section className="py-24 bg-surface-raised w-full">
-        <div className="container mx-auto px-4 max-w-6xl">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
-            <div>
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">지금 뭐 할까?</h2>
-              <p className="text-text-secondary text-lg">고민할 필요 없이 바로 시작할 수 있는 게임들.</p>
-            </div>
-            <Link to="/games" className="group flex items-center gap-2 text-brand font-semibold hover:text-brand-light transition-colors">
-              전체보기
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
+      {/* Multiplayer Teaser Banner */}
+      <section className="w-full rounded-3xl bg-gradient-to-r from-surface-raised via-surface-overlay to-surface border border-border p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col gap-2 z-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-blue/10 border border-accent-blue/30 text-accent-blue font-extrabold text-xs">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>COMMUNITY & MULTIPLAYER</span>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featuredGames.map(game => (
-              <GameCard key={game.slug} {...game} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Why Gamemoa Section */}
-      <section className="py-32 bg-surface relative overflow-hidden w-full">
-        <div className="container mx-auto px-4 max-w-6xl relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="p-8 rounded-3xl bg-surface-overlay/50 border border-border/50 backdrop-blur-sm flex flex-col items-start hover:border-brand/30 transition-colors group">
-              <div className="p-4 rounded-2xl bg-brand/10 text-brand mb-6 group-hover:scale-110 transition-transform">
-                <MonitorSmartphone className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">설치 없이</h3>
-              <p className="text-text-secondary leading-relaxed">
-                브라우저만 열면 끝. 다운로드도 업데이트도 필요 없어요. 언제 어디서든 바로 시작하세요.
-              </p>
-            </div>
-            
-            <div className="p-8 rounded-3xl bg-surface-overlay/50 border border-border/50 backdrop-blur-sm flex flex-col items-start hover:border-accent-green/30 transition-colors group">
-              <div className="p-4 rounded-2xl bg-accent-green/10 text-accent-green mb-6 group-hover:scale-110 transition-transform">
-                <Timer className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">짧고 가볍게</h3>
-              <p className="text-text-secondary leading-relaxed">
-                1분이든 10분이든, 원할 때 한 판만 즐겨도 충분해요. 바쁜 일상 속 작은 휴식을 즐기세요.
-              </p>
-            </div>
-            
-            <div className="p-8 rounded-3xl bg-surface-overlay/50 border border-border/50 backdrop-blur-sm flex flex-col items-start hover:border-accent-yellow/30 transition-colors group">
-              <div className="p-4 rounded-2xl bg-accent-yellow/10 text-accent-yellow mb-6 group-hover:scale-110 transition-transform">
-                <Trophy className="w-8 h-8" />
-              </div>
-              <h3 className="text-xl font-bold mb-3">기록에 도전</h3>
-              <p className="text-text-secondary leading-relaxed">
-                로그인하면 최고 기록과 플레이 이력을 남길 수 있어요. 친구들과 순위를 경쟁해보세요.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Multiplayer Teaser */}
-      <section className="py-24 bg-surface w-full relative">
-        <div className="container mx-auto px-4 max-w-4xl text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-blue/10 border border-accent-blue/20 text-accent-blue font-bold text-sm mb-8">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-blue opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-accent-blue"></span>
-            </span>
-            COMING SOON
-          </div>
-          
-          <h2 className="text-4xl md:text-5xl font-bold mb-6 whitespace-pre-line leading-tight">
-            혼자도 좋지만,{"\n"}같이 하면 더 재밌으니까.
-          </h2>
-          <p className="text-xl text-text-secondary">
-            친구와 바로 입장할 수 있는 온라인 멀티게임도 준비하고 있습니다.
+          <h3 className="text-2xl md:text-3xl font-black text-text-primary">
+            실시간 랭킹 & 멀티플레이어 업데이트 예정
+          </h3>
+          <p className="text-sm text-text-secondary">
+            친구와 링크 하나로 접속해 함께 실시간 대결을 펼칠 수 있는 멀티 모드가 곧 출시됩니다.
           </p>
         </div>
-      </section>
 
-      {/* Login CTA Section */}
-      <section className="py-24 bg-surface-raised w-full">
-        <div className="container mx-auto px-4 max-w-4xl text-center">
-          <div className="bg-surface p-12 rounded-[3rem] border border-border/80 shadow-2xl relative overflow-hidden">
-            <div className="absolute -top-40 -right-40 w-80 h-80 bg-brand/10 blur-[100px] rounded-full" />
-            <div className="relative z-10">
-              <h2 className="text-3xl md:text-4xl font-bold mb-4">오늘의 기록을 남겨볼까요?</h2>
-              <p className="text-text-secondary text-lg mb-10 max-w-xl mx-auto">
-                Google 또는 Discord로 로그인하고 최고 기록과 즐겨찾기를 안전하게 저장하세요.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <button 
-                  disabled 
-                  className="px-8 py-4 bg-white text-black rounded-full font-bold text-lg opacity-50 cursor-not-allowed hover:bg-gray-100 transition-colors"
-                >
-                  Google로 계속하기
-                </button>
-                <button 
-                  disabled 
-                  className="px-8 py-4 bg-[#5865F2] text-white rounded-full font-bold text-lg opacity-50 cursor-not-allowed hover:bg-[#4752C4] transition-colors"
-                >
-                  Discord로 계속하기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Link
+          to="/games"
+          className="z-10 shrink-0 px-6 py-3 bg-surface-raised border border-border hover:border-brand/40 text-text-primary font-bold text-sm rounded-xl transition-all cursor-pointer"
+        >
+          게임 미리보기
+        </Link>
       </section>
     </div>
   );

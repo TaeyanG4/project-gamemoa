@@ -1,8 +1,8 @@
-import { jsx, jsxs } from "react/jsx-runtime";
-import { ServerRouter, Link, UNSAFE_withComponentProps, Meta, Links, Outlet, ScrollRestoration, Scripts, useParams, useNavigate } from "react-router";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
+import { ServerRouter, useNavigate, Link, useLocation, UNSAFE_withComponentProps, Meta, Links, Outlet, ScrollRestoration, Scripts, useSearchParams, useParams } from "react-router";
 import { renderToReadableStream } from "react-dom/server";
-import { Gamepad2, Search, X, Menu, Clock, Play, ArrowRight, MonitorSmartphone, Timer, Trophy, AlertCircle, ArrowLeft } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
+import { Menu, Gamepad2, Search, Command, Bookmark, User, Flame, Sparkles, Zap, Trophy, Compass, X, Play, Clock, Brain, MonitorSmartphone, Timer, AlertCircle, ArrowLeft } from "lucide-react";
 async function handleRequest(request, responseStatusCode, responseHeaders, routerContext, _loadContext) {
   const body = await renderToReadableStream(
     /* @__PURE__ */ jsx(ServerRouter, { context: routerContext, url: request.url }),
@@ -24,83 +24,196 @@ const entryServer = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineP
   __proto__: null,
   default: handleRequest
 }, Symbol.toStringTag, { value: "Module" }));
-function Header() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  return /* @__PURE__ */ jsxs("header", { className: "sticky top-0 z-50 w-full backdrop-blur-md bg-surface/80 border-b border-border/50 transition-all", children: [
-    /* @__PURE__ */ jsxs("div", { className: "container mx-auto px-4 h-16 flex items-center justify-between", children: [
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-8", children: [
+function Header({ onToggleMobileSidebar }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/games?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+  return /* @__PURE__ */ jsx("header", { className: "sticky top-0 z-50 w-full backdrop-blur-xl bg-surface/90 border-b border-border/80 transition-all select-none", children: /* @__PURE__ */ jsxs("div", { className: "w-full px-4 h-16 flex items-center justify-between gap-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3", children: [
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          className: "lg:hidden p-2 rounded-xl text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors cursor-pointer",
+          onClick: onToggleMobileSidebar,
+          "aria-label": "메뉴 열기",
+          children: /* @__PURE__ */ jsx(Menu, { className: "w-6 h-6" })
+        }
+      ),
+      /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2.5 group", children: [
+        /* @__PURE__ */ jsx("div", { className: "p-2 rounded-xl bg-gradient-to-tr from-brand to-accent-purple shadow-md shadow-brand/20 group-hover:scale-105 transition-transform duration-200", children: /* @__PURE__ */ jsx(Gamepad2, { className: "w-5 h-5 text-white" }) }),
+        /* @__PURE__ */ jsxs("span", { className: "font-extrabold text-xl tracking-tight text-text-primary", children: [
+          "game",
+          /* @__PURE__ */ jsx("span", { className: "text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-accent-purple", children: "moa" })
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("form", { onSubmit: handleSearchSubmit, className: "flex-1 max-w-md hidden sm:flex items-center relative", children: [
+      /* @__PURE__ */ jsx(Search, { className: "w-4 h-4 text-text-muted absolute left-3.5 pointer-events-none" }),
+      /* @__PURE__ */ jsx(
+        "input",
+        {
+          type: "text",
+          value: searchQuery,
+          onChange: (e) => setSearchQuery(e.target.value),
+          placeholder: "게임명, 태그 또는 카테고리 검색...",
+          className: "w-full bg-surface-raised text-text-primary placeholder:text-text-muted text-sm rounded-full pl-10 pr-12 py-2 border border-border/80 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all shadow-inner"
+        }
+      ),
+      /* @__PURE__ */ jsxs("div", { className: "absolute right-3 flex items-center gap-1 text-[10px] font-bold text-text-muted px-1.5 py-0.5 rounded bg-surface border border-border pointer-events-none", children: [
+        /* @__PURE__ */ jsx(Command, { className: "w-3 h-3" }),
+        /* @__PURE__ */ jsx("span", { children: "K" })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2.5", children: [
+      /* @__PURE__ */ jsx(
+        Link,
+        {
+          to: "/games?category=favorites",
+          className: "p-2.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors relative cursor-pointer",
+          title: "즐겨찾기",
+          children: /* @__PURE__ */ jsx(Bookmark, { className: "w-5 h-5" })
+        }
+      ),
+      /* @__PURE__ */ jsxs("button", { className: "flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-brand to-brand-dark rounded-full hover:shadow-lg hover:shadow-brand/30 hover:scale-105 transition-all cursor-pointer", children: [
+        /* @__PURE__ */ jsx(User, { className: "w-4 h-4" }),
+        /* @__PURE__ */ jsx("span", { children: "로그인" })
+      ] })
+    ] })
+  ] }) });
+}
+function Sidebar({ isMobileOpen, onMobileClose }) {
+  const location = useLocation();
+  const currentPath = location.pathname;
+  const navItems = [
+    { label: "홈", path: "/", icon: Flame, badge: "HOT" },
+    { label: "전체 게임", path: "/games", icon: Gamepad2 },
+    { label: "인기 게임", path: "/games?category=popular", icon: Sparkles },
+    { label: "순발력 & 두뇌", path: "/games?category=reaction", icon: Zap, badge: "NEW" },
+    { label: "랭킹 & 기록", path: "/ranking", icon: Trophy }
+  ];
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx("aside", { className: "hidden lg:flex flex-col w-16 hover:w-56 transition-all duration-300 ease-in-out bg-surface-sidebar border-r border-border h-[calc(100vh-4rem)] sticky top-16 z-40 group shadow-2xl overflow-hidden shrink-0 select-none", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-col justify-between h-full p-2", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-1.5", children: [
+        /* @__PURE__ */ jsx("div", { className: "px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap", children: "탐색 메뉴" }),
+        navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPath === item.path || item.path !== "/" && currentPath.startsWith(item.path);
+          return /* @__PURE__ */ jsxs(
+            Link,
+            {
+              to: item.path,
+              className: `flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition-all duration-200 group/btn relative ${isActive ? "bg-brand text-white font-bold shadow-lg shadow-brand/25" : "text-text-secondary hover:text-text-primary hover:bg-surface-raised"}`,
+              children: [
+                /* @__PURE__ */ jsx(Icon, { className: `w-5 h-5 shrink-0 transition-transform group-hover/btn:scale-110 ${isActive ? "text-white" : "text-brand-light"}` }),
+                /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap overflow-hidden", children: item.label }),
+                item.badge && /* @__PURE__ */ jsx("span", { className: "ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-accent-red text-white uppercase tracking-wider", children: item.badge })
+              ]
+            },
+            item.label
+          );
+        })
+      ] }),
+      /* @__PURE__ */ jsx("div", { className: "p-2 border-t border-border/50 flex flex-col gap-2", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 px-2 py-1.5 text-xs text-text-muted opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap", children: [
+        /* @__PURE__ */ jsx(Compass, { className: "w-4 h-4 text-brand-light" }),
+        /* @__PURE__ */ jsx("span", { children: "웹 게임 100% 무설치" })
+      ] }) })
+    ] }) }),
+    isMobileOpen && /* @__PURE__ */ jsxs("div", { className: "lg:hidden fixed inset-0 z-50 flex", children: [
+      /* @__PURE__ */ jsx("div", { className: "fixed inset-0 bg-black/70 backdrop-blur-sm", onClick: onMobileClose }),
+      /* @__PURE__ */ jsxs("div", { className: "relative flex flex-col w-72 max-w-[80vw] bg-surface-sidebar border-r border-border h-full p-4 z-10 shadow-2xl animate-in slide-in-from-left duration-200", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between pb-4 mb-4 border-b border-border", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+            /* @__PURE__ */ jsx(Gamepad2, { className: "w-6 h-6 text-brand" }),
+            /* @__PURE__ */ jsx("span", { className: "font-bold text-lg text-text-primary", children: "메뉴" })
+          ] }),
+          /* @__PURE__ */ jsx("button", { onClick: onMobileClose, className: "p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised", children: /* @__PURE__ */ jsx(X, { className: "w-5 h-5" }) })
+        ] }),
+        /* @__PURE__ */ jsx("nav", { className: "flex flex-col gap-2", children: navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPath === item.path;
+          return /* @__PURE__ */ jsxs(
+            Link,
+            {
+              to: item.path,
+              onClick: onMobileClose,
+              className: `flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${isActive ? "bg-brand text-white font-bold" : "text-text-secondary hover:text-text-primary hover:bg-surface-raised"}`,
+              children: [
+                /* @__PURE__ */ jsx(Icon, { className: "w-5 h-5" }),
+                /* @__PURE__ */ jsx("span", { className: "text-base font-medium", children: item.label }),
+                item.badge && /* @__PURE__ */ jsx("span", { className: "ml-auto text-[10px] font-extrabold px-2 py-0.5 rounded bg-accent-red text-white", children: item.badge })
+              ]
+            },
+            item.label
+          );
+        }) })
+      ] })
+    ] })
+  ] });
+}
+function Footer() {
+  return /* @__PURE__ */ jsxs("footer", { className: "w-full border-t border-border bg-surface-sidebar mt-auto select-none", children: [
+    /* @__PURE__ */ jsx("div", { className: "w-full border-b border-border/50 bg-surface-raised/40 py-12 px-6", children: /* @__PURE__ */ jsxs("div", { className: "max-w-6xl mx-auto flex flex-col gap-6", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-brand font-extrabold text-lg", children: [
+        /* @__PURE__ */ jsx(Sparkles, { className: "w-5 h-5" }),
+        /* @__PURE__ */ jsx("h3", { children: "빠르고 재미있는 웹 미니게임 모음 플랫폼, gamemoa!" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-8 text-xs md:text-sm text-text-secondary leading-relaxed", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-3", children: [
+          /* @__PURE__ */ jsx("h4", { className: "font-bold text-text-primary text-base", children: "다운로드 없이 1초만에 시작하는 미니게임" }),
+          /* @__PURE__ */ jsx("p", { children: "gamemoa는 별도의 회원가입이나 앱 설치 없이 브라우저에서 즉시 실행되는 웹 미니게임 라이브러리입니다. 바쁜 일상 속 점심시간이나 쉬는 시간 동안 순발력 테스트, 두뇌 회전 게임, 아케이드 게임을 부담 없이 즐겨보세요." })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-3", children: [
+          /* @__PURE__ */ jsx("h4", { className: "font-bold text-text-primary text-base", children: "공정한 기록 도전과 순위 경쟁" }),
+          /* @__PURE__ */ jsx("p", { children: "순발력 측정, 반응속도 테스트 등 유저의 정밀한 타이밍과 반응시간을 밀리초(ms) 단위로 측정합니다. 친구들과 기록을 비교하고 최고의 랭커가 되기 위해 계속 도전해 보세요!" })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2 pt-4 border-t border-border/30", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs font-bold text-text-muted mr-2", children: "인기 태그:" }),
+        ["#반응속도테스트", "#무설치미니게임", "#순발력게임", "#두뇌회전", "#웹게임모음", "#무료게임"].map((tag) => /* @__PURE__ */ jsx("span", { className: "text-xs font-medium px-2.5 py-1 rounded-full bg-surface border border-border/80 text-text-secondary hover:text-text-primary hover:border-brand/40 transition-colors", children: tag }, tag))
+      ] })
+    ] }) }),
+    /* @__PURE__ */ jsxs("div", { className: "max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-6", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center md:items-start gap-2", children: [
         /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2 group", children: [
-          /* @__PURE__ */ jsx(Gamepad2, { className: "w-6 h-6 text-brand transition-transform group-hover:-translate-y-1" }),
-          /* @__PURE__ */ jsxs("span", { className: "font-bold text-xl tracking-tight", children: [
+          /* @__PURE__ */ jsx(Gamepad2, { className: "w-5 h-5 text-brand" }),
+          /* @__PURE__ */ jsxs("span", { className: "font-bold text-lg tracking-tight text-text-primary", children: [
             "game",
             /* @__PURE__ */ jsx("span", { className: "text-brand", children: "moa" })
           ] })
         ] }),
-        /* @__PURE__ */ jsxs("nav", { className: "hidden md:flex items-center gap-6", children: [
-          /* @__PURE__ */ jsx(Link, { to: "/games", className: "text-sm font-medium text-text-secondary hover:text-text-primary transition-colors", children: "게임" }),
-          /* @__PURE__ */ jsx(Link, { to: "/ranking", className: "text-sm font-medium text-text-secondary hover:text-text-primary transition-colors", children: "랭킹" })
+        /* @__PURE__ */ jsxs("p", { className: "text-xs text-text-muted", children: [
+          "© ",
+          (/* @__PURE__ */ new Date()).getFullYear(),
+          " gamemoa. All rights reserved. Designed for speed & fun."
         ] })
       ] }),
-      /* @__PURE__ */ jsxs("div", { className: "hidden md:flex items-center gap-4", children: [
-        /* @__PURE__ */ jsx("button", { className: "p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors cursor-pointer", children: /* @__PURE__ */ jsx(Search, { className: "w-5 h-5" }) }),
-        /* @__PURE__ */ jsx("button", { className: "px-4 py-2 text-sm font-semibold text-brand border border-brand/50 rounded-full hover:bg-brand/10 transition-colors cursor-pointer", children: "로그인" })
-      ] }),
-      /* @__PURE__ */ jsx(
-        "button",
-        {
-          className: "md:hidden p-2 text-text-secondary cursor-pointer",
-          onClick: () => setIsMobileMenuOpen(!isMobileMenuOpen),
-          children: isMobileMenuOpen ? /* @__PURE__ */ jsx(X, { className: "w-6 h-6" }) : /* @__PURE__ */ jsx(Menu, { className: "w-6 h-6" })
-        }
-      )
-    ] }),
-    isMobileMenuOpen && /* @__PURE__ */ jsx("div", { className: "md:hidden border-t border-border/50 bg-surface", children: /* @__PURE__ */ jsxs("nav", { className: "flex flex-col p-4 gap-4", children: [
-      /* @__PURE__ */ jsx(
-        Link,
-        {
-          to: "/games",
-          className: "px-4 py-3 text-sm font-medium rounded-lg hover:bg-surface-raised transition-colors",
-          onClick: () => setIsMobileMenuOpen(false),
-          children: "게임"
-        }
-      ),
-      /* @__PURE__ */ jsx(
-        Link,
-        {
-          to: "/ranking",
-          className: "px-4 py-3 text-sm font-medium rounded-lg hover:bg-surface-raised transition-colors",
-          onClick: () => setIsMobileMenuOpen(false),
-          children: "랭킹"
-        }
-      ),
-      /* @__PURE__ */ jsx("button", { className: "mt-4 px-4 py-3 text-sm font-semibold text-center text-brand border border-brand/50 rounded-lg hover:bg-brand/10 transition-colors cursor-pointer", children: "로그인" })
-    ] }) })
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-6 text-xs text-text-secondary", children: [
+        /* @__PURE__ */ jsx("a", { href: "https://github.com/TaeyanG4/project-gamemoa", target: "_blank", rel: "noreferrer", className: "hover:text-text-primary transition-colors", children: "GitHub Repo" }),
+        /* @__PURE__ */ jsx(Link, { to: "/games", className: "hover:text-text-primary transition-colors", children: "전체 게임 목록" }),
+        /* @__PURE__ */ jsx(Link, { to: "/ranking", className: "hover:text-text-primary transition-colors", children: "명예의 전당" })
+      ] })
+    ] })
   ] });
 }
-function Footer() {
-  return /* @__PURE__ */ jsx("footer", { className: "w-full border-t border-border/30 bg-surface mt-auto", children: /* @__PURE__ */ jsx("div", { className: "container mx-auto px-4 py-8 md:py-12", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-col md:flex-row justify-between items-center gap-6", children: [
-    /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center md:items-start gap-2", children: [
-      /* @__PURE__ */ jsxs(Link, { to: "/", className: "font-bold text-lg tracking-tight", children: [
-        "game",
-        /* @__PURE__ */ jsx("span", { className: "text-brand", children: "moa" })
-      ] }),
-      /* @__PURE__ */ jsxs("p", { className: "text-sm text-text-muted", children: [
-        "© ",
-        (/* @__PURE__ */ new Date()).getFullYear(),
-        " gamemoa. All rights reserved."
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-6", children: [
-      /* @__PURE__ */ jsx("a", { href: "https://github.com", target: "_blank", rel: "noreferrer", className: "text-sm text-text-secondary hover:text-text-primary transition-colors", children: "GitHub" }),
-      /* @__PURE__ */ jsx(Link, { to: "/terms", className: "text-sm text-text-secondary hover:text-text-primary transition-colors", children: "이용약관" }),
-      /* @__PURE__ */ jsx(Link, { to: "/privacy", className: "text-sm text-text-secondary hover:text-text-primary transition-colors", children: "개인정보처리방침" })
-    ] })
-  ] }) }) });
-}
 function Layout({ children }) {
-  return /* @__PURE__ */ jsxs("div", { className: "min-h-screen flex flex-col w-full selection:bg-brand/30 selection:text-text-primary", children: [
-    /* @__PURE__ */ jsx(Header, {}),
-    /* @__PURE__ */ jsx("main", { className: "flex-1 w-full flex flex-col", children }),
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  return /* @__PURE__ */ jsxs("div", { className: "min-h-screen flex flex-col w-full selection:bg-brand/30 selection:text-text-primary bg-surface text-text-primary", children: [
+    /* @__PURE__ */ jsx(Header, { onToggleMobileSidebar: () => setIsMobileSidebarOpen((prev) => !prev) }),
+    /* @__PURE__ */ jsxs("div", { className: "flex-1 flex w-full", children: [
+      /* @__PURE__ */ jsx(
+        Sidebar,
+        {
+          isMobileOpen: isMobileSidebarOpen,
+          onMobileClose: () => setIsMobileSidebarOpen(false)
+        }
+      ),
+      /* @__PURE__ */ jsx("main", { className: "flex-1 w-full min-w-0 flex flex-col", children })
+    ] }),
     /* @__PURE__ */ jsx(Footer, {})
   ] });
 }
@@ -186,20 +299,20 @@ function GameCard({
     Link,
     {
       to: `/games/${slug}`,
-      className: "group flex flex-col bg-surface-raised rounded-2xl overflow-hidden border border-border/50 hover:border-border transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/20 block",
+      className: "group relative flex flex-col bg-surface-raised rounded-2xl overflow-hidden border border-border/80 hover:border-brand/50 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-brand/10 select-none block",
       children: [
         /* @__PURE__ */ jsxs(
           "div",
           {
-            className: "w-full aspect-[4/3] relative flex items-center justify-center p-6 overflow-hidden bg-surface-overlay",
+            className: "w-full aspect-[16/10] relative flex items-center justify-center p-6 overflow-hidden bg-surface-overlay",
             style: {
-              background: `linear-gradient(135deg, ${accent}22 0%, ${accent}05 100%)`
+              background: `radial-gradient(circle at center, ${accent}25 0%, rgba(15, 19, 31, 0.95) 100%)`
             },
             children: [
-              /* @__PURE__ */ jsx("div", { className: "absolute top-3 left-3 flex gap-2", children: modes.map((mode) => /* @__PURE__ */ jsx(
+              /* @__PURE__ */ jsx("div", { className: "absolute top-3 left-3 z-10 flex gap-1.5", children: modes.slice(0, 2).map((mode) => /* @__PURE__ */ jsx(
                 "span",
                 {
-                  className: "text-[10px] uppercase tracking-wider font-semibold px-2 py-1 rounded-md bg-black/40 text-white backdrop-blur-sm",
+                  className: "text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-md border border-white/10 tracking-wider",
                   children: mode
                 },
                 mode
@@ -209,23 +322,28 @@ function GameCard({
                 {
                   src: thumbnail,
                   alt: title,
-                  className: "w-20 h-20 rounded-xl shadow-lg object-cover transform group-hover:scale-110 transition-transform duration-300"
+                  className: "w-24 h-24 object-contain rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300"
                 }
               ) : /* @__PURE__ */ jsx(
                 "div",
                 {
-                  className: "w-20 h-20 rounded-xl shadow-lg transform group-hover:scale-110 transition-transform duration-300",
-                  style: { backgroundColor: accent }
+                  className: "w-24 h-24 rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300 flex items-center justify-center text-white font-extrabold text-xl",
+                  style: { backgroundColor: accent },
+                  children: title.slice(0, 2)
                 }
-              )
+              ),
+              /* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-20", children: /* @__PURE__ */ jsx("div", { className: "w-12 h-12 rounded-full bg-brand text-white flex items-center justify-center shadow-lg shadow-brand/40 transform scale-75 group-hover:scale-100 transition-transform duration-200", children: /* @__PURE__ */ jsx(Play, { className: "w-6 h-6 fill-current ml-0.5" }) }) })
             ]
           }
         ),
-        /* @__PURE__ */ jsxs("div", { className: "p-5 flex flex-col flex-1 gap-2", children: [
-          /* @__PURE__ */ jsx("h3", { className: "font-bold text-lg text-text-primary leading-tight group-hover:text-brand transition-colors", children: title }),
-          /* @__PURE__ */ jsx("p", { className: "text-sm text-text-secondary line-clamp-2 leading-relaxed flex-1", children: shortDescription }),
-          estimatedRoundSeconds && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5 text-xs font-medium text-text-muted mt-2", children: [
-            /* @__PURE__ */ jsx(Clock, { className: "w-3.5 h-3.5" }),
+        /* @__PURE__ */ jsxs("div", { className: "p-4 flex flex-col flex-1 gap-1.5 bg-surface-raised", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-2", children: [
+            /* @__PURE__ */ jsx("h3", { className: "font-bold text-base text-text-primary group-hover:text-brand transition-colors line-clamp-1", children: title }),
+            /* @__PURE__ */ jsx(Sparkles, { className: "w-4 h-4 text-brand-light opacity-0 group-hover:opacity-100 transition-opacity shrink-0" })
+          ] }),
+          /* @__PURE__ */ jsx("p", { className: "text-xs text-text-secondary line-clamp-2 leading-relaxed flex-1", children: shortDescription }),
+          estimatedRoundSeconds && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5 text-[11px] font-semibold text-text-muted mt-2 pt-2 border-t border-border/40", children: [
+            /* @__PURE__ */ jsx(Clock, { className: "w-3 h-3 text-brand-light" }),
             /* @__PURE__ */ jsxs("span", { children: [
               "약 ",
               Math.round(estimatedRoundSeconds),
@@ -237,214 +355,316 @@ function GameCard({
     }
   );
 }
+function HeroSpotlight({ game }) {
+  return /* @__PURE__ */ jsxs("div", { className: "relative w-full rounded-3xl overflow-hidden bg-gradient-to-br from-surface-raised via-surface-overlay to-surface border border-border shadow-2xl group select-none", children: [
+    /* @__PURE__ */ jsx(
+      "div",
+      {
+        className: "absolute -right-20 -top-20 w-96 h-96 blur-[120px] rounded-full pointer-events-none opacity-40 group-hover:opacity-60 transition-opacity duration-500",
+        style: { backgroundColor: game.accent || "#6366f1" }
+      }
+    ),
+    /* @__PURE__ */ jsx("div", { className: "absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand/10 via-transparent to-transparent pointer-events-none" }),
+    /* @__PURE__ */ jsxs("div", { className: "relative z-10 p-6 md:p-10 flex flex-col md:flex-row items-center justify-between gap-8", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-start gap-4 max-w-xl", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 px-3 py-1 rounded-full bg-brand/10 border border-brand/30 text-brand-light text-xs font-extrabold uppercase tracking-wider", children: [
+          /* @__PURE__ */ jsx(Sparkles, { className: "w-3.5 h-3.5" }),
+          /* @__PURE__ */ jsx("span", { children: "오늘의 피처드 게임" })
+        ] }),
+        /* @__PURE__ */ jsx("h2", { className: "text-3xl md:text-5xl font-black text-text-primary tracking-tight leading-tight", children: game.title }),
+        /* @__PURE__ */ jsx("p", { className: "text-base md:text-lg text-text-secondary leading-relaxed", children: game.shortDescription }),
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-3 pt-2", children: [
+          game.modes.map((mode) => /* @__PURE__ */ jsxs(
+            "span",
+            {
+              className: "flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg bg-surface-sidebar border border-border text-text-secondary",
+              children: [
+                /* @__PURE__ */ jsx(Zap, { className: "w-3 h-3 text-accent-yellow" }),
+                mode
+              ]
+            },
+            mode
+          )),
+          game.estimatedRoundSeconds && /* @__PURE__ */ jsxs("span", { className: "flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-lg bg-surface-sidebar border border-border text-text-muted", children: [
+            /* @__PURE__ */ jsx(Clock, { className: "w-3 h-3 text-brand-light" }),
+            "약 ",
+            game.estimatedRoundSeconds,
+            "초 라운드"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "pt-4 flex items-center gap-4 w-full sm:w-auto", children: /* @__PURE__ */ jsxs(
+          Link,
+          {
+            to: `/games/${game.slug}`,
+            className: "flex-1 sm:flex-none flex items-center justify-center gap-3 px-8 py-4 bg-gradient-to-r from-brand to-accent-purple text-white rounded-2xl font-extrabold text-lg shadow-xl shadow-brand/30 hover:scale-105 hover:shadow-2xl hover:shadow-brand/50 transition-all duration-200 cursor-pointer",
+            children: [
+              /* @__PURE__ */ jsx(Play, { className: "w-6 h-6 fill-current" }),
+              /* @__PURE__ */ jsx("span", { children: "지금 바로 플레이" })
+            ]
+          }
+        ) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "w-full md:w-72 aspect-[4/3] relative rounded-2xl overflow-hidden border border-border/80 bg-surface-sidebar flex items-center justify-center p-6 shrink-0 group-hover:border-brand/40 transition-colors shadow-2xl", children: [
+        /* @__PURE__ */ jsx(
+          "div",
+          {
+            className: "absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity",
+            style: {
+              background: `radial-gradient(circle, ${game.accent || "#6366f1"} 0%, transparent 70%)`
+            }
+          }
+        ),
+        game.thumbnail.startsWith("/") || game.thumbnail.startsWith("http") ? /* @__PURE__ */ jsx(
+          "img",
+          {
+            src: game.thumbnail,
+            alt: game.title,
+            className: "w-32 h-32 object-contain rounded-2xl shadow-2xl group-hover:scale-110 transition-transform duration-300 relative z-10"
+          }
+        ) : /* @__PURE__ */ jsx(
+          "div",
+          {
+            className: "w-32 h-32 rounded-2xl shadow-2xl group-hover:scale-110 transition-transform duration-300 relative z-10 flex items-center justify-center text-white font-black text-2xl",
+            style: { backgroundColor: game.accent || "#6366f1" },
+            children: game.title.slice(0, 2)
+          }
+        )
+      ] })
+    ] })
+  ] });
+}
+const CATEGORIES = [
+  { id: "all", label: "전체", icon: Flame },
+  { id: "popular", label: "인기", icon: Sparkles },
+  { id: "reaction", label: "순발력", icon: Zap },
+  { id: "brain", label: "두뇌", icon: Brain },
+  { id: "arcade", label: "아케이드", icon: Gamepad2 },
+  { id: "favorites", label: "즐겨찾기", icon: Bookmark }
+];
+function CategoryChips({ selectedCategory, onSelectCategory }) {
+  return /* @__PURE__ */ jsx("div", { className: "flex items-center gap-2 overflow-x-auto no-scrollbar py-2 w-full select-none", children: CATEGORIES.map((cat) => {
+    const Icon = cat.icon;
+    const isSelected = selectedCategory === cat.id;
+    return /* @__PURE__ */ jsxs(
+      "button",
+      {
+        onClick: () => onSelectCategory(cat.id),
+        className: `flex items-center gap-2 px-4 py-2 rounded-full text-xs md:text-sm font-bold whitespace-nowrap transition-all cursor-pointer border ${isSelected ? "bg-brand text-white border-brand shadow-lg shadow-brand/25 scale-105" : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary hover:bg-surface-overlay hover:border-border"}`,
+        children: [
+          /* @__PURE__ */ jsx(Icon, { className: `w-4 h-4 ${isSelected ? "text-white" : "text-brand-light"}` }),
+          /* @__PURE__ */ jsx("span", { children: cat.label })
+        ]
+      },
+      cat.id
+    );
+  }) });
+}
+function meta$1() {
+  return [{
+    title: "gamemoa — 심심할 틈 없이, 게임을 한곳에"
+  }, {
+    name: "description",
+    content: "설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼"
+  }];
+}
 const home = UNSAFE_withComponentProps(function Home() {
-  const featuredGames = gameManifests.slice(0, 3);
+  const [searchParams] = useSearchParams();
+  const initialCategory = searchParams.get("category") || "all";
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const featuredGame = gameManifests[0];
+  const filteredGames = useMemo(() => {
+    if (selectedCategory === "all") return gameManifests;
+    if (selectedCategory === "popular") return gameManifests;
+    if (selectedCategory === "reaction") {
+      return gameManifests.filter((g) => g.modes.includes("single") || g.slug.includes("reaction"));
+    }
+    if (selectedCategory === "brain") {
+      return gameManifests.filter((g) => g.modes.includes("single"));
+    }
+    if (selectedCategory === "arcade") {
+      return gameManifests;
+    }
+    return gameManifests;
+  }, [selectedCategory]);
   return /* @__PURE__ */ jsxs("div", {
-    className: "flex flex-col w-full",
-    children: [/* @__PURE__ */ jsxs("section", {
-      className: "relative w-full pt-20 pb-32 overflow-hidden flex flex-col items-center justify-center min-h-[85vh]",
-      children: [/* @__PURE__ */ jsx("div", {
-        className: "absolute inset-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--color-surface-raised)_0%,_var(--color-surface)_100%)] -z-10"
-      }), /* @__PURE__ */ jsx("div", {
-        className: "absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-brand/20 blur-[120px] rounded-full mix-blend-screen pointer-events-none -z-10"
+    className: "flex flex-col w-full px-4 md:px-8 py-6 gap-10 max-w-7xl mx-auto",
+    children: [featuredGame && /* @__PURE__ */ jsx("section", {
+      className: "w-full",
+      children: /* @__PURE__ */ jsx(HeroSpotlight, {
+        game: featuredGame
+      })
+    }), /* @__PURE__ */ jsxs("section", {
+      className: "flex flex-col gap-6 w-full",
+      children: [/* @__PURE__ */ jsxs("div", {
+        className: "flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/60 pb-4",
+        children: [/* @__PURE__ */ jsxs("div", {
+          className: "flex items-center gap-2.5",
+          children: [/* @__PURE__ */ jsx(Gamepad2, {
+            className: "w-6 h-6 text-brand"
+          }), /* @__PURE__ */ jsx("h2", {
+            className: "text-2xl font-black text-text-primary tracking-tight",
+            children: "미니게임 라인업"
+          }), /* @__PURE__ */ jsxs("span", {
+            className: "text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20",
+            children: [filteredGames.length, "개"]
+          })]
+        }), /* @__PURE__ */ jsx("div", {
+          className: "w-full sm:w-auto",
+          children: /* @__PURE__ */ jsx(CategoryChips, {
+            selectedCategory,
+            onSelectCategory: setSelectedCategory
+          })
+        })]
       }), /* @__PURE__ */ jsxs("div", {
-        className: "container mx-auto px-4 flex flex-col items-center text-center z-10 max-w-4xl",
-        children: [/* @__PURE__ */ jsx("span", {
-          className: "px-4 py-1.5 rounded-full bg-brand/10 text-brand text-sm font-bold tracking-widest mb-8 border border-brand/20 shadow-[0_0_15px_rgba(99,102,241,0.2)]",
-          children: "PLAY. SCORE. AGAIN."
-        }), /* @__PURE__ */ jsxs("h1", {
-          className: "text-5xl md:text-7xl font-extrabold tracking-tight mb-8 whitespace-pre-line leading-[1.1]",
-          children: [/* @__PURE__ */ jsx("span", {
-            className: "text-text-primary",
-            children: "심심할 틈 없이,"
-          }), /* @__PURE__ */ jsx("br", {}), /* @__PURE__ */ jsx("span", {
-            className: "text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-brand",
-            children: "게임을 한곳에."
-          })]
-        }), /* @__PURE__ */ jsxs("p", {
-          className: "text-lg md:text-xl text-text-secondary mb-12 max-w-2xl leading-relaxed whitespace-pre-line",
-          children: ["설치 없이 바로 즐기는 가벼운 미니게임.", "\n", "짧게 한 판, 기록을 깨고, 다시 도전하세요."]
-        }), /* @__PURE__ */ jsxs("div", {
-          className: "flex flex-col sm:flex-row gap-4 w-full sm:w-auto",
-          children: [/* @__PURE__ */ jsxs(Link, {
-            to: "/games",
-            className: "flex items-center justify-center gap-2 px-8 py-4 bg-brand text-white rounded-full font-bold text-lg hover:bg-brand-dark hover:scale-105 transition-all shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] cursor-pointer",
-            children: [/* @__PURE__ */ jsx(Play, {
-              className: "w-5 h-5 fill-current"
-            }), "지금 바로 플레이"]
-          }), /* @__PURE__ */ jsx(Link, {
-            to: "/games",
-            className: "flex items-center justify-center gap-2 px-8 py-4 bg-surface-raised text-text-primary border border-border rounded-full font-bold text-lg hover:bg-surface-overlay transition-colors cursor-pointer",
-            children: "게임 둘러보기"
-          })]
+        className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5",
+        children: [filteredGames.map((game) => /* @__PURE__ */ jsx(GameCard, {
+          ...game
+        }, game.slug)), filteredGames.length === 0 && /* @__PURE__ */ jsx("div", {
+          className: "col-span-full py-16 text-center text-text-muted bg-surface-raised rounded-3xl border border-border border-dashed",
+          children: "해당 카테고리에 준비된 게임이 없습니다."
         })]
       })]
     }), /* @__PURE__ */ jsx("section", {
-      className: "py-24 bg-surface-raised w-full",
+      className: "py-8 w-full border-t border-border/40",
       children: /* @__PURE__ */ jsxs("div", {
-        className: "container mx-auto px-4 max-w-6xl",
+        className: "grid grid-cols-1 md:grid-cols-3 gap-6",
         children: [/* @__PURE__ */ jsxs("div", {
-          className: "flex flex-col md:flex-row justify-between items-end mb-12 gap-4",
-          children: [/* @__PURE__ */ jsxs("div", {
-            children: [/* @__PURE__ */ jsx("h2", {
-              className: "text-3xl md:text-4xl font-bold mb-4",
-              children: "지금 뭐 할까?"
-            }), /* @__PURE__ */ jsx("p", {
-              className: "text-text-secondary text-lg",
-              children: "고민할 필요 없이 바로 시작할 수 있는 게임들."
-            })]
-          }), /* @__PURE__ */ jsxs(Link, {
-            to: "/games",
-            className: "group flex items-center gap-2 text-brand font-semibold hover:text-brand-light transition-colors",
-            children: ["전체보기", /* @__PURE__ */ jsx(ArrowRight, {
-              className: "w-5 h-5 group-hover:translate-x-1 transition-transform"
-            })]
-          })]
-        }), /* @__PURE__ */ jsx("div", {
-          className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
-          children: featuredGames.map((game) => /* @__PURE__ */ jsx(GameCard, {
-            ...game
-          }, game.slug))
-        })]
-      })
-    }), /* @__PURE__ */ jsx("section", {
-      className: "py-32 bg-surface relative overflow-hidden w-full",
-      children: /* @__PURE__ */ jsx("div", {
-        className: "container mx-auto px-4 max-w-6xl relative z-10",
-        children: /* @__PURE__ */ jsxs("div", {
-          className: "grid grid-cols-1 md:grid-cols-3 gap-8",
-          children: [/* @__PURE__ */ jsxs("div", {
-            className: "p-8 rounded-3xl bg-surface-overlay/50 border border-border/50 backdrop-blur-sm flex flex-col items-start hover:border-brand/30 transition-colors group",
-            children: [/* @__PURE__ */ jsx("div", {
-              className: "p-4 rounded-2xl bg-brand/10 text-brand mb-6 group-hover:scale-110 transition-transform",
-              children: /* @__PURE__ */ jsx(MonitorSmartphone, {
-                className: "w-8 h-8"
-              })
-            }), /* @__PURE__ */ jsx("h3", {
-              className: "text-xl font-bold mb-3",
-              children: "설치 없이"
-            }), /* @__PURE__ */ jsx("p", {
-              className: "text-text-secondary leading-relaxed",
-              children: "브라우저만 열면 끝. 다운로드도 업데이트도 필요 없어요. 언제 어디서든 바로 시작하세요."
-            })]
-          }), /* @__PURE__ */ jsxs("div", {
-            className: "p-8 rounded-3xl bg-surface-overlay/50 border border-border/50 backdrop-blur-sm flex flex-col items-start hover:border-accent-green/30 transition-colors group",
-            children: [/* @__PURE__ */ jsx("div", {
-              className: "p-4 rounded-2xl bg-accent-green/10 text-accent-green mb-6 group-hover:scale-110 transition-transform",
-              children: /* @__PURE__ */ jsx(Timer, {
-                className: "w-8 h-8"
-              })
-            }), /* @__PURE__ */ jsx("h3", {
-              className: "text-xl font-bold mb-3",
-              children: "짧고 가볍게"
-            }), /* @__PURE__ */ jsx("p", {
-              className: "text-text-secondary leading-relaxed",
-              children: "1분이든 10분이든, 원할 때 한 판만 즐겨도 충분해요. 바쁜 일상 속 작은 휴식을 즐기세요."
-            })]
-          }), /* @__PURE__ */ jsxs("div", {
-            className: "p-8 rounded-3xl bg-surface-overlay/50 border border-border/50 backdrop-blur-sm flex flex-col items-start hover:border-accent-yellow/30 transition-colors group",
-            children: [/* @__PURE__ */ jsx("div", {
-              className: "p-4 rounded-2xl bg-accent-yellow/10 text-accent-yellow mb-6 group-hover:scale-110 transition-transform",
-              children: /* @__PURE__ */ jsx(Trophy, {
-                className: "w-8 h-8"
-              })
-            }), /* @__PURE__ */ jsx("h3", {
-              className: "text-xl font-bold mb-3",
-              children: "기록에 도전"
-            }), /* @__PURE__ */ jsx("p", {
-              className: "text-text-secondary leading-relaxed",
-              children: "로그인하면 최고 기록과 플레이 이력을 남길 수 있어요. 친구들과 순위를 경쟁해보세요."
-            })]
-          })]
-        })
-      })
-    }), /* @__PURE__ */ jsx("section", {
-      className: "py-24 bg-surface w-full relative",
-      children: /* @__PURE__ */ jsxs("div", {
-        className: "container mx-auto px-4 max-w-4xl text-center",
-        children: [/* @__PURE__ */ jsxs("div", {
-          className: "inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent-blue/10 border border-accent-blue/20 text-accent-blue font-bold text-sm mb-8",
-          children: [/* @__PURE__ */ jsxs("span", {
-            className: "relative flex h-3 w-3",
-            children: [/* @__PURE__ */ jsx("span", {
-              className: "animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-blue opacity-75"
-            }), /* @__PURE__ */ jsx("span", {
-              className: "relative inline-flex rounded-full h-3 w-3 bg-accent-blue"
-            })]
-          }), "COMING SOON"]
-        }), /* @__PURE__ */ jsxs("h2", {
-          className: "text-4xl md:text-5xl font-bold mb-6 whitespace-pre-line leading-tight",
-          children: ["혼자도 좋지만,", "\n", "같이 하면 더 재밌으니까."]
-        }), /* @__PURE__ */ jsx("p", {
-          className: "text-xl text-text-secondary",
-          children: "친구와 바로 입장할 수 있는 온라인 멀티게임도 준비하고 있습니다."
-        })]
-      })
-    }), /* @__PURE__ */ jsx("section", {
-      className: "py-24 bg-surface-raised w-full",
-      children: /* @__PURE__ */ jsx("div", {
-        className: "container mx-auto px-4 max-w-4xl text-center",
-        children: /* @__PURE__ */ jsxs("div", {
-          className: "bg-surface p-12 rounded-[3rem] border border-border/80 shadow-2xl relative overflow-hidden",
+          className: "p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-brand/40 transition-all group shadow-md",
           children: [/* @__PURE__ */ jsx("div", {
-            className: "absolute -top-40 -right-40 w-80 h-80 bg-brand/10 blur-[100px] rounded-full"
-          }), /* @__PURE__ */ jsxs("div", {
-            className: "relative z-10",
-            children: [/* @__PURE__ */ jsx("h2", {
-              className: "text-3xl md:text-4xl font-bold mb-4",
-              children: "오늘의 기록을 남겨볼까요?"
-            }), /* @__PURE__ */ jsx("p", {
-              className: "text-text-secondary text-lg mb-10 max-w-xl mx-auto",
-              children: "Google 또는 Discord로 로그인하고 최고 기록과 즐겨찾기를 안전하게 저장하세요."
-            }), /* @__PURE__ */ jsxs("div", {
-              className: "flex flex-col sm:flex-row justify-center gap-4",
-              children: [/* @__PURE__ */ jsx("button", {
-                disabled: true,
-                className: "px-8 py-4 bg-white text-black rounded-full font-bold text-lg opacity-50 cursor-not-allowed hover:bg-gray-100 transition-colors",
-                children: "Google로 계속하기"
-              }), /* @__PURE__ */ jsx("button", {
-                disabled: true,
-                className: "px-8 py-4 bg-[#5865F2] text-white rounded-full font-bold text-lg opacity-50 cursor-not-allowed hover:bg-[#4752C4] transition-colors",
-                children: "Discord로 계속하기"
-              })]
-            })]
+            className: "p-3.5 rounded-xl bg-brand/10 text-brand mb-4 group-hover:scale-110 transition-transform",
+            children: /* @__PURE__ */ jsx(MonitorSmartphone, {
+              className: "w-6 h-6"
+            })
+          }), /* @__PURE__ */ jsx("h3", {
+            className: "text-lg font-bold mb-2 text-text-primary",
+            children: "1초 무설치 시작"
+          }), /* @__PURE__ */ jsx("p", {
+            className: "text-xs md:text-sm text-text-secondary leading-relaxed",
+            children: "웹 브라우저만 열면 즉시 시작됩니다. 로딩도, 앱 다운로드도 없습니다."
           })]
-        })
+        }), /* @__PURE__ */ jsxs("div", {
+          className: "p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-green/40 transition-all group shadow-md",
+          children: [/* @__PURE__ */ jsx("div", {
+            className: "p-3.5 rounded-xl bg-accent-green/10 text-accent-green mb-4 group-hover:scale-110 transition-transform",
+            children: /* @__PURE__ */ jsx(Timer, {
+              className: "w-6 h-6"
+            })
+          }), /* @__PURE__ */ jsx("h3", {
+            className: "text-lg font-bold mb-2 text-text-primary",
+            children: "초단위 숏폼 게임"
+          }), /* @__PURE__ */ jsx("p", {
+            className: "text-xs md:text-sm text-text-secondary leading-relaxed",
+            children: "30초 내외의 빠른 라운드로 부담 없이 짧게 즐길 수 있는 게임들로 구성되어 있습니다."
+          })]
+        }), /* @__PURE__ */ jsxs("div", {
+          className: "p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-yellow/40 transition-all group shadow-md",
+          children: [/* @__PURE__ */ jsx("div", {
+            className: "p-3.5 rounded-xl bg-accent-yellow/10 text-accent-yellow mb-4 group-hover:scale-110 transition-transform",
+            children: /* @__PURE__ */ jsx(Trophy, {
+              className: "w-6 h-6"
+            })
+          }), /* @__PURE__ */ jsx("h3", {
+            className: "text-lg font-bold mb-2 text-text-primary",
+            children: "정밀 기록 측정"
+          }), /* @__PURE__ */ jsx("p", {
+            className: "text-xs md:text-sm text-text-secondary leading-relaxed",
+            children: "밀리초(ms) 단위의 최고 기록을 측정하고 자신의 신기록에 계속 도전해 보세요."
+          })]
+        })]
       })
+    }), /* @__PURE__ */ jsxs("section", {
+      className: "w-full rounded-3xl bg-gradient-to-r from-surface-raised via-surface-overlay to-surface border border-border p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden",
+      children: [/* @__PURE__ */ jsxs("div", {
+        className: "flex flex-col gap-2 z-10",
+        children: [/* @__PURE__ */ jsxs("div", {
+          className: "inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent-blue/10 border border-accent-blue/30 text-accent-blue font-extrabold text-xs",
+          children: [/* @__PURE__ */ jsx(Sparkles, {
+            className: "w-3.5 h-3.5"
+          }), /* @__PURE__ */ jsx("span", {
+            children: "COMMUNITY & MULTIPLAYER"
+          })]
+        }), /* @__PURE__ */ jsx("h3", {
+          className: "text-2xl md:text-3xl font-black text-text-primary",
+          children: "실시간 랭킹 & 멀티플레이어 업데이트 예정"
+        }), /* @__PURE__ */ jsx("p", {
+          className: "text-sm text-text-secondary",
+          children: "친구와 링크 하나로 접속해 함께 실시간 대결을 펼칠 수 있는 멀티 모드가 곧 출시됩니다."
+        })]
+      }), /* @__PURE__ */ jsx(Link, {
+        to: "/games",
+        className: "z-10 shrink-0 px-6 py-3 bg-surface-raised border border-border hover:border-brand/40 text-text-primary font-bold text-sm rounded-xl transition-all cursor-pointer",
+        children: "게임 미리보기"
+      })]
     })]
   });
 });
 const route1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  default: home
+  default: home,
+  meta: meta$1
 }, Symbol.toStringTag, { value: "Module" }));
 function meta() {
   return [{
-    title: "게임 목록 | gamemoa"
+    title: "전체 미니게임 목록 | gamemoa"
   }, {
     name: "description",
-    content: "모든 미니게임을 한 곳에서 확인하세요."
+    content: "설치 없는 모든 웹 미니게임을 한 곳에서 탐색하고 즐기세요."
   }];
 }
 const games = UNSAFE_withComponentProps(function Games() {
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get("search") || "";
+  const initialCategory = searchParams.get("category") || "all";
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const filteredGames = useMemo(() => {
+    return gameManifests.filter((game) => {
+      const matchesSearch = !searchQuery || game.title.toLowerCase().includes(searchQuery.toLowerCase()) || game.shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === "all" || selectedCategory === "popular" || selectedCategory === "reaction" && game.slug.includes("reaction") || selectedCategory === "brain" && game.modes.includes("single");
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchQuery, selectedCategory]);
   return /* @__PURE__ */ jsxs("div", {
-    className: "container mx-auto px-4 py-12 max-w-6xl flex-1",
+    className: "flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-7xl mx-auto flex-1",
     children: [/* @__PURE__ */ jsxs("div", {
-      className: "mb-10",
-      children: [/* @__PURE__ */ jsx("h1", {
-        className: "text-4xl font-extrabold mb-4",
-        children: "모든 게임"
-      }), /* @__PURE__ */ jsxs("p", {
-        className: "text-lg text-text-secondary",
-        children: ["총 ", gameManifests.length, "개의 게임이 준비되어 있습니다."]
+      className: "flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-border/60 pb-6",
+      children: [/* @__PURE__ */ jsxs("div", {
+        children: [/* @__PURE__ */ jsxs("div", {
+          className: "flex items-center gap-2 text-brand font-bold text-xs uppercase tracking-wider mb-1",
+          children: [/* @__PURE__ */ jsx(Gamepad2, {
+            className: "w-4 h-4"
+          }), /* @__PURE__ */ jsx("span", {
+            children: "Game Collection"
+          })]
+        }), /* @__PURE__ */ jsx("h1", {
+          className: "text-3xl md:text-4xl font-black text-text-primary",
+          children: "전체 미니게임"
+        }), /* @__PURE__ */ jsxs("p", {
+          className: "text-sm text-text-secondary mt-1",
+          children: ["총 ", filteredGames.length, "개의 가벼운 미니게임이 준비되어 있습니다."]
+        })]
+      }), /* @__PURE__ */ jsxs("div", {
+        className: "relative w-full md:w-80",
+        children: [/* @__PURE__ */ jsx(Search, {
+          className: "w-4 h-4 text-text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+        }), /* @__PURE__ */ jsx("input", {
+          type: "text",
+          value: searchQuery,
+          onChange: (e) => setSearchQuery(e.target.value),
+          placeholder: "게임 검색...",
+          className: "w-full bg-surface-raised text-text-primary placeholder:text-text-muted text-sm rounded-xl pl-10 pr-4 py-2.5 border border-border/80 focus:outline-none focus:border-brand transition-all"
+        })]
       })]
+    }), /* @__PURE__ */ jsx(CategoryChips, {
+      selectedCategory,
+      onSelectCategory: setSelectedCategory
     }), /* @__PURE__ */ jsxs("div", {
-      className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6",
-      children: [gameManifests.map((game) => /* @__PURE__ */ jsx(GameCard, {
+      className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",
+      children: [filteredGames.map((game) => /* @__PURE__ */ jsx(GameCard, {
         ...game
-      }, game.slug)), gameManifests.length === 0 && /* @__PURE__ */ jsx("div", {
+      }, game.slug)), filteredGames.length === 0 && /* @__PURE__ */ jsx("div", {
         className: "col-span-full py-20 text-center text-text-muted bg-surface-raised rounded-3xl border border-border border-dashed",
-        children: "현재 준비된 게임이 없습니다."
+        children: "검색 결과와 일치하는 게임이 없습니다."
       })]
     })]
   });
@@ -618,7 +838,7 @@ const route3 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   __proto__: null,
   default: gameSlug
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/assets/entry.client-CaOTZVTm.js", "imports": ["/assets/chunk-62JRHF6Z-CH7ymSO7.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/root--FdAIe4v.js", "imports": ["/assets/chunk-62JRHF6Z-CH7ymSO7.js", "/assets/createLucideIcon-5Vn2kO8t.js"], "css": ["/assets/root-6kfVYbvd.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/home-B8RdAGSK.js", "imports": ["/assets/chunk-62JRHF6Z-CH7ymSO7.js", "/assets/registry-2CJyOPBc.js", "/assets/GameCard-fW6G4Ilh.js", "/assets/createLucideIcon-5Vn2kO8t.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/games": { "id": "routes/games", "parentId": "root", "path": "games", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/games-CXSI9r_N.js", "imports": ["/assets/chunk-62JRHF6Z-CH7ymSO7.js", "/assets/registry-2CJyOPBc.js", "/assets/GameCard-fW6G4Ilh.js", "/assets/createLucideIcon-5Vn2kO8t.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/game-slug": { "id": "routes/game-slug", "parentId": "root", "path": "games/:slug", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/game-slug-B2P1Y2dL.js", "imports": ["/assets/chunk-62JRHF6Z-CH7ymSO7.js", "/assets/registry-2CJyOPBc.js", "/assets/createLucideIcon-5Vn2kO8t.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/assets/manifest-5ebf2a72.js", "version": "5ebf2a72", "sri": void 0 };
+const serverManifest = { "entry": { "module": "/assets/entry.client-BdWs7cPS.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/root-LisnnjG4.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/createLucideIcon-Cr_PdLWK.js", "/assets/zap-C5cD1i_b.js", "/assets/search-dUXyqtQM.js", "/assets/trophy-DKu0BhLc.js"], "css": ["/assets/root-Ca_9YDYS.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/home-CkmqHVMA.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/CategoryChips-CiaAKfpd.js", "/assets/zap-C5cD1i_b.js", "/assets/createLucideIcon-Cr_PdLWK.js", "/assets/trophy-DKu0BhLc.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/games": { "id": "routes/games", "parentId": "root", "path": "games", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/games-CK_8hkWc.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/CategoryChips-CiaAKfpd.js", "/assets/zap-C5cD1i_b.js", "/assets/search-dUXyqtQM.js", "/assets/createLucideIcon-Cr_PdLWK.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/game-slug": { "id": "routes/game-slug", "parentId": "root", "path": "games/:slug", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/game-slug-R-GW6GNn.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/createLucideIcon-Cr_PdLWK.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/assets/manifest-65ea8a22.js", "version": "65ea8a22", "sri": void 0 };
 const assetsBuildDirectory = "build\\client";
 const basename = "/";
 const future = { "unstable_optimizeDeps": false, "v8_passThroughRequests": false, "v8_trailingSlashAwareDataRequests": false, "unstable_previewServerPrerendering": false, "v8_middleware": false, "v8_splitRouteModules": false, "v8_viteEnvironmentApi": false };
