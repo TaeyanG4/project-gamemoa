@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
-import { MonitorSmartphone, Timer, Trophy, ArrowRight, Gamepad2, Sparkles } from "lucide-react";
+import { Gamepad2, Sparkles } from "lucide-react";
 import { gameManifests } from "../features/catalog/registry";
 import { GameCard } from "../components/ui/GameCard";
 import { HeroSpotlight } from "../components/ui/HeroSpotlight";
@@ -75,41 +75,6 @@ export default function Home() {
               해당 카테고리에 준비된 게임이 없습니다.
             </div>
           )}
-        </div>
-      </section>
-
-      {/* Why Gamemoa Grid (Feature Highlights) */}
-      <section className="py-8 w-full border-t border-border/40">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-brand/40 transition-all group shadow-md">
-            <div className="p-3.5 rounded-xl bg-brand/10 text-brand mb-4 group-hover:scale-110 transition-transform">
-              <MonitorSmartphone className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold mb-2 text-text-primary">1초 무설치 시작</h3>
-            <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-              웹 브라우저만 열면 즉시 시작됩니다. 로딩도, 앱 다운로드도 없습니다.
-            </p>
-          </div>
-          
-          <div className="p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-green/40 transition-all group shadow-md">
-            <div className="p-3.5 rounded-xl bg-accent-green/10 text-accent-green mb-4 group-hover:scale-110 transition-transform">
-              <Timer className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold mb-2 text-text-primary">초단위 숏폼 게임</h3>
-            <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-              30초 내외의 빠른 라운드로 부담 없이 짧게 즐길 수 있는 게임들로 구성되어 있습니다.
-            </p>
-          </div>
-          
-          <div className="p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-yellow/40 transition-all group shadow-md">
-            <div className="p-3.5 rounded-xl bg-accent-yellow/10 text-accent-yellow mb-4 group-hover:scale-110 transition-transform">
-              <Trophy className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold mb-2 text-text-primary">정밀 기록 측정</h3>
-            <p className="text-xs md:text-sm text-text-secondary leading-relaxed">
-              밀리초(ms) 단위의 최고 기록을 측정하고 자신의 신기록에 계속 도전해 보세요.
-            </p>
-          </div>
         </div>
       </section>
 

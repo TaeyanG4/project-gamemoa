@@ -2,7 +2,7 @@ import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { ServerRouter, useNavigate, Link, useLocation, UNSAFE_withComponentProps, Meta, Links, Outlet, ScrollRestoration, Scripts, useSearchParams, useParams } from "react-router";
 import { renderToReadableStream } from "react-dom/server";
 import { useState, useMemo, useEffect } from "react";
-import { Menu, Gamepad2, Search, Command, Bookmark, User, Flame, Sparkles, Zap, Trophy, Compass, X, Play, Clock, Brain, MonitorSmartphone, Timer, AlertCircle, ArrowLeft } from "lucide-react";
+import { Menu, Gamepad2, Search, Command, Bookmark, User, Flame, Sparkles, Zap, Trophy, Compass, X, Play, Clock, Brain, AlertCircle, ArrowLeft } from "lucide-react";
 async function handleRequest(request, responseStatusCode, responseHeaders, routerContext, _loadContext) {
   const body = await renderToReadableStream(
     /* @__PURE__ */ jsx(ServerRouter, { context: routerContext, url: request.url }),
@@ -524,54 +524,6 @@ const home = UNSAFE_withComponentProps(function Home() {
           children: "해당 카테고리에 준비된 게임이 없습니다."
         })]
       })]
-    }), /* @__PURE__ */ jsx("section", {
-      className: "py-8 w-full border-t border-border/40",
-      children: /* @__PURE__ */ jsxs("div", {
-        className: "grid grid-cols-1 md:grid-cols-3 gap-6",
-        children: [/* @__PURE__ */ jsxs("div", {
-          className: "p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-brand/40 transition-all group shadow-md",
-          children: [/* @__PURE__ */ jsx("div", {
-            className: "p-3.5 rounded-xl bg-brand/10 text-brand mb-4 group-hover:scale-110 transition-transform",
-            children: /* @__PURE__ */ jsx(MonitorSmartphone, {
-              className: "w-6 h-6"
-            })
-          }), /* @__PURE__ */ jsx("h3", {
-            className: "text-lg font-bold mb-2 text-text-primary",
-            children: "1초 무설치 시작"
-          }), /* @__PURE__ */ jsx("p", {
-            className: "text-xs md:text-sm text-text-secondary leading-relaxed",
-            children: "웹 브라우저만 열면 즉시 시작됩니다. 로딩도, 앱 다운로드도 없습니다."
-          })]
-        }), /* @__PURE__ */ jsxs("div", {
-          className: "p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-green/40 transition-all group shadow-md",
-          children: [/* @__PURE__ */ jsx("div", {
-            className: "p-3.5 rounded-xl bg-accent-green/10 text-accent-green mb-4 group-hover:scale-110 transition-transform",
-            children: /* @__PURE__ */ jsx(Timer, {
-              className: "w-6 h-6"
-            })
-          }), /* @__PURE__ */ jsx("h3", {
-            className: "text-lg font-bold mb-2 text-text-primary",
-            children: "초단위 숏폼 게임"
-          }), /* @__PURE__ */ jsx("p", {
-            className: "text-xs md:text-sm text-text-secondary leading-relaxed",
-            children: "30초 내외의 빠른 라운드로 부담 없이 짧게 즐길 수 있는 게임들로 구성되어 있습니다."
-          })]
-        }), /* @__PURE__ */ jsxs("div", {
-          className: "p-6 rounded-2xl bg-surface-raised border border-border/80 flex flex-col items-start hover:border-accent-yellow/40 transition-all group shadow-md",
-          children: [/* @__PURE__ */ jsx("div", {
-            className: "p-3.5 rounded-xl bg-accent-yellow/10 text-accent-yellow mb-4 group-hover:scale-110 transition-transform",
-            children: /* @__PURE__ */ jsx(Trophy, {
-              className: "w-6 h-6"
-            })
-          }), /* @__PURE__ */ jsx("h3", {
-            className: "text-lg font-bold mb-2 text-text-primary",
-            children: "정밀 기록 측정"
-          }), /* @__PURE__ */ jsx("p", {
-            className: "text-xs md:text-sm text-text-secondary leading-relaxed",
-            children: "밀리초(ms) 단위의 최고 기록을 측정하고 자신의 신기록에 계속 도전해 보세요."
-          })]
-        })]
-      })
     }), /* @__PURE__ */ jsxs("section", {
       className: "w-full rounded-3xl bg-gradient-to-r from-surface-raised via-surface-overlay to-surface border border-border p-8 md:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl relative overflow-hidden",
       children: [/* @__PURE__ */ jsxs("div", {
@@ -838,7 +790,7 @@ const route3 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   __proto__: null,
   default: gameSlug
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/assets/entry.client-BdWs7cPS.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/root-LisnnjG4.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/createLucideIcon-Cr_PdLWK.js", "/assets/zap-C5cD1i_b.js", "/assets/search-dUXyqtQM.js", "/assets/trophy-DKu0BhLc.js"], "css": ["/assets/root-Ca_9YDYS.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/home-CkmqHVMA.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/CategoryChips-CiaAKfpd.js", "/assets/zap-C5cD1i_b.js", "/assets/createLucideIcon-Cr_PdLWK.js", "/assets/trophy-DKu0BhLc.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/games": { "id": "routes/games", "parentId": "root", "path": "games", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/games-CK_8hkWc.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/CategoryChips-CiaAKfpd.js", "/assets/zap-C5cD1i_b.js", "/assets/search-dUXyqtQM.js", "/assets/createLucideIcon-Cr_PdLWK.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/game-slug": { "id": "routes/game-slug", "parentId": "root", "path": "games/:slug", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/game-slug-R-GW6GNn.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/createLucideIcon-Cr_PdLWK.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/assets/manifest-65ea8a22.js", "version": "65ea8a22", "sri": void 0 };
+const serverManifest = { "entry": { "module": "/assets/entry.client-BdWs7cPS.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/root-DvwjNhww.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/createLucideIcon-Cr_PdLWK.js", "/assets/zap-C5cD1i_b.js", "/assets/search-dUXyqtQM.js"], "css": ["/assets/root-C-aq1qRm.css"], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/home": { "id": "routes/home", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/home-9T4otNJt.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/CategoryChips-CiaAKfpd.js", "/assets/zap-C5cD1i_b.js", "/assets/createLucideIcon-Cr_PdLWK.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/games": { "id": "routes/games", "parentId": "root", "path": "games", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/games-CK_8hkWc.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/CategoryChips-CiaAKfpd.js", "/assets/zap-C5cD1i_b.js", "/assets/search-dUXyqtQM.js", "/assets/createLucideIcon-Cr_PdLWK.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 }, "routes/game-slug": { "id": "routes/game-slug", "parentId": "root", "path": "games/:slug", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasClientMiddleware": false, "hasDefaultExport": true, "hasErrorBoundary": false, "module": "/assets/game-slug-R-GW6GNn.js", "imports": ["/assets/chunk-62JRHF6Z-CmonFRjV.js", "/assets/registry-BNd0FKyJ.js", "/assets/createLucideIcon-Cr_PdLWK.js"], "css": [], "clientActionModule": void 0, "clientLoaderModule": void 0, "clientMiddlewareModule": void 0, "hydrateFallbackModule": void 0 } }, "url": "/assets/manifest-b90e91d1.js", "version": "b90e91d1", "sri": void 0 };
 const assetsBuildDirectory = "build\\client";
 const basename = "/";
 const future = { "unstable_optimizeDeps": false, "v8_passThroughRequests": false, "v8_trailingSlashAwareDataRequests": false, "unstable_previewServerPrerendering": false, "v8_middleware": false, "v8_splitRouteModules": false, "v8_viteEnvironmentApi": false };
