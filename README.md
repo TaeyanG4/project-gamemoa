@@ -15,8 +15,12 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - **오늘의 추천 게임 스포트라이트**: 대형 비주얼 카드와 1-클릭 실행 버튼
   - **카테고리 칩 필터 바**: 페이지 전환 없는 실시간 1-클릭 라이브 필터링
   - **16:10 고밀도 게이밍 카드**: 호버 플레이 오버레이 및 소요 시간 안내
-- ⏱️ **밀리초(ms) 단위 정밀 반응속도 테스트 게임**: 부정클릭 방지, 5회 평균값 계산 및 S~F 등급 판정
-- ☁️ **Cloudflare Workers SSR Edge Deployment**: 빠른 서버 사이드 렌더링 및 에지 배포
+- ⏱️ **밀리초(ms) 단위 정밀 반응속도 및 기억력 테스트 게임**: 부정클릭 방지, 5회 평균값 계산 및 S~F 등급 판정
+- ☁️ **Cloudflare Free Tier Production Architecture**:
+  - **Hono + Cloudflare Workers**: 고성능 서버리스 API 백엔드
+  - **Cloudflare D1**: 글로벌 에지 데이터베이스 (유저, 세션, 게임 점수, 랭킹)
+  - **Google & Discord OAuth**: HttpOnly 세션 기반 보안 인증
+- 🔄 **Cloudflare Exit Strategy**: Hono business logic과 Repository Abstraction을 통해 Node.js + Docker + PostgreSQL 구조로의 용이한 전환 보장
 
 ---
 
@@ -42,10 +46,16 @@ pnpm install
 pnpm dev
 ```
 
-또는 웹 앱 전용 개발 서버 실행:
+웹 앱 전용 실행:
 
 ```bash
 pnpm --filter @gamemoa/web dev
+```
+
+API 백엔드 전용 실행:
+
+```bash
+pnpm --filter @gamemoa/api dev
 ```
 
 ### 4. 웹 페이지 접속 (Open Page)
@@ -65,10 +75,10 @@ pnpm lint
 # TypeScript 타입 검사
 pnpm typecheck
 
-# 단위 테스트 실행 (node:test - 19개 테스트 100% 통과)
+# 단위 테스트 실행
 pnpm test
 
-# 전체 프로젝트 빌드 (Turbo build - 8개 패키지 성공)
+# 전체 프로젝트 빌드 (Turbo build)
 pnpm build
 ```
 
@@ -78,12 +88,13 @@ pnpm build
 
 | 영역 | 기술 스택 |
 |---|---|
-| **Core** | TypeScript (Strict Mode) |
-| **Framework** | React 19, React Router v7 (Framework Mode) |
-| **Styling** | Tailwind CSS v4, Dark Space Navy Theme |
-| **Runtime / Edge** | Cloudflare Workers |
+| **Frontend** | React 19, React Router v7 (Framework Mode), Tailwind CSS v4 |
+| **Backend** | Hono, TypeScript, Zod Validation |
+| **Database** | Cloudflare D1 (SQL) & Repository Abstraction Layer |
+| **Auth** | Google OAuth (GIS), Discord OAuth 2.0, HttpOnly Cookie Session |
+| **Runtime / Hosting** | Cloudflare Workers & Cloudflare Pages / Static Assets |
+| **CI/CD** | GitHub Actions & Wrangler CLI |
 | **Monorepo** | pnpm workspaces, Turborepo |
-| **Testing** | Node.js Test Runner (`node:test`), tsx |
 
 ---
 
@@ -92,20 +103,19 @@ pnpm build
 ```text
 gamemoa/
 ├── apps/
-│   └── web/                   # 웹 UI & SSR Server (React Router v7 + Cloudflare)
-│       ├── app/
-│       │   ├── components/    # Layout(Header, Sidebar, Footer), UI(GameCard, HeroSpotlight, CategoryChips)
-│       │   ├── routes/        # Home, Games, GameSlug 라우트
-│       │   └── app.css        # Tailwind v4 디자인 시스템
+│   ├── web/                   # 웹 UI & SSR Server (React Router v7 + Cloudflare)
+│   └── api/                   # Hono API Backend (Cloudflare Workers / Node.js portable)
 ├── games/
-│   └── reaction-time/         # 반응속도 테스트 게임 (독립 패키지 플러그인)
+│   ├── reaction-time/         # 반응속도 테스트 게임
+│   └── memory-test/           # 순서 기억력 테스트 게임
 ├── packages/
-│   ├── auth/                  # Better Auth 인증 계층
-│   ├── core/                  # 비즈니스 도메인 및 포트 인터페이스
-│   ├── db/                    # D1 / Drizzle ORM 스키마 & 마이그레이션
+│   ├── auth/                  # Client Auth Service & Auth Context
+│   ├── core/                  # 도메인 모델, 비즈니스 서비스 & Repository 인터페이스
+│   ├── db/                    # D1 Repository 구현체, 마이그레이션 & SQL 스키마
 │   ├── game-sdk/              # 게임 모듈 공통 계약 & 스코어링 인터페이스
-│   ├── shared/                # Zod 공통 검증 스키마 & 유틸리티
+│   ├── shared/                # Zod 공통 검증 스키마 & 타입
 │   └── ui/                    # 공통 UI 컴포넌트 & GameShell
+├── docs/                      # 문서 및 진행 상황 기록 (WORK_PROGRESS.md)
 ├── GAMEMOA_BLUEPRINT.md       # 아키텍처 및 시스템 설계 명세서
 └── AGENTS.md                  # AI 코딩 및 개발 규칙 명세서
 ```

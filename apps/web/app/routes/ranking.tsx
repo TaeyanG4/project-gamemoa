@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
-import { Trophy, Medal, Sparkles, Filter } from "lucide-react";
-import { MOCK_LEADERBOARD, filterLeaderboard } from "@gamemoa/core";
+import { useState, useEffect, useMemo } from "react";
+import { Trophy, Medal } from "lucide-react";
+import { MOCK_LEADERBOARD, filterLeaderboard, fetchLeaderboardApi } from "@gamemoa/core";
+import type { LeaderRecord } from "@gamemoa/shared";
 import { gameManifests } from "../features/catalog/registry";
 
 export function meta() {
@@ -12,10 +13,38 @@ export function meta() {
 
 export default function Ranking() {
   const [selectedGameId, setSelectedGameId] = useState<string>("all");
+  const [apiRecords, setApiRecords] = useState<LeaderRecord[] | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const filteredRecords = useMemo(() => {
-    return filterLeaderboard(MOCK_LEADERBOARD, selectedGameId);
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+
+    async function loadData() {
+      const records = await fetchLeaderboardApi(selectedGameId);
+      if (isMounted) {
+        if (records.length > 0) {
+          setApiRecords(records);
+        } else {
+          setApiRecords(null);
+        }
+        setIsLoading(false);
+      }
+    }
+
+    void loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [selectedGameId]);
+
+  const displayRecords = useMemo(() => {
+    if (apiRecords && apiRecords.length > 0) {
+      return apiRecords;
+    }
+    return filterLeaderboard(MOCK_LEADERBOARD, selectedGameId);
+  }, [apiRecords, selectedGameId]);
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-7xl mx-auto flex-1 select-none">
@@ -28,7 +57,7 @@ export default function Ranking() {
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-text-primary">명예의 전당</h1>
           <p className="text-sm text-text-secondary mt-1">
-            최고의 반응속도와 두뇌 회전 기록에 도전한 유저들의 랭킹입니다.
+            최고의 반응속도와 두뇌 회전 기록에 도전한 유저들의 실시간 랭킹입니다.
           </p>
         </div>
       </div>
@@ -71,78 +100,80 @@ export default function Ranking() {
                 <th className="py-4 px-6">플레이어</th>
                 <th className="py-4 px-6">종목</th>
                 <th className="py-4 px-6">기록</th>
-                <th className="py-4 px-6">등급</th>
                 <th className="py-4 px-6">달성일</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50 text-sm font-medium text-text-primary">
-              {filteredRecords.map((record, index) => {
-                const rank = index + 1;
-
-                return (
-                  <tr key={record.id} className="hover:bg-surface-overlay/50 transition-colors">
-                    {/* Rank Badge */}
-                    <td className="py-4 px-6 whitespace-nowrap">
-                      {rank === 1 && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40 shadow-md">
-                          <Medal className="w-4 h-4" /> 1위
-                        </span>
-                      )}
-                      {rank === 2 && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
-                          <Medal className="w-4 h-4" /> 2위
-                        </span>
-                      )}
-                      {rank === 3 && (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
-                          <Medal className="w-4 h-4" /> 3위
-                        </span>
-                      )}
-                      {rank > 3 && (
-                        <span className="text-text-muted font-bold px-3">
-                          #{rank}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Player Name */}
-                    <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs">
-                        {record.playerName.slice(0, 2)}
-                      </div>
-                      <span>{record.playerName}</span>
-                    </td>
-
-                    {/* Game Title */}
-                    <td className="py-4 px-6 text-text-secondary whitespace-nowrap">
-                      {record.gameTitle}
-                    </td>
-
-                    {/* Score */}
-                    <td className="py-4 px-6 font-black text-brand-light text-base whitespace-nowrap">
-                      {record.formattedScore}
-                    </td>
-
-                    {/* Grade */}
-                    <td className="py-4 px-6 whitespace-nowrap">
-                      {record.grade && (
-                        <span className="px-2.5 py-1 rounded-lg bg-surface border border-border text-xs font-extrabold text-accent-green">
-                          {record.grade}등급
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Date */}
-                    <td className="py-4 px-6 text-text-muted text-xs whitespace-nowrap">
-                      {record.createdAt}
-                    </td>
-                  </tr>
-                );
-              })}
-
-              {filteredRecords.length === 0 && (
+              {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="py-16 text-center text-text-muted">
+                  <td colSpan={5} className="py-16 text-center text-text-muted animate-pulse">
+                    랭킹 정보를 불러오는 중...
+                  </td>
+                </tr>
+              ) : (
+                displayRecords.map((record, index) => {
+                  const rank = index + 1;
+
+                  return (
+                    <tr key={record.id} className="hover:bg-surface-overlay/50 transition-colors">
+                      {/* Rank Badge */}
+                      <td className="py-4 px-6 whitespace-nowrap">
+                        {rank === 1 && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40 shadow-md">
+                            <Medal className="w-4 h-4" /> 1위
+                          </span>
+                        )}
+                        {rank === 2 && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
+                            <Medal className="w-4 h-4" /> 2위
+                          </span>
+                        )}
+                        {rank === 3 && (
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
+                            <Medal className="w-4 h-4" /> 3위
+                          </span>
+                        )}
+                        {rank > 3 && (
+                          <span className="text-text-muted font-bold px-3">
+                            #{rank}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Player Name */}
+                      <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
+                          {record.avatarUrl ? (
+                            <img src={record.avatarUrl} alt={record.playerName} className="w-full h-full object-cover" />
+                          ) : (
+                            record.playerName.slice(0, 2)
+                          )}
+                        </div>
+                        <span>{record.playerName}</span>
+                      </td>
+
+                      {/* Game Title */}
+                      <td className="py-4 px-6 text-text-secondary whitespace-nowrap">
+                        {record.gameTitle}
+                      </td>
+
+                      {/* Score */}
+                      <td className="py-4 px-6 font-black text-brand-light text-base whitespace-nowrap">
+                        {record.formattedScore}
+                      </td>
+
+                      {/* Date */}
+                      <td className="py-4 px-6 text-text-muted text-xs whitespace-nowrap">
+                        {record.createdAt}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+
+              {!isLoading && displayRecords.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-16 text-center text-text-muted">
                     등록된 기록이 없습니다.
                   </td>
                 </tr>

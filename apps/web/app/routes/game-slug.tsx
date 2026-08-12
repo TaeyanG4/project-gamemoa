@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, type ComponentType } from "react";
 import { useParams, useNavigate } from "react-router";
 import { loadGame, gameManifests } from "../features/catalog/registry";
 import type { GameRuntimeContext, GameResult, GameProps } from "@gamemoa/game-sdk";
+import { saveLocalBestScore, submitScoreApi } from "@gamemoa/core";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function GamePlay() {
@@ -60,11 +61,16 @@ export default function GamePlay() {
     complete: async (gameResult) => {
       console.log("Game completed with result:", gameResult);
       setResult(gameResult);
+
+      const lowerIsBetter = slug === "reaction-time" || slug === "aim-test";
+      saveLocalBestScore(slug, gameResult.score, lowerIsBetter);
+      void submitScoreApi({ gameId: slug, score: gameResult.score });
     },
     cancel: () => {
       void navigate("/games");
     }
-  }), [navigate]);
+  }), [navigate, slug]);
+
 
   if (error) {
     return (

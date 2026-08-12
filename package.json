@@ -9,8 +9,11 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
+    "deploy": "pnpm --filter @gamemoa/api deploy && pnpm --filter @gamemoa/web deploy",
+    "d1:migrate": "pnpm --filter @gamemoa/api wrangler d1 migrations apply DB --local",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
+
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",

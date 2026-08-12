@@ -1,7 +1,8 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@gamemoa/auth";
 import { Link, useNavigate } from "react-router";
 import { User, LogOut, Trophy, Gamepad2, ArrowLeft } from "lucide-react";
-import { getLocalBestScore } from "@gamemoa/core";
+import { getLocalBestScore, fetchUserBestsApi } from "@gamemoa/core";
 import { gameManifests } from "../features/catalog/registry";
 
 export function meta() {
@@ -14,6 +15,13 @@ export function meta() {
 export default function ProfilePage() {
   const { user, isAuthenticated, logout, openLoginModal } = useAuth();
   const navigate = useNavigate();
+  const [serverBests, setServerBests] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      void fetchUserBestsApi().then(setServerBests);
+    }
+  }, [isAuthenticated, user]);
 
   if (!isAuthenticated || !user) {
     return (
@@ -80,7 +88,7 @@ export default function ProfilePage() {
         </button>
       </div>
 
-      {/* Local High Scores Section */}
+      {/* High Scores Section */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -95,7 +103,15 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {gameManifests.map((game) => {
-            const best = getLocalBestScore(game.slug);
+            const localBest = getLocalBestScore(game.slug);
+            const serverBest = serverBests[game.slug] ?? null;
+
+            let best: number | null = null;
+            if (serverBest !== null && localBest !== null) {
+              best = game.slug === "reaction-time" ? Math.min(serverBest, localBest) : Math.max(serverBest, localBest);
+            } else {
+              best = serverBest ?? localBest;
+            }
 
             return (
               <div

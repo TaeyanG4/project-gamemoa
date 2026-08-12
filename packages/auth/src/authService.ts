@@ -1,6 +1,7 @@
 const API_URL = typeof window !== "undefined"
-  ? ((import.meta as any).env?.VITE_API_URL ?? "http://localhost:8000")
-  : "http://localhost:8000";
+  ? ((import.meta as any).env?.VITE_API_URL ?? "http://localhost:8787")
+  : "http://localhost:8787";
+
 
 export type SocialProvider = "google" | "discord";
 export type AuthProviderName = SocialProvider;

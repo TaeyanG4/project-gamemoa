@@ -1,4 +1,8 @@
-import type { LeaderRecord, ScoreSubmission } from "@gamemoa/shared";
+import type { LeaderRecord } from "@gamemoa/shared";
+
+const API_URL = typeof window !== "undefined"
+  ? ((import.meta as any).env?.VITE_API_URL ?? "http://localhost:8787")
+  : "http://localhost:8787";
 
 export const MOCK_LEADERBOARD: LeaderRecord[] = [
   {
@@ -75,4 +79,79 @@ export function saveLocalBestScore(gameId: string, score: number, lowerIsBetter 
 export function filterLeaderboard(records: LeaderRecord[], gameId?: string): LeaderRecord[] {
   if (!gameId || gameId === "all") return records;
   return records.filter((r) => r.gameId === gameId);
+}
+
+/**
+ * Submit score to Hono API backend
+ */
+export async function submitScoreApi(payload: {
+  gameId: string;
+  score: number;
+  nickname?: string;
+}): Promise<{ success: boolean; score_id?: number }> {
+  try {
+    const res = await fetch(`${API_URL}/api/scores`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        game_id: payload.gameId,
+        score: payload.score,
+        nickname: payload.nickname,
+      }),
+    });
+    if (!res.ok) return { success: false };
+    return await res.json();
+  } catch {
+    return { success: false };
+  }
+}
+
+/**
+ * Fetch leaderboard from Hono API backend
+ */
+export async function fetchLeaderboardApi(gameId = "all"): Promise<LeaderRecord[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/scores/${encodeURIComponent(gameId)}`, {
+      credentials: "include",
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const list = data.leaderboard || [];
+
+    const titleMap: Record<string, string> = {
+      "reaction-time": "반응속도 테스트",
+      "memory-test": "순서 기억력 테스트",
+      "aim-test": "에임 테스트",
+    };
+
+    return list.map((item: any) => ({
+      id: String(item.id),
+      playerName: item.playerName || item.nickname || "게스트",
+      gameId: item.gameId || gameId,
+      gameTitle: titleMap[item.gameId] || item.gameId,
+      score: item.score,
+      formattedScore: item.formattedScore || `${item.score}`,
+      avatarUrl: item.avatarUrl || item.avatar_url,
+      createdAt: item.createdAt || item.created_at,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fetch user's personal bests from Hono API backend
+ */
+export async function fetchUserBestsApi(): Promise<Record<string, number>> {
+  try {
+    const res = await fetch(`${API_URL}/api/scores/user/me`, {
+      credentials: "include",
+    });
+    if (!res.ok) return {};
+    const data = await res.json();
+    return data.bests || {};
+  } catch {
+    return {};
+  }
 }
