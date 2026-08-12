@@ -44,7 +44,7 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 
 ## ☁️ 4. Cloudflare 이탈 전략 (Exit Strategy)
 
-GAMEMOA 아키텍처는 인프라 독립성을 100% 보장합니다:
+GAMEMOA는 핵심 도메인 로직과 저장소 인터페이스를 명확하게 분리하여 미래 인프라 전환 가능성을 고려해 설계되었습니다:
 
-- **API 엔진**: `@gamemoa/api` (Hono 기반)는 Cloudflare Workers뿐만 아니라 Node.js (`@hono/node-server`), Bun, Deno, Docker 컨테이너 환경에서 수정 없이 동작합니다.
-- **영속성 어댑터**: `packages/core`의 포트 인터페이스 (`ScoreRepository`, `UserRepository`, `SessionRepository`)를 따르므로, Cloudflare D1 대신 PostgreSQL/MySQL ORM 어댑터로 교체하더라도 도메인 비즈니스 로직은 영향을 받지 않습니다.
+- **API 엔진**: `@gamemoa/api` (Hono 기반)는 Hono의 이식 가능 웹 표준 아키텍처를 활용하여 Cloudflare Workers뿐만 아니라 Node.js (`@hono/node-server`), Bun, Deno, Docker 컨테이너 환경으로 유연하게 이식이 가능합니다.
+- **영속성 어댑터**: `packages/core`의 저장소 인터페이스 (`ScoreRepository`, `UserRepository`, `SessionRepository`)를 따르므로, Cloudflare D1 전용 어댑터 이면에 의존성을 격리하여 향후 PostgreSQL/MySQL ORM 어댑터 변경 시 핵심 비즈니스 로직 수정 범위를 최소화합니다.
