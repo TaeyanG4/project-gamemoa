@@ -8,6 +8,7 @@ import {
   D1AchievementRepository,
   D1DiscordLinkRepository,
   D1DiscordGuildRepository,
+  D1CreatorRepository,
 } from "@gamemoa/db";
 import {
   ScoreUseCases,
@@ -22,6 +23,7 @@ import {
   DiscordGuildDirectoryUseCases,
   DiscordGuildManagementUseCases,
   DiscordGuildXpUseCases,
+  CreatorUseCases,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -31,6 +33,7 @@ import {
   type AchievementRepository,
   type DiscordLinkRepository,
   type DiscordGuildRepository,
+  type CreatorRepository,
 } from "@gamemoa/core";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -44,6 +47,7 @@ export interface AppContainer {
   achievementRepo: AchievementRepository;
   discordLinkRepo: DiscordLinkRepository;
   discordGuildRepo: DiscordGuildRepository;
+  creatorRepo: CreatorRepository;
 
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
@@ -57,6 +61,7 @@ export interface AppContainer {
   discordGuildDirectoryUseCases: DiscordGuildDirectoryUseCases;
   discordGuildManagementUseCases: DiscordGuildManagementUseCases;
   discordGuildXpUseCases: DiscordGuildXpUseCases;
+  creatorUseCases: CreatorUseCases;
 }
 
 export function createContainer(db: D1Database): AppContainer {
@@ -69,6 +74,7 @@ export function createContainer(db: D1Database): AppContainer {
   const achievementRepo = new D1AchievementRepository(db);
   const discordLinkRepo = new D1DiscordLinkRepository(db);
   const discordGuildRepo = new D1DiscordGuildRepository(db);
+  const creatorRepo = new D1CreatorRepository(db);
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -82,6 +88,7 @@ export function createContainer(db: D1Database): AppContainer {
   const discordGuildDirectoryUseCases = new DiscordGuildDirectoryUseCases(discordGuildRepo);
   const discordGuildManagementUseCases = new DiscordGuildManagementUseCases(discordGuildRepo);
   const discordGuildXpUseCases = new DiscordGuildXpUseCases(discordGuildRepo, userRepo);
+  const creatorUseCases = new CreatorUseCases(creatorRepo);
 
   return {
     userRepo,
@@ -93,6 +100,7 @@ export function createContainer(db: D1Database): AppContainer {
     achievementRepo,
     discordLinkRepo,
     discordGuildRepo,
+    creatorRepo,
 
     scoreUseCases,
     personalizationUseCases,
@@ -106,6 +114,7 @@ export function createContainer(db: D1Database): AppContainer {
     discordGuildDirectoryUseCases,
     discordGuildManagementUseCases,
     discordGuildXpUseCases,
+    creatorUseCases,
   };
 }
 

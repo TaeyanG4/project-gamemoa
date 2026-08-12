@@ -18,11 +18,11 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 | ----- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)                     | ✅ 완료                                                                                       |
 | C     | My Page(내 프로필/기록 탭) / 닉네임·국가 변경 UI / 즐겨찾기·최근 플레이    | ✅ 완료 (공개 프로필 `/profile/:id`, `/me`·`/account` 완전 라우트 분리는 보류)                |
-| D     | XP 랭킹 UI, Creator 모델 기초                                              | 예정                                                                                          |
+| D     | XP 랭킹 UI, Creator 모델 기초                                              | ✅ 완료                                                                                       |
 | E     | Creator 채널 소유권 인증 + Featured 심사 엔진 (6시간 자동 재심사)          | 예정                                                                                          |
 | F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어               | ✅ 완료 (`games`/`link`/`profile`) — `rank`/`leaderboard`/`play`/`server`는 Phase H 선행 필요 |
 | H1    | Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`                          | ✅ 완료                                                                                       |
-| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`) | 예정                                                                                          |
+| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`) | ✅ 완료                                                                                       |
 | I     | 계정 통합 회귀 테스트, 최종 문서화, 프로덕션 검증                          | 예정                                                                                          |
 
 세부 정책(XP 지급/상한/멱등성, 레벨 공식, 도전과제 목록)은 `docs/PROGRESSION.md`를 참고하세요.

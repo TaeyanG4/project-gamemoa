@@ -9,6 +9,7 @@ import { profileRouter } from "./routes/profile.js";
 import { discordRouter } from "./routes/discordInteractions.js";
 import { discordLinkRouter } from "./routes/discordLink.js";
 import { discordGuildsRouter } from "./routes/discordGuilds.js";
+import { creatorsRouter } from "./routes/creators.js";
 import type { ApiEnv } from "./routes/auth.js";
 
 const app = new Hono<ApiEnv>();
@@ -82,6 +83,7 @@ app.route("/api/profile", profileRouter);
 app.route("/api/discord", discordRouter);
 app.route("/api/discord", discordLinkRouter);
 app.route("/api/discord/guilds", discordGuildsRouter);
+app.route("/api/creators", creatorsRouter);
 
 // 404 Handler
 app.notFound((c) => {

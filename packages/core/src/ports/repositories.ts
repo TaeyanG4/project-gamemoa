@@ -436,3 +436,88 @@ export interface DiscordGuildRepository {
     startOfWeekIso?: string,
   ): Promise<{ totalXp: number; rank: number | null }>;
 }
+
+export type CreatorPlatformType = "YOUTUBE" | "CHZZK" | "SOOP" | "TWITCH";
+export type CreatorStatusType = "UNVERIFIED" | "VERIFIED" | "SUSPENDED";
+export type FeaturedStatusType = "NONE" | "FEATURED" | "PARTNER";
+
+export interface CreatorProfile {
+  id: number;
+  userId: number;
+  status: CreatorStatusType;
+  featuredStatus: FeaturedStatusType;
+  featuredReason: string | null;
+  featuredSince: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatorPlatformAccount {
+  id: number;
+  creatorId: number;
+  platform: CreatorPlatformType;
+  platformUserId: string;
+  channelName: string;
+  channelHandle: string | null;
+  channelUrl: string;
+  avatarUrl: string | null;
+  verificationStatus: string;
+  verifiedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatorRankEntry {
+  userId: number;
+  nickname: string;
+  avatarUrl: string | null;
+  country: string | null;
+  creatorId: number;
+  featuredStatus: FeaturedStatusType;
+  platformAccounts: Array<{
+    platform: CreatorPlatformType;
+    channelName: string;
+    channelUrl: string;
+    avatarUrl: string | null;
+  }>;
+  score?: number | undefined;
+  formattedScore?: string | undefined;
+  gameId?: string | undefined;
+  gameTitle?: string | undefined;
+  totalXp?: number | undefined;
+  level?: number | undefined;
+  rank: number;
+}
+
+export interface CreatorRepository {
+  findProfileByUserId(
+    userId: number,
+  ): Promise<(CreatorProfile & { platformAccounts: CreatorPlatformAccount[] }) | null>;
+  findProfileById(
+    creatorId: number,
+  ): Promise<(CreatorProfile & { platformAccounts: CreatorPlatformAccount[] }) | null>;
+  upsertProfile(input: {
+    userId: number;
+    status: CreatorStatusType;
+    featuredStatus?: FeaturedStatusType;
+    featuredReason?: string | null;
+  }): Promise<CreatorProfile>;
+  addPlatformAccount(input: {
+    creatorId: number;
+    platform: CreatorPlatformType;
+    platformUserId: string;
+    channelName: string;
+    channelHandle?: string | null;
+    channelUrl: string;
+    avatarUrl?: string | null;
+    verificationStatus?: string;
+  }): Promise<CreatorPlatformAccount>;
+  getCreatorRankings(options: {
+    mode: "score" | "xp";
+    gameId?: string;
+    direction?: "asc" | "desc";
+    platform?: CreatorPlatformType;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ entries: CreatorRankEntry[]; total: number }>;
+}

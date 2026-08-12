@@ -1,41 +1,73 @@
 import { useState, useEffect, useCallback } from "react";
-import { Trophy, Medal, AlertCircle, RefreshCw } from "lucide-react";
+import { Trophy, Medal, AlertCircle, RefreshCw, Zap, Video, Gamepad2 } from "lucide-react";
 import { fetchLeaderboardApi } from "../features/scores/api";
-import type { LeaderRecord } from "@gamemoa/contracts";
+import { fetchXpLeaderboardApi } from "../features/progression/api";
+import { fetchCreatorRankingsApi } from "../features/creators/creatorApi";
+import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@gamemoa/contracts";
+
+import { levelForTotalXp } from "@gamemoa/core";
+
 import { gameManifests } from "../features/catalog/registry";
 
 export function meta() {
   return [
-    { title: "명예의 전당 (랭킹) | gamemoa" },
-    { name: "description", content: "최고 기록 랭킹과 유저 기록을 확인하세요." },
+    { title: "명예의 전당 (랭킹) | GAMEMOA" },
+    { name: "description", content: "최고 기록, XP 레벨, 스트리머 랭킹을 확인하세요." },
   ];
 }
 
+type MainTab = "game" | "xp" | "creator";
 type LeaderboardState = "loading" | "success" | "error";
 
 export default function Ranking() {
+  const [mainTab, setMainTab] = useState<MainTab>("game");
+
+  // Game Score Ranking state
   const [selectedGameId, setSelectedGameId] = useState<string>("all");
-  const [records, setRecords] = useState<LeaderRecord[]>([]);
+  const [gameRecords, setGameRecords] = useState<LeaderRecord[]>([]);
+
+  // XP Ranking state
+  const [xpRecords, setXpRecords] = useState<XpLeaderboardEntry[]>([]);
+
+  // Creator Ranking state
+  const [creatorMode, setCreatorMode] = useState<"score" | "xp">("score");
+  const [selectedPlatform, setSelectedPlatform] = useState<string>("ALL");
+  const [creatorRecords, setCreatorRecords] = useState<CreatorRankEntryDto[]>([]);
+
   const [status, setStatus] = useState<LeaderboardState>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const loadData = useCallback(async (gameId: string) => {
+  const loadData = useCallback(async () => {
     setStatus("loading");
     setErrorMsg(null);
     try {
-      const data = await fetchLeaderboardApi(gameId);
-      setRecords(data);
+      if (mainTab === "game") {
+        const data = await fetchLeaderboardApi(selectedGameId);
+        setGameRecords(data);
+      } else if (mainTab === "xp") {
+        const res = await fetchXpLeaderboardApi(50);
+        setXpRecords(res.entries);
+      } else if (mainTab === "creator") {
+        const res = await fetchCreatorRankingsApi(
+          creatorMode,
+          selectedGameId,
+          selectedPlatform,
+          50,
+          0,
+        );
+        setCreatorRecords(res.entries);
+      }
       setStatus("success");
     } catch (err) {
       console.error("Failed to load leaderboard:", err);
       setErrorMsg("랭킹 정보를 불러오지 못했습니다.");
       setStatus("error");
     }
-  }, []);
+  }, [mainTab, selectedGameId, creatorMode, selectedPlatform]);
 
   useEffect(() => {
-    void loadData(selectedGameId);
-  }, [selectedGameId, loadData]);
+    void loadData();
+  }, [loadData]);
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-7xl mx-auto flex-1 select-none">
@@ -44,60 +76,202 @@ export default function Ranking() {
         <div>
           <div className="flex items-center gap-2 text-accent-yellow font-bold text-xs uppercase tracking-wider mb-1">
             <Trophy className="w-4 h-4" />
-            <span>Leaderboard & High Scores</span>
+            <span>Leaderboard & Community Hall of Fame</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-text-primary">명예의 전당</h1>
           <p className="text-sm text-text-secondary mt-1">
-            최고의 반응속도와 두뇌 회전 기록에 도전한 유저들의 실시간 랭킹입니다.
+            최고 기록, 유저 활동 레벨, 그리고 검증된 스트리머 랭킹입니다.
           </p>
+        </div>
+
+        {/* Top-Level Mode Tabs */}
+        <div className="flex items-center gap-1.5 rounded-2xl bg-surface-sidebar p-1.5 border border-border">
+          <button
+            onClick={() => setMainTab("game")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-extrabold transition-all cursor-pointer ${
+              mainTab === "game"
+                ? "bg-brand text-white shadow-lg shadow-brand/25"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <Gamepad2 className="w-4 h-4" />
+            <span>게임 랭킹</span>
+          </button>
+
+          <button
+            onClick={() => setMainTab("xp")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-extrabold transition-all cursor-pointer ${
+              mainTab === "xp"
+                ? "bg-brand text-white shadow-lg shadow-brand/25"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <Zap className="w-4 h-4 text-accent-yellow" />
+            <span>경험치 랭킹</span>
+          </button>
+
+          <button
+            onClick={() => setMainTab("creator")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs md:text-sm font-extrabold transition-all cursor-pointer ${
+              mainTab === "creator"
+                ? "bg-purple-600 text-white shadow-lg shadow-purple-600/25"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            <Video className="w-4 h-4 text-purple-300" />
+            <span>스트리머 랭킹</span>
+          </button>
         </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 border-b border-border/40">
-        <button
-          onClick={() => setSelectedGameId("all")}
-          className={`px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer border ${
-            selectedGameId === "all"
-              ? "bg-brand text-white border-brand shadow-lg shadow-brand/25"
-              : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary"
-          }`}
-        >
-          🏆 전체 랭킹
-        </button>
-
-        {gameManifests.map((game) => (
+      {/* Sub-Filters per Main Tab */}
+      {mainTab === "game" && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 border-b border-border/40">
           <button
-            key={game.slug}
-            onClick={() => setSelectedGameId(game.slug)}
+            onClick={() => setSelectedGameId("all")}
             className={`px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer border ${
-              selectedGameId === game.slug
+              selectedGameId === "all"
                 ? "bg-brand text-white border-brand shadow-lg shadow-brand/25"
                 : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary"
             }`}
           >
-            {game.title}
+            🏆 전체 종목
           </button>
-        ))}
-      </div>
 
-      {/* Leaderboard Table */}
+          {gameManifests.map((game) => (
+            <button
+              key={game.slug}
+              onClick={() => setSelectedGameId(game.slug)}
+              className={`px-4 py-2 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer border ${
+                selectedGameId === game.slug
+                  ? "bg-brand text-white border-brand shadow-lg shadow-brand/25"
+                  : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary"
+              }`}
+            >
+              {game.title}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {mainTab === "creator" && (
+        <div className="space-y-3 border-b border-border/40 pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Platform Filter Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+              {[
+                { id: "ALL", label: "🌐 전체 플랫폼" },
+                { id: "YOUTUBE", label: "▶️ YouTube" },
+                { id: "CHZZK", label: "🟢 치지직 (CHZZK)" },
+                { id: "SOOP", label: "🔵 SOOP (아프리카)" },
+                { id: "TWITCH", label: "💜 Twitch" },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPlatform(p.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                    selectedPlatform === p.id
+                      ? "bg-purple-600 text-white border-purple-500 shadow-md"
+                      : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Metric Mode Switch */}
+            <div className="flex items-center gap-1 rounded-xl bg-surface-sidebar p-1 border border-border self-start sm:self-auto">
+              <button
+                onClick={() => setCreatorMode("score")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  creatorMode === "score"
+                    ? "bg-purple-600 text-white"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                🎮 게임 점수
+              </button>
+              <button
+                onClick={() => setCreatorMode("xp")}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  creatorMode === "xp"
+                    ? "bg-purple-600 text-white"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                ⚡ 경험치 (XP)
+              </button>
+            </div>
+          </div>
+
+          {/* If Creator Score mode, show game selector pills */}
+          {creatorMode === "score" && (
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2">
+              <button
+                onClick={() => setSelectedGameId("all")}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all border ${
+                  selectedGameId === "all"
+                    ? "bg-purple-500/20 text-purple-300 border-purple-400/40"
+                    : "bg-surface-raised text-text-muted border-border/60 hover:text-text-primary"
+                }`}
+              >
+                전체 종목
+              </button>
+              {gameManifests.map((game) => (
+                <button
+                  key={game.slug}
+                  onClick={() => setSelectedGameId(game.slug)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all border ${
+                    selectedGameId === game.slug
+                      ? "bg-purple-500/20 text-purple-300 border-purple-400/40"
+                      : "bg-surface-raised text-text-muted border-border/60 hover:text-text-primary"
+                  }`}
+                >
+                  {game.title}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Leaderboard Table Container */}
       <div className="w-full bg-surface-raised rounded-3xl border border-border overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-sidebar border-b border-border text-xs font-extrabold text-text-muted uppercase tracking-wider">
                 <th className="py-4 px-6">순위</th>
-                <th className="py-4 px-6">플레이어</th>
-                <th className="py-4 px-6">종목</th>
-                <th className="py-4 px-6">기록</th>
-                <th className="py-4 px-6">달성일</th>
+                <th className="py-4 px-6">{mainTab === "creator" ? "스트리머" : "플레이어"}</th>
+                {mainTab === "game" && (
+                  <>
+                    <th className="py-4 px-6">종목</th>
+                    <th className="py-4 px-6">기록</th>
+                    <th className="py-4 px-6">달성일</th>
+                  </>
+                )}
+                {mainTab === "xp" && (
+                  <>
+                    <th className="py-4 px-6">레벨</th>
+                    <th className="py-4 px-6">총 경험치</th>
+                  </>
+                )}
+                {mainTab === "creator" && (
+                  <>
+                    <th className="py-4 px-6">연동 채널</th>
+                    <th className="py-4 px-6">
+                      {creatorMode === "score" ? "기록 / 종목" : "활동 레벨 (XP)"}
+                    </th>
+                    <th className="py-4 px-6">뱃지</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50 text-sm font-medium text-text-primary">
               {status === "loading" && (
                 <tr>
-                  <td colSpan={5} className="py-16 text-center text-text-muted animate-pulse">
+                  <td colSpan={6} className="py-16 text-center text-text-muted animate-pulse">
                     랭킹 정보를 불러오는 중...
                   </td>
                 </tr>
@@ -105,12 +279,12 @@ export default function Ranking() {
 
               {status === "error" && (
                 <tr>
-                  <td colSpan={5} className="py-16 text-center text-text-muted">
+                  <td colSpan={6} className="py-16 text-center text-text-muted">
                     <div className="flex flex-col items-center justify-center gap-3">
                       <AlertCircle className="w-8 h-8 text-accent-red" />
                       <p className="font-semibold text-text-primary">{errorMsg}</p>
                       <button
-                        onClick={() => void loadData(selectedGameId)}
+                        onClick={() => void loadData()}
                         className="inline-flex items-center gap-2 px-4 py-2 bg-surface-raised border border-border rounded-xl text-xs font-bold hover:bg-surface-overlay transition-colors cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
@@ -121,75 +295,262 @@ export default function Ranking() {
                 </tr>
               )}
 
-              {status === "success" && records.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-16 text-center text-text-muted">
-                    아직 등록된 기록이 없습니다. 첫 기록의 주인공이 되어보세요.
-                  </td>
-                </tr>
+              {/* Mode 1: Game Score Leaderboard */}
+              {status === "success" && mainTab === "game" && (
+                <>
+                  {gameRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-16 text-center text-text-muted">
+                        아직 등록된 기록이 없습니다. 첫 기록의 주인공이 되어보세요.
+                      </td>
+                    </tr>
+                  ) : (
+                    gameRecords.map((record, index) => {
+                      const rank = index + 1;
+
+                      return (
+                        <tr
+                          key={record.id}
+                          className="hover:bg-surface-overlay/50 transition-colors"
+                        >
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            {rank === 1 && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40 shadow-md">
+                                <Medal className="w-4 h-4" /> 1위
+                              </span>
+                            )}
+                            {rank === 2 && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
+                                <Medal className="w-4 h-4" /> 2위
+                              </span>
+                            )}
+                            {rank === 3 && (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
+                                <Medal className="w-4 h-4" /> 3위
+                              </span>
+                            )}
+                            {rank > 3 && (
+                              <span className="text-text-muted font-bold px-3">#{rank}</span>
+                            )}
+                          </td>
+
+                          <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
+                              {record.avatarUrl ? (
+                                <img
+                                  src={record.avatarUrl}
+                                  alt={record.playerName}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                record.playerName.slice(0, 2)
+                              )}
+                            </div>
+                            <span>{record.playerName}</span>
+                          </td>
+
+                          <td className="py-4 px-6 text-text-secondary whitespace-nowrap">
+                            {record.gameTitle}
+                          </td>
+
+                          <td className="py-4 px-6 font-black text-brand-light text-base whitespace-nowrap">
+                            {record.formattedScore}
+                          </td>
+
+                          <td className="py-4 px-6 text-text-muted text-xs whitespace-nowrap">
+                            {record.createdAt}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </>
               )}
 
-              {status === "success" &&
-                records.map((record, index) => {
-                  const rank = index + 1;
-
-                  return (
-                    <tr key={record.id} className="hover:bg-surface-overlay/50 transition-colors">
-                      {/* Rank Badge */}
-                      <td className="py-4 px-6 whitespace-nowrap">
-                        {rank === 1 && (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40 shadow-md">
-                            <Medal className="w-4 h-4" /> 1위
-                          </span>
-                        )}
-                        {rank === 2 && (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
-                            <Medal className="w-4 h-4" /> 2위
-                          </span>
-                        )}
-                        {rank === 3 && (
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
-                            <Medal className="w-4 h-4" /> 3위
-                          </span>
-                        )}
-                        {rank > 3 && (
-                          <span className="text-text-muted font-bold px-3">#{rank}</span>
-                        )}
+              {/* Mode 2: XP Leaderboard */}
+              {status === "success" && mainTab === "xp" && (
+                <>
+                  {xpRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-16 text-center text-text-muted">
+                        아직 활동 내역이 있는 유저가 없습니다.
                       </td>
+                    </tr>
+                  ) : (
+                    xpRecords.map((record) => {
+                      const level = levelForTotalXp(record.totalXp);
 
-                      {/* Player Name */}
-                      <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
+                      return (
+                        <tr
+                          key={record.userId}
+                          className="hover:bg-surface-overlay/50 transition-colors"
+                        >
+                          <td className="py-4 px-6 whitespace-nowrap font-bold">
+                            {record.rank === 1 ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40">
+                                <Medal className="w-4 h-4" /> 1위
+                              </span>
+                            ) : record.rank === 2 ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
+                                <Medal className="w-4 h-4" /> 2위
+                              </span>
+                            ) : record.rank === 3 ? (
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
+                                <Medal className="w-4 h-4" /> 3위
+                              </span>
+                            ) : (
+                              <span className="text-text-muted px-3">#{record.rank}</span>
+                            )}
+                          </td>
+
+                          <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs overflow-hidden">
+                              {record.avatarUrl ? (
+                                <img
+                                  src={record.avatarUrl}
+                                  alt={record.nickname}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                record.nickname.slice(0, 2)
+                              )}
+                            </div>
+                            <span>{record.nickname}</span>
+                          </td>
+
+                          <td className="py-4 px-6 whitespace-nowrap">
+                            <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-extrabold text-indigo-300 border border-indigo-500/20">
+                              Lv. {level}
+                            </span>
+                          </td>
+
+                          <td className="py-4 px-6 font-black text-amber-300 text-base whitespace-nowrap">
+                            {record.totalXp.toLocaleString()} XP
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </>
+              )}
+
+              {/* Mode 3: Creator Ranking */}
+              {status === "success" && mainTab === "creator" && (
+                <>
+                  {creatorRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-16 text-center space-y-3">
+                        <div className="text-3xl">🎥</div>
+                        <p className="text-sm font-semibold text-text-secondary">
+                          아직 검증된 스트리머 기록이 없습니다
+                        </p>
+                        <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">
+                          GAMEMOA 크리에이터 채널 소유권 인증 서비스가 준비 중입니다. 인증된
+                          크리에이터의 게임 최고 기록과 활동 XP가 여기에 게시됩니다.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : (
+                    creatorRecords.map((record) => (
+                      <tr
+                        key={record.creatorId}
+                        className="hover:bg-surface-overlay/50 transition-colors"
+                      >
+                        <td className="py-4 px-6 whitespace-nowrap font-bold">
+                          <span className="text-purple-300 px-3">#{record.rank}</span>
+                        </td>
+
+                        <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-3">
                           {record.avatarUrl ? (
                             <img
                               src={record.avatarUrl}
-                              alt={record.playerName}
-                              className="w-full h-full object-cover"
+                              alt={record.nickname}
+                              className="w-9 h-9 rounded-full object-cover border border-purple-500/30"
                             />
                           ) : (
-                            record.playerName.slice(0, 2)
+                            <div className="w-9 h-9 rounded-full bg-purple-600/30 text-purple-200 flex items-center justify-center font-black text-xs border border-purple-500/30">
+                              {record.nickname.slice(0, 2)}
+                            </div>
                           )}
-                        </div>
-                        <span>{record.playerName}</span>
-                      </td>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-white">{record.nickname}</span>
+                              {record.country && (
+                                <span className="text-[10px] text-text-muted font-mono">
+                                  [{record.country}]
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
-                      {/* Game Title */}
-                      <td className="py-4 px-6 text-text-secondary whitespace-nowrap">
-                        {record.gameTitle}
-                      </td>
+                        <td className="py-4 px-6 text-xs whitespace-nowrap space-x-1.5">
+                          {record.platformAccounts.map((acc, idx) => (
+                            <a
+                              key={idx}
+                              href={acc.channelUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-sidebar border border-border/80 text-xs font-semibold hover:border-purple-500/40 hover:text-purple-300 transition-colors"
+                            >
+                              <span>
+                                {acc.platform === "YOUTUBE"
+                                  ? "▶️"
+                                  : acc.platform === "CHZZK"
+                                    ? "🟢"
+                                    : acc.platform === "SOOP"
+                                      ? "🔵"
+                                      : "💜"}
+                              </span>
+                              <span>{acc.channelName}</span>
+                            </a>
+                          ))}
+                        </td>
 
-                      {/* Score */}
-                      <td className="py-4 px-6 font-black text-brand-light text-base whitespace-nowrap">
-                        {record.formattedScore}
-                      </td>
+                        <td className="py-4 px-6 whitespace-nowrap font-black text-purple-200">
+                          {creatorMode === "score" ? (
+                            <div>
+                              <div>{record.formattedScore}</div>
+                              {record.gameTitle && (
+                                <div className="text-[11px] font-normal text-text-muted">
+                                  {record.gameTitle}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="text-amber-300">
+                                {(record.totalXp ?? 0).toLocaleString()} XP
+                              </div>
+                              <div className="text-[11px] font-normal text-text-muted">
+                                Lv. {record.level ?? 1}
+                              </div>
+                            </div>
+                          )}
+                        </td>
 
-                      {/* Date */}
-                      <td className="py-4 px-6 text-text-muted text-xs whitespace-nowrap">
-                        {record.createdAt}
-                      </td>
-                    </tr>
-                  );
-                })}
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                              record.featuredStatus === "PARTNER"
+                                ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
+                                : record.featuredStatus === "FEATURED"
+                                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                  : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                            }`}
+                          >
+                            {record.featuredStatus === "PARTNER"
+                              ? "PARTNER CREATOR"
+                              : record.featuredStatus === "FEATURED"
+                                ? "FEATURED CREATOR"
+                                : "VERIFIED CREATOR"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </>
+              )}
             </tbody>
           </table>
         </div>

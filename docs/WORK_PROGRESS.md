@@ -3,9 +3,9 @@
 # 현재 목표
 
 **GAMEMOA 플레이어 플랫폼 확장 스프린트 (My Page / Creator Ranking / Discord Community)** — 지금까지
-**Phase B(진행도 파운데이션)**, **Phase C(My Page)**, **Phase F(Discord HTTP Interactions 파운데이션)**,
-**Phase G(Discord 서버 시스템 & 커뮤니티 Hub)**, **Phase H1(Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`)**,
-**Phase H2(Discord 서버 리더보드 & 커맨드)**를 완수했습니다.
+**Phase B(진행도 파운데이션)**, **Phase C(My Page)**, **Phase D(XP 랭킹 UI & Creator 모델 파운데이션)**,
+**Phase F(Discord HTTP Interactions 파운데이션)**, **Phase G(Discord 서버 시스템 & 커뮤니티 Hub)**,
+**Phase H1(Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`)**, **Phase H2(Discord 서버 리더보드 & 커맨드)**를 완수했습니다.
 전체 스프린트 단계 구조는 `docs/ROADMAP.md` §1, 상세 설계는 `docs/PROGRESSION.md`(진행도),
 `docs/DISCORD_INTEGRATION.md`(Discord)를 참고하세요.
 
@@ -13,34 +13,35 @@
 
 ## 완료
 
-### Phase H2: Discord Server Leaderboards & Commands (이번 세션)
+### Phase D: XP Ranking UI & Creator Model Foundation (이번 세션)
 
-- [x] **D1 마이그레이션 `0009_discord_guild_xp_weekly_idx.sql`**:
-  - `idx_discord_guild_xp_guild_created` 인덱스 추가 (`(guild_id, created_at)`)
-- [x] **KST 주간 경계 도메인 헬퍼 (`getStartOfWeekKst`)**:
-  - Asia/Seoul 기준 월요일 00:00:00 KST = UTC 일요일 15:00:00 ISO 문자열 계산 (월/연도 경계 안전 처리)
-- [x] **리포지토리 쿼리 & 유즈케이스 구현**:
-  - `getGuildXpLeaderboard`: 길드 내 사용자별 누적/주간 기여 XP 랭킹 (XP DESC, user_id ASC 결정론적 정렬)
-  - `getGuildSummary`: 길드 총 활동 XP, 주간 활동 XP, GAMEMOA 참여 유저 수
-  - `getGlobalGuildActivityRanking`: PUBLIC + ACTIVE 서버 대상 전역 활동 XP 랭킹 (PRIVATE/UNLISTED 노출 엄격 격리)
-  - `getGuildGameLeaderboard`: canonical GAMEMOA `scores` 테이블 재활용하여 서버 참가자 스코어 랭킹 조회 (방향성 적용)
-  - `getGuildUserXpRank`: 길드 내 특정 연동 유저의 XP 및 순위 반환
-- [x] **Discord 슬래시 커맨드 연결 (`commands.ts` & `interactionHandlers.ts`)**:
-  - `/gamemoa rank`: 서버 내 나의 기여 XP & 랭크 확인 (미연동/미등록 서버 거부)
-  - `/gamemoa leaderboard`: 서버 내 Top 10 XP 랭킹 & 웹 서버 페이지 링크
-  - `/gamemoa server`: 서버 정보 요약 (총 XP, 주간 XP, 참여자 수, 웹 URL)
-- [x] **웹 커뮤니티 UI 확장**:
-  - `/discord/servers/:slug`: 탭 `[⚡ 서버 XP]` `[📅 주간 XP]` `[🎮 게임별 기록]` 및 지표 카드로 교체
-  - `/discord`: "이번 주 서버 활동 랭킹" (PUBLIC 서버 전용) 사이드바 위젯 추가
-- [x] **단위/통합 테스트 완벽 통과**: `discordGuildXpUseCases.test.ts` 및 `discordGuilds.test.ts` (100% 그린)
+- [x] **D1 마이그레이션 `0010_creator_foundation.sql`**:
+  - `creator_profiles` (`user_id UNIQUE`, `status`, `featured_status`, `featured_reason`, `featured_since`, timestamps)
+  - `creator_platform_accounts` (`creator_id`, `platform`, `platform_user_id`, `channel_name`, `channel_handle`, `channel_url`, `avatar_url`, `verification_status`, `verified_at`, `UNIQUE(platform, platform_user_id)`)
+- [x] **계정 원칙 준수**:
+  - Creator는 독자 계정이 아니라 GAMEMOA User의 선택적 1:1 확장에 불과함 (`user_id UNIQUE`).
+- [x] **계층적 아키텍처 수호**:
+  - `@gamemoa/db`는 `GAME_MANIFEST_MAP`에 디커플링되어 순수 원시 데이터 반환.
+  - `@gamemoa/core`의 `CreatorUseCases`에서 게임 카탈로그 명세 기반 포맷팅 및 XP 레벨 공식 통합.
+- [x] **랭킹 & 통합 정보 구조 (IA) 완성 (`/ranking`)**:
+  - 최상위 모드 탭: `[🎮 게임 랭킹]`, `[⚡ 경험치 랭킹]`, `[🎥 스트리머 랭킹]`
+  - 스트리머 랭킹 서브 필터: `[전체]`, `[YouTube]`, `[CHZZK]`, `[SOOP]`, `[Twitch]` 플랫폼 필터 & `[게임 점수]` / `[경험치]` 지표 토글
+  - 검증된 크리에이터가 없는 초기 상태를 위한 정돈된 Empty State UI 제공.
+- [x] **단위/통합 테스트**: `creatorUseCases.test.ts` & `creators.test.ts` (100% 그린)
+
+### Phase H2: Discord Server Leaderboards & Commands (이전 세션)
+
+- [x] **D1 마이그레이션 `0009_discord_guild_xp_weekly_idx.sql`**
+- [x] **KST 주간 경계 도메인 헬퍼 (`getStartOfWeekKst`)**
+- [x] **리포지토리 쿼리 & 유즈케이스 구현 (`getGuildXpLeaderboard`, `getGuildSummary`, `getGlobalGuildActivityRanking`, `getGuildGameLeaderboard`, `getGuildUserXpRank`)**
+- [x] **Discord 슬래시 커맨드 연결 (`/gamemoa rank`, `/gamemoa leaderboard`, `/gamemoa server`)**
+- [x] **웹 커뮤니티 UI 확장 (`/discord/servers/:slug`, `/discord` 위젯)**
 
 ### Phase H1: Discord 길드 XP 귀속 파운데이션 & `/gamemoa play` (이전 세션)
 
 - [x] **D1 마이그레이션 `0008_discord_guild_xp.sql`**
-- [x] **3개 XP 개념의 엄격한 분리** (Global GAMEMOA XP vs Guild-local User XP vs Guild Activity XP)
+- [x] **3개 XP 개념의 엄격한 분리**
 - [x] **`/gamemoa play [game]` 슬래시 커맨드**
-- [x] **Referer 토큰 누출 방지 & SPA 연동**
-- [x] **1:1 원자적 귀속 & 일일 상한 연동**
 
 ---
 
@@ -48,13 +49,11 @@
 
 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-- **Phase D~E: Creator 모델** — YouTube/CHZZK/SOOP/Twitch 채널 소유권 인증, Featured Creator 심사 엔진, Creator Ranking UI.
+- **Phase E**: Creator 채널 소유권 인증 + Featured 심사 엔진 (6시간 자동 재심사)
 - **Phase I**: 계정 통합 회귀 테스트 확장, 최종 문서화 및 프로덕션 배포 검증.
 
 ---
 
 ## 다음 작업 (Next Action)
 
-`Phase D — XP Ranking UI & Creator Model Foundation`
-
----
+`Phase E — Creator Ownership Verification & Featured Qualification Engine`
