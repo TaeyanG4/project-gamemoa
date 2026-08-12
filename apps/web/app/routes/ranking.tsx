@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from "react";
 import { Trophy, Medal } from "lucide-react";
-import { filterLeaderboard } from "@gamemoa/core";
 import { MOCK_LEADERBOARD, fetchLeaderboardApi } from "../features/scores/api";
 import type { LeaderRecord } from "@gamemoa/shared";
 import { gameManifests } from "../features/catalog/registry";
+
+function filterLeaderboard(records: LeaderRecord[], gameId?: string): LeaderRecord[] {
+  if (!gameId || gameId === "all") return records;
+  return records.filter((rec) => rec.gameId === gameId);
+}
 
 export function meta() {
   return [

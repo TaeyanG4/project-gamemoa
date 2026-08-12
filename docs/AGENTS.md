@@ -12,8 +12,8 @@
 `pnpm architecture:check` (`scripts/verify-architecture.ts`) 및 `pnpm registry:check` (`scripts/check-registry.ts`)가 CI에서 자동 검사하며, 위반 시 CI 빌드가 즉시 실패합니다.
 
 1. **Game Loader 수동 등록 금지**: `apps/web/app/features/catalog/registry.ts`에 게임 로더를 수동으로 등록하지 않으며, `pnpm generate:registry`를 통해 자동 생성된 `gameLoaders.generated.ts`를 사용합니다.
-2. **Game Manifest Export 규칙**: 모든 미니게임 패키지(`games/*`)는 `src/manifest.ts`에서 `export const manifest` 규칙을 준수해야 하며, legacy fallback 구문을 추가하지 않습니다.
-3. **레지스트리 최신성 보장**: 생성된 파일(`gameRegistry.generated.ts`, `gameLoaders.generated.ts`)은 변경 발생 시 반드시 `pnpm generate:registry`를 실행하여 커밋해야 합니다.
+2. **생성된 파일 결정론성 및 불변성**: 생성 파일(`gameRegistry.generated.ts`, `gameLoaders.generated.ts`)은 Prettier 경로별 설정으로 캐노니컬(canonical)하게 생성되며, 수동 편집을 엄금합니다. `pnpm registry:check`는 `pnpm format` 실행 후에도 0 diff 통과해야 합니다.
+3. **Game Manifest Export 규칙**: 모든 미니게임 패키지(`games/*`)는 `src/manifest.ts`에서 `export const manifest` 규칙을 준수해야 합니다.
 4. **Domain/Core 순수성 (`packages/core`)**: Browser API (`window`, `localStorage`, `fetch`), Hono, Cloudflare bindings, React, `@gamemoa/db` 어댑터, 프로덕션 URL을 절대 포섭하거나 import하지 않습니다.
 5. **API Contract 일원화 (`packages/contracts`)**: API 요청/응답 Zod 스키마 및 DTO 타입은 `@gamemoa/contracts`에 위치하며, `@gamemoa/shared`에 중복 정의하지 않습니다.
 6. **Persistence Adapter 순수성 (`packages/db`)**: D1 저장소 어댑터는 `GAME_MANIFEST_MAP`에 의존하지 않으며 순수 SQL 실행 역할만 수행합니다. 게임 점수 정렬 및 포맷 정책은 Application Layer에서 결정합니다.
@@ -31,10 +31,11 @@
 
 ---
 
-## 3. 🚨 시크릿 및 마이그레이션 관리 규칙
+## 3. 🚨 시크릿, 마이그레이션 및 락파일 관리 규칙
 
 1. **시크릿 커밋 절대 금지**: API 토큰, OAuth Client Secret, 개인 키, `.env` / `.dev.vars` 파일을 절대 Git에 저장하거나 로그에 출력하지 않습니다.
 2. **마이그레이션 불변성 (Immutable Migrations)**: 이미 프로덕션에 적용된 마이그레이션 파일(`apps/api/migrations/*`)을 임의 수정하거나 삭제하지 않으며, DB 스키마 변경 시 반드시 새 마이그레이션 파일로 수행합니다.
+3. **패키지 락파일 동기화**: `package.json` 변경 시 반드시 `pnpm-lock.yaml`을 갱신하고 `pnpm install --frozen-lockfile` 성공을 사전 검증합니다.
 
 ---
 
@@ -43,18 +44,20 @@
 모든 AI Agent는 코드 및 문서 수정 후 다음 품질 게이트 및 원격 검증 절차를 완수해야 합니다:
 
 1. `pnpm install --frozen-lockfile` (의존성 동기화 확인)
-2. `pnpm format:check` (코드 포맷 확인)
-3. `pnpm lint` (ESLint 검사)
-4. `pnpm architecture:check` (레이어 경계 검사)
-5. `pnpm registry:check` (레지스트리 최신성 및 불변성 검사)
-6. `pnpm typecheck` (TypeScript 타입 검사)
-7. `pnpm test` (단위 및 통합 테스트)
-8. `pnpm build` (전체 프로젝트 빌드)
-9. `git status` 및 `git diff` 검토
-10. `git commit` & `git push origin main`
-11. GitHub Actions **CI Status = GREEN** 확인
-12. Cloudflare Deploy **Status = GREEN** 확인
-13. 프로덕션 API Health Check (`/api/health`) & Web Smoke Check 수행
+2. `pnpm generate:registry`
+3. `pnpm format`
+4. `pnpm format:check` (코드 포맷 확인)
+5. `pnpm architecture:check` (레이어 경계 검사)
+6. `pnpm registry:check` (Prettier 포맷팅 후 레지스트리 불변성 재검사)
+7. `pnpm lint` (ESLint 검사)
+8. `pnpm typecheck` (TypeScript 타입 검사)
+9. `pnpm test` (단위 및 통합 테스트)
+10. `pnpm build` (전체 프로젝트 빌드)
+11. `git status` 및 `git diff` 검토
+12. `git commit` & `git push origin main`
+13. GitHub Actions **CI Status = GREEN** 확인
+14. Cloudflare Deploy **Status = GREEN** 확인
+15. 프로덕션 API Health Check (`/api/health`) & Web Smoke Check 수행
 
 - **Local Validation 성공만으로 완료라 보고하지 않습니다.**
 - **GitHub Actions CI 및 Deploy Green이 확인된 경우에만 최종 완료 처리합니다.**

@@ -1,65 +1,77 @@
-import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { buildRegistrySources } from "./registry-builder.js";
 
-console.log("🔍 Checking Game Registry & Plugin Invariants...");
+async function checkRegistry() {
+  console.log("🔍 Checking Game Registry & Plugin Invariants (Pure In-Memory Verification)...");
 
-const rootDir = process.cwd();
-const gamesDir = path.join(rootDir, "games");
-const coreFile = path.join(
-  rootDir,
-  "packages",
-  "core",
-  "src",
-  "registry",
-  "gameRegistry.generated.ts",
-);
-const webFile = path.join(
-  rootDir,
-  "apps",
-  "web",
-  "app",
-  "features",
-  "catalog",
-  "gameLoaders.generated.ts",
-);
-
-// 1. Verify filesystem game packages
-const fsGameDirs = fs
-  .readdirSync(gamesDir, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
-  .map((entry) => entry.name)
-  .sort();
-
-const initialCoreContent = fs.existsSync(coreFile) ? fs.readFileSync(coreFile, "utf-8") : "";
-const initialWebContent = fs.existsSync(webFile) ? fs.readFileSync(webFile, "utf-8") : "";
-
-// Re-run registry generator deterministically
-execSync("pnpm exec tsx scripts/generate-game-registry.ts", { stdio: "inherit" });
-
-const updatedCoreContent = fs.existsSync(coreFile) ? fs.readFileSync(coreFile, "utf-8") : "";
-const updatedWebContent = fs.existsSync(webFile) ? fs.readFileSync(webFile, "utf-8") : "";
-
-if (initialCoreContent !== updatedCoreContent || initialWebContent !== updatedWebContent) {
-  console.error(
-    "\n❌ Game Registries are STALE! Please run 'pnpm generate:registry' and commit the generated files.\n",
+  const rootDir = process.cwd();
+  const coreFile = path.join(
+    rootDir,
+    "packages",
+    "core",
+    "src",
+    "registry",
+    "gameRegistry.generated.ts",
   );
-  process.exit(1);
+  const webFile = path.join(
+    rootDir,
+    "apps",
+    "web",
+    "app",
+    "features",
+    "catalog",
+    "gameLoaders.generated.ts",
+  );
+
+  const committedCoreContent = fs.existsSync(coreFile)
+    ? fs.readFileSync(coreFile, "utf-8").replace(/\r\n/g, "\n")
+    : "";
+  const committedWebContent = fs.existsSync(webFile)
+    ? fs.readFileSync(webFile, "utf-8").replace(/\r\n/g, "\n")
+    : "";
+
+  const { coreRegistryCode, webLoaderCode, gameEntries } = await buildRegistrySources(rootDir);
+
+  const expectedCoreContent = coreRegistryCode.replace(/\r\n/g, "\n");
+  const expectedWebContent = webLoaderCode.replace(/\r\n/g, "\n");
+
+  let hasStale = false;
+
+  if (committedCoreContent !== expectedCoreContent) {
+    console.error(`❌ Core Game Registry is STALE! Path: ${coreFile}`);
+    hasStale = true;
+  }
+
+  if (committedWebContent !== expectedWebContent) {
+    console.error(`❌ Web Loader Registry is STALE! Path: ${webFile}`);
+    hasStale = true;
+  }
+
+  if (hasStale) {
+    console.error(
+      "\n❌ Registry check failed! Please run 'pnpm generate:registry' locally and commit the generated files.\n",
+    );
+    process.exit(1);
+  }
+
+  // Verify full 3-set invariant matching: games/* package set == manifest set == web loader set
+  const fsGameSlugs = gameEntries.map((e) => e.manifest.slug).sort();
+  const loaderSlugs = Array.from(expectedWebContent.matchAll(/"([^"]+)":\s*\(\)\s*=>\s*import/g))
+    .map((m) => m[1])
+    .sort();
+
+  if (JSON.stringify(fsGameSlugs) !== JSON.stringify(loaderSlugs)) {
+    console.error(
+      `\n❌ Invariant Mismatch! Filesystem game slugs !== Web loader registry slugs.\n`,
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `✅ Verified Plugin Architecture Invariants: ${fsGameSlugs.length} games registered identically across filesystem, manifest registry, and web loaders.`,
+  );
+  console.log("✅ Game Registries are canonical and up to date! 0 Stale Registries Found.\n");
 }
 
-// 2. Verify Plugin Architecture Invariant: games/* package set == manifest set == web loader set
-const loaderSlugs = Array.from(updatedWebContent.matchAll(/"([^"]+)":\s*\(\)\s*=>\s*import/g))
-  .map((m) => m[1])
-  .sort();
-
-if (fsGameDirs.length !== loaderSlugs.length) {
-  console.error(
-    `\n❌ Game count mismatch! Filesystem games (${fsGameDirs.length}) !== Web Loader Registry (${loaderSlugs.length})\n`,
-  );
-  process.exit(1);
-}
-
-console.log(
-  `✅ Verified Plugin Architecture Invariants: ${fsGameDirs.length} games registered identically across filesystem, manifest registry, and web loaders.`,
-);
-console.log("✅ Game Registries are up to date! 0 Stale Registries Found.\n");
+void checkRegistry();

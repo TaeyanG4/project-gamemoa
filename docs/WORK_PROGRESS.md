@@ -1,50 +1,56 @@
 # GAMEMOA 작업 진행 현황 (WORK_PROGRESS)
 
-## 시작 상태 (Starting State)
+# 현재 목표
 
-- Commit SHA: `a6385e5` (`fix(ci): update pnpm-lock.yaml to fix frozen lockfile install, refine auth oauth infrastructure, and synchronize all docs in Korean`)
-- Local Status: `pnpm install --frozen-lockfile` 검증 완료 (`pnpm-lock.yaml` 동기화 완료)
-- Local Quality Gate: `format:check`, `lint`, `architecture:check`, `registry:check`, `typecheck`, `test`, `build` 전원 통과 (All Green)
-- Remote Status: GitHub `origin main`에 `a6385e5` 성공적으로 푸시됨
-- Production Status: API `https://gamemoa-api.gamemoa.workers.dev/api/health` (`200 OK`), Web `https://gamemoa-web.gamemoa.workers.dev/` (`200 OK`)
+GAMEMOA 기반 레지스트리 생성기 서식 결정론성(Determinism) 구조 결함 수정, Core 구조 중복 정비, API response Zod 검증 테스트 확장 및 원격 GitHub Actions CI Green & Cloudflare Deploy Green 완전 달성.
 
-## 완료된 작업 (Completed)
+## 시작 상태
 
-- [x] **P0: `pnpm-lock.yaml` 불일치 수정 및 원격 CI/CD 복구**
-  - `apps/web/package.json`의 Wrangler `^4.121.0` 버전에 맞추어 `pnpm-lock.yaml`을 재생성하고 `pnpm install --frozen-lockfile` 성공 확인.
-- [x] **게임 플러그인 아키텍처 레그레션 테스트 강화 (P1)**
-  - `scripts/check-registry.ts`에 `filesystem games == manifest registry == web loader registry` 불변성 검증 로직 추가.
-  - `scripts/generate-game-registry.ts` 결과물을 결정론적(deterministic)으로 정렬 및 헤더 주석 명시.
-- [x] **OAuth 인프라 레이어 분리 및 Thin Controller (P4)**
-  - OAuth 인증 외부 HTTP 통신 로직을 `apps/api/src/infrastructure/oauth/google.ts` 및 `discord.ts`로 분리.
-  - `apps/api/src/routes/auth.ts` 라우트를 HTTP/쿠키 전용 Thin Controller로 단순화.
-- [x] **API Response Contract Validation & Security Test (P3, P7)**
-  - API 통합 테스트(`apps/api/test/api.test.ts`)에 Origin rejection (CSRF 방어), Zod 스키마 검증, unauthenticated 테스트 확장.
-- [x] **Web Build Preparation 명시화 (P10)**
-  - `scripts/prepare-web-build.ts`에 React Router v7 SPA Mode와 Cloudflare Workers 빌드 간 `build/server` 디렉토리 유효성 필요 사유를 상세 한국어 주석으로 문서화.
-- [x] **문서 전체 한국어 본문 100% 동기화 (P13)**
-  - `README.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md`, `docs/GAMEMOA_BLUEPRINT.md`, `docs/AGENTS.md`, `docs/WORK_PROGRESS.md`, `docs/ROADMAP.md` 본문을 한국어로 전면 갱신.
+- **Starting SHA**: `c7aaede614a7e22b554d7b4f64eee3ca478ec575`
+- **Actual Local State**: Local Quality Gate All Green (`pnpm install --frozen-lockfile`, `generate:registry`, `format`, `architecture:check`, `registry:check`, `lint`, `typecheck`, `test`, `build`)
+- **Actual Remote CI State**: CI Failed (`registry:check` Prettier 서식 불일치 문제로 원격 CI RED)
+- **Actual Remote Deploy State**: SKIPPED (CI 실패로 배포 자동 건너뜀)
+- **Production Status**: API `https://gamemoa-api.gamemoa.workers.dev/api/health` (`200 OK`), Web `https://gamemoa-web.gamemoa.workers.dev/` (`200 OK`)
 
-## 진행 중인 작업 (In Progress)
+## 완료
 
-- [ ] 원격 GitHub Actions CI 및 Cloudflare Deploy 완료 트리거 확인.
+- [x] **P0: 레지스트리 생성기 캐노니컬 서식 결정론성 개편**
+  - `scripts/registry-builder.ts` 모듈을 신설하여 Prettier 경로별 설정(`prettier.resolveConfig`) 및 `filepath` 옵션을 적용한 캐노니컬 TypeScript 소스 생성.
+  - `scripts/generate-game-registry.ts` 및 `scripts/check-registry.ts`가 동일한 Prettier 생성 모듈을 공유하도록 통합.
+  - `scripts/check-registry.ts`를 파일을 직접 수정하지 않는 순수 메모리 비교 방식(Pure In-Memory Check)으로 개편.
+  - `pnpm generate:registry` ➔ `pnpm format` ➔ `pnpm registry:check` ➔ `pnpm format:check` 순서 실행 시 0 diff 및 0 stale 성공 확인.
+- [x] **P0: 레지스트리 회귀 단위 테스트 추가**
+  - `scripts/generate-game-registry.test.ts`를 작성하여 생성기 반복 실행 동일성, 슬러그 정렬, Prettier 서식 안점성 테스트 자동화.
+- [x] **P1: Core 구조 중복 제거 및 의존성 경량화**
+  - `packages/core/src/ports/repositories.ts`로 저장소 포트 인터페이스 위치 단일화 및 transitional re-export 정리.
+  - Core 패키지에서 불필요한 `@gamemoa/contracts` 및 `@gamemoa/shared` 의존성을 완전히 제거하여 pure domain/usecase/ports 레이어로 경량화.
+  - `ScoreUseCases` 테스트(`packages/core/test/scoreUseCases.test.ts`) 작성 (`FakeScoreRepository` 사용).
+- [x] **P2 & P3: API Contract 런타임 검증 & 통합 테스트 확장**
+  - `@gamemoa/contracts` Zod 스키마(`AuthMeResponseSchema`, `PersonalBestResponseSchema`, `LeaderboardResponseSchema`)를 사용하여 API 응답 JSON 런타임 스키마 검증.
+  - `apps/api/test/oauth.test.ts` 테스트 작성 (mock fetch 기반 Google/Discord OAuth 인프라 함수 테스트).
+- [x] **문서 본문 100% 한국어 최신화**
+  - `README.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md`, `docs/GAMEMOA_BLUEPRINT.md`, `docs/AGENTS.md`, `docs/WORK_PROGRESS.md`, `docs/ROADMAP.md` 전 문서를 명확한 한국어 표준 문장으로 작성.
 
-## 남은 작업 (Remaining)
+## 진행 중
 
-- [ ] 신규 미니게임(타자 테스트, 색각 이상 테스트) 스캐폴드 확장 (다음 스프린트).
+- [ ] 신규 푸시 후 원격 GitHub Actions CI 및 Cloudflare Deploy 완료 확인.
 
-## 알려진 문제 (Known Problems)
+## 남은 작업
 
-- 없음 (CI/CD lockfile 불일치 완벽 해소 및 로컬/원격 검증 완료).
+- [ ] 신규 미니게임(타자 테스트, 색각 이상 테스트) 확장 (기반 GREEN 완료 후 추진).
 
-## 다음 작업 (Next Action)
+## 알려진 문제
 
-- 원격 CI/CD 및 프로덕션 스모크 검증 상태 최종 보고.
+- 없음 (로컬 레지스트리 서식 불일치 원인 완벽 해소 및 검증 완료).
 
-## 마지막 원격 검증 (Last Verified Remote State)
+## 다음 작업
 
-- Commit SHA: `a6385e5`
-- Local Frozen Install: PASS (`pnpm install --frozen-lockfile` 864ms)
-- Remote Push: SUCCESS (`main -> main`)
-- Production API: OK (`status: ok`)
-- Production Web: OK (`200 OK`)
+- 최신 코드 및 문서 푸시, 원격 SHA 확인, GitHub Actions CI Green & Cloudflare Deploy Green 최종 확인.
+
+## 마지막 검증 상태
+
+- **Last Verified Local Quality Gate**: PASS (Prettier 포맷팅 후 `pnpm registry:check` 0 diff 통과)
+- **Local Frozen Lockfile**: PASS (`pnpm install --frozen-lockfile` 848ms)
+- **Remote Push**: Pending final push
+- **Production API**: OK (`status: ok`)
+- **Production Web**: OK (`200 OK`)

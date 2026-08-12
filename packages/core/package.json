@@ -9,9 +9,7 @@
     }
   },
   "dependencies": {
-    "@gamemoa/contracts": "workspace:*",
-    "@gamemoa/game-sdk": "workspace:*",
-    "@gamemoa/shared": "workspace:*"
+    "@gamemoa/game-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

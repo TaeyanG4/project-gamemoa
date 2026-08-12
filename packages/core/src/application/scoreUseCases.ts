@@ -1,6 +1,6 @@
 import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
 import { formatScore } from "@gamemoa/game-sdk";
-import type { Score, ScoreRepository } from "../repositories/interfaces.js";
+import type { Score, ScoreRepository } from "../ports/repositories.js";
 import { validateScorePayload } from "../domain/scoreValidation.js";
 
 export interface FormattedScoreRecord extends Score {

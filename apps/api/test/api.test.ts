@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import app from "../src/index.js";
+import {
+  AuthMeResponseSchema,
+  PersonalBestResponseSchema,
+  LeaderboardResponseSchema,
+} from "@gamemoa/contracts";
 
 test("GET / returns 200 OK with service info", async () => {
   const res = await app.request("http://localhost/");
@@ -17,11 +22,13 @@ test("GET /api/health returns 200 OK with status ok", async () => {
   assert.equal(data.status, "ok");
 });
 
-test("GET /api/auth/me returns 401 unauthenticated when no session cookie", async () => {
+test("GET /api/auth/me returns 401 unauthenticated and matches AuthMeResponseSchema", async () => {
   const res = await app.request("http://localhost/api/auth/me");
   assert.equal(res.status, 401);
-  const data = (await res.json()) as { authenticated: boolean };
-  assert.equal(data.authenticated, false);
+  const json = await res.json();
+  const parsed = AuthMeResponseSchema.safeParse(json);
+  assert.ok(parsed.success, "Response matches AuthMeResponseSchema");
+  assert.equal(parsed.data.authenticated, false);
 });
 
 test("POST /api/scores rejects foreign origin with 403 Forbidden", async () => {
@@ -38,7 +45,7 @@ test("POST /api/scores rejects foreign origin with 403 Forbidden", async () => {
   assert.match(data.error, /Forbidden/i);
 });
 
-test("POST /api/scores accepts allowed origin or missing origin (for same-domain apps)", async () => {
+test("POST /api/scores accepts allowed origin", async () => {
   const res = await app.request("http://localhost/api/scores", {
     method: "POST",
     headers: {
@@ -47,7 +54,6 @@ test("POST /api/scores accepts allowed origin or missing origin (for same-domain
     },
     body: JSON.stringify({ game_id: "reaction-time", score: "invalid-string" }),
   });
-  // Origin accepted, payload rejected with 400 Bad Request
   assert.equal(res.status, 400);
 });
 
@@ -71,10 +77,21 @@ test("POST /api/auth/logout succeeds", async () => {
   assert.equal(data.success, true);
 });
 
-test("GET /api/scores/user/me returns unauthenticated status without session", async () => {
+test("GET /api/scores/user/me matches PersonalBestResponseSchema without session", async () => {
   const res = await app.request("http://localhost/api/scores/user/me");
   assert.equal(res.status, 200);
-  const data = (await res.json()) as { authenticated: boolean; bests: Record<string, number> };
-  assert.equal(data.authenticated, false);
-  assert.deepEqual(data.bests, {});
+  const json = await res.json();
+  const parsed = PersonalBestResponseSchema.safeParse(json);
+  assert.ok(parsed.success, "Response matches PersonalBestResponseSchema");
+  assert.equal(parsed.data.authenticated, false);
+  assert.deepEqual(parsed.data.bests, {});
+});
+
+test("GET /api/scores/:gameId matches LeaderboardResponseSchema", async () => {
+  const res = await app.request("http://localhost/api/scores/reaction-time");
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  const parsed = LeaderboardResponseSchema.safeParse(json);
+  assert.ok(parsed.success, "Response matches LeaderboardResponseSchema");
+  assert.equal(parsed.data.game_id || parsed.data.gameId, "reaction-time");
 });
