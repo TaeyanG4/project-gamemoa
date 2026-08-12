@@ -46,19 +46,26 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
-          command: deploy
+          command: deploy --var COMMIT_SHA:${{ github.event.workflow_run.head_sha }}
 
-      - name: Verify API Health
+      - name: Verify API Health & Provenance
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           node -e "
+            const expectedSha = process.env.EXPECTED_SHA;
             fetch('https://gamemoa-api.gamemoa.workers.dev/api/health')
               .then(res => {
-                if (!res.ok) process.exit(1);
+                if (!res.ok) throw new Error('API Health Endpoint Failed: ' + res.status);
                 return res.json();
               })
               .then(data => {
-                if (data.status !== 'ok') process.exit(1);
-                console.log('API Health Check Passed:', data);
+                console.log('API Health Response:', data);
+                if (data.status !== 'ok') throw new Error('API status is not ok');
+                if (expectedSha && data.commit !== expectedSha) {
+                  throw new Error('API SHA Mismatch! Expected: ' + expectedSha + ', Deployed: ' + data.commit);
+                }
+                console.log('✅ API Health & Provenance Verification Passed!');
               })
               .catch(err => {
                 console.error(err);
@@ -68,6 +75,8 @@ jobs:
 
       - name: Build Web Frontend
         run: pnpm --filter @gamemoa/web build
+        env:
+          COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
 
       - name: Deploy Web Frontend
         uses: cloudflare/wrangler-action@v3
@@ -77,16 +86,33 @@ jobs:
           workingDirectory: apps/web
           command: deploy
 
-      - name: Smoke Test Web Frontend
+      - name: Smoke Test Web Frontend & Provenance
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
           node -e "
-            const routes = ['/', '/games', '/ranking', '/profile', '/games/reaction-time', '/games/memory-test'];
-            Promise.all(routes.map(r => 
-              fetch('https://gamemoa-web.gamemoa.workers.dev' + r + '?v=' + Date.now())
-                .then(res => {
-                  console.log(r, res.status, res.headers.get('content-type'));
-                  if (!res.ok) throw new Error('Route failed: ' + r);
-                })
-            )).then(() => console.log('Web Smoke Tests Passed!'))
-            .catch(err => { console.error(err); process.exit(1); });
+            const expectedSha = process.env.EXPECTED_SHA;
+            fetch('https://gamemoa-web.gamemoa.workers.dev/version.json?v=' + Date.now())
+              .then(res => {
+                if (!res.ok) throw new Error('version.json fetch failed: ' + res.status);
+                return res.json();
+              })
+              .then(data => {
+                console.log('Web Version Response:', data);
+                if (expectedSha && data.commit !== expectedSha) {
+                  throw new Error('Web SHA Mismatch! Expected: ' + expectedSha + ', Deployed: ' + data.commit);
+                }
+              })
+              .then(() => {
+                const routes = ['/', '/games', '/ranking', '/profile', '/games/reaction-time', '/games/memory-test', '/games/aim-test'];
+                return Promise.all(routes.map(r => 
+                  fetch('https://gamemoa-web.gamemoa.workers.dev' + r + '?v=' + Date.now())
+                    .then(res => {
+                      console.log(r, res.status);
+                      if (!res.ok) throw new Error('Route failed: ' + r);
+                    })
+                ));
+              })
+              .then(() => console.log('✅ Web Smoke & Provenance Verification Passed!'))
+              .catch(err => { console.error(err); process.exit(1); });
           "

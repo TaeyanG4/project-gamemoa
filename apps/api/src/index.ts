@@ -57,7 +57,10 @@ app.get("/", (c) => {
 });
 
 app.get("/api/health", (c) => {
-  return c.json({ status: "ok" });
+  return c.json({
+    status: "ok",
+    commit: c.env?.COMMIT_SHA || process.env.COMMIT_SHA || "dev",
+  });
 });
 
 // Route modules

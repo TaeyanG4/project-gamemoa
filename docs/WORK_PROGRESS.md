@@ -2,55 +2,50 @@
 
 # 현재 목표
 
-GAMEMOA 기반 레지스트리 생성기 서식 결정론성(Determinism) 구조 결함 수정, Core 구조 중복 정비, API response Zod 검증 테스트 확장 및 원격 GitHub Actions CI Green & Cloudflare Deploy Green 완전 달성.
+`pnpm-lock.yaml` 락파일 동기화 회귀 수정, 단일 사전 통합 품질 게이트 (`pnpm verify`) 도입, 배포 커밋 SHA 검증(Deployment Provenance) 구축 및 신규 타자 속도 테스트(`typing-test`) 미니게임 플러그인 구현 완수.
 
 ## 시작 상태
 
-- **Starting SHA**: `c7aaede614a7e22b554d7b4f64eee3ca478ec575`
-- **Actual Local State**: Local Quality Gate All Green (`pnpm install --frozen-lockfile`, `generate:registry`, `format`, `architecture:check`, `registry:check`, `lint`, `typecheck`, `test`, `build`)
-- **Actual Remote CI State**: CI Failed (`registry:check` Prettier 서식 불일치 문제로 원격 CI RED)
-- **Actual Remote Deploy State**: SKIPPED (CI 실패로 배포 자동 건너뜀)
+- **Starting SHA**: `492539edbce89fbbed74128790f54fc99fafceaa`
+- **Actual Local State**: `pnpm install`을 통해 lockfile 동기화 완료, `pnpm verify` 성공 통과
+- **Actual Remote CI State**: CI Pending (푸시 대기)
+- **Actual Remote Deploy State**: Deploy Pending (푸시 대기)
 - **Production Status**: API `https://gamemoa-api.gamemoa.workers.dev/api/health` (`200 OK`), Web `https://gamemoa-web.gamemoa.workers.dev/` (`200 OK`)
 
-## 완료
+## 완료 (Completed)
 
-- [x] **P0: 레지스트리 생성기 캐노니컬 서식 결정론성 개편**
-  - `scripts/registry-builder.ts` 모듈을 신설하여 Prettier 경로별 설정(`prettier.resolveConfig`) 및 `filepath` 옵션을 적용한 캐노니컬 TypeScript 소스 생성.
-  - `scripts/generate-game-registry.ts` 및 `scripts/check-registry.ts`가 동일한 Prettier 생성 모듈을 공유하도록 통합.
-  - `scripts/check-registry.ts`를 파일을 직접 수정하지 않는 순수 메모리 비교 방식(Pure In-Memory Check)으로 개편.
-  - `pnpm generate:registry` ➔ `pnpm format` ➔ `pnpm registry:check` ➔ `pnpm format:check` 순서 실행 시 0 diff 및 0 stale 성공 확인.
-- [x] **P0: 레지스트리 회귀 단위 테스트 추가**
-  - `scripts/generate-game-registry.test.ts`를 작성하여 생성기 반복 실행 동일성, 슬러그 정렬, Prettier 서식 안점성 테스트 자동화.
-- [x] **P1: Core 구조 중복 제거 및 의존성 경량화**
-  - `packages/core/src/ports/repositories.ts`로 저장소 포트 인터페이스 위치 단일화 및 transitional re-export 정리.
-  - Core 패키지에서 불필요한 `@gamemoa/contracts` 및 `@gamemoa/shared` 의존성을 완전히 제거하여 pure domain/usecase/ports 레이어로 경량화.
-  - `ScoreUseCases` 테스트(`packages/core/test/scoreUseCases.test.ts`) 작성 (`FakeScoreRepository` 사용).
-- [x] **P2 & P3: API Contract 런타임 검증 & 통합 테스트 확장**
-  - `@gamemoa/contracts` Zod 스키마(`AuthMeResponseSchema`, `PersonalBestResponseSchema`, `LeaderboardResponseSchema`)를 사용하여 API 응답 JSON 런타임 스키마 검증.
-  - `apps/api/test/oauth.test.ts` 테스트 작성 (mock fetch 기반 Google/Discord OAuth 인프라 함수 테스트).
-- [x] **문서 본문 100% 한국어 최신화**
-  - `README.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md`, `docs/GAMEMOA_BLUEPRINT.md`, `docs/AGENTS.md`, `docs/WORK_PROGRESS.md`, `docs/ROADMAP.md` 전 문서를 명확한 한국어 표준 문장으로 작성.
+- [x] **P0: 락파일 동기화 회귀 수정 (`pnpm-lock.yaml`)**
+  - `packages/core/package.json` 의존성 변경 사항을 `pnpm install`로 `pnpm-lock.yaml`에 반영 완료.
+  - `pnpm install --frozen-lockfile` 성공 통과 (904ms).
+- [x] **P0: 통합 사전 품질 게이트 스크립트 추가 (`pnpm verify`)**
+  - Root `package.json`에 `pnpm verify` (`frozen-lockfile` + `format:check` + `architecture:check` + `registry:check` + `lint` + `typecheck` + `test` + `build`) 추가.
+- [x] **P0: 배포 커밋 SHA 출처 검증 (Deployment Provenance)**
+  - API `GET /api/health` 응답에 `commit` SHA 필드 노출.
+  - Web SPA 빌드 프리훅(`scripts/prepare-web-build.ts`)에서 `public/version.json` 정적 자산 자동 생성.
+  - `.github/workflows/deploy.yml` 배포 워크플로우에 `COMMIT_SHA` 환경변수 전달 및 배포 후 원격 API/Web의 커밋 SHA와 `github.event.workflow_run.head_sha` 100% 일치 검증 강제.
+- [x] **P0: AGENTS.md 및 워크플로우 강제 규칙 최신화**
+  - `package.json` 수정 시 락파일 갱신 필수 절차 및 `pnpm verify` 품질 게이트 명시.
 
-## 진행 중
+## 진행 중 (In Progress)
 
-- [ ] 신규 푸시 후 원격 GitHub Actions CI 및 Cloudflare Deploy 완료 확인.
+- [ ] Commit A 푸시 및 원격 GitHub Actions CI Green & Cloudflare Deploy Green (Provenance 통과) 확인.
 
-## 남은 작업
+## 남은 작업 (Remaining)
 
-- [ ] 신규 미니게임(타자 테스트, 색각 이상 테스트) 확장 (기반 GREEN 완료 후 추진).
+- [ ] P1: 신규 타자 속도 테스트 (`typing-test`) 미니게임 플러그인 구현 (Commit B).
 
-## 알려진 문제
+## 알려진 문제 (Known Problems)
 
-- 없음 (로컬 레지스트리 서식 불일치 원인 완벽 해소 및 검증 완료).
+- 없음.
 
-## 다음 작업
+## 다음 작업 (Next Action)
 
-- 최신 코드 및 문서 푸시, 원격 SHA 확인, GitHub Actions CI Green & Cloudflare Deploy Green 최종 확인.
+- Commit A (`fix(ci): sync pnpm-lock.yaml, add pnpm verify script, and add deployment provenance SHA check`) 푸시 및 원격 CI/CD 통과 확인 후 Commit B (`typing-test` 추가) 착수.
 
-## 마지막 검증 상태
+## 마지막 검증 상태 (Last Verified State)
 
-- **Last Verified Local Quality Gate**: PASS (Prettier 포맷팅 후 `pnpm registry:check` 0 diff 통과)
-- **Local Frozen Lockfile**: PASS (`pnpm install --frozen-lockfile` 848ms)
-- **Remote Push**: Pending final push
+- **Local Quality Gate (`pnpm verify`)**: PASS
+- **Local Frozen Lockfile**: PASS (`pnpm install --frozen-lockfile`)
+- **Remote Push**: Pending push (Commit A)
 - **Production API**: OK (`status: ok`)
 - **Production Web**: OK (`200 OK`)

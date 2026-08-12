@@ -31,33 +31,31 @@
 
 ---
 
-## 3. 🚨 시크릿, 마이그레이션 및 락파일 관리 규칙
+## 3. 🚨 시크릿, 마이그레이션 및 락파일 관리 규칙 (Strict Package Manifest Rule)
 
 1. **시크릿 커밋 절대 금지**: API 토큰, OAuth Client Secret, 개인 키, `.env` / `.dev.vars` 파일을 절대 Git에 저장하거나 로그에 출력하지 않습니다.
 2. **마이그레이션 불변성 (Immutable Migrations)**: 이미 프로덕션에 적용된 마이그레이션 파일(`apps/api/migrations/*`)을 임의 수정하거나 삭제하지 않으며, DB 스키마 변경 시 반드시 새 마이그레이션 파일로 수행합니다.
-3. **패키지 락파일 동기화**: `package.json` 변경 시 반드시 `pnpm-lock.yaml`을 갱신하고 `pnpm install --frozen-lockfile` 성공을 사전 검증합니다.
+3. **패키지 락파일 동기화 강제 절차**: 워크스페이스 내 어떠한 `package.json`이라도 의존성 추가/삭제/수정 등 변경 발생 시 반드시:
+   1. `pnpm install` 실행
+   2. `pnpm-lock.yaml` diff 검토
+   3. `pnpm install --frozen-lockfile` 검증
+   4. `pnpm verify` 사전 품질 게이트 실행  
+      절차를 준수해야 하며, `pnpm-lock.yaml`이 동기화되지 않은 커밋을 절대 허용하지 않습니다.
 
 ---
 
 ## 4. ✅ 작업 완료 및 검증 규칙 (Definition of Done)
 
-모든 AI Agent는 코드 및 문서 수정 후 다음 품질 게이트 및 원격 검증 절차를 완수해야 합니다:
+모든 AI Agent는 코드 및 문서 수정 후 다음 품질 게이트(`pnpm verify`) 및 원격 검증 절차를 완수해야 합니다:
 
-1. `pnpm install --frozen-lockfile` (의존성 동기화 확인)
-2. `pnpm generate:registry`
-3. `pnpm format`
-4. `pnpm format:check` (코드 포맷 확인)
-5. `pnpm architecture:check` (레이어 경계 검사)
-6. `pnpm registry:check` (Prettier 포맷팅 후 레지스트리 불변성 재검사)
-7. `pnpm lint` (ESLint 검사)
-8. `pnpm typecheck` (TypeScript 타입 검사)
-9. `pnpm test` (단위 및 통합 테스트)
-10. `pnpm build` (전체 프로젝트 빌드)
-11. `git status` 및 `git diff` 검토
-12. `git commit` & `git push origin main`
-13. GitHub Actions **CI Status = GREEN** 확인
-14. Cloudflare Deploy **Status = GREEN** 확인
-15. 프로덕션 API Health Check (`/api/health`) & Web Smoke Check 수행
+1. `pnpm generate:registry`
+2. `pnpm format`
+3. `pnpm verify` (frozen install, format check, arch check, registry check, lint, typecheck, test, build 통합 검증)
+4. `git status` 및 `git diff` 검토
+5. `git commit` & `git push origin main`
+6. GitHub Actions **CI Status = GREEN** 확인
+7. Cloudflare Deploy **Status = GREEN** 확인 및 **Commit SHA Provenance** 일치 확인
+8. 프로덕션 API Health Check (`/api/health`) & Web Smoke Check 수행
 
 - **Local Validation 성공만으로 완료라 보고하지 않습니다.**
-- **GitHub Actions CI 및 Deploy Green이 확인된 경우에만 최종 완료 처리합니다.**
+- **GitHub Actions CI 및 Deploy Green, 그리고 배포 커밋 SHA가 원격과 100% 일치할 때만 최종 완료 처리합니다.**

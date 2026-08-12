@@ -13,6 +13,7 @@ export type ApiEnv = {
     DISCORD_CLIENT_SECRET?: string;
     DISCORD_REDIRECT_URI?: string;
     FRONTEND_URL?: string;
+    COMMIT_SHA?: string;
   };
 };
 
