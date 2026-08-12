@@ -27,6 +27,7 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 - [x] **테스트**: core 68 / db 22 / api 34 (신규 progression/achievement/profile 관련 테스트 다수 포함) — 전원 PASS. 경계값(레벨 임계값, XP 상한, 멱등성 리플레이, 쿨다운 경계), 계정 통합 고스트 XP 방지 회귀 테스트 포함.
 - [x] **문서**: `docs/PROGRESSION.md` 신규 작성(Korean), `docs/ARCHITECTURE.md`/`docs/ROADMAP.md`/`docs/PROGRESS.md`/`README.md` 갱신.
 - [x] **품질 게이트**: `pnpm verify` (frozen install/format/architecture/registry/lint/typecheck/test/build) 전원 PASS.
+- [x] **원격 검증**: `git push origin main` → GitHub Actions CI GREEN → Cloudflare Deploy GREEN(D1 프로덕션 마이그레이션 0005 적용 포함) → `pnpm smoke:prod` API/Web provenance 및 신규 엔드포인트 프로덕션 200/401 확인 완료.
 
 ---
 
@@ -68,6 +69,9 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 
 - **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
 - **Local Unit Tests**: core 68 / db 22 / api 34 — 전원 PASS
-- **D1 마이그레이션 (로컬)**: 0005 적용 성공 (기존 0000~0004 위에 additive)
-- **GitHub Actions CI / Cloudflare Deploy / 운영 Provenance**: 이 커밋 push 직후 검증 예정 — 아래 "PUSH 이후 최종 상태" 갱신본 확인 (동일 세션에서 push 후 즉시 갱신).
+- **D1 마이그레이션 (로컬 + 프로덕션)**: 0005 적용 성공 (기존 0000~0004 위에 additive)
+- **최종 커밋 (Final SHA)**: `22a240af84b18cc149c914f990800cbde8217c6c` (origin/main과 100% 일치)
+- **GitHub Actions CI**: GREEN (최종 SHA 기준, run `31639739137`) — 첫 push(`774a7df`)는 신규 Korean 문서 3개의 Prettier 테이블 정렬 누락으로 Format Check 실패(run `31639575768`) → `pnpm format` 재실행 후 재푸시로 해결.
+- **Cloudflare Deploy**: GREEN (run `31639800610`) — D1 프로덕션 마이그레이션 적용, API/Web Worker 배포, Health/Provenance 체크 전원 통과.
+- **운영 Provenance/Smoke (`pnpm smoke:prod`)**: API `/api/health` commit = Web `/version.json` commit = `22a240af84b18cc149c914f990800cbde8217c6c` (= origin/main). 홈/게임/랭킹/프로필/미니게임/파비콘 자산 HTTP 200. 신규 `GET /api/progression/leaderboard` 프로덕션 200 확인(`{"entries":[]}` — 아직 XP 이벤트 없음, 정상), `GET /api/progression/me` 미인증 401 확인.
 - **시작 SHA**: `dbcb4591bfdb6aac3b6150b398509f6992f29a5c`
