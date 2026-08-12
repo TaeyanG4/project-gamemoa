@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { authRouter } from "./routes/auth.js";
 import { scoresRouter } from "./routes/scores.js";
+import { personalizationRouter } from "./routes/personalization.js";
 import type { ApiEnv } from "./routes/auth.js";
 
 const app = new Hono<ApiEnv>();
@@ -70,6 +71,7 @@ app.get("/api/health", (c) => {
 // Route modules
 app.route("/api/auth", authRouter);
 app.route("/api/scores", scoresRouter);
+app.route("/api/personalization", personalizationRouter);
 
 // 404 Handler
 app.notFound((c) => {

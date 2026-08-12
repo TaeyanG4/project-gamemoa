@@ -69,3 +69,33 @@ export interface ScoreRepository {
   getLeaderboard(gameId: string, limit?: number, direction?: "asc" | "desc"): Promise<Score[]>;
   getUserPersonalBests(userId: number): Promise<UserPersonalBestAggregate[]>;
 }
+
+export interface FavoriteItem {
+  user_id: number;
+  game_id: string;
+  created_at: string;
+}
+
+export interface RecentPlayItem {
+  user_id: number;
+  game_id: string;
+  last_played_at: string;
+}
+
+export interface PersonalizationRepository {
+  getFavorites(userId: number): Promise<string[]>;
+  addFavorite(userId: number, gameId: string): Promise<void>;
+  removeFavorite(userId: number, gameId: string): Promise<void>;
+
+  getRecentPlays(
+    userId: number,
+    limit?: number,
+  ): Promise<{ gameId: string; lastPlayedAt: string }[]>;
+  recordRecentPlay(userId: number, gameId: string, playedAt?: string): Promise<void>;
+
+  importGuestData(
+    userId: number,
+    guestFavorites: string[],
+    guestRecentPlays: { gameId: string; lastPlayedAt: string }[],
+  ): Promise<void>;
+}
