@@ -10,6 +10,10 @@ import {
   LinkProviderRequestSchema,
   LinkProviderResponseSchema,
   UnlinkProviderResponseSchema,
+  MergePreviewPairSchema,
+  CreateMergeChallengeResponseSchema,
+  ConfirmAccountMergeRequestSchema,
+  ConfirmAccountMergeResponseSchema,
 } from "@gamemoa/contracts";
 import type { SocialProvider } from "@gamemoa/contracts";
 
@@ -320,12 +324,29 @@ authRouter.post("/link/google", async (c) => {
 
   if (!result.ok) {
     if (result.code === "ACCOUNT_ALREADY_LINKED") {
-      return accountError(
-        c,
-        "ACCOUNT_ALREADY_LINKED",
-        "이 Google 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다.",
+      const { accountMergeUseCases } = createContainer(c.env.DB);
+      const challenge = await accountMergeUseCases.startMergeChallenge(
+        auth.userId,
+        result.conflictUserId,
+        "google",
+        profile.sub,
+      );
+      const validated = CreateMergeChallengeResponseSchema.parse({
+        challengeId: challenge.challengeId,
+        expiresAt: challenge.expiresAt,
+        conflictUserId: result.conflictUserId,
+        provider: "google",
+      });
+      return c.json(
+        {
+          error: {
+            code: "ACCOUNT_ALREADY_LINKED",
+            message:
+              "이 Google 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다. 계정 통합을 진행할 수 있습니다.",
+          },
+          mergeChallenge: validated,
+        },
         409,
-        { conflictUserId: result.conflictUserId },
       );
     }
     return accountError(
@@ -434,7 +455,16 @@ authRouter.get("/link/discord/callback", async (c) => {
 
   if (!result.ok) {
     if (result.code === "ACCOUNT_ALREADY_LINKED") {
-      return c.redirect(`${frontendUrl}/profile?link_status=conflict&provider=discord`);
+      const { accountMergeUseCases } = createContainer(c.env.DB);
+      const challenge = await accountMergeUseCases.startMergeChallenge(
+        auth.userId,
+        result.conflictUserId,
+        "discord",
+        profile.id,
+      );
+      return c.redirect(
+        `${frontendUrl}/profile?link_status=conflict&provider=discord&challenge=${encodeURIComponent(challenge.challengeId)}`,
+      );
     }
     return c.redirect(`${frontendUrl}/profile?link_status=already&provider=discord`);
   }
@@ -473,6 +503,159 @@ authRouter.delete("/link/:provider", async (c) => {
   const validated = UnlinkProviderResponseSchema.parse({
     unlinked: true,
     provider: result.provider,
+  });
+  return c.json(validated, 200);
+});
+
+// ---------------------------------------------------------------------------
+// Account merge workflow (Primary Account Wins)
+// ---------------------------------------------------------------------------
+
+// POST /api/auth/merge/challenge — resolve an existing fresh merge challenge for a conflict
+authRouter.post("/merge/challenge", async (c) => {
+  const auth = await requireAuth(c);
+  if (!auth) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "Unauthenticated" } }, 401);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const body = (await c.req
+    .json<{ conflictUserId?: number; provider?: string }>()
+    .catch(() => ({}))) as { conflictUserId?: number; provider?: string };
+  if (typeof body.conflictUserId !== "number" || typeof body.provider !== "string") {
+    return c.json({ error: "conflictUserId and provider are required" }, 400);
+  }
+  if (!isKnownProvider(body.provider)) {
+    return c.json({ error: "Unknown provider" }, 400);
+  }
+
+  const { accountMergeUseCases } = createContainer(c.env.DB);
+  const existing = await accountMergeUseCases.findPendingMergeChallenge(
+    auth.userId,
+    body.conflictUserId,
+  );
+  if (!existing || new Date(existing.expiresAt) <= new Date()) {
+    return c.json(
+      {
+        error: {
+          code: "MERGE_CHALLENGE_EXPIRED",
+          message:
+            "유효한 계정 통합 세션이 없습니다. 로그인 수단 연결을 다시 시도해 새 인증을 진행해주세요.",
+        },
+      },
+      404,
+    );
+  }
+
+  const validated = CreateMergeChallengeResponseSchema.parse({
+    challengeId: existing.id,
+    expiresAt: existing.expiresAt,
+    conflictUserId: body.conflictUserId,
+    provider: body.provider,
+  });
+  return c.json(validated, 200);
+});
+
+// GET /api/auth/merge/preview?challenge=<id> — safe summaries of both candidate accounts
+authRouter.get("/merge/preview", async (c) => {
+  const auth = await requireAuth(c);
+  if (!auth) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "Unauthenticated" } }, 401);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const challengeId = c.req.query("challenge");
+  if (!challengeId) {
+    return c.json({ error: "challenge query parameter is required" }, 400);
+  }
+
+  const { accountMergeUseCases } = createContainer(c.env.DB);
+  const challenge = await accountMergeUseCases.findMergeChallenge(challengeId);
+  if (!challenge) {
+    return c.json(
+      { error: { code: "MERGE_CHALLENGE_EXPIRED", message: "유효하지 않은 통합 세션입니다." } },
+      404,
+    );
+  }
+  if (auth.userId !== challenge.userA && auth.userId !== challenge.userB) {
+    return c.json(
+      { error: { code: "MERGE_CHALLENGE_MISMATCH", message: "권한이 없습니다." } },
+      403,
+    );
+  }
+
+  const previews = await accountMergeUseCases.getMergePreviewPair(challengeId);
+  if (!previews) {
+    return c.json({ error: "Merge preview unavailable" }, 404);
+  }
+
+  const validated = MergePreviewPairSchema.parse({
+    userA: previews.userA,
+    userB: previews.userB,
+  });
+  return c.json(validated, 200);
+});
+
+// POST /api/auth/merge/confirm — perform the Primary-Wins merge atomically
+authRouter.post("/merge/confirm", async (c) => {
+  const auth = await requireAuth(c);
+  if (!auth) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "Unauthenticated" } }, 401);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const body = (await c.req
+    .json<{ challengeId?: string; keepUserId?: number }>()
+    .catch(() => ({}))) as { challengeId?: string; keepUserId?: number };
+  const parsed = ConfirmAccountMergeRequestSchema.safeParse({
+    challengeId: body.challengeId,
+    keepUserId: body.keepUserId,
+  });
+  if (!parsed.success) {
+    return c.json({ error: "challengeId and keepUserId are required" }, 400);
+  }
+
+  const { accountMergeUseCases } = createContainer(c.env.DB);
+  const result = await accountMergeUseCases.confirmMerge(
+    parsed.data.challengeId,
+    parsed.data.keepUserId,
+    auth.userId,
+  );
+
+  if (!result.ok) {
+    const statusMap: Record<string, 400 | 403 | 404 | 409> = {
+      MERGE_CHALLENGE_EXPIRED: 400,
+      MERGE_CHALLENGE_CONSUMED: 400,
+      MERGE_CHALLENGE_MISMATCH: 403,
+      USER_NOT_FOUND: 404,
+      MERGE_PROVIDER_CONFLICT: 409,
+    };
+    const messageMap: Record<string, string> = {
+      MERGE_CHALLENGE_EXPIRED: "계정 통합 세션이 만료되었습니다. 다시 시도해주세요.",
+      MERGE_CHALLENGE_CONSUMED: "이미 처리된 계정 통합 세션입니다.",
+      MERGE_CHALLENGE_MISMATCH: "통합 대상 계정이 일치하지 않습니다.",
+      USER_NOT_FOUND: "통합 대상 계정을 찾을 수 없습니다.",
+      MERGE_PROVIDER_CONFLICT: "두 계정 모두 동일 로그인 수단을 사용 중이라 병합할 수 없습니다.",
+    };
+    const code = result.code;
+    return accountError(
+      c,
+      code,
+      messageMap[code] ?? "계정 통합에 실패했습니다.",
+      statusMap[code] ?? 400,
+    );
+  }
+
+  const validated = ConfirmAccountMergeResponseSchema.parse({
+    merged: true,
+    primaryId: result.primaryId,
+    secondaryId: result.secondaryId,
   });
   return c.json(validated, 200);
 });

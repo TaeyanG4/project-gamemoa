@@ -107,3 +107,38 @@ export interface PersonalizationRepository {
     guestRecentPlays: { gameId: string; lastPlayedAt: string }[],
   ): Promise<void>;
 }
+
+export interface MergePreview {
+  userId: number;
+  nickname: string;
+  provider: string;
+  createdAt: string;
+  scoreCount: number;
+  favoriteCount: number;
+  recentPlayCount: number;
+}
+
+export interface MergeChallenge {
+  id: string;
+  userA: number;
+  userB: number;
+  provider: string;
+  providerUserId: string;
+  expiresAt: string;
+  consumedAt: string | null;
+}
+
+export interface AccountMergeRepository {
+  getAccountMergePreview(userId: number): Promise<MergePreview>;
+  createMergeChallenge(input: {
+    userA: number;
+    userB: number;
+    provider: string;
+    providerUserId: string;
+    ttlSeconds: number;
+  }): Promise<{ id: string; expiresAt: string }>;
+  findMergeChallenge(id: string): Promise<MergeChallenge | null>;
+  findPendingMergeChallenge(userA: number, userB: number): Promise<MergeChallenge | null>;
+  consumeMergeChallenge(id: string): Promise<void>;
+  mergeAccounts(primaryId: number, secondaryId: number): Promise<void>;
+}

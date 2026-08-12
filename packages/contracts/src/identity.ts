@@ -48,3 +48,51 @@ export const LinkProviderRequestSchema = z.object({
   credential: z.string().min(1, "Credential is required"),
 });
 export type LinkProviderRequest = z.infer<typeof LinkProviderRequestSchema>;
+
+// ---------------------------------------------------------------------------
+// Account merge (Primary Account Wins)
+// ---------------------------------------------------------------------------
+
+export const MergePreviewSchema = z.object({
+  userId: z.number(),
+  nickname: z.string(),
+  provider: z.string(),
+  createdAt: z.string(),
+  scoreCount: z.number(),
+  favoriteCount: z.number(),
+  recentPlayCount: z.number(),
+});
+export type MergePreview = z.infer<typeof MergePreviewSchema>;
+
+export const MergePreviewPairSchema = z.object({
+  userA: MergePreviewSchema,
+  userB: MergePreviewSchema,
+});
+export type MergePreviewPair = z.infer<typeof MergePreviewPairSchema>;
+
+export const CreateMergeChallengeResponseSchema = z.object({
+  challengeId: z.string(),
+  expiresAt: z.string(),
+  conflictUserId: z.number(),
+  provider: SocialProviderSchema,
+});
+export type CreateMergeChallengeResponse = z.infer<typeof CreateMergeChallengeResponseSchema>;
+
+export const MergeChallengeResolveRequestSchema = z.object({
+  conflictUserId: z.number(),
+  provider: SocialProviderSchema,
+});
+export type MergeChallengeResolveRequest = z.infer<typeof MergeChallengeResolveRequestSchema>;
+
+export const ConfirmAccountMergeRequestSchema = z.object({
+  challengeId: z.string().min(1),
+  keepUserId: z.number(),
+});
+export type ConfirmAccountMergeRequest = z.infer<typeof ConfirmAccountMergeRequestSchema>;
+
+export const ConfirmAccountMergeResponseSchema = z.object({
+  merged: z.boolean(),
+  primaryId: z.number(),
+  secondaryId: z.number(),
+});
+export type ConfirmAccountMergeResponse = z.infer<typeof ConfirmAccountMergeResponseSchema>;

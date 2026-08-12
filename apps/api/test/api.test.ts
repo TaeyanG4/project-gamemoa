@@ -140,3 +140,28 @@ test("DELETE /api/auth/link/:provider rejects unknown providers when authenticat
   });
   assert.equal(res.status, 401);
 });
+
+test("GET /api/auth/merge/preview requires authentication", async () => {
+  const res = await app.request("http://localhost/api/auth/merge/preview?challenge=abc");
+  assert.equal(res.status, 401);
+  const data = (await res.json()) as { error: { code: string } };
+  assert.equal(data.error.code, "UNAUTHORIZED");
+});
+
+test("POST /api/auth/merge/challenge requires authentication", async () => {
+  const res = await app.request("http://localhost/api/auth/merge/challenge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "http://localhost:5173" },
+    body: JSON.stringify({ conflictUserId: 2, provider: "discord" }),
+  });
+  assert.equal(res.status, 401);
+});
+
+test("POST /api/auth/merge/confirm requires authentication", async () => {
+  const res = await app.request("http://localhost/api/auth/merge/confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "http://localhost:5173" },
+    body: JSON.stringify({ challengeId: "abc", keepUserId: 1 }),
+  });
+  assert.equal(res.status, 401);
+});

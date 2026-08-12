@@ -100,6 +100,9 @@ function createMockD1Database(): {
       };
       return stmt as any;
     },
+    async batch() {
+      return [];
+    },
   };
 
   return { db, sessionsTable, usersTable, oauthTable };
