@@ -25,6 +25,9 @@ jobs:
       - name: Lint
         run: pnpm lint
 
+      - name: Architecture Check
+        run: pnpm architecture:check
+
       - name: Typecheck
         run: pnpm typecheck
 

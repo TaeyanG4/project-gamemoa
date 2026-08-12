@@ -1,5 +1,5 @@
 {
-  "name": "@gamemoa/shared",
+  "name": "@gamemoa/contracts",
   "version": "0.0.1",
   "type": "module",
   "exports": {
@@ -9,7 +9,6 @@
     }
   },
   "dependencies": {
-    "@gamemoa/contracts": "workspace:*",
     "zod": "^3.24.2"
   },
   "devDependencies": {

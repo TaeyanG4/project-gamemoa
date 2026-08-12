@@ -1,7 +1,7 @@
 import type { GameManifest } from "@gamemoa/game-sdk";
 
 export const memoryTestManifest: GameManifest = {
-  id: "game-memory-test",
+  id: "memory-test",
   slug: "memory-test",
   title: "순서 기억력 테스트",
   shortDescription: "깜빡이는 색상 순서를 기억하고 순서대로 똑같이 누르세요!",
@@ -18,4 +18,12 @@ export const memoryTestManifest: GameManifest = {
   requiresAuth: false,
   supportsLeaderboard: true,
   version: "0.0.1",
+  scoreConfig: {
+    unit: "Level",
+    direction: "desc",
+    min: 1,
+    max: 50,
+  },
 };
+
+export const manifest = memoryTestManifest;

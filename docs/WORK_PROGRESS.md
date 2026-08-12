@@ -1,37 +1,36 @@
-# GAMEMOA Goal Progress
+# GAMEMOA Architecture & Refactoring Goal Progress
 
 ## Goal
-GAMEMOA 프로젝트의 Cloudflare Production CI/CD를 실제 배포 및 헬스 체크/스모크 테스트까지 100% 완수한다.
-- Production API Worker: `gamemoa-api` (`https://gamemoa-api.gamemoa.workers.dev`)
-- Production Web Worker Assets: `gamemoa-web` (`https://gamemoa-web.gamemoa.workers.dev`)
-- Production Database: Cloudflare D1 `gamemoa-d1` (`e55f84c5-e3a3-4547-8aa3-7a8ec186a02e`)
+GAMEMOA 프로젝트의 장기 확장성을 위한 전체 아키텍처 점검, 폴더 구조 개선, API Composition Root, Game Manifest/Registry 자동화, Architecture Guard 구축 및 신규 게임 확장성 검증을 완수했습니다.
 
-## Architecture & Production Deployment Status
-- **API Worker**: `https://gamemoa-api.gamemoa.workers.dev` (GET `/` & `/api/health` 200 OK)
-- **Web Worker Assets**: `https://gamemoa-web.gamemoa.workers.dev` (Routes `/`, `/games`, `/ranking`, `/profile`, `/games/reaction-time`, `/games/memory-test` 200 OK)
-- **Database**: Cloudflare D1 `gamemoa-d1` (Migration `0000_initial_schema.sql` applied)
-- **CI/CD Pipeline**:
-  - `CI`: `pnpm install --frozen-lockfile` ➔ `lint` ➔ `typecheck` ➔ `test` ➔ `build`
-  - `Deploy`: `on: workflow_run` (CI success only on `main`) ➔ exact SHA checkout ➔ `pnpm d1:migrate:prod` ➔ `Deploy API` ➔ `API Health Check` ➔ `Build Web` ➔ `Deploy Web` ➔ `Web Smoke Test`
+## Target Modular Monolith Architecture
+- **Web**: `apps/web` ➔ `@gamemoa/contracts` & `@gamemoa/ui` & `@gamemoa/game-sdk`
+- **API**: `apps/api` (Composition Root: `container.ts`) ➔ `@gamemoa/core` (Application/Domain/Ports) ➔ `@gamemoa/db` (Cloudflare D1 Adapter)
+- **Contracts**: `@gamemoa/contracts` (`packages/contracts`) - Zod request/response schemas & types
+- **Game Architecture**: Game Manifest Single Source of Truth + Build-time Registry Generator (`scripts/generate-game-registry.ts`) + Game Template Generator (`scripts/generate-game.ts`)
+- **Architecture Guard**: `pnpm architecture:check` (`scripts/verify-architecture.ts`) + CI Automated Blocking
 
-## Completed
-- [x] Cloudflare CLI (`wrangler whoami`) 및 계정 권한 확인 (`Taeyang95@naver.com's Account`)
-- [x] Production D1 Database 생성 (`gamemoa-d1`, ID: `e55f84c5-e3a3-4547-8aa3-7a8ec186a02e`) 및 `apps/api/wrangler.jsonc` 연동
-- [x] D1 마이그레이션 적용 (`0000_initial_schema.sql` remote 적용 완료)
-- [x] `gamemoa-api` Worker 실제 Cloudflare 배포 및 `/api/health` 200 OK 검증 완료
-- [x] `gamemoa-web` React Router SPA / Static Assets 배포 및 전 라우트 스모크 테스트 (200 OK) 검증 완료
-- [x] CORS 및 Cross-site Credentials (HttpOnly SameSite=None on Secure) 설정 반영
-- [x] GitHub Actions CD Workflow (`.github/workflows/deploy.yml`) 전면 개선
-  - `workflow_run` 기반 CI 성공 후 동작
-  - exact commit SHA (`github.event.workflow_run.head_sha`) 체크아웃
-  - Concurrency 제어 (`gamemoa-production`)
-  - 자동 D1 마이그레이션 + API 배포 + Health Check + Web 배포 + Web Smoke Test
-- [x] 문서화 (`README.md`, `ARCHITECTURE.md`, `PROGRESS.md`, `WORK_PROGRESS.md`) 최신 배포 주소 및 가이드 반영
-
-## User Action Required for Production OAuth Console
-- **Google Cloud Console**:
-  - Authorized JavaScript Origins: `https://gamemoa-web.gamemoa.workers.dev`
-- **Discord Developer Portal**:
-  - Redirect URI: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
-- **Cloudflare Secrets** (필요시 CLI 실행):
-  - `pnpm exec wrangler secret put DISCORD_CLIENT_SECRET --config apps/api/wrangler.jsonc`
+## Completed Checkpoints
+- [x] **Phase 0: Baseline & Integration Tests**
+  - Locked in API behavior with Hono integration tests (`apps/api/test/api.test.ts`).
+  - Added web catalog & score validation tests (`apps/web/app/test/catalog.test.ts`).
+- [x] **Phase 1: API Contracts Package (`@gamemoa/contracts`)**
+  - Created `@gamemoa/contracts` (`packages/contracts`) with Zod schemas & TypeScript types for Auth, Scores, Leaderboard, and Common API Error handling.
+  - Linked workspace dependencies across `@gamemoa/shared`, `@gamemoa/api`, `@gamemoa/web`.
+- [x] **Phase 2: Core Layering & API Composition Root (`apps/api/src/container.ts`)**
+  - Implemented API Composition Root (`createContainer(c.env.DB)`) in `apps/api/src/container.ts`.
+  - Refactored `auth.ts` and `scores.ts` route handlers to receive repositories via Dependency Injection, eliminating direct `new D1...Repository` calls in routes.
+- [x] **Phase 3: Game Manifest, Server-Safe Validation & Registry Automation**
+  - Added `ScoreConfig` (`unit`, `direction`, `min`, `max`) to `GameManifest`.
+  - Created `scripts/generate-game-registry.ts` to automatically generate `gameRegistry.generated.ts` containing manifests and manifest-driven score validation logic.
+  - Removed manual `switch(gameId)` statements from server-side score validation.
+- [x] **Phase 4: Architecture Guard Construction (`scripts/verify-architecture.ts`)**
+  - Created `scripts/verify-architecture.ts` and added `pnpm architecture:check`.
+  - Added `Architecture Check` step to `.github/workflows/ci.yml` to automatically block cross-layer dependency violations in CI.
+- [x] **Phase 5: Web Feature-Based Structure Refactoring (`apps/web/app/features/`)**
+  - Extracted `apps/web/app/features/auth/` (`authService.ts`, `AuthContext.tsx`).
+- [x] **Phase 6: Game Generator & Extensibility Verification**
+  - Created `scripts/generate-game.ts` (`pnpm generate:game <slug>`).
+  - Added new game `games/aim-test` without modifying any central backend switch statement, verifying 100% manifest-driven game registration.
+- [x] **Phase 7: Full Verification & Remote CI/CD Deployment**
+  - Passed all local checks: `install --frozen-lockfile`, `lint`, `architecture:check`, `typecheck`, `test`, `build`.

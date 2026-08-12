@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { D1ScoreRepository, D1SessionRepository } from "@gamemoa/db";
+import { createContainer } from "../container.js";
 import { scoreSubmissionSchema } from "@gamemoa/shared";
 import { validateScorePayload } from "../services/scoreValidation.js";
 import type { ApiEnv } from "./auth.js";
@@ -40,10 +40,11 @@ scoresRouter.post("/", async (c) => {
     let nickname = customNickname;
     let avatarUrl: string | null = null;
 
+    const { sessionRepo, scoreRepo } = createContainer(c.env.DB);
+
     const sessionId = getCookie(c, "gamemoa_session");
     if (sessionId) {
       try {
-        const sessionRepo = new D1SessionRepository(c.env.DB);
         const authData = await sessionRepo.findSession(sessionId);
         if (authData) {
           userId = authData.user.id;
@@ -55,7 +56,6 @@ scoresRouter.post("/", async (c) => {
       }
     }
 
-    const scoreRepo = new D1ScoreRepository(c.env.DB);
     const saved = await scoreRepo.saveScore({
       userId,
       nickname,
@@ -85,14 +85,13 @@ scoresRouter.get("/user/me", async (c) => {
   }
 
   try {
-    const sessionRepo = new D1SessionRepository(c.env.DB);
+    const { sessionRepo, scoreRepo } = createContainer(c.env.DB);
     const authData = await sessionRepo.findSession(sessionId);
 
     if (!authData) {
       return c.json({ authenticated: false, bests: {} });
     }
 
-    const scoreRepo = new D1ScoreRepository(c.env.DB);
     const bests = await scoreRepo.getUserPersonalBests(authData.user.id);
 
     return c.json({
@@ -111,7 +110,7 @@ scoresRouter.get("/:gameId", async (c) => {
   const gameId = c.req.param("gameId");
 
   try {
-    const scoreRepo = new D1ScoreRepository(c.env.DB);
+    const { scoreRepo } = createContainer(c.env.DB);
     const rawScores = await scoreRepo.getLeaderboard(gameId, 20);
 
     const leaderboard = rawScores.map((item) => {

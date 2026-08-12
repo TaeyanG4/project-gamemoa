@@ -2,6 +2,13 @@ export type GameMode = "single" | "local-multi" | "online-multi";
 
 export type GameStatus = "draft" | "beta" | "published" | "hidden";
 
+export interface ScoreConfig {
+  readonly unit: string;
+  readonly direction: "asc" | "desc";
+  readonly min: number;
+  readonly max: number;
+}
+
 export interface GameManifest {
   readonly id: string;
   readonly slug: string;
@@ -20,4 +27,5 @@ export interface GameManifest {
   readonly requiresAuth: boolean;
   readonly supportsLeaderboard: boolean;
   readonly version: string;
+  readonly scoreConfig?: ScoreConfig | undefined;
 }

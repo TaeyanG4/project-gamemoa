@@ -18,4 +18,10 @@ export const manifest: GameManifest = {
   requiresAuth: false,
   supportsLeaderboard: true,
   version: "0.1.0",
+  scoreConfig: {
+    unit: "ms",
+    direction: "asc",
+    min: 50,
+    max: 10000,
+  },
 };

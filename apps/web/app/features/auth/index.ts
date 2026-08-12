@@ -1,2 +1,2 @@
-export * from "./context.js";
 export * from "./authService.js";
+export * from "./AuthContext.js";

@@ -8,9 +8,12 @@
     "dev": "wrangler dev src/index.ts",
     "deploy": "wrangler deploy --minify src/index.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "test": "tsx --test test/**/*.test.ts"
   },
+
   "dependencies": {
+    "@gamemoa/contracts": "workspace:*",
     "@gamemoa/core": "workspace:*",
     "@gamemoa/db": "workspace:*",
     "@gamemoa/shared": "workspace:*",
@@ -20,7 +23,9 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241230.0",
     "@types/node": "^22.13.4",
+    "tsx": "^4.23.12",
     "typescript": "^5.8.0",
+
     "wrangler": "^3.109.2"
   }
 }

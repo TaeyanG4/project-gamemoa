@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LeaderRecordSchema } from "@gamemoa/contracts";
 
 export const scoreSubmissionSchema = z.object({
   gameId: z.string().min(1, "Game ID is required"),
@@ -18,16 +19,5 @@ export const leaderboardQuerySchema = z.object({
 
 export type LeaderboardQuery = z.infer<typeof leaderboardQuerySchema>;
 
-export const leaderRecordSchema = z.object({
-  id: z.string(),
-  playerName: z.string(),
-  avatarUrl: z.string().optional(),
-  gameId: z.string(),
-  gameTitle: z.string(),
-  score: z.number(),
-  formattedScore: z.string(),
-  grade: z.string().optional(),
-  createdAt: z.string(),
-});
-
-export type LeaderRecord = z.infer<typeof leaderRecordSchema>;
+export const leaderRecordSchema = LeaderRecordSchema;
+export type { LeaderRecord } from "@gamemoa/contracts";

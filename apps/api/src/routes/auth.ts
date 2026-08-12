@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { D1UserRepository, D1SessionRepository, type D1Database } from "@gamemoa/db";
+import { createContainer } from "../container.js";
+import type { D1Database } from "@cloudflare/workers-types";
 
 export type ApiEnv = {
   Bindings: {
@@ -63,8 +64,7 @@ authRouter.post("/google", async (c) => {
       return c.json({ error: "Audience mismatch" }, 401);
     }
 
-    const userRepo = new D1UserRepository(c.env.DB);
-    const sessionRepo = new D1SessionRepository(c.env.DB);
+    const { userRepo, sessionRepo } = createContainer(c.env.DB);
 
     const user = await userRepo.findOrCreateUser({
       provider: "google",
@@ -188,8 +188,7 @@ authRouter.get("/discord/callback", async (c) => {
     ? `https://cdn.discordapp.com/avatars/${userInfo.id}/${userInfo.avatar}.png`
     : null;
 
-  const userRepo = new D1UserRepository(c.env.DB);
-  const sessionRepo = new D1SessionRepository(c.env.DB);
+  const { userRepo, sessionRepo } = createContainer(c.env.DB);
 
   const user = await userRepo.findOrCreateUser({
     provider: "discord",
@@ -221,7 +220,7 @@ authRouter.get("/me", async (c) => {
   }
 
   try {
-    const sessionRepo = new D1SessionRepository(c.env.DB);
+    const { sessionRepo } = createContainer(c.env.DB);
     const result = await sessionRepo.findSession(sessionId);
 
     if (!result) {
@@ -244,7 +243,7 @@ authRouter.post("/logout", async (c) => {
   const sessionId = getCookie(c, "gamemoa_session");
   if (sessionId) {
     try {
-      const sessionRepo = new D1SessionRepository(c.env.DB);
+      const { sessionRepo } = createContainer(c.env.DB);
       await sessionRepo.deleteSession(sessionId);
     } catch {
       // Ignore DB error during logout
