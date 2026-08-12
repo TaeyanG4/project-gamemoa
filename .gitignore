@@ -10,6 +10,8 @@ build/
 !.env.example
 .DS_Store
 coverage/
+.claude/
+
 
 # Python backend
 backend/.venv/

@@ -21,7 +21,7 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 | D     | XP 랭킹 UI, Creator 모델 기초                                           | 예정                                                                                          |
 | E     | Creator 채널 소유권 인증 + Featured 심사 엔진 (6시간 자동 재심사)       | 예정                                                                                          |
 | F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어            | ✅ 완료 (`games`/`link`/`profile`) — `rank`/`leaderboard`/`play`/`server`는 Phase H 선행 필요 |
-| G     | Discord 서버 등록/검색/관리 페이지                                      | 예정                                                                                          |
+| G     | Discord 서버 등록/검색/공개 페이지/관리                                 | ✅ 완료                                                                                       |
 | H     | Discord 길드-로컬 XP, 서버 랭킹, 다중 길드 중복 방지                    | 예정                                                                                          |
 | I     | 계정 통합 회귀 테스트, 최종 문서화, 프로덕션 검증                       | 예정                                                                                          |
 

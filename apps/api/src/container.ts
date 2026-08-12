@@ -7,6 +7,7 @@ import {
   D1ProgressionRepository,
   D1AchievementRepository,
   D1DiscordLinkRepository,
+  D1DiscordGuildRepository,
 } from "@gamemoa/db";
 import {
   ScoreUseCases,
@@ -17,6 +18,9 @@ import {
   AchievementUseCases,
   ProfileUseCases,
   DiscordLinkUseCases,
+  DiscordGuildRegistrationUseCases,
+  DiscordGuildDirectoryUseCases,
+  DiscordGuildManagementUseCases,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -25,6 +29,7 @@ import {
   type ProgressionRepository,
   type AchievementRepository,
   type DiscordLinkRepository,
+  type DiscordGuildRepository,
 } from "@gamemoa/core";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -37,6 +42,8 @@ export interface AppContainer {
   progressionRepo: ProgressionRepository;
   achievementRepo: AchievementRepository;
   discordLinkRepo: DiscordLinkRepository;
+  discordGuildRepo: DiscordGuildRepository;
+
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
   identityUseCases: IdentityUseCases;
@@ -45,6 +52,9 @@ export interface AppContainer {
   achievementUseCases: AchievementUseCases;
   profileUseCases: ProfileUseCases;
   discordLinkUseCases: DiscordLinkUseCases;
+  discordGuildRegistrationUseCases: DiscordGuildRegistrationUseCases;
+  discordGuildDirectoryUseCases: DiscordGuildDirectoryUseCases;
+  discordGuildManagementUseCases: DiscordGuildManagementUseCases;
 }
 
 export function createContainer(db: D1Database): AppContainer {
@@ -56,6 +66,7 @@ export function createContainer(db: D1Database): AppContainer {
   const progressionRepo = new D1ProgressionRepository(db);
   const achievementRepo = new D1AchievementRepository(db);
   const discordLinkRepo = new D1DiscordLinkRepository(db);
+  const discordGuildRepo = new D1DiscordGuildRepository(db);
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -65,6 +76,9 @@ export function createContainer(db: D1Database): AppContainer {
   const achievementUseCases = new AchievementUseCases(achievementRepo);
   const profileUseCases = new ProfileUseCases(userRepo);
   const discordLinkUseCases = new DiscordLinkUseCases(discordLinkRepo);
+  const discordGuildRegistrationUseCases = new DiscordGuildRegistrationUseCases(discordGuildRepo);
+  const discordGuildDirectoryUseCases = new DiscordGuildDirectoryUseCases(discordGuildRepo);
+  const discordGuildManagementUseCases = new DiscordGuildManagementUseCases(discordGuildRepo);
 
   return {
     userRepo,
@@ -75,6 +89,8 @@ export function createContainer(db: D1Database): AppContainer {
     progressionRepo,
     achievementRepo,
     discordLinkRepo,
+    discordGuildRepo,
+
     scoreUseCases,
     personalizationUseCases,
     identityUseCases,
@@ -83,6 +99,9 @@ export function createContainer(db: D1Database): AppContainer {
     achievementUseCases,
     profileUseCases,
     discordLinkUseCases,
+    discordGuildRegistrationUseCases,
+    discordGuildDirectoryUseCases,
+    discordGuildManagementUseCases,
   };
 }
 

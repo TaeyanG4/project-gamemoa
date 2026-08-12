@@ -1,3 +1,5 @@
+import { hasGuildManagementPermission } from "@gamemoa/core";
+
 export interface DiscordUserProfile {
   id: string;
   username: string;
@@ -5,16 +7,25 @@ export interface DiscordUserProfile {
   avatarUrl: string | null;
 }
 
+export interface DiscordUserGuildRaw {
+  id: string;
+  name: string;
+  icon: string | null;
+  owner?: boolean;
+  permissions?: string;
+}
+
 export function buildDiscordAuthorizeUrl(params: {
   clientId: string;
   redirectUri: string;
   state: string;
+  scope?: string;
 }): string {
   const discordUrl = new URL("https://discord.com/api/oauth2/authorize");
   discordUrl.searchParams.set("client_id", params.clientId);
   discordUrl.searchParams.set("redirect_uri", params.redirectUri);
   discordUrl.searchParams.set("response_type", "code");
-  discordUrl.searchParams.set("scope", "identify email");
+  discordUrl.searchParams.set("scope", params.scope || "identify email");
   discordUrl.searchParams.set("state", params.state);
   return discordUrl.toString();
 }
@@ -24,7 +35,12 @@ export async function exchangeDiscordCode(params: {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
-}): Promise<{ valid: boolean; profile?: DiscordUserProfile; reason?: string }> {
+}): Promise<{
+  valid: boolean;
+  profile?: DiscordUserProfile;
+  accessToken?: string;
+  reason?: string;
+}> {
   try {
     const tokenParams = new URLSearchParams({
       client_id: params.clientId,
@@ -49,8 +65,10 @@ export async function exchangeDiscordCode(params: {
       return { valid: false, reason: "Invalid token response from Discord" };
     }
 
+    const accessToken = tokenData.access_token;
+
     const userRes = await fetch("https://discord.com/api/users/@me", {
-      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!userRes.ok) {
@@ -70,6 +88,7 @@ export async function exchangeDiscordCode(params: {
 
     return {
       valid: true,
+      accessToken,
       profile: {
         id: userInfo.id,
         username: userInfo.username,
@@ -81,6 +100,42 @@ export async function exchangeDiscordCode(params: {
     return {
       valid: false,
       reason: err instanceof Error ? err.message : "Discord auth exchange failed",
+    };
+  }
+}
+
+export async function fetchUserManageableGuilds(accessToken: string): Promise<{
+  valid: boolean;
+  guilds?: { guildId: string; name: string; iconUrl: string | null }[];
+  reason?: string;
+}> {
+  try {
+    const res = await fetch("https://discord.com/api/v10/users/@me/guilds", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!res.ok) {
+      return { valid: false, reason: `Discord API returned status ${res.status}` };
+    }
+
+    const rawGuilds = (await res.json()) as DiscordUserGuildRaw[];
+    if (!Array.isArray(rawGuilds)) {
+      return { valid: false, reason: "Invalid response array from Discord guilds API" };
+    }
+
+    const manageable = rawGuilds
+      .filter((g) => hasGuildManagementPermission(g.permissions, g.owner))
+      .map((g) => ({
+        guildId: g.id,
+        name: g.name,
+        iconUrl: g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : null,
+      }));
+
+    return { valid: true, guilds: manageable };
+  } catch (err) {
+    return {
+      valid: false,
+      reason: err instanceof Error ? err.message : "Failed to fetch user guilds",
     };
   }
 }

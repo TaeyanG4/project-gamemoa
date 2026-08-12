@@ -4,7 +4,11 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createContainer } from "../container.js";
 import type { D1Database } from "@cloudflare/workers-types";
 import { verifyGoogleToken } from "../infrastructure/oauth/google.js";
-import { buildDiscordAuthorizeUrl, exchangeDiscordCode } from "../infrastructure/oauth/discord.js";
+import {
+  buildDiscordAuthorizeUrl,
+  exchangeDiscordCode,
+  fetchUserManageableGuilds,
+} from "../infrastructure/oauth/discord.js";
 import {
   ConnectedProvidersResponseSchema,
   LinkProviderRequestSchema,
@@ -177,17 +181,105 @@ authRouter.get("/discord", async (c) => {
   return c.redirect(discordUrl);
 });
 
-// GET /api/auth/discord/callback — handles BOTH the LOGIN flow and the LINK flow, since
-// both must share the single redirect_uri registered with Discord (see
-// getDiscordRedirectUri above). A `discord_link_state` cookie present means this callback
-// belongs to an in-progress LINK (started at /api/auth/link/discord); otherwise it's a
-// normal LOGIN callback (started at /api/auth/discord).
+// GET /api/auth/discord/register-server — starts 1-time Discord OAuth for guild registration
+authRouter.get("/discord/register-server", async (c) => {
+  const auth = await requireAuth(c);
+  const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
+  if (!auth) {
+    return c.redirect(`${frontendUrl}/discord/servers?register_status=unauthorized`);
+  }
+
+  const clientId = c.env.DISCORD_CLIENT_ID;
+  const redirectUri = getDiscordRedirectUri(c);
+
+  if (!clientId) {
+    return c.text("DISCORD_CLIENT_ID is not configured", 500);
+  }
+
+  const state = crypto.randomUUID();
+  const payload = JSON.stringify({ state, userId: auth.userId });
+
+  setCookie(c, "discord_register_server_state", payload, {
+    httpOnly: true,
+    secure: !isLocalhost(c.req.url),
+    sameSite: "Lax",
+    maxAge: 600,
+    path: "/",
+  });
+
+  const discordUrl = buildDiscordAuthorizeUrl({
+    clientId,
+    redirectUri,
+    state,
+    scope: "identify guilds",
+  });
+
+  return c.redirect(discordUrl);
+});
+
+// GET /api/auth/discord/callback — handles LOGIN, LINK, and SERVER_REGISTRATION flows, since
+// all share the single redirect_uri registered with Discord.
 authRouter.get("/discord/callback", async (c) => {
   const code = c.req.query("code");
   const state = c.req.query("state");
   const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
 
+  // Check for Server Registration intent
+  const registerServerStateCookie = getCookie(c, "discord_register_server_state");
+  if (registerServerStateCookie) {
+    deleteCookie(c, "discord_register_server_state", { path: "/" });
+
+    let registerIntent: { state: string; userId: number } | null = null;
+    try {
+      const parsed = JSON.parse(registerServerStateCookie) as { state?: string; userId?: number };
+      if (typeof parsed.state === "string" && typeof parsed.userId === "number") {
+        registerIntent = { state: parsed.state, userId: parsed.userId };
+      }
+    } catch {
+      registerIntent = null;
+    }
+
+    if (!code || !state || !registerIntent || registerIntent.state !== state) {
+      return c.redirect(`${frontendUrl}/discord/servers?register_status=error`);
+    }
+
+    const auth = await requireAuth(c);
+    if (!auth || auth.userId !== registerIntent.userId) {
+      return c.redirect(`${frontendUrl}/discord/servers?register_status=unauthorized`);
+    }
+
+    const clientId = c.env.DISCORD_CLIENT_ID;
+    const clientSecret = c.env.DISCORD_CLIENT_SECRET;
+    const redirectUri = getDiscordRedirectUri(c);
+
+    if (!clientId || !clientSecret) {
+      return c.redirect(`${frontendUrl}/discord/servers?register_status=error`);
+    }
+
+    const exchangeResult = await exchangeDiscordCode({ code, clientId, clientSecret, redirectUri });
+    if (!exchangeResult.valid || !exchangeResult.accessToken) {
+      return c.redirect(`${frontendUrl}/discord/servers?register_status=error`);
+    }
+
+    const guildsResult = await fetchUserManageableGuilds(exchangeResult.accessToken);
+    if (!guildsResult.valid || !guildsResult.guilds || guildsResult.guilds.length === 0) {
+      return c.redirect(`${frontendUrl}/discord/servers?register_status=no_guilds`);
+    }
+
+    const { discordGuildRepo } = createContainer(c.env.DB);
+    const challenge = await discordGuildRepo.createRegistrationChallenge({
+      userId: auth.userId,
+      manageableGuilds: guildsResult.guilds,
+      ttlSeconds: 900,
+    });
+
+    return c.redirect(
+      `${frontendUrl}/discord/servers?register_token=${encodeURIComponent(challenge.token)}`,
+    );
+  }
+
   const linkStateCookie = getCookie(c, "discord_link_state");
+
   if (linkStateCookie) {
     deleteCookie(c, "discord_link_state", { path: "/" });
 

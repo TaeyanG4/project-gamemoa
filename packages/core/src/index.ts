@@ -13,4 +13,6 @@ export * from "./application/progressionUseCases.js";
 export * from "./application/achievementUseCases.js";
 export * from "./application/profileUseCases.js";
 export * from "./application/discordLinkUseCases.js";
+export * from "./domain/discordGuildPolicy.js";
+export * from "./application/discordGuildUseCases.js";
 export * from "./registry/gameRegistry.generated.js";

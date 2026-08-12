@@ -6,3 +6,4 @@ export * from "./d1/D1AccountMergeRepository.js";
 export * from "./d1/D1ProgressionRepository.js";
 export * from "./d1/D1AchievementRepository.js";
 export * from "./d1/D1DiscordLinkRepository.js";
+export * from "./d1/D1DiscordGuildRepository.js";

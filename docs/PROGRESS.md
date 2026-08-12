@@ -20,10 +20,19 @@
 | **Phase 11** | 계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 (별도 계정 기본, Primary Account Wins 통합, 게스트 즐겨찾기 제거, Google JWT/JWKS, 파비콘)                                     | ✅ 완료 | `pnpm verify`, 단위 테스트, D1 마이그레이션 0003/0004 및 파비콘 자산 검증 통과                                 |
 | **Phase 12** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase B: 진행도(XP/레벨/도전과제) 파운데이션** (My Page/Creator/Discord의 하위 기반)                                                                 | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0005 로컬 적용 검증, 신규 단위/통합 테스트 전원 통과                            |
 | **Phase 13** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase C 완료(My Page 탭 분리, 닉네임/국가 UI, 즐겨찾기/최근 플레이) + Discord `잘못된 redirect_uri` 버그 수정 + Phase F(Discord HTTP Interactions)** | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0006 로컬 적용 검증, Ed25519 실서명 테스트 포함 신규 단위/통합 테스트 전원 통과 |
+| **Phase 14** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase G: Discord 서버 시스템 (서버 등록 / 디렉토리·검색 / 공개 서버 페이지 / 서버 관리)**                                                            | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0007 로컬 적용 검증, 단위/통합 테스트 전원 통과                                 |
 
 ---
 
 ## 2. ⚙️ 현재 작업 (Current Phase)
+
+- **GAMEMOA 플레이어 플랫폼 확장 스프린트 — Phase G: Discord 서버 시스템 (Phase 14)**:
+  - **개념 분리**: 일반 GAMEMOA 게임 랭킹(`/ranking`)과 Discord 서버 커뮤니티 페이지(`/discord/*`)를 완전히 분리.
+  - **서버 등록 권한 검증**: Discord OAuth `guilds` 스코프 1회용 인증으로 `MANAGE_GUILD`/`ADMINISTRATOR` 권한이 있는 관리자만 서버 등록 가능. 1회용 해시 챌린지(`discord_server_registration_challenges`, 마이그레이션 0007) 발급 후 Discord access_token 즉시 삭제.
+  - **Vanity Slug 정책**: 영문 소문자/숫자/하이픈 3~32자, 예약어(`admin`, `api`, `register` 등) 차단, Slug 변경 시에도 `guild_id` 정규 식별자는 영구 보존.
+  - **공개 디렉토리 & 검색 (`/discord/servers`)**: PUBLIC 상태 등록 서버의 인덱스 검색, 바운디드 쿼리, candidate 등록 모달 위저드.
+  - **공개 서버 페이지 (`/discord/servers/:slug`)**: 서버 메타데이터, 가시성 배지, Phase H 정갈한 자리표시자 안내 문구.
+  - **서버 관리 페이지 (`/discord/servers/:slug/manage`)**: 검증된 관리자 전용 수정 (설명/slug/가시성 PUBLIC·UNLISTED·PRIVATE/등록 해제).
 
 - **GAMEMOA 플레이어 플랫폼 확장 스프린트 — Phase C 완료 + Discord 버그 수정 + Phase F: Discord HTTP Interactions (Phase 13)**:
   - **My Page "내 프로필"/"기록" 탭 분리**: `/profile`을 탭(세그먼트 컨트롤)으로 분리 — 내 프로필(사용자 카드, 레벨/XP, 프로필 설정, 즐겨찾기, 최근 플레이, 연결된 로그인 계정) / 기록(도전과제, 게임별 최고 기록). 게임 기록 카드를 실제 썸네일 + accent 색상 기반으로 재구성.

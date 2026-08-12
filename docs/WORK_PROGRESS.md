@@ -3,62 +3,39 @@
 # 현재 목표
 
 **GAMEMOA 플레이어 플랫폼 확장 스프린트 (My Page / Creator Ranking / Discord Community)** — 지금까지
-**Phase B(진행도 파운데이션)**, **Phase C(My Page)**, **Phase F(Discord HTTP Interactions 파운데이션)**를
-완료했습니다. Creator(Phase D~~E), Discord 서버 시스템/길드 XP(Phase G~~H)는 아직 착수하지 않았습니다.
+**Phase B(진행도 파운데이션)**, **Phase C(My Page)**, **Phase F(Discord HTTP Interactions 파운데이션)**,
+**Phase G(Discord 서버 시스템 & 커뮤니티 Hub)**를 완수했습니다.
 전체 스프린트 단계 구조는 `docs/ROADMAP.md` §1, 상세 설계는 `docs/PROGRESSION.md`(진행도),
 `docs/DISCORD_INTEGRATION.md`(Discord)를 참고하세요.
-
-## 시작 상태 (이번 세션)
-
-- **시작 커밋**: `18f2f3bb0df6a92969d387dbf8b4e93f5e70f507` (origin/main, 이전 세션에서 Phase C 1~3차
-  증분까지 검증 완료된 상태)
 
 ---
 
 ## 완료
 
-### Phase F: Discord HTTP Interactions (이번 세션)
+### Phase G: Discord 서버 시스템 & 커뮤니티 Hub (이번 세션)
 
-- [x] **D1 마이그레이션 `0006_discord_link.sql`**: `discord_link_challenges`(원문 토큰 미저장, SHA-256
-      해시만 저장, 1회용/만료 지원).
-- [x] **Ed25519 서명 검증**: `apps/api/src/infrastructure/discord/signature.ts` — Cloudflare Workers
-      `crypto.subtle`의 네이티브 `"Ed25519"` 알고리즘 사용(추가 의존성 없음). Node의
-      `crypto.generateKeyPairSync("ed25519")`로 만든 실제 키쌍/서명으로 정상 검증·변조 거부·다른 키 거부·
-      타임스탬프 불일치 거부·헤더 누락 거부를 전부 테스트.
-- [x] **`POST /api/discord/interactions`**: PING→PONG, `/gamemoa link|profile|games` 라우팅, 서명 실패
-      401, 미설정 시 500(전체 앱은 정상 부팅). `GET /api/discord/status`(비밀 아님, 설정 여부 확인용).
-- [x] **`/gamemoa link` 계정 연동**: 1회용 해시 토큰 발급(`DiscordLinkUseCases`, 10분 만료) →
-      `GET /api/discord/link/preview`(로그인 불필요, 안전한 미리보기) → `POST /api/discord/link/confirm`
-      (로그인 필요) → 기존 `IdentityUseCases.linkProvider` 그대로 재사용(별도 병합 로직 없음,
-      `ACCOUNT_ALREADY_LINKED` 시 기존 Primary Account Wins 통합 플로우 그대로 트리거).
-- [x] **웹 `/discord/link` 페이지**: 미리보기 → 로그인 유도 → 확인 → 성공/충돌(MergeModal 재사용)/오류
-      상태 전부 처리.
-- [x] **명령어 등록 스크립트**: `pnpm discord:commands:register` — `apps/api/src/infrastructure/discord/commands.ts`
-      가 등록 스크립트와 인터랙션 라우터의 단일 진실 공급원. 토큰 미출력, 안전한 재실행.
-- [x] **문서**: `docs/DISCORD_INTEGRATION.md` 신규(아키텍처/보안/명령어/외부 설정 한국어 절차).
-- [x] **테스트**: core 6 / db 5 / api 20 신규 (서명 검증 6, 라우트 6, 커맨드 핸들러 6, link 라우트 2,
-      DiscordLinkUseCases 6, D1DiscordLinkRepository 5 — 일부 항목은 여러 파일에 걸침, 최종 합계는 하단 참고).
-
-### Phase C 잔여 완료 + 버그 수정 (이번 세션)
-
-- [x] **My Page "내 프로필"/"기록" 탭 분리 + 게임 기록 카드 UI 개선**: 이미 이전 세션에서 완료(참고용
-      기록 — `docs/PROGRESS.md` Phase 13 참고).
-- [x] **버그 수정: Discord 계정 연결 `잘못된 OAuth2 redirect_uri`**: LOGIN/LINK가 서로 다른
-      redirect_uri를 Discord에 보내던 문제 — 단일 등록된 redirect_uri로 통합, LOGIN/LINK 구분은 state
-      쿠키로 판별. Developer Portal 설정 변경 불필요, 프로덕션에서 확인 완료.
-- [x] **버그 수정: `/api/auth/me` 세션 조회가 country/nickname_updated_at/country_updated_at 미반환**:
-      `D1SessionRepository` SELECT 확장, `AuthUserSchema` 필드 추가.
-- [x] **닉네임/국가 변경 UI + 즐겨찾기·최근 플레이 카드**: "내 프로필" 탭에 추가 완료.
-- [x] **UI 정리**: 푸터 "인기 태그"/설명 문단 제거.
-
-(위 Phase C 항목들은 실제로 **이전 세션**에서 구현·배포·검증까지 끝났으며, 이번 세션 시작 시점에 이미
-`완료` 상태였습니다. 여기 다시 나열한 것은 새 세션이 반복 작업하지 않도록 하기 위함입니다.)
-
----
-
-## 진행 중
-
-- 없음.
+- [x] **D1 마이그레이션 `0007_discord_guilds.sql`**:
+  - `discord_guilds` (`guild_id` PK, `slug` UNIQUE, `name`, `icon_url`, `description`, `visibility`, `registration_status`, `registered_by_user_id`, timestamps)
+  - `discord_guild_managers` (`guild_id`, `user_id`, `role`, timestamps)
+  - `discord_server_registration_challenges` (`token_hash` PK, `user_id`, `manageable_guilds_json`, `created_at`, `expires_at`, `consumed_at`)
+- [x] **순수 도메인 정책 (`discordGuildPolicy.ts`)**:
+  - `hasGuildManagementPermission`: `MANAGE_GUILD` (`32n`) 또는 `ADMINISTRATOR` (`8n`) 비트위즈 권한 및 소유자 검증.
+  - `validateVanitySlug`: 영문 소문자/숫자/하이픈 3~32자, 예약어(admin/api/register/link 등) 차단.
+  - `slugifyGuildName`: 길드명으로 기본 valid vanity slug 생성.
+- [x] **유즈케이스 (`discordGuildUseCases.ts`)**:
+  - `DiscordGuildRegistrationUseCases`: OAuth 1회용 토큰 챌린지 검증, 관리자 검증, 중복/예약 slug 거부, 등록/재활성화.
+  - `DiscordGuildDirectoryUseCases`: 바운디드 디렉토리 검색, PUBLIC/UNLISTED 공개 조회, PRIVATE 접근 제어.
+  - `DiscordGuildManagementUseCases`: 관리자 권한 확인, 메타데이터/가시성/slug 수정, 등록 해제.
+- [x] **계약 & API 라우트 (`discordGuild.ts` & `discordGuilds.ts`)**:
+  - Zod DTO 계약 명세 (`DiscordGuildDtoSchema`, `RegisterGuildRequestSchema`, `UpdateGuildRequestSchema`, `ServerSearchQuerySchema`).
+  - Hono API 라우트: `GET /api/discord/guilds/candidates`, `POST /api/discord/guilds/register`, `GET /api/discord/guilds/search`, `GET /api/discord/guilds/my`, `GET /api/discord/guilds/by-slug/:slug`, `PATCH /api/discord/guilds/by-slug/:slug`, `POST /api/discord/guilds/by-slug/:slug/unregister`.
+  - OAuth 라우트 `GET /api/auth/discord/register-server`: 단일 redirect_uri 사용, `discord_register_server_state` 쿠키로 콜백 분기.
+- [x] **웹 커뮤니티 UI**:
+  - `/discord`: Hub 페이지 (관리 서버, 계정 연결 상태)
+  - `/discord/servers`: 공개 디렉토리 검색 & 서버 등록 위저드
+  - `/discord/servers/:slug`: 공개 서버 페이지 (Phase H 정갈한 자리표시자 포함)
+  - `/discord/servers/:slug/manage`: 서버 관리 페이지 (설명/slug/가시성 변경, 등록 해제)
+- [x] **테스트 전원 통과**: `discordGuildPolicy.test.ts`, `discordGuildUseCases.test.ts`, `D1DiscordGuildRepository.test.ts`, `discordGuilds.test.ts` 신규 추가.
 
 ---
 
@@ -66,65 +43,20 @@
 
 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-- **Phase D~E: Creator 모델** — YouTube/CHZZK/SOOP/Twitch 채널 소유권 인증(공식 API/OAuth만 사용,
-  스크래핑 금지), Featured Creator 심사 엔진(구독자/팔로워 + 채널 생성 기간, 6시간 자동 재심사 Cron),
-  Creator 랭킹(기존 점수 재사용, 중복 저장 금지). **외부 Provider 자격증명 필요 — 착수 전 사용자와
-  어느 플랫폼부터 시작할지 범위 확인 권장.**
-- **Phase G: Discord 서버 시스템** — 서버 등록(권한 있는 관리자만), 서버 검색/디렉토리, vanity slug,
-  서버 관리 페이지, PUBLIC/UNLISTED/PRIVATE 가시성.
-- **Phase H: Discord 길드 XP** — `/gamemoa play`(길드-바인딩 플레이 컨텍스트), 길드-로컬 사용자 XP(신규
-  가입 시 0부터 시작, 전역 XP와 별개), 길드 활동 XP, 주간 XP, 전역 서버 랭킹, 다중 길드 중복 방지. 이
-  원장 패턴은 `docs/PROGRESSION.md`의 XP 원장 설계와 이번 세션의 `discord_link_challenges` 1회용
-  토큰/해시 저장 패턴을 재사용할 예정. 완료 후 `/gamemoa rank|leaderboard|play|server` 구현.
-- **Phase C 잔여(선택)**: 공개 프로필(`/profile/:id`), 필요 시에만 `/me`·`/account` 완전 라우트 분리.
-- **Phase I**: 계정 통합 회귀 테스트 확장(Creator/Discord 식별자 포함), 최종 문서화.
-
----
-
-## 블로커 / 외부 설정 대기
-
-- **Discord Interactions 외부 설정 (부분 완료)**: 정확한 절차는 `docs/DISCORD_INTEGRATION.md` §8.
-  1. ✅ **완료**: 사용자가 Developer Portal에서 Public Key를 확인해 전달, `gh variable set
-DISCORD_PUBLIC_KEY`로 GitHub 저장소 Variable에 등록(Secret 아님) → 재배포로 Worker에 반영.
-  2. ⏳ **대기**: Developer Portal의 **Interactions Endpoint URL**을
-     `https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions`로 설정 — 사용자가 Discord
-     Developer Portal에서 직접 저장해야 합니다(외부 서비스 UI, 저장소에서 조작 불가). 저장 시점에
-     Discord가 즉시 PING을 보내 서명 검증에 성공해야 저장되므로, 반드시 `DISCORD_PUBLIC_KEY`가 이미
-     배포된 상태(위 1번)에서 진행해야 합니다 — 이 조건은 이미 충족되었습니다.
-  3. ⏳ **대기**: 로컬 터미널에서 `DISCORD_APPLICATION_ID=... DISCORD_BOT_TOKEN=...
-pnpm discord:commands:register` 실행 — Bot Token은 비밀값이므로 **채팅에 붙여넣지 말고** 로컬
-     환경에서만 실행해야 합니다.
-- **Creator 플랫폼 자격증명**: Phase D~E 착수 시 YouTube/Twitch 등 OAuth Client 등록이 필요하며, 아직
-  요청/설정되지 않았습니다.
+- **Phase H: Discord Guild-local XP & Server Ranking Foundation** — `/gamemoa play`(길드-바인딩 플레이 컨텍스트), 길드-로컬 사용자 XP, 주간 XP, 전역 서버 랭킹, 다중 길드 중복 방지. 완료 후 `/gamemoa rank|leaderboard|play|server` 슬래시 커맨드 연결.
+- **Phase D~E: Creator 모델** — YouTube/CHZZK/SOOP/Twitch 채널 소유권 인증, Featured Creator 심사 엔진.
+- **Phase I**: 계정 통합 회귀 테스트 확장, 최종 문서화 및 프로덕션 배포 검증.
 
 ---
 
 ## 다음 작업 (Next Action)
 
-**Phase D 착수 전, Creator 플랫폼 범위를 사용자에게 먼저 확인할 것.** 4개 플랫폼(YouTube/CHZZK/SOOP/
-Twitch)을 한 번에 구현하는 대신, 이전 세션들의 패턴처럼 파운데이션(스키마 + 소유권 상태 모델 + Featured
-심사 정책의 순수 도메인 로직)부터 시작하고, 실제 OAuth 연동은 공식 문서를 다시 확인하며 플랫폼 1개씩
-진행하는 것을 권장합니다. 대안으로 Phase G(Discord 서버 등록/검색)를 먼저 진행할 수도 있습니다 — 외부
-Provider 자격증명이 필요 없고 이번 세션에서 만든 `discord_link_challenges` 패턴을 바로 재사용할 수
-있어 착수 장벽이 낮습니다. 새 세션은 본 문서, `docs/ROADMAP.md`, `docs/PROGRESSION.md`,
-`docs/DISCORD_INTEGRATION.md`만으로 이어서 진행 가능합니다.
+`Phase H — Discord Guild-local XP & Server Ranking Foundation`
 
 ---
 
 ## 마지막 검증 상태 (Last Verified State)
 
-- **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
-- **Local Unit Tests**: core 74 / db 19 / api 56 / web 15 — 전원 PASS (Discord 서명 검증은 Node
-  `crypto.generateKeyPairSync("ed25519")`로 만든 실제 키쌍/서명 사용)
-- **D1 마이그레이션 (로컬 + 프로덕션)**: 0006 적용 성공 (기존 0000~0005 위에 additive)
-- **최종 커밋 (Final SHA)**: `99dc2dd3e91e3895561a57d04b2f876fdac88ed1` (origin/main과 100% 일치)
-- **GitHub Actions CI**: GREEN (run `31646841329`)
-- **Cloudflare Deploy**: GREEN (run `31646920168`) — D1 프로덕션 마이그레이션 0006 적용, API/Web Worker
-  배포, Health/Provenance 체크 전원 통과.
-- **운영 Provenance/Smoke (`pnpm smoke:prod`)**: API `/api/health` commit = Web `/version.json` commit =
-  `99dc2dd3e91e3895561a57d04b2f876fdac88ed1` (= origin/main). `/discord/link` 포함 전체 웹 라우트/자산
-  HTTP 200.
-- **프로덕션 직접 확인**: `GET /api/discord/status` → `{"configured":false}`(예상된 상태, 외부 설정
-  대기), `POST /api/discord/interactions`(미설정) → 500(안전한 성능 저하, 전체 API는 정상), `GET
-/api/discord/link/preview`(토큰 없음) → 400, `POST /api/discord/link/confirm`(미인증) → 401.
-- **시작 SHA (이번 세션)**: `18f2f3bb0df6a92969d387dbf8b4e93f5e70f507`
+- **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build - 11/11 tasks 100% SUCCESS)
+- **Local Unit & Integration Tests**: core 88 / db 20 / api 61 / web 15 — 전원 PASS
+- **D1 마이그레이션**: 0007 적용 성공 (로컬 SQLite)

@@ -240,3 +240,93 @@ export interface DiscordLinkRepository {
   findChallengeByToken(token: string): Promise<DiscordLinkChallenge | null>;
   consumeChallengeByToken(token: string): Promise<void>;
 }
+
+// ---------------------------------------------------------------------------
+// Discord Guild Registration & Management (Phase G)
+// ---------------------------------------------------------------------------
+
+export type DiscordGuildVisibility = "PUBLIC" | "UNLISTED" | "PRIVATE";
+export type DiscordGuildRegistrationStatus = "ACTIVE" | "DISABLED";
+
+export interface DiscordGuild {
+  guild_id: string;
+  slug: string;
+  name: string;
+  icon_url: string | null;
+  description: string | null;
+  visibility: DiscordGuildVisibility;
+  registration_status: DiscordGuildRegistrationStatus;
+  registered_by_user_id: number;
+  registered_at: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  updated_at: string;
+}
+
+export interface DiscordGuildManager {
+  guild_id: string;
+  user_id: number;
+  role: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscordCandidateGuild {
+  guildId: string;
+  name: string;
+  iconUrl: string | null;
+}
+
+export interface DiscordRegistrationChallenge {
+  tokenHash: string;
+  userId: number;
+  manageableGuilds: DiscordCandidateGuild[];
+  createdAt: string;
+  expiresAt: string;
+  consumedAt: string | null;
+}
+
+export interface DiscordGuildRepository {
+  createRegistrationChallenge(input: {
+    userId: number;
+    manageableGuilds: DiscordCandidateGuild[];
+    ttlSeconds?: number;
+  }): Promise<{ token: string; expiresAt: string }>;
+  findRegistrationChallengeByToken(token: string): Promise<DiscordRegistrationChallenge | null>;
+  consumeRegistrationChallengeByToken(token: string): Promise<void>;
+
+  registerGuild(input: {
+    guildId: string;
+    slug: string;
+    name: string;
+    iconUrl?: string | null;
+    description?: string | null;
+    visibility: DiscordGuildVisibility;
+    userId: number;
+  }): Promise<DiscordGuild>;
+
+  findByGuildId(guildId: string): Promise<DiscordGuild | null>;
+  findBySlug(slug: string): Promise<DiscordGuild | null>;
+
+  updateGuild(
+    guildId: string,
+    updates: {
+      slug?: string | undefined;
+      description?: string | null | undefined;
+      visibility?: DiscordGuildVisibility | undefined;
+      registrationStatus?: DiscordGuildRegistrationStatus | undefined;
+      name?: string | undefined;
+      iconUrl?: string | null | undefined;
+    },
+  ): Promise<DiscordGuild>;
+
+  searchPublicGuilds(
+    query?: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<{ guilds: DiscordGuild[]; total: number }>;
+
+  isGuildManager(guildId: string, userId: number): Promise<boolean>;
+  addGuildManager(guildId: string, userId: number, role?: string): Promise<void>;
+  getUserManagedGuilds(userId: number): Promise<DiscordGuild[]>;
+}
