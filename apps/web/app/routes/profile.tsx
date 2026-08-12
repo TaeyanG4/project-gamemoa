@@ -1,10 +1,23 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../features/auth";
-import { Link, useNavigate } from "react-router";
-import { User, LogOut, Trophy, Gamepad2, ArrowLeft } from "lucide-react";
+import { Link, useNavigate, useSearchParams } from "react-router";
+import { User, LogOut, Trophy, Gamepad2, ArrowLeft, Link2, Unlink, Loader2 } from "lucide-react";
 import { formatScore } from "@gamemoa/game-sdk";
 import { getLocalBestScore, fetchUserBestsApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
+import {
+  fetchConnectedProviders,
+  linkGoogleProvider,
+  getDiscordLinkUrl,
+  unlinkProvider,
+} from "../features/auth/authService";
+import type {
+  ConnectedProvider,
+  SocialProvider,
+  CreateMergeChallengeResponse,
+} from "@gamemoa/contracts";
+import { ApiClientError } from "../lib/api";
+import { MergeModal } from "../components/ui/MergeModal";
 
 export function meta() {
   return [
@@ -13,18 +26,149 @@ export function meta() {
   ];
 }
 
+const ALL_PROVIDERS: SocialProvider[] = ["google", "discord"];
+
+function providerLabel(provider: SocialProvider): string {
+  return provider === "google" ? "Google" : "Discord";
+}
+
 export default function ProfilePage() {
-  const { user, isAuthenticated, logout, openLoginModal } = useAuth();
+  const { user, isAuthenticated, logout, openLoginModal, refreshUser, providerStatus } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [serverBests, setServerBests] = useState<Record<string, number>>({});
+  const [connected, setConnected] = useState<ConnectedProvider[]>([]);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [busyProvider, setBusyProvider] = useState<SocialProvider | null>(null);
+  const [mergeChallengeId, setMergeChallengeId] = useState<string | null>(null);
+
+  const refreshConnected = useCallback(async () => {
+    try {
+      const data = await fetchConnectedProviders();
+      setConnected(data.providers);
+    } catch {
+      setConnected([]);
+    }
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && user) {
       void fetchUserBestsApi()
         .then(setServerBests)
         .catch(() => setServerBests({}));
+      void refreshConnected();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, refreshConnected]);
+
+  // Handle Discord link redirect status params
+  useEffect(() => {
+    const linkStatus = searchParams.get("link_status");
+    const challenge = searchParams.get("challenge");
+    if (!linkStatus) return;
+
+    if (linkStatus === "success") {
+      setStatusMessage("로그인 수단이 연결되었습니다.");
+      void refreshConnected();
+    } else if (linkStatus === "already") {
+      setStatusMessage("이미 연결된 계정입니다.");
+    } else if (linkStatus === "conflict" && challenge) {
+      setMergeChallengeId(challenge);
+    } else if (linkStatus === "error") {
+      setStatusMessage("로그인 수단 연결 중 오류가 발생했습니다.");
+    }
+    // clean the URL
+    setSearchParams({}, { replace: true });
+  }, [searchParams, refreshConnected, setSearchParams]);
+
+  const isConnected = (provider: SocialProvider) => connected.some((p) => p.provider === provider);
+
+  const handleLinkGoogle = () => {
+    if (busyProvider) return;
+    const clientId = providerStatus.google.clientId;
+    if (!clientId || !providerStatus.google.configured || !window.google?.accounts?.id) {
+      setStatusMessage("Google 로그인 스크립트가 준비되지 않았습니다.");
+      return;
+    }
+    setBusyProvider("google");
+    const googleAuth = window.google.accounts.id;
+    googleAuth.initialize({
+      client_id: clientId,
+      callback: async (response: { credential: string }) => {
+        try {
+          await linkGoogleProvider(response.credential);
+          setStatusMessage("Google 로그인이 연결되었습니다.");
+          await refreshConnected();
+        } catch (err: unknown) {
+          const code = err instanceof ApiClientError ? err.code : undefined;
+          const data = err instanceof ApiClientError ? err.data : undefined;
+          if (code === "ACCOUNT_ALREADY_LINKED" && data) {
+            const merge = (data as { mergeChallenge?: CreateMergeChallengeResponse })
+              .mergeChallenge;
+            if (merge?.challengeId) {
+              setMergeChallengeId(merge.challengeId);
+            } else {
+              setStatusMessage("이 Google 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다.");
+            }
+          } else if (code === "PROVIDER_ALREADY_LINKED") {
+            setStatusMessage("이 계정에는 이미 Google 로그인이 연결되어 있습니다.");
+          } else {
+            setStatusMessage(err instanceof Error ? err.message : "Google 연결에 실패했습니다.");
+          }
+        } finally {
+          setBusyProvider(null);
+        }
+      },
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+    googleAuth.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        const tempDiv = document.createElement("div");
+        tempDiv.style.position = "fixed";
+        tempDiv.style.top = "-9999px";
+        document.body.appendChild(tempDiv);
+        googleAuth.renderButton(tempDiv, { type: "icon", size: "large" });
+        const btn = tempDiv.querySelector("div[role=button]") as HTMLElement | null;
+        if (btn) btn.click();
+        setTimeout(() => document.body.removeChild(tempDiv), 5000);
+      }
+    });
+  };
+
+  const handleLinkDiscord = () => {
+    if (busyProvider) return;
+    window.location.href = getDiscordLinkUrl();
+  };
+
+  const handleUnlink = async (provider: SocialProvider) => {
+    if (busyProvider) return;
+    setBusyProvider(provider);
+    try {
+      await unlinkProvider(provider);
+      setStatusMessage(`${providerLabel(provider)} 연결이 해제되었습니다.`);
+      await refreshConnected();
+    } catch (err: unknown) {
+      const code = err instanceof ApiClientError ? err.code : undefined;
+      if (code === "LAST_AUTH_PROVIDER") {
+        setStatusMessage("마지막 로그인 수단은 해제할 수 없습니다.");
+      } else {
+        setStatusMessage(err instanceof Error ? err.message : "연결 해제에 실패했습니다.");
+      }
+    } finally {
+      setBusyProvider(null);
+    }
+  };
+
+  const handleMerged = async () => {
+    setMergeChallengeId(null);
+    setStatusMessage("계정 통합이 완료되었습니다.");
+    // The current session may now resolve to the primary account or be invalidated (reverse merge).
+    await refreshUser();
+    await refreshConnected();
+    await fetchUserBestsApi()
+      .then(setServerBests)
+      .catch(() => setServerBests({}));
+  };
 
   if (!isAuthenticated || !user) {
     return (
@@ -48,7 +192,14 @@ export default function ProfilePage() {
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-4xl mx-auto flex-1 select-none">
-      {/* Back button */}
+      {mergeChallengeId && (
+        <MergeModal
+          challengeId={mergeChallengeId}
+          onClose={() => setMergeChallengeId(null)}
+          onMerged={() => void handleMerged()}
+        />
+      )}
+
       <button
         onClick={() => void navigate(-1)}
         className="flex items-center gap-2 text-xs font-bold text-text-muted hover:text-text-primary transition-colors cursor-pointer w-fit"
@@ -98,6 +249,85 @@ export default function ProfilePage() {
           <LogOut className="w-4 h-4" />
           <span>로그아웃</span>
         </button>
+      </div>
+
+      {statusMessage && (
+        <div className="px-4 py-3 rounded-2xl bg-brand/10 border border-brand/30 text-brand text-xs font-semibold">
+          {statusMessage}
+          <button
+            onClick={() => setStatusMessage(null)}
+            className="ml-2 p-1 hover:bg-brand/20 rounded-full cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Connected login accounts */}
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center gap-2">
+          <Link2 className="w-5 h-5 text-brand" />
+          <h2 className="text-xl font-bold text-text-primary">연결된 로그인 계정</h2>
+        </div>
+        <div className="flex flex-col gap-3">
+          {ALL_PROVIDERS.map((provider) => {
+            const linked = isConnected(provider);
+            return (
+              <div
+                key={provider}
+                className="flex items-center justify-between p-4 rounded-2xl bg-surface-raised border border-border shadow-md"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-sm text-text-primary">
+                    {providerLabel(provider)}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase ${
+                      linked
+                        ? "bg-accent-green/10 text-accent-green border-accent-green/30"
+                        : "bg-surface text-text-muted border-border"
+                    }`}
+                  >
+                    {linked ? "연결됨" : "연결 안 됨"}
+                  </span>
+                </div>
+                {linked ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleUnlink(provider)}
+                    disabled={busyProvider === provider}
+                    className="flex items-center gap-2 px-4 py-2 bg-accent-red/10 text-accent-red border border-accent-red/30 rounded-xl font-bold text-xs hover:bg-accent-red/20 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {busyProvider === provider ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Unlink className="w-3.5 h-3.5" />
+                    )}
+                    <span>연결 해제</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={provider === "google" ? handleLinkGoogle : handleLinkDiscord}
+                    disabled={
+                      busyProvider !== null ||
+                      (provider === "google" && !providerStatus.google.configured) ||
+                      (provider === "discord" && !providerStatus.discord.configured)
+                    }
+                    className="flex items-center gap-2 px-4 py-2 bg-brand text-white border border-brand rounded-xl font-bold text-xs hover:bg-brand-dark transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {busyProvider === provider ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Link2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>연결</span>
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* High Scores Section */}

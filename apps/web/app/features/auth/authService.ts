@@ -4,12 +4,18 @@ import {
   ConnectedProvidersResponseSchema,
   LinkProviderResponseSchema,
   UnlinkProviderResponseSchema,
+  MergePreviewPairSchema,
+  CreateMergeChallengeResponseSchema,
+  ConfirmAccountMergeResponseSchema,
   type AuthMeResponse,
   type AuthUser,
   type ConnectedProvidersResponse,
+  type CreateMergeChallengeResponse,
   type LinkProviderResponse,
+  type MergePreviewPair,
   type SocialProvider,
   type UnlinkProviderResponse,
+  type ConfirmAccountMergeResponse,
 } from "@gamemoa/contracts";
 import { API_URL, apiFetch } from "../../lib/api";
 
@@ -103,5 +109,36 @@ export function getDiscordLinkUrl(): string {
 export async function unlinkProvider(provider: SocialProvider): Promise<UnlinkProviderResponse> {
   return apiFetch(`/api/auth/link/${provider}`, UnlinkProviderResponseSchema, {
     method: "DELETE",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Account merge (Primary Account Wins)
+// ---------------------------------------------------------------------------
+
+export async function fetchMergePreview(challengeId: string): Promise<MergePreviewPair> {
+  return apiFetch(
+    `/api/auth/merge/preview?challenge=${encodeURIComponent(challengeId)}`,
+    MergePreviewPairSchema,
+  );
+}
+
+export async function resolveMergeChallenge(
+  conflictUserId: number,
+  provider: SocialProvider,
+): Promise<CreateMergeChallengeResponse> {
+  return apiFetch("/api/auth/merge/challenge", CreateMergeChallengeResponseSchema, {
+    method: "POST",
+    body: JSON.stringify({ conflictUserId, provider }),
+  });
+}
+
+export async function confirmAccountMerge(
+  challengeId: string,
+  keepUserId: number,
+): Promise<ConfirmAccountMergeResponse> {
+  return apiFetch("/api/auth/merge/confirm", ConfirmAccountMergeResponseSchema, {
+    method: "POST",
+    body: JSON.stringify({ challengeId, keepUserId }),
   });
 }
