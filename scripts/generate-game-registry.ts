@@ -91,6 +91,9 @@ async function generateRegistry() {
     }
   }
 
+  // Sort game entries deterministically by slug
+  gameEntries.sort((a, b) => a.manifest.slug.localeCompare(b.manifest.slug));
+
   const manifests = gameEntries.map((e) => e.manifest);
 
   // 1. Generate Core Manifest Registry

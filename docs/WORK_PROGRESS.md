@@ -1,46 +1,49 @@
-# GAMEMOA Architecture & Refactoring Goal Progress
+# GAMEMOA 작업 진행 현황 (WORK_PROGRESS)
 
-## Goal
+## 시작 상태 (Starting State)
 
-GAMEMOA 프로젝트의 장기 확장성을 위한 전체 아키텍처 점검, 폴더 구조 개선, API Composition Root, Game Manifest/Registry 자동화, Architecture Guard 구축, 기술 부채 완전 제거, 2차 Architecture Stabilization 및 Game Plugin Architecture 완성을 달성했습니다.
+- Commit SHA: `00b50616fd21ded994a9017a733a79be32db7477`
+- Local Status: `pnpm-lock.yaml` 불일치 수정 완료 (`pnpm install --frozen-lockfile` 성공)
+- GitHub CI Status: RED (이전 00b5061 커밋 시 pnpm-lock.yaml 미갱신으로 인한 CI 실패)
+- Cloudflare Deploy Status: SKIPPED (CI 실패로 인해 배포 자동 건너뜀)
+- Production Status: API `https://gamemoa-api.gamemoa.workers.dev/api/health` (`200 OK`), Web `https://gamemoa-web.gamemoa.workers.dev/` (`200 OK`)
 
-## Target Modular Monolith Architecture
+## 완료된 작업 (Completed)
 
-- **Web**: `apps/web` ➔ `@gamemoa/contracts` & `@gamemoa/ui` & `@gamemoa/game-sdk` & `@gamemoa/core`
-- **API**: `apps/api` (Composition Root: `container.ts`) ➔ `@gamemoa/core` (Application/Domain/Ports) ➔ `@gamemoa/db` (Cloudflare D1 Adapter)
-- **Contracts**: `@gamemoa/contracts` (`packages/contracts`) - Zod request/response schemas & types
-- **Game Architecture**: Game Manifest Single Source of Truth + Build-time Dual Registry Generator (`scripts/generate-game-registry.ts`) + Game Template Generator (`scripts/generate-game.ts`)
-- **Architecture Guard**: `pnpm architecture:check` (`scripts/verify-architecture.ts`) + `pnpm registry:check` (`scripts/check-registry.ts`) + `pnpm format:check` + CI Automated Blocking
+- [x] P0: `pnpm-lock.yaml` 갱신 및 `pnpm install --frozen-lockfile` 검증 완료
+- [x] 게임 플러그인 아키텍처 (매니페스트 및 웹 로더 자동 레지스트리 생성)
+- [x] Core 및 D1 Persistence 레이어 분리 (D1ScoreRepository에서 GAME_MANIFEST_MAP 제거)
+- [x] @gamemoa/contracts API Contract 단일 소스 통합
+- [x] Application Layer (`ScoreUseCases`) 도입 및 API Composition Root 적용
+- [x] Aim Test 반응형 아레나 및 순수 로직 단위 테스트 분리
+- [x] API Origin / CSRF 보안 가드 적용
 
-## Completed Checkpoints
+## 진행 중인 작업 (In Progress)
 
-- [x] **Phase 0: Baseline & Baseline Lock**
-  - Verified baseline commit `352a3be` and production health (`https://gamemoa-api.gamemoa.workers.dev/api/health` -> `{ status: "ok" }`, `https://gamemoa-web.gamemoa.workers.dev/` -> `200`).
-- [x] **Phase 1: Game Registry & Web Loaders Dual Automation (P1)**
-  - Updated `scripts/generate-game-registry.ts` to dynamically scan `games/*/package.json` package names and `src/manifest.ts`.
-  - Auto-generates both `packages/core/src/registry/gameRegistry.generated.ts` AND `apps/web/app/features/catalog/gameLoaders.generated.ts`.
-  - Standardized `export const manifest` across all game packages.
-  - Enhanced `scripts/check-registry.ts` to check freshness of both manifest and loader registry files.
-- [x] **Phase 2: Decouple D1 Score Repository from Game Catalog Policy (P2)**
-  - Completely removed `GAME_MANIFEST_MAP` import from `D1ScoreRepository`.
-  - `D1ScoreRepository` is now a pure SQL persistence adapter.
-  - `getUserPersonalBests(userId)` returns raw aggregates (`min_score`, `max_score`), and `getLeaderboard(gameId, limit, direction)` accepts ordering direction parameter.
-- [x] **Phase 3: API Contracts Single Source of Truth (P3)**
-  - Moved `scoreSubmissionSchema`, `LeaderboardQuerySchema`, and DTO schemas into `@gamemoa/contracts`.
-  - Re-exported schemas in `@gamemoa/shared` to eliminate definition duplication.
-- [x] **Phase 4: Core Layering & Application Use Cases (P4, P5)**
-  - Restructured `packages/core/src/` into `domain/`, `application/`, `ports/`, `errors/`, `registry/`.
-  - Implemented `ScoreUseCases` in Application Layer (`packages/core/src/application/scoreUseCases.ts`).
-  - Updated API Composition Root (`apps/api/src/container.ts`) to instantiate repositories and `ScoreUseCases`.
-  - Refactored `apps/api/src/routes/scores.ts` into a thin HTTP controller.
-- [x] **Phase 5: Security Hardening (P7)**
-  - Added Origin/CSRF verification guard middleware on state-changing API endpoints (`POST`, `PUT`, `DELETE`, `PATCH`).
-- [x] **Phase 6: Aim Test UX Polish & Responsiveness (P8)**
-  - Made Aim Test arena responsive using percentage coordinates (`xPercent`, `yPercent`) and aspect ratio `aspect-[4/3]`.
-  - Extracted pure aim test logic into `games/aim-test/src/logic.ts` with unit tests in `games/aim-test/test/aimTest.test.ts`.
-- [x] **Phase 7: Tooling & Wrangler Cleanup (P9, P10, P11)**
-  - Unified Wrangler version (`^4.121.0`) across root, `apps/web`, and `apps/api`.
-  - Replaced inline `node -e` build script with explicit script `scripts/prepare-web-build.ts`.
-  - Added `Format Check` (`pnpm format:check`) step to `.github/workflows/ci.yml`.
-- [x] **Phase 8: Full Quality Gate Verification & CI/CD Green**
-  - Verified local quality gate pipeline: `pnpm generate:registry` ➔ `pnpm architecture:check` ➔ `pnpm registry:check` ➔ `pnpm format:check` ➔ `pnpm lint` ➔ `pnpm typecheck` ➔ `pnpm test` ➔ `pnpm build` (All Green!).
+- [ ] P0-P3: Remote GitHub CI/CD Green 복구 (pnpm-lock.yaml 푸시 및 원격 CI/Deploy 검증)
+- [ ] Game Plugin Regression Test 강화 (games/* == manifest registry == web loader registry 검증)
+- [ ] OAuth 인프라 레이어 분리 (`apps/api/src/infrastructure/oauth/`)
+- [ ] Zod API 응답 계약 검증 및 API JSON camelCase 표준화 문서화
+- [ ] 문서 전체 한국어 본문 최신화 (README, PROGRESS, BLUEPRINT, ARCHITECTURE, AGENTS, ROADMAP)
+
+## 남은 작업 (Remaining)
+
+- [ ] 원격 GitHub CI 성공 확인
+- [ ] 원격 Cloudflare Deploy 성공 확인
+- [ ] Production API 및 Web 스모크 테스트 수행
+
+## 알려진 문제 (Known Problems)
+
+- 00b5061 커밋에서 `apps/web/package.json`의 Wrangler 버전을 `^4.121.0`으로 변경했으나 `pnpm-lock.yaml`을 갱신하여 푸시하지 않아 원격 GitHub Actions CI가 RED 상태였음 (로컬에서 lockfile 갱신 완료, 푸시 대기 중).
+
+## 다음 작업 (Next Action)
+
+- 로컬 품질 게이트 전수 검증 (`format:check`, `lint`, `architecture:check`, `registry:check`, `typecheck`, `test`, `build`) 후 git commit & push 수행하여 원격 CI 및 Deploy Green 복구.
+
+## 마지막 원격 검증 (Last Verified Remote State)
+
+- Commit SHA: `00b50616fd21ded994a9017a733a79be32db7477`
+- GitHub CI: RED (lockfile mismatch)
+- Cloudflare Deploy: SKIPPED
+- Production API: OK (`status: ok`)
+- Production Web: OK (`200 OK`)

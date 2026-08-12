@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createContainer } from "../container.js";
 import type { D1Database } from "@cloudflare/workers-types";
+import { verifyGoogleToken } from "../infrastructure/oauth/google.js";
+import { buildDiscordAuthorizeUrl, exchangeDiscordCode } from "../infrastructure/oauth/discord.js";
 
 export type ApiEnv = {
   Bindings: {
@@ -38,40 +40,20 @@ authRouter.post("/google", async (c) => {
       return c.json({ error: "Credential is required" }, 400);
     }
 
-    // Verify Google ID Token via Google's tokeninfo endpoint
-    const tokenInfoRes = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
-    );
-
-    if (!tokenInfoRes.ok) {
-      return c.json({ error: "Invalid Google token" }, 401);
-    }
-
-    const payload = (await tokenInfoRes.json()) as {
-      sub?: string;
-      email?: string;
-      name?: string;
-      picture?: string;
-      aud?: string;
-    };
-
-    if (!payload.sub) {
-      return c.json({ error: "Invalid token payload" }, 401);
-    }
-
-    const expectedClientId = c.env.GOOGLE_CLIENT_ID;
-    if (expectedClientId && payload.aud !== expectedClientId) {
-      return c.json({ error: "Audience mismatch" }, 401);
+    const verifyResult = await verifyGoogleToken(credential, c.env.GOOGLE_CLIENT_ID);
+    if (!verifyResult.valid || !verifyResult.profile) {
+      return c.json({ error: verifyResult.reason || "Invalid Google token" }, 401);
     }
 
     const { userRepo, sessionRepo } = createContainer(c.env.DB);
+    const profile = verifyResult.profile;
 
     const user = await userRepo.findOrCreateUser({
       provider: "google",
-      providerUserId: payload.sub,
-      email: payload.email ?? null,
-      nickname: payload.name || "Google User",
-      avatarUrl: payload.picture ?? null,
+      providerUserId: profile.sub,
+      email: profile.email,
+      nickname: profile.name,
+      avatarUrl: profile.picture,
     });
 
     const session = await sessionRepo.createSession(user.id);
@@ -115,14 +97,13 @@ authRouter.get("/discord", async (c) => {
     path: "/",
   });
 
-  const discordUrl = new URL("https://discord.com/api/oauth2/authorize");
-  discordUrl.searchParams.set("client_id", clientId);
-  discordUrl.searchParams.set("redirect_uri", redirectUri);
-  discordUrl.searchParams.set("response_type", "code");
-  discordUrl.searchParams.set("scope", "identify email");
-  discordUrl.searchParams.set("state", state);
+  const discordUrl = buildDiscordAuthorizeUrl({
+    clientId,
+    redirectUri,
+    state,
+  });
 
-  return c.redirect(discordUrl.toString());
+  return c.redirect(discordUrl);
 });
 
 // GET /api/auth/discord/callback
@@ -148,56 +129,26 @@ authRouter.get("/discord/callback", async (c) => {
     return c.text("Discord client secret not configured", 500);
   }
 
-  const tokenParams = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "authorization_code",
+  const exchangeResult = await exchangeDiscordCode({
     code,
-    redirect_uri: redirectUri,
+    clientId,
+    clientSecret,
+    redirectUri,
   });
 
-  const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: tokenParams.toString(),
-  });
-
-  if (!tokenRes.ok) {
-    return c.text("Failed to exchange code for token", 400);
+  if (!exchangeResult.valid || !exchangeResult.profile) {
+    return c.text(exchangeResult.reason || "Failed to exchange Discord code", 400);
   }
 
-  const tokenData = (await tokenRes.json()) as { access_token?: string };
-  if (!tokenData.access_token) {
-    return c.text("Invalid token response from Discord", 400);
-  }
-
-  const userRes = await fetch("https://discord.com/api/users/@me", {
-    headers: { Authorization: `Bearer ${tokenData.access_token}` },
-  });
-
-  if (!userRes.ok) {
-    return c.text("Failed to fetch Discord user info", 400);
-  }
-
-  const userInfo = (await userRes.json()) as {
-    id: string;
-    username: string;
-    email?: string;
-    avatar?: string;
-  };
-
-  const avatarUrl = userInfo.avatar
-    ? `https://cdn.discordapp.com/avatars/${userInfo.id}/${userInfo.avatar}.png`
-    : null;
-
+  const profile = exchangeResult.profile;
   const { userRepo, sessionRepo } = createContainer(c.env.DB);
 
   const user = await userRepo.findOrCreateUser({
     provider: "discord",
-    providerUserId: userInfo.id,
-    email: userInfo.email ?? null,
-    nickname: userInfo.username,
-    avatarUrl,
+    providerUserId: profile.id,
+    email: profile.email,
+    nickname: profile.username,
+    avatarUrl: profile.avatarUrl,
   });
 
   const session = await sessionRepo.createSession(user.id);

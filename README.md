@@ -18,12 +18,12 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
 - 🎮 **게이머 필수 테스트 미니게임 컬렉션**:
   - ⏱️ **반응속도 테스트 (Reaction Time)**: 밀리초(ms) 단위 반응속도 측정 및 S~F 등급 판정
   - 🧠 **순서 기억력 테스트 (Memory Test)**: 패턴 시퀀스 암기 및 최고 레벨 도전
-  - 🎯 **에임 테스트 (Aim Test)**: 30개 무작위 타겟 정밀 타격 반응속도 측정
+  - 🎯 **에임 테스트 (Aim Test)**: 30개 무작위 타겟 정밀 타격 반응속도 측정 (반응형 아레나 지원)
 - 🧩 **Game Plugin Architecture**:
-  - 빌드 타임 자동 레지스트리 생성기 (`generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
+  - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
 - 🛡️ **Clean Monorepo & Architecture Guard**:
   - `packages/core` (Domain, Application, Ports), `packages/db` (Cloudflare D1 Persistence), `@gamemoa/contracts` (Single Source of Truth Schemas)
-  - CI 자동화 Architecture Guard (`architecture:check`, `registry:check`)로 레이어 위반 차단
+  - CI 자동화 Architecture Guard (`pnpm architecture:check`, `pnpm registry:check`)로 레이어 위반 및 생성 파일 이탈 자동 차단
 - ☁️ **Cloudflare Free Tier Production Architecture**:
   - **Hono + Cloudflare Workers**: 고성능 서버리스 API 백엔드
   - **Cloudflare D1**: 글로벌 에지 데이터베이스 (유저, 세션, 게임 점수, 랭킹)
@@ -86,11 +86,11 @@ pnpm lint
 pnpm architecture:check
 pnpm registry:check
 
-# 게임 레지스트리 자동 생성
+# 게임 레지스트리 자동 생성 (Core Manifest Registry & Web Dynamic Loaders)
 pnpm generate:registry
 
 # 새 게임 스캐폴딩 생성
-pnpm generate:game
+pnpm generate:game <game-slug>
 
 # TypeScript 타입 검사 & 단위 테스트
 pnpm typecheck
@@ -130,14 +130,30 @@ gamemoa/
 ├── packages/
 │   ├── contracts/             # Zod 요청/응답 스키마 & API Single Source of Truth
 │   ├── core/                  # Pure Domain, Application Use Cases & Ports (No Infra/Browser deps)
-│   ├── db/                    # Cloudflare D1 Repository 구현체 & SQL schema
+│   ├── db/                    # Cloudflare D1 Repository 구현체 & SQL schema (Persistence Adapter)
 │   ├── game-sdk/              # 게임 모듈 공통 계약 & 스코어링 인터페이스
 │   ├── shared/                # Zod 공통 검증 스키마 & 타입
 │   └── ui/                    # 공통 UI 컴포넌트 & GameShell
-├── scripts/                   # Architecture Guard & Registry Generator 스크립트
-├── docs/                      # 아키텍처, 작업 진행 상황 & 로드맵 (WORK_PROGRESS.md, ROADMAP.md)
-├── GAMEMOA_BLUEPRINT.md       # 아키텍처 및 시스템 설계 명세서
-└── AGENTS.md                  # 코딩 및 개발 규칙 명세서
+├── scripts/                   # Architecture Guard, Registry Generator & SPA Build 스크립트
+└── docs/                      # 아키텍처, 시스템 설계, 작업 진행 상황 & 로드맵
+    ├── ARCHITECTURE.md        # 레이어 의존성 & 플러그인 아키텍처 명세서
+    ├── GAMEMOA_BLUEPRINT.md   # 전체 시스템 블루프린트
+    ├── PROGRESS.md            # 기능별 구현 진행 현황
+    ├── WORK_PROGRESS.md       # CI/CD 및 작업 진행 상황
+    ├── ROADMAP.md             # 플랫폼 향후 로드맵
+    └── AGENTS.md              # AI Agent 개발 규칙 명세서
+```
+
+---
+
+## ☁️ 배포 파이프라인 (Deployment Pipeline)
+
+GAMEMOA는 **GitHub Actions**와 **Wrangler CLI**를 통해 Cloudflare Workers에 자동 배포됩니다:
+
+```text
+git push origin main
+  └─► GitHub Actions CI (frozen install ➔ format ➔ lint ➔ architecture ➔ registry ➔ typecheck ➔ test ➔ build)
+        └─► GitHub Actions CD (D1 Migration ➔ API Worker 배포 ➔ API Health Check ➔ Web Worker 배포 ➔ Web Smoke Check)
 ```
 
 ---
