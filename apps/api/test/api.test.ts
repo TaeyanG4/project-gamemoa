@@ -104,3 +104,39 @@ test("GET /api/personalization returns 401 unauthenticated without session cooki
   const data = (await res.json()) as { error: string };
   assert.equal(data.error, "Unauthenticated");
 });
+
+test("GET /api/auth/accounts requires authentication", async () => {
+  const res = await app.request("http://localhost/api/auth/accounts");
+  assert.equal(res.status, 401);
+  const data = (await res.json()) as { error: { code: string; message: string } };
+  assert.equal(data.error.code, "UNAUTHORIZED");
+});
+
+test("POST /api/auth/link/google requires authentication", async () => {
+  const res = await app.request("http://localhost/api/auth/link/google", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "http://localhost:5173" },
+    body: JSON.stringify({ credential: "fake-credential" }),
+  });
+  assert.equal(res.status, 401);
+  const data = (await res.json()) as { error: { code: string } };
+  assert.equal(data.error.code, "UNAUTHORIZED");
+});
+
+test("DELETE /api/auth/link/:provider requires authentication", async () => {
+  const res = await app.request("http://localhost/api/auth/link/google", {
+    method: "DELETE",
+    Origin: "http://localhost:5173",
+  });
+  assert.equal(res.status, 401);
+  const data = (await res.json()) as { error: { code: string } };
+  assert.equal(data.error.code, "UNAUTHORIZED");
+});
+
+test("DELETE /api/auth/link/:provider rejects unknown providers when authenticated-less (401 first)", async () => {
+  const res = await app.request("http://localhost/api/auth/link/unknown", {
+    method: "DELETE",
+    Origin: "http://localhost:5173",
+  });
+  assert.equal(res.status, 401);
+});

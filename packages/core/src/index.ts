@@ -4,4 +4,5 @@ export * from "./ports/repositories.js";
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";
 export * from "./application/personalizationUseCases.js";
+export * from "./application/identityUseCases.js";
 export * from "./registry/gameRegistry.generated.js";

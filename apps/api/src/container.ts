@@ -7,6 +7,7 @@ import {
 import {
   ScoreUseCases,
   PersonalizationUseCases,
+  IdentityUseCases,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -21,6 +22,7 @@ export interface AppContainer {
   personalizationRepo: PersonalizationRepository;
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
+  identityUseCases: IdentityUseCases;
 }
 
 export function createContainer(db: D1Database): AppContainer {
@@ -31,6 +33,7 @@ export function createContainer(db: D1Database): AppContainer {
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
+  const identityUseCases = new IdentityUseCases(userRepo);
 
   return {
     userRepo,
@@ -39,5 +42,6 @@ export function createContainer(db: D1Database): AppContainer {
     personalizationRepo,
     scoreUseCases,
     personalizationUseCases,
+    identityUseCases,
   };
 }

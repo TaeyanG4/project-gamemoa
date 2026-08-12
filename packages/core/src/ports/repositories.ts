@@ -50,6 +50,15 @@ export interface UserRepository {
     nickname: string;
     avatarUrl: string | null;
   }): Promise<User>;
+  getOAuthAccounts(userId: number): Promise<OAuthAccount[]>;
+  findOAuthAccount(provider: string, providerUserId: string): Promise<OAuthAccount | null>;
+  linkOAuthAccount(
+    userId: number,
+    provider: string,
+    providerUserId: string,
+    providerEmail: string | null,
+  ): Promise<void>;
+  unlinkOAuthAccount(userId: number, provider: string): Promise<void>;
 }
 
 export interface SessionRepository {

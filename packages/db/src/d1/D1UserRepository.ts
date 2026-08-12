@@ -1,4 +1,4 @@
-import type { User, UserRepository } from "@gamemoa/core";
+import type { OAuthAccount, User, UserRepository } from "@gamemoa/core";
 
 export interface D1Database {
   prepare(query: string): D1PreparedStatement;
@@ -137,6 +137,69 @@ export class D1UserRepository implements UserRepository {
       .all<{ provider: string }>();
 
     return res.results.map((r) => r.provider);
+  }
+
+  async getOAuthAccounts(userId: number): Promise<OAuthAccount[]> {
+    const res = await this.db
+      .prepare(
+        `SELECT id, user_id, provider, provider_user_id, provider_email, created_at
+         FROM oauth_accounts WHERE user_id = ? ORDER BY created_at ASC`,
+      )
+      .bind(userId)
+      .all<Record<string, unknown>>();
+
+    return (res.results || []).map((row) => ({
+      id: Number(row.id),
+      user_id: Number(row.user_id),
+      provider: String(row.provider),
+      provider_user_id: String(row.provider_user_id),
+      provider_email: row.provider_email ? String(row.provider_email) : null,
+      created_at: String(row.created_at),
+    }));
+  }
+
+  async findOAuthAccount(provider: string, providerUserId: string): Promise<OAuthAccount | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT id, user_id, provider, provider_user_id, provider_email, created_at
+         FROM oauth_accounts WHERE provider = ? AND provider_user_id = ?`,
+      )
+      .bind(provider, providerUserId)
+      .first<Record<string, unknown>>();
+
+    if (!row) return null;
+
+    return {
+      id: Number(row.id),
+      user_id: Number(row.user_id),
+      provider: String(row.provider),
+      provider_user_id: String(row.provider_user_id),
+      provider_email: row.provider_email ? String(row.provider_email) : null,
+      created_at: String(row.created_at),
+    };
+  }
+
+  async linkOAuthAccount(
+    userId: number,
+    provider: string,
+    providerUserId: string,
+    providerEmail: string | null,
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        `INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_email, created_at)
+         VALUES (?, ?, ?, ?, datetime('now'))
+         ON CONFLICT(provider, provider_user_id) DO NOTHING`,
+      )
+      .bind(userId, provider, providerUserId, providerEmail)
+      .run();
+  }
+
+  async unlinkOAuthAccount(userId: number, provider: string): Promise<void> {
+    await this.db
+      .prepare(`DELETE FROM oauth_accounts WHERE user_id = ? AND provider = ?`)
+      .bind(userId, provider)
+      .run();
   }
 
   private async getLastInsertId(): Promise<number> {

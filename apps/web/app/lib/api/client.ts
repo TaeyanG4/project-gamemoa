@@ -27,21 +27,37 @@ export async function apiFetch<T>(
 
   if (!res.ok) {
     let detail: string | undefined;
+    let code: string | undefined;
     try {
-      const body = (await res.json()) as { error?: string; detail?: string; message?: string };
-      detail = body.error || body.detail || body.message;
+      const body = (await res.json()) as {
+        error?: string | { code?: string; message?: string };
+        detail?: string;
+        message?: string;
+      };
+      if (body?.error && typeof body.error === "object" && typeof body.error.message === "string") {
+        detail = body.error.message;
+        code = body.error.code;
+      } else if (typeof body?.error === "string") {
+        detail = body.error;
+      } else {
+        detail = body?.detail || body?.message;
+      }
     } catch {
       // Failed to parse body as json
     }
-    const errOptions: { status?: number; detail?: string } = {};
+    const errOptions: { status?: number; detail?: string; code?: string } = {};
     if (res.status) errOptions.status = res.status;
     if (detail) errOptions.detail = detail;
 
-    throw new ApiClientError(
+    const err = new ApiClientError(
       "HttpError",
       detail || `요청 처리에 실패했습니다. (HTTP ${res.status})`,
       errOptions,
     );
+    if (code) {
+      (err as unknown as { code?: string }).code = code;
+    }
+    throw err;
   }
 
   const json = await res.json();

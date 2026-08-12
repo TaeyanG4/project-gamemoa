@@ -1,9 +1,15 @@
 import {
   AuthMeResponseSchema,
   AuthProvidersResponseSchema,
+  ConnectedProvidersResponseSchema,
+  LinkProviderResponseSchema,
+  UnlinkProviderResponseSchema,
   type AuthMeResponse,
   type AuthUser,
+  type ConnectedProvidersResponse,
+  type LinkProviderResponse,
   type SocialProvider,
+  type UnlinkProviderResponse,
 } from "@gamemoa/contracts";
 import { API_URL, apiFetch } from "../../lib/api";
 
@@ -73,4 +79,29 @@ export async function logoutFromServer(): Promise<void> {
   } catch {
     // Ignore network errors on logout
   }
+}
+
+// ---------------------------------------------------------------------------
+// Account identity: connected providers, linking and unlinking
+// ---------------------------------------------------------------------------
+
+export async function fetchConnectedProviders(): Promise<ConnectedProvidersResponse> {
+  return apiFetch("/api/auth/accounts", ConnectedProvidersResponseSchema);
+}
+
+export async function linkGoogleProvider(credential: string): Promise<LinkProviderResponse> {
+  return apiFetch("/api/auth/link/google", LinkProviderResponseSchema, {
+    method: "POST",
+    body: JSON.stringify({ credential }),
+  });
+}
+
+export function getDiscordLinkUrl(): string {
+  return `${API_URL}/api/auth/link/discord`;
+}
+
+export async function unlinkProvider(provider: SocialProvider): Promise<UnlinkProviderResponse> {
+  return apiFetch(`/api/auth/link/${provider}`, UnlinkProviderResponseSchema, {
+    method: "DELETE",
+  });
 }
