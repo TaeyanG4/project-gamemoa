@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useAuth } from "../features/auth";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
@@ -12,11 +12,15 @@ import {
   Loader2,
   Zap,
   Award,
+  Settings,
+  Bookmark,
+  Clock,
 } from "lucide-react";
 import { formatScore } from "@gamemoa/game-sdk";
 import type { GameManifest } from "@gamemoa/game-sdk";
 import { getLocalBestScore, fetchUserBestsApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
+import { usePersonalization } from "../features/personalization";
 import {
   fetchConnectedProviders,
   linkGoogleProvider,
@@ -24,6 +28,8 @@ import {
   unlinkProvider,
 } from "../features/auth/authService";
 import { fetchMyProgressApi, fetchMyAchievementsApi } from "../features/progression/api";
+import { updateNicknameApi, updateCountryApi } from "../features/profile/api";
+import { COUNTRY_OPTIONS } from "../lib/countries";
 import type {
   ConnectedProvider,
   SocialProvider,
@@ -52,16 +58,8 @@ function providerLabel(provider: SocialProvider): string {
   return provider === "google" ? "Google" : "Discord";
 }
 
-function GameRecordCard({
-  game,
-  serverBest,
-  localBest,
-}: {
-  game: GameManifest;
-  serverBest: number | null;
-  localBest: number | null;
-}) {
-  const hasRecord = serverBest !== null || localBest !== null;
+/** Shared compact "game + info row" card used for records, favorites, and recent plays. */
+function GameLinkCard({ game, children }: { game: GameManifest; children: ReactNode }) {
   const accent = game.accent ?? "#6366f1";
 
   return (
@@ -86,21 +84,7 @@ function GameRecordCard({
         <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors truncate">
           {game.title}
         </h3>
-        {hasRecord ? (
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className="flex items-center gap-1 text-sm font-black text-brand-light">
-              <Trophy className="w-3.5 h-3.5 text-accent-yellow shrink-0" />
-              {serverBest !== null ? formatScore(serverBest, game.scoreConfig) : "계정 기록 없음"}
-            </span>
-            {localBest !== null && (
-              <span className="text-[10px] text-text-muted font-semibold">
-                기기 기록: {formatScore(localBest, game.scoreConfig)}
-              </span>
-            )}
-          </div>
-        ) : (
-          <p className="text-xs text-text-muted mt-1">아직 기록이 없어요 — 지금 도전해보세요!</p>
-        )}
+        {children}
       </div>
 
       <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-brand group-hover:translate-x-0.5 transition-all shrink-0" />
@@ -108,10 +92,75 @@ function GameRecordCard({
   );
 }
 
+function GameRecordCard({
+  game,
+  serverBest,
+  localBest,
+}: {
+  game: GameManifest;
+  serverBest: number | null;
+  localBest: number | null;
+}) {
+  const hasRecord = serverBest !== null || localBest !== null;
+
+  return (
+    <GameLinkCard game={game}>
+      {hasRecord ? (
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
+          <span className="flex items-center gap-1 text-sm font-black text-brand-light">
+            <Trophy className="w-3.5 h-3.5 text-accent-yellow shrink-0" />
+            {serverBest !== null ? formatScore(serverBest, game.scoreConfig) : "계정 기록 없음"}
+          </span>
+          {localBest !== null && (
+            <span className="text-[10px] text-text-muted font-semibold">
+              기기 기록: {formatScore(localBest, game.scoreConfig)}
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className="text-xs text-text-muted mt-1">아직 기록이 없어요 — 지금 도전해보세요!</p>
+      )}
+    </GameLinkCard>
+  );
+}
+
+function GameFavoriteCard({ game }: { game: GameManifest }) {
+  return (
+    <GameLinkCard game={game}>
+      <p className="text-xs text-text-secondary line-clamp-1 mt-1">{game.shortDescription}</p>
+    </GameLinkCard>
+  );
+}
+
+function formatRelativeTimeKo(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const diffMin = Math.floor((Date.now() - then) / 60000);
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}일 전`;
+  return iso.split("T")[0] ?? iso;
+}
+
+function GameActivityCard({ game, lastPlayedAt }: { game: GameManifest; lastPlayedAt: string }) {
+  return (
+    <GameLinkCard game={game}>
+      <p className="flex items-center gap-1 text-xs text-text-muted mt-1">
+        <Clock className="w-3 h-3 shrink-0" />
+        {formatRelativeTimeKo(lastPlayedAt)}
+      </p>
+    </GameLinkCard>
+  );
+}
+
 export default function ProfilePage() {
   const { user, isAuthenticated, logout, openLoginModal, refreshUser, providerStatus } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { favoriteGameIds, recentPlays } = usePersonalization();
   const [activeTab, setActiveTab] = useState<ProfileTab>("profile");
   const [serverBests, setServerBests] = useState<Record<string, number>>({});
   const [connected, setConnected] = useState<ConnectedProvider[]>([]);
@@ -120,6 +169,43 @@ export default function ProfilePage() {
   const [mergeChallengeId, setMergeChallengeId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressResponse | null>(null);
   const [achievements, setAchievements] = useState<AchievementSummaryResponse | null>(null);
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [nicknameBusy, setNicknameBusy] = useState(false);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
+  const [countryInput, setCountryInput] = useState("");
+  const [countryBusy, setCountryBusy] = useState(false);
+  const [countryError, setCountryError] = useState<string | null>(null);
+
+  // Keep the settings inputs in sync with the latest saved user data (e.g. after a
+  // successful update, or on first load) without clobbering an unrelated in-progress edit.
+  useEffect(() => {
+    if (user) {
+      setNicknameInput(user.nickname);
+      setCountryInput(user.country ?? "");
+    }
+  }, [user]);
+
+  const favoriteGames = useMemo(
+    () =>
+      favoriteGameIds
+        .map((id) => gameManifests.find((g) => g.slug === id || g.id === id))
+        .filter((g): g is (typeof gameManifests)[number] => Boolean(g)),
+    [favoriteGameIds],
+  );
+
+  const recentGames = useMemo(
+    () =>
+      recentPlays
+        .map((r) => {
+          const game = gameManifests.find((g) => g.slug === r.gameId || g.id === r.gameId);
+          return game ? { game, lastPlayedAt: r.lastPlayedAt } : null;
+        })
+        .filter((entry): entry is { game: (typeof gameManifests)[number]; lastPlayedAt: string } =>
+          Boolean(entry),
+        )
+        .slice(0, 8),
+    [recentPlays],
+  );
 
   const refreshConnected = useCallback(async () => {
     try {
@@ -254,6 +340,64 @@ export default function ProfilePage() {
     await fetchUserBestsApi()
       .then(setServerBests)
       .catch(() => setServerBests({}));
+  };
+
+  const handleUpdateNickname = async () => {
+    if (!user || nicknameBusy) return;
+    const trimmed = nicknameInput.trim();
+    if (!trimmed || trimmed === user.nickname) return;
+
+    setNicknameBusy(true);
+    setNicknameError(null);
+    try {
+      await updateNicknameApi(trimmed);
+      await refreshUser();
+      setStatusMessage("닉네임이 변경되었습니다.");
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError) {
+        const data = err.data as { nextAllowedAt?: string } | undefined;
+        if (err.code === "NICKNAME_COOLDOWN_ACTIVE" && data?.nextAllowedAt) {
+          setNicknameError(
+            `닉네임은 ${data.nextAllowedAt.split("T")[0]} 이후 다시 변경할 수 있습니다.`,
+          );
+        } else {
+          setNicknameError(err.detail || "닉네임 변경에 실패했습니다.");
+        }
+      } else {
+        setNicknameError("닉네임 변경에 실패했습니다.");
+      }
+    } finally {
+      setNicknameBusy(false);
+    }
+  };
+
+  const handleUpdateCountry = async () => {
+    if (!user || countryBusy) return;
+    const nextCountry = countryInput || null;
+    if (nextCountry === (user.country ?? null)) return;
+
+    setCountryBusy(true);
+    setCountryError(null);
+    try {
+      await updateCountryApi(nextCountry);
+      await refreshUser();
+      setStatusMessage("국가/지역이 변경되었습니다.");
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError) {
+        const data = err.data as { nextAllowedAt?: string } | undefined;
+        if (err.code === "COUNTRY_COOLDOWN_ACTIVE" && data?.nextAllowedAt) {
+          setCountryError(
+            `국가/지역은 ${data.nextAllowedAt.split("T")[0]} 이후 다시 변경할 수 있습니다.`,
+          );
+        } else {
+          setCountryError(err.detail || "국가/지역 변경에 실패했습니다.");
+        }
+      } else {
+        setCountryError("국가/지역 변경에 실패했습니다.");
+      }
+    } finally {
+      setCountryBusy(false);
+    }
   };
 
   if (!isAuthenticated || !user) {
@@ -415,6 +559,128 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
+
+          {/* Profile settings: nickname & country/region */}
+          <div className="w-full bg-surface-raised rounded-3xl border border-border p-6 md:p-8 flex flex-col gap-6 shadow-xl">
+            <div className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-brand" />
+              <h2 className="text-xl font-bold text-text-primary">프로필 설정</h2>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="nickname-input" className="text-xs font-bold text-text-muted">
+                닉네임
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="nickname-input"
+                  type="text"
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  maxLength={20}
+                  className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-surface border border-border text-sm text-text-primary focus:outline-none focus:border-brand/50"
+                  placeholder="닉네임을 입력하세요"
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleUpdateNickname()}
+                  disabled={
+                    nicknameBusy || !nicknameInput.trim() || nicknameInput.trim() === user.nickname
+                  }
+                  className="flex items-center justify-center px-4 py-2.5 bg-brand text-white border border-brand rounded-xl font-bold text-xs hover:bg-brand-dark transition-all cursor-pointer disabled:opacity-50 shrink-0 min-w-16"
+                >
+                  {nicknameBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "변경"}
+                </button>
+              </div>
+              {nicknameError && (
+                <p className="text-[11px] text-accent-red font-semibold">{nicknameError}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label htmlFor="country-input" className="text-xs font-bold text-text-muted">
+                국가/지역{" "}
+                <span className="font-normal text-text-muted">
+                  (선택, 자기 신고 정보이며 국적 인증이 아닙니다)
+                </span>
+              </label>
+              <div className="flex gap-2">
+                <select
+                  id="country-input"
+                  value={countryInput}
+                  onChange={(e) => setCountryInput(e.target.value)}
+                  className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-surface border border-border text-sm text-text-primary focus:outline-none focus:border-brand/50"
+                >
+                  <option value="">설정 안 함</option>
+                  {COUNTRY_OPTIONS.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.labelKo}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => void handleUpdateCountry()}
+                  disabled={countryBusy || countryInput === (user.country ?? "")}
+                  className="flex items-center justify-center px-4 py-2.5 bg-brand text-white border border-brand rounded-xl font-bold text-xs hover:bg-brand-dark transition-all cursor-pointer disabled:opacity-50 shrink-0 min-w-16"
+                >
+                  {countryBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "변경"}
+                </button>
+              </div>
+              {countryError && (
+                <p className="text-[11px] text-accent-red font-semibold">{countryError}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Favorites */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bookmark className="w-5 h-5 text-amber-400 fill-amber-400" />
+                <h2 className="text-xl font-bold text-text-primary">즐겨찾기</h2>
+              </div>
+              <span className="text-xs font-bold text-text-muted">{favoriteGames.length}개</span>
+            </div>
+
+            {favoriteGames.length === 0 ? (
+              <div className="p-5 rounded-2xl bg-surface-raised border border-border text-xs text-text-muted">
+                아직 즐겨찾기한 게임이 없습니다. 게임 카드의 북마크 아이콘을 눌러 추가해보세요.{" "}
+                <Link to="/games" className="text-brand-light font-bold hover:underline">
+                  게임 둘러보기 →
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {favoriteGames.map((game) => (
+                  <GameFavoriteCard key={game.slug} game={game} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Recent plays */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-brand" />
+                <h2 className="text-xl font-bold text-text-primary">최근 플레이</h2>
+              </div>
+              <span className="text-xs font-bold text-text-muted">{recentGames.length}개</span>
+            </div>
+
+            {recentGames.length === 0 ? (
+              <div className="p-5 rounded-2xl bg-surface-raised border border-border text-xs text-text-muted">
+                아직 플레이 기록이 없습니다. 게임을 플레이하면 여기에 표시돼요.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {recentGames.map(({ game, lastPlayedAt }) => (
+                  <GameActivityCard key={game.slug} game={game} lastPlayedAt={lastPlayedAt} />
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Connected login accounts */}
           <div className="flex flex-col gap-4">
