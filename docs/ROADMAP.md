@@ -14,32 +14,34 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 
 ## 🎯 1. 진행 중인 대형 스프린트 — 플레이어 플랫폼 확장
 
-| Phase | 내용                                                              | 상태    |
-| ----- | ----------------------------------------------------------------- | ------- |
-| B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)            | ✅ 완료 |
-| C     | My Page / Account Center / Public Profile UI                      | 예정    |
-| D     | XP 랭킹 UI, Creator 모델 기초                                     | 예정    |
-| E     | Creator 채널 소유권 인증 + Featured 심사 엔진 (6시간 자동 재심사) | 예정    |
-| F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어      | 예정    |
-| G     | Discord 서버 등록/검색/관리 페이지                                | 예정    |
-| H     | Discord 길드-로컬 XP, 서버 랭킹, 다중 길드 중복 방지              | 예정    |
-| I     | 계정 통합 회귀 테스트, 최종 문서화, 프로덕션 검증                 | 예정    |
+| Phase | 내용                                                                    | 상태                                                                                          |
+| ----- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)                  | ✅ 완료                                                                                       |
+| C     | My Page(내 프로필/기록 탭) / 닉네임·국가 변경 UI / 즐겨찾기·최근 플레이 | ✅ 완료 (공개 프로필 `/profile/:id`, `/me`·`/account` 완전 라우트 분리는 보류)                |
+| D     | XP 랭킹 UI, Creator 모델 기초                                           | 예정                                                                                          |
+| E     | Creator 채널 소유권 인증 + Featured 심사 엔진 (6시간 자동 재심사)       | 예정                                                                                          |
+| F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어            | ✅ 완료 (`games`/`link`/`profile`) — `rank`/`leaderboard`/`play`/`server`는 Phase H 선행 필요 |
+| G     | Discord 서버 등록/검색/관리 페이지                                      | 예정                                                                                          |
+| H     | Discord 길드-로컬 XP, 서버 랭킹, 다중 길드 중복 방지                    | 예정                                                                                          |
+| I     | 계정 통합 회귀 테스트, 최종 문서화, 프로덕션 검증                       | 예정                                                                                          |
 
 세부 정책(XP 지급/상한/멱등성, 레벨 공식, 도전과제 목록)은 `docs/PROGRESSION.md`를 참고하세요.
 
-### Discord Integration Foundation (HTTP Interactions) — Phase F~H 상세
+### Discord Integration Foundation (HTTP Interactions) — Phase F 완료, 상세는 `docs/DISCORD_INTEGRATION.md`
 
-- **아키텍처 (v1)**: `discord.js` 상시 Gateway / VM / Docker 데몬 없이 **HTTP Interactions** 베이스.
+- **아키텍처 (v1, 구현됨)**: `discord.js` 상시 Gateway / VM / Docker 데몬 없이 **HTTP Interactions** 베이스.
   - Discord App → HTTP Interactions → Hono Worker → GAMEMOA 애플리케이션 서비스 → D1
-  - 영구 WebSocket 연결, Gateway 서버, 봇 프로세스 데몬은 초기 구현에서 사용하지 않습니다.
-- **명령어 후보**:
-  - `/gamemoa link` — Discord 계정과 GAMEMOA 계정 연결
-  - `/gamemoa profile` — 연결된 사용자 프로필/기록
-  - `/gamemoa ranking` — 글로벌 랭킹
-  - `/gamemoa server-ranking` — 서버 랭킹
-  - `/gamemoa games` — 게임 목록
-- **서버 랭킹 정책**: `server-ranking`은 **"해당 Discord 서버에서 GAMEMOA와 연결된 사용자들"**의 랭킹으로 제한합니다. 모든 서버 멤버를 대상으로 하지 않아 권한 서버 멤버 인텐트(Server Member Intent) 없이 초기 구현이 가능합니다.
-- **이후 후보**: `/gamemoa challenge`, `/gamemoa daily`.
+  - 영구 WebSocket 연결, Gateway 서버, 봇 프로세스 데몬은 사용하지 않습니다.
+- **구현된 명령어**: `/gamemoa link`(계정 연동), `/gamemoa profile`(연동 계정 요약), `/gamemoa games`(게임
+  목록, 매니페스트 기반).
+- **Phase H 선행 필요(미구현)**: `/gamemoa rank`, `/gamemoa leaderboard`, `/gamemoa play`,
+  `/gamemoa server` — Discord 길드-로컬 XP 원장이 있어야 의미가 있는 명령어입니다.
+- **서버 랭킹 정책(예정)**: 서버 랭킹은 **"해당 Discord 서버에서 GAMEMOA와 연결된 사용자들"**의 랭킹으로
+  제한합니다. 모든 서버 멤버를 대상으로 하지 않아 권한 서버 멤버 인텐트(Server Member Intent) 없이 구현
+  가능합니다.
+- **외부 설정 대기**: `DISCORD_PUBLIC_KEY` GitHub Actions Variable 등록, Developer Portal Interactions
+  Endpoint URL 설정, `pnpm discord:commands:register` 실행 — 전부 사용자의 Discord Developer Portal
+  접근이 필요해 이 저장소만으로는 완결되지 않습니다. 정확한 절차는 `docs/DISCORD_INTEGRATION.md` §8 참고.
 
 ---
 

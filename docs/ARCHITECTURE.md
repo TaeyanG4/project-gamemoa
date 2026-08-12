@@ -11,7 +11,8 @@ gamemoa/
 │   │   │   └── gameLoaders.generated.ts # 자동 생성된 웹 동적 임포트 로더
 │   │   └── app/features/scores/ # 클라이언트 점수 API 및 저장소 헬퍼
 │   └── api/                     # Hono API 백엔드 (Cloudflare Workers / Node.js portable)
-│       └── src/container.ts     # API Composition Root (의존성 주입 컨테이너)
+│       ├── src/container.ts     # API Composition Root (의존성 주입 컨테이너)
+│       └── src/infrastructure/discord/ # Discord HTTP Interactions (Ed25519 서명 검증, 명령어 정의/핸들러) — Gateway 없음
 ├── games/
 │   ├── reaction-time/           # 반응속도 테스트 게임 모듈 (@gamemoa/game-reaction-time)
 │   ├── memory-test/             # 순서 기억력 테스트 게임 모듈 (@gamemoa/game-memory-test)
@@ -21,11 +22,11 @@ gamemoa/
 │   ├── game-sdk/                # 게임 매니페스트 및 호스트 계약 (@gamemoa/game-sdk)
 │   ├── core/                    # 순수 도메인 엔티티, 유즈케이스 및 포트 (@gamemoa/core)
 │   │   ├── src/domain/          # 순수 도메인 엔티티 (점수 검증, 진행도/레벨 공식, 도전과제 정의, 닉네임/국가 정책)
-│   │   ├── src/application/     # 애플리케이션 유즈케이스 (ScoreUseCases, PersonalizationUseCases, IdentityUseCases, AccountMergeUseCases, ProgressionUseCases, AchievementUseCases, ProfileUseCases)
-│   │   ├── src/ports/           # 저장소 포트 인터페이스 (UserRepository, AccountMergeRepository, ProgressionRepository, AchievementRepository 포함)
+│   │   ├── src/application/     # 애플리케이션 유즈케이스 (ScoreUseCases, PersonalizationUseCases, IdentityUseCases, AccountMergeUseCases, ProgressionUseCases, AchievementUseCases, ProfileUseCases, DiscordLinkUseCases)
+│   │   ├── src/ports/           # 저장소 포트 인터페이스 (UserRepository, AccountMergeRepository, ProgressionRepository, AchievementRepository, DiscordLinkRepository 포함)
 │   │   └── src/registry/        # 자동 생성된 도메인 레지스트리 (gameRegistry.generated.ts)
 │   ├── db/                      # Cloudflare D1 저장소 어댑터 및 SQL 마이그레이션 (@gamemoa/db)
-│   │   └── migrations/         # 0000 초기 스키마, 0002 점수 인증 무결성, 0003 계정 식별(UNIQUE(user_id,provider)), 0004 계정 통합 챌린지, 0005 진행도(XP/레벨/도전과제) + 닉네임/국가 메타데이터
+│   │   └── migrations/         # 0000 초기 스키마, 0002 점수 인증 무결성, 0003 계정 식별(UNIQUE(user_id,provider)), 0004 계정 통합 챌린지, 0005 진행도(XP/레벨/도전과제) + 닉네임/국가 메타데이터, 0006 Discord 계정 연동 챌린지
 │   ├── ui/                      # 공통 UI 컴포넌트 및 GameShell 컨테이너 (@gamemoa/ui)
 │   └── shared/                  # 공통 유틸리티 및 re-export (@gamemoa/shared)
 ├── scripts/

@@ -29,6 +29,8 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - 💾 **게스트 로컬스토리지 & 계정 D1 동기화**: 로그인 없이 최근 플레이를 로컬스토리지에 보존하며, 로그인 시 계정 D1로 안전한 1-Way 최근 플레이 통합(게스트 즐겨찾기는 미통합)
 - 🎨 **GAMEMOA 브랜드 파비콘**: 4-타일 게임 허브 마크의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`
 - 🏆 **진행도 시스템 (XP / 레벨 / 도전과제)**: 서버 권위 XP(인증된 게임 완료 1회당 +10, 사용자×게임×UTC일 기준 최대 10회 상한), `xp_events` 원장 기반 멱등 지급, 결정론적 레벨 공식(`100×(L-1)²`), 7종 초기 도전과제(FIRST_PLAY/PLAY_10/PLAY_100/FIRST_FAVORITE/LEVEL_5/LEVEL_10/ALL_GAMES), 글로벌 XP 리더보드. 게임 점수(실력)와 XP(활동)는 항상 분리되어 랭킹 무결성을 해치지 않습니다. 자세한 내용은 `docs/PROGRESSION.md` 참고.
+- 📊 **My Page ("내 프로필 & 기록")**: `/profile`의 "내 프로필"(사용자 정보, 레벨/XP, 닉네임·국가/지역 변경, 즐겨찾기, 최근 플레이, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록) 탭 분리. 게임 기록 카드는 실제 썸네일 기반으로 재구성.
+- 🤖 **Discord HTTP Interactions**: `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/gamemoa link|profile|games`). 상시 WebSocket 연결 없이 Cloudflare Workers `crypto.subtle` 네이티브 검증만으로 동작. 자세한 내용은 `docs/DISCORD_INTEGRATION.md` 참고.
 - 🧩 **Game Plugin Architecture**:
   - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
 - 🛡️ **Clean Monorepo & Architecture Guard**:
@@ -165,6 +167,7 @@ gamemoa/
     ├── WORK_PROGRESS.md       # CI/CD 및 작업 진행 상황
     ├── ROADMAP.md             # 플랫폼 향후 로드맵
     ├── PROGRESSION.md         # XP/레벨/도전과제 진행도 시스템 설계
+    ├── DISCORD_INTEGRATION.md # Discord HTTP Interactions 아키텍처 및 설정 가이드
     ├── AGENTS.md              # AI Agent 개발 규칙 명세서
     └── runbooks/
         ├── oauth-setup.md        # 소셜 로그인 설정 런북
