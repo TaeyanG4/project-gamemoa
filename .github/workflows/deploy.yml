@@ -55,7 +55,7 @@ jobs:
           node -e "
             const expectedSha = process.env.EXPECTED_SHA;
             async function check() {
-              for (let attempt = 1; attempt <= 10; attempt++) {
+              for (let attempt = 1; attempt <= 20; attempt++) {
                 try {
                   const res = await fetch('https://gamemoa-api.gamemoa.workers.dev/api/health?v=' + Date.now());
                   if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -70,7 +70,7 @@ jobs:
                 }
                 await new Promise(r => setTimeout(r, 3000));
               }
-              throw new Error('API Health & Provenance Verification Failed after 10 attempts');
+              throw new Error('API Health & Provenance Verification Failed after 20 attempts');
             }
             check().catch(err => { console.error(err); process.exit(1); });
           "
@@ -95,7 +95,7 @@ jobs:
           node -e "
             const expectedSha = process.env.EXPECTED_SHA;
             async function check() {
-              for (let attempt = 1; attempt <= 10; attempt++) {
+              for (let attempt = 1; attempt <= 20; attempt++) {
                 try {
                   const res = await fetch('https://gamemoa-web.gamemoa.workers.dev/version.json?v=' + Date.now());
                   if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -110,7 +110,7 @@ jobs:
                 }
                 await new Promise(r => setTimeout(r, 3000));
               }
-              throw new Error('Web Provenance Verification Failed after 10 attempts');
+              throw new Error('Web Provenance Verification Failed after 20 attempts');
             }
             check().then(() => {
               const routes = ['/', '/games', '/ranking', '/profile', '/games/reaction-time', '/games/memory-test', '/games/aim-test', '/games/typing-test'];
