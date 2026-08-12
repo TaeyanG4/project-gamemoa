@@ -13,4 +13,7 @@
       "migrations_dir": "../../packages/db/migrations",
     },
   ],
+  "vars": {
+    "COMMIT_SHA": "dev",
+  },
 }

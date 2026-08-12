@@ -54,23 +54,25 @@ jobs:
         run: |
           node -e "
             const expectedSha = process.env.EXPECTED_SHA;
-            fetch('https://gamemoa-api.gamemoa.workers.dev/api/health')
-              .then(res => {
-                if (!res.ok) throw new Error('API Health Endpoint Failed: ' + res.status);
-                return res.json();
-              })
-              .then(data => {
-                console.log('API Health Response:', data);
-                if (data.status !== 'ok') throw new Error('API status is not ok');
-                if (expectedSha && data.commit !== expectedSha) {
-                  throw new Error('API SHA Mismatch! Expected: ' + expectedSha + ', Deployed: ' + data.commit);
+            async function check() {
+              for (let attempt = 1; attempt <= 5; attempt++) {
+                try {
+                  const res = await fetch('https://gamemoa-api.gamemoa.workers.dev/api/health?v=' + Date.now());
+                  if (!res.ok) throw new Error('HTTP ' + res.status);
+                  const data = await res.json();
+                  console.log('Attempt', attempt, 'API Response:', data);
+                  if (data.status === 'ok' && (!expectedSha || data.commit === expectedSha)) {
+                    console.log('✅ API Health & Provenance Verification Passed!');
+                    return;
+                  }
+                } catch (err) {
+                  console.log('Attempt', attempt, 'failed:', err.message);
                 }
-                console.log('✅ API Health & Provenance Verification Passed!');
-              })
-              .catch(err => {
-                console.error(err);
-                process.exit(1);
-              });
+                await new Promise(r => setTimeout(r, 3000));
+              }
+              throw new Error('API Health & Provenance Verification Failed after 5 attempts');
+            }
+            check().catch(err => { console.error(err); process.exit(1); });
           "
 
       - name: Build Web Frontend
@@ -92,27 +94,34 @@ jobs:
         run: |
           node -e "
             const expectedSha = process.env.EXPECTED_SHA;
-            fetch('https://gamemoa-web.gamemoa.workers.dev/version.json?v=' + Date.now())
-              .then(res => {
-                if (!res.ok) throw new Error('version.json fetch failed: ' + res.status);
-                return res.json();
-              })
-              .then(data => {
-                console.log('Web Version Response:', data);
-                if (expectedSha && data.commit !== expectedSha) {
-                  throw new Error('Web SHA Mismatch! Expected: ' + expectedSha + ', Deployed: ' + data.commit);
+            async function check() {
+              for (let attempt = 1; attempt <= 5; attempt++) {
+                try {
+                  const res = await fetch('https://gamemoa-web.gamemoa.workers.dev/version.json?v=' + Date.now());
+                  if (!res.ok) throw new Error('HTTP ' + res.status);
+                  const data = await res.json();
+                  console.log('Attempt', attempt, 'Web Version Response:', data);
+                  if (!expectedSha || data.commit === expectedSha) {
+                    console.log('✅ Web Provenance Verification Passed!');
+                    return;
+                  }
+                } catch (err) {
+                  console.log('Attempt', attempt, 'failed:', err.message);
                 }
-              })
-              .then(() => {
-                const routes = ['/', '/games', '/ranking', '/profile', '/games/reaction-time', '/games/memory-test', '/games/aim-test'];
-                return Promise.all(routes.map(r => 
-                  fetch('https://gamemoa-web.gamemoa.workers.dev' + r + '?v=' + Date.now())
-                    .then(res => {
-                      console.log(r, res.status);
-                      if (!res.ok) throw new Error('Route failed: ' + r);
-                    })
-                ));
-              })
-              .then(() => console.log('✅ Web Smoke & Provenance Verification Passed!'))
-              .catch(err => { console.error(err); process.exit(1); });
+                await new Promise(r => setTimeout(r, 3000));
+              }
+              throw new Error('Web Provenance Verification Failed after 5 attempts');
+            }
+            check().then(() => {
+              const routes = ['/', '/games', '/ranking', '/profile', '/games/reaction-time', '/games/memory-test', '/games/aim-test', '/games/typing-test'];
+              return Promise.all(routes.map(r => 
+                fetch('https://gamemoa-web.gamemoa.workers.dev' + r + '?v=' + Date.now())
+                  .then(res => {
+                    console.log(r, res.status);
+                    if (!res.ok) throw new Error('Route failed: ' + r);
+                  })
+              ));
+            })
+            .then(() => console.log('✅ Web Smoke & Provenance Verification Passed!'))
+            .catch(err => { console.error(err); process.exit(1); });
           "
