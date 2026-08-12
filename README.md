@@ -22,9 +22,12 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - ⌨️ **타자 속도 테스트 (Typing Test)**: 60초간 연속 문장 입력 및 WPM/CPM/정확도 실시간 측정
 - ⭐️ **사용자 맞춤화 레이어 (Personalization & Account Foundation)**:
   - 📜 **최근 플레이 (Recent Plays)**: 실제 게임 시작 시점(`game_started`)에 타임스탬프 자동 기록 및 최근 플레이 탭 제공
-  - ⭐ **즐겨찾기 (Favorites)**: 게임 카드 1-클릭 북마크 등록, 카테고리 칩 탭 필터링 및 홈 화면 전용 섹션 제공
-  - 💾 **게스트 로컬스토리지 & 계정 D1 동기화**: 로그인 없이 브라우저 로컬스토리지로 완벽 보존되며, 로그인 시 계정 D1 데이터베이스로 안전한 1-Way 데이터 통합 (Import)
-  - 🔒 **SHA-256 세션 보안 강화**: 데이터베이스 내 세션 토큰 해싱 저장으로 보안 강화
+  - ⭐ **즐겨찾기 (Favorites, 로그인 전용)**: 게임 카드 북마크, 카테고리 칩 필터링 및 홈 화면 전용 섹션 — 게스트는 즐겨찾기 클릭 시 로그인 유도(게스트 즐겨찾기 미저장). 레거시 v1 게스트 즐겨찾기는 안전한 v2 마이그레이션으로 폐기되며 최근 플레이만 보존됨
+  - 🔐 **계정 식별/통합 (Account Identity & Merge)**: Google/Discord 로그인은 기본적으로 별도 GAMEMOA 계정(이메일 자동 병합 금지). 사용자 명시 요청 시 **Primary Account Wins** 계정 통합(Primary 데이터 유지, Secondary 데이터 삭제, Secondary 로그인 수단은 Primary로 이전). D1 원자 트랜잭션 기반
+  - 🔗 **연결된 로그인 계정 관리**: 프로필에서 Google/Discord 연결/연결해제 및 충돌 시 계정 통합 UI 제공
+  - 🔒 **SHA-256 세션 보안 & Google ID Token JWT/JWKS 검증**: 세션 토큰 해싱 저장 및 Google OpenID JWKS 기반 RS256 서명/iss/aud/exp/sub 검증(`tokeninfo` 비의존)
+  - 💾 **게스트 로컬스토리지 & 계정 D1 동기화**: 로그인 없이 최근 플레이를 로컬스토리지에 보존하며, 로그인 시 계정 D1로 안전한 1-Way 최근 플레이 통합(게스트 즐겨찾기는 미통합)
+- 🎨 **GAMEMOA 브랜드 파비콘**: 4-타일 게임 허브 마크의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`
 - 🧩 **Game Plugin Architecture**:
   - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
 - 🛡️ **Clean Monorepo & Architecture Guard**:
@@ -104,6 +107,9 @@ pnpm registry:check
 # 게임 레지스트리 자동 생성 (Core Manifest Registry & Web Dynamic Loaders)
 pnpm generate:registry
 
+# GAMEMOA 파비콘/아이콘 자산 결정론적 생성 (favicon.svg -> favicon.ico/PNG/manifest)
+pnpm generate:favicon
+
 # 새 게임 스캐폴딩 생성
 pnpm generate:game <game-slug>
 
@@ -157,7 +163,10 @@ gamemoa/
     ├── PROGRESS.md            # 기능별 구현 진행 현황
     ├── WORK_PROGRESS.md       # CI/CD 및 작업 진행 상황
     ├── ROADMAP.md             # 플랫폼 향후 로드맵
-    └── AGENTS.md              # AI Agent 개발 규칙 명세서
+    ├── AGENTS.md              # AI Agent 개발 규칙 명세서
+    └── runbooks/
+        ├── oauth-setup.md        # 소셜 로그인 설정 런북
+        └── account-linking.md    # 계정 연결/통합(Pimary Account Wins) 런북
 ```
 
 ---

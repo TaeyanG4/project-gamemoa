@@ -21,16 +21,19 @@ gamemoa/
 │   ├── game-sdk/                # 게임 매니페스트 및 호스트 계약 (@gamemoa/game-sdk)
 │   ├── core/                    # 순수 도메인 엔티티, 유즈케이스 및 포트 (@gamemoa/core)
 │   │   ├── src/domain/          # 순수 도메인 엔티티 및 점수 범위 검증
-│   │   ├── src/application/     # 애플리케이션 유즈케이스 (ScoreUseCases)
-│   │   ├── src/ports/           # 저장소 포트 인터페이스
+│   │   ├── src/application/     # 애플리케이션 유즈케이스 (ScoreUseCases, PersonalizationUseCases, IdentityUseCases, AccountMergeUseCases)
+│   │   ├── src/ports/           # 저장소 포트 인터페이스 (UserRepository 연결 역량, AccountMergeRepository 포함)
 │   │   └── src/registry/        # 자동 생성된 도메인 레지스트리 (gameRegistry.generated.ts)
 │   ├── db/                      # Cloudflare D1 저장소 어댑터 및 SQL 마이그레이션 (@gamemoa/db)
+│   │   └── migrations/         # 0000 초기 스키마, 0002 점수 인증 무결성, 0003 계정 식별(UNIQUE(user_id,provider)), 0004 계정 통합 챌린지
 │   ├── ui/                      # 공통 UI 컴포넌트 및 GameShell 컨테이너 (@gamemoa/ui)
 │   └── shared/                  # 공통 유틸리티 및 re-export (@gamemoa/shared)
 ├── scripts/
 │   ├── generate-game.ts         # 새 게임 생성 스캐폴딩 CLI (pnpm generate:game <slug>)
 │   ├── generate-game-registry.ts# 빌드 타임 이중 레지스트리 자동 생성기 (pnpm generate:registry)
+│   ├── generate-favicon.ts      # 결정론적 파비콘/PNG/ICO 자산 생성기 (pnpm generate:favicon)
 │   ├── prepare-web-build.ts     # SPA 빌드 준비 스크립트
+│   ├── post-web-build.ts        # 버전 provenance + SPA 셸 파비콘 링크 주입 스크립트
 │   ├── check-registry.ts        # 레지스트리 최신성 및 불변성 검증기 (pnpm registry:check)
 │   └── verify-architecture.ts   # 아키텍처 가드 레이어 경계 검증기 (pnpm architecture:check)
 └── .github/workflows/
@@ -79,3 +82,12 @@ API Composition Root (apps/api/src/container.ts)
 2. `src/manifest.ts`에 `export const manifest` (`scoreConfig` 단주, 정렬 방향, 최소/최대값, 접두사, 접미사)를 정의합니다.
 3. `pnpm generate:registry`를 실행하면 도메인 레지스트리(`gameRegistry.generated.ts`)와 웹 로더 레지스트리(`gameLoaders.generated.ts`)가 자동으로 빌드 타임 컴파일됩니다.
 4. 프론트엔드와 백엔드는 매니페스트 메타데이터를 활용하여 점수 검증, 정렬, 웹 동적 임포트, 포맷팅을 자동으로 처리합니다.
+
+---
+
+## 4. 🧬 계정 식별/통합 및 파비콘 (Identity & Brand)
+
+1. **계정 식별 모델**: Google/Discord 로그인을 기본적으로 별도 GAMEMOA 계정으로 분리하며, 이메일은 자동 병합 근거가 아닙니다. 정규 식별자는 `provider` + `provider_user_id`이며, `IdentityUseCases`가 연결/연결해제 도메인 규칙(`ACCOUNT_ALREADY_LINKED`, `PROVIDER_ALREADY_LINKED`, `LAST_AUTH_PROVIDER`)을 담당합니다. LOGIN과 LINK 흐름은 명시적으로 분리됩니다.
+2. **Primary Account Wins 통합**: `AccountMergeUseCases` + `AccountMergeRepository`가 단기/일회용 `account_merge_challenges`(마이그레이션 `0004`) 기반 원자 통합을 수행합니다. D1 `batch` 단일 트랜잭션으로 Secondary 게임/개인화/세션 데이터를 삭제하고 Secondary OAuth 식별자를 Primary로 이전한 뒤 Secondary 사용자를 삭제합니다. 기록은 합집합하지 않고 Primary 데이터만 유지합니다.
+3. **Google JWT 검증**: 프로덕션은 `oauth2.googleapis.com/tokeninfo`에 의존하지 않고 Google OpenID JWKS로 로컬 RS256 서명 검증과 `iss`/`aud`/`exp`/`sub` 검증을 수행합니다.
+4. **파비콘**: 캐노니컬 원본은 `apps/web/public/favicon.svg`이며, 결정론적 `scripts/generate-favicon.ts`(의존성 없는 PNG/ICO 인코더 + 초과샘플링 래스터라이저)가 동일 파라메트릭 디자인에서 `favicon.ico`, PNG(16/32/48/180/192/512), `apple-touch-icon.png`, `site.webmanifest`를 생성합니다. SPA `index.html` 셸에 파비콘/애플터치/매니페스트 링크가 주입됩니다. 상세 절차는 `docs/runbooks/oauth-setup.md` 및 `docs/runbooks/account-linking.md`를 참조.

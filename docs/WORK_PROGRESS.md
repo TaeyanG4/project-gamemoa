@@ -2,56 +2,55 @@
 
 # 현재 목표
 
-인증 및 랭킹 무결성 완수 (Authentication & Ranking Integrity Sprint)
+계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 완수
 
 ## 시작 상태
 
-- **시작 커밋 (Starting SHA)**: `1c687b98d1621303f8f7dcad48b3866d51462cad` (origin/main pushed & verified)
-- **Local Quality Gate (`pnpm verify`)**: 13/13 패키지 전원 PASS 통과
+- **시작 커밋 (Starting SHA)**: `053f16d86320db4d020141ac7986ad94fb88d041` (origin/main)
+- **Local Quality Gate (`pnpm verify`)**: PASS (13 패키지)
 - **Production Status**: API `https://gamemoa-api.gamemoa.workers.dev/api/health` (`200 OK`), Web `https://gamemoa-web.gamemoa.workers.dev/` (`200 OK`)
 
 ---
 
-## 완료 및 프로덕션 검증 (Completed & Production Verified)
+## 완료
 
-- [x] **P0: Score API 인증 강제 & 계정 식별자 바인딩**
-  - `POST /api/scores`에 유효한 `gamemoa_session` 쿠키 필수화 (미인증 제출 시 401 Unauthorized 반환).
-  - 클라이언트 닉네임 변조를 차단하고 세션 유저 식별자(`user_id`, `nickname`, `avatar_url`)만 랭킹에 바인딩.
-- [x] **P0: 도메인 & 저장소 타입 및 쿼리 방어**
-  - `@gamemoa/core` `Score` 엔티티 및 `ScoreRepository` 인터페이스의 `userId` 필수화 (`number`).
-  - `D1ScoreRepository`에서 `user_id IS NOT NULL` 조건 추가로 레거시 게스트 기록 랭킹 노출 전면 차단.
-- [x] **P0: D1 마이그레이션 `0002_score_auth_integrity.sql` 적용**
-  - 프로덕션 D1 레거시 `user_id IS NULL` 게스트 점수 행 안전 제거.
-  - SQLite Trigger를 통한 `user_id IS NULL` 저장 차단 가드 구축.
-- [x] **P1: 프론트엔드 게스트 점수 서버 제출 차단 & 시도 시점 자격 캡처**
-  - 게임 시작 시점의 인증 상태로 랭킹 참여 자격(`rankingEligible`) 결정.
-  - 게스트 완료 결과 UI에 "게스트 기록은 이 기기에만 저장됩니다." 한국어 안내 및 로그인 버튼 렌더링.
-- [x] **P2: 소셜 로그인 실제 프로덕션 설정 & 단일 출처 (Single Source of Truth) 완료**
-  - Google OAuth Web Client ID 및 Discord OAuth Application 자격 증명을 GitHub Variables / Secrets에 등록.
-  - `GET /api/auth/providers` 프로덕션 진단 결과 `google.configured: true`, `discord.configured: true` 최종 통과 (`pnpm auth:prod:check` GREEN).
-  - `deploy.yml` 배포 파이프라인 연동 및 프로덕션 배포 출처 Provenance 일치 확인.
+- [x] **P0: 게스트 즐겨찾기 로그인 전용화 & 스토리지 마이그레이션** — 게스트 즐겨찾기 클릭/카테고리 칩 → 로그인 모달, 로컬 미저장. v1→v2 마이그레이션(즐겨찾기 폐기, 최근 플레이 보존). 게스트 임포트 `guestFavorites` 제거.
+- [x] **P2: Google ID Token 검증 강화** — `tokeninfo` → Google OpenID JWKS 로컬 RS256 JWT 검증(iss/aud/exp/sub). JWKS 캐싱. 모의 JWKS/RSA 서명 테스트 매트릭스.
+- [x] **P1: OAuth 공급자 연결** — `IdentityUseCases` + `UserRepository` 연결 역량, 마이그레이션 `0003`(UNIQUE(user_id, provider)), 연결/연결해제 API, LOGIN/LINK 명시 분리, `ACCOUNT_ALREADY_LINKED`/`LAST_AUTH_PROVIDER` 처리.
+- [x] **P1: Primary Account Wins 계정 통합** — 마이그레이션 `0004`(`account_merge_challenges`), `AccountMergeUseCases`(소유 증명/챌린지/동일 프로바이더 충돌 가드), D1 `batch` 원자 트랜잭션. 유지/폐기 방향 모두 지원, 실패 시 원자 롤백 테스트.
+- [x] **P4: 프로필 계정 관리 UX** — "연결된 로그인 계정" 섹션, `MergeModal`(안전 요약/Primary 선택/삭제 경고/확정), 연결 충돌 시 통합 제안.
+- [x] **P3: GAMEMOA 브랜드 파비콘** — 캐노니컬 `favicon.svg`(4-타일 게임 허브 마크), 결정론적 `scripts/generate-favicon.ts`(의존성 없는 PNG/ICO 인코더), SPA 셸 파비콘 링크 주입, `site.webmanifest`, 프로덕션 자산 200 검증.
+- [x] **한국어 문서 업데이트** — README/ARCHITECTURE/PROGRESS/WORK_PROGRESS/ROADMAP/oauth-setup 런북 업데이트, `docs/runbooks/account-linking.md` 신규 작성.
 
 ---
 
-## 블로커 / 프로덕션 현황 (Blockers & Production Status)
+## 진행 중
 
-- **게스트 랭킹 버그**: ✅ 수정 완료 및 D1 마이그레이션 적용 완료 (`user_id IS NOT NULL` 강제)
-- **Google 소셜 로그인**: ✅ 프로덕션 활성화 완료 (`configured: true`, Client ID 정상 서빙)
-- **Discord 소셜 로그인**: ✅ 프로덕션 활성화 완료 (`configured: true`, OAuth2 Callback & State validation 준비 완료)
-- **Local / Remote Quality Gate**: `pnpm verify` & `pnpm smoke:prod` 100% PASS
+- GitHub Actions CI / Cloudflare Deploy / 배포 커밋 출처(Provenance) 검증.
+
+---
+
+## 남은 작업
+
+- 원격 `origin/main` 푸시 후 CI GREEN, Cloudflare Deploy GREEN, API/Web Provenance SHA 일치, 프로덕션 스모크 통과 검증.
+
+---
+
+## 블로커
+
+- 없음 (로컬 품질 게이트 및 단위 테스트 전원 PASS).
 
 ---
 
 ## 다음 작업 (Next Action)
 
-- 계정 프로필 UX polish 및 맞춤화 기능(Personalization) 동기화 고도화 또는 신규 미니게임 확장.
+- **Discord Integration Foundation Sprint** — Discord App → HTTP Interactions → Hono Worker → GAMEMOA 애플리케이션 서비스 → D1 (Gateway 없이). 명령어 후보: `/gamemoa link`, `/gamemoa profile`, `/gamemoa ranking`, `/gamemoa server-ranking`, `/gamemoa games`. 서버 랭킹은 "해당 Discord 서버에서 GAMEMOA와 연결된 사용자들의 랭킹"으로 제한.
 
 ---
 
 ## 마지막 검증 상태 (Last Verified State)
 
-- **Local Quality Gate (`pnpm verify`)**: PASS (13 workspace packages)
-- **Local Unit Tests (`pnpm test`)**: PASS (27 workspace tasks)
-- **Starting SHA**: `00d8ec784963a41ef253525f9a9c010c355c3fc6`
-- **Production API**: OK (`status: ok`)
-- **Production Web**: OK (`200 OK`)
+- **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
+- **Local Unit Tests**: core 25 / api 28 / db 4 / web 10 / games — 전원 PASS
+- **D1 마이그레이션 (로컬)**: 0003 / 0004 적용 성공
+- **Starting SHA**: `053f16d86320db4d020141ac7986ad94fb88d041`

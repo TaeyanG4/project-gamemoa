@@ -376,9 +376,7 @@ authRouter.get("/link/discord", async (c) => {
   if (!clientId) {
     return c.text("DISCORD_CLIENT_ID is not configured", 500);
   }
-
-  const redirectUri =
-    c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/link/discord/callback`;
+  const redirectUri = `${new URL(c.req.url).origin}/api/auth/link/discord/callback`;
 
   const state = crypto.randomUUID();
   const statePayload = JSON.stringify({ state, userId: auth.userId });
@@ -426,13 +424,11 @@ authRouter.get("/link/discord/callback", async (c) => {
 
   const clientId = c.env.DISCORD_CLIENT_ID;
   const clientSecret = c.env.DISCORD_CLIENT_SECRET;
-  const redirectUri =
-    c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/link/discord/callback`;
+  const redirectUri = `${new URL(c.req.url).origin}/api/auth/link/discord/callback`;
 
   if (!clientId || !clientSecret) {
     return c.redirect(`${frontendUrl}/profile?link_status=error`);
   }
-
   const exchangeResult = await exchangeDiscordCode({
     code,
     clientId,

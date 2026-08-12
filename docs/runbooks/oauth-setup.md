@@ -50,9 +50,10 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
 3. **OAuth2 > General** 메뉴 이동
 4. **Client ID** 복사
 5. **Client Secret** 생성 후 안전한 장소에 복사 (절대 공개 금지)
-6. **Redirects** 항목에 카카오/디스코드 인증 콜백 URI 추가:
-   - 개발 환경: `http://localhost:8787/api/auth/discord/callback`
-   - 프로덕션: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
+6. **Redirects** 항목에 로그인/연결 카카오/디스코드 인증 콜백 URI 추가 (로그인과 연결은 서로 다른 경로 사용):
+   - 로그인: `http://localhost:8787/api/auth/discord/callback` / 프로덕션: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
+   - 연결(LINK): `http://localhost:8787/api/auth/link/discord/callback` / 프로덕션: `https://gamemoa-api.gamemoa.workers.dev/api/auth/link/discord/callback`
+   - 계정 연결/연결해제 및 통합 절차는 `docs/runbooks/account-linking.md`를 참조하세요.
 
 ### B. 환경 변수 및 Worker Secret 설정
 
