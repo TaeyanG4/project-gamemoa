@@ -21,6 +21,11 @@ const ROUTES_TO_CHECK = [
   "/games/memory-test/thumbnail.svg",
   "/games/aim-test/thumbnail.svg",
   "/games/typing-test/thumbnail.svg",
+  "/favicon.svg",
+  "/favicon.ico",
+  "/apple-touch-icon.png",
+  "/favicon-192x192.png",
+  "/site.webmanifest",
 ];
 
 interface VerifyOptions {

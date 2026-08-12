@@ -20,3 +20,22 @@ fs.writeFileSync(versionPath, JSON.stringify({ commit: commitSha }, null, 2), "u
 console.log(
   `✅ Deployment Provenance version.json written to ${versionPath} (Commit: ${commitSha})`,
 );
+
+// Inject GAMEMOA favicon / manifest links into the SPA HTML shell so the initial
+// document references the brand icons before client hydration.
+const indexPath = path.join(clientDir, "index.html");
+if (fs.existsSync(indexPath)) {
+  const faviconLinks = [
+    '<meta name="theme-color" content="#6366f1" />',
+    '<link rel="icon" href="/favicon.svg" type="image/svg+xml" />',
+    '<link rel="icon" href="/favicon.ico" sizes="any" />',
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png" />',
+    '<link rel="manifest" href="/site.webmanifest" />',
+  ].join("");
+  let html = fs.readFileSync(indexPath, "utf-8");
+  if (!html.includes('rel="manifest"')) {
+    html = html.replace(/<head>/, `<head>${faviconLinks}`);
+    fs.writeFileSync(indexPath, html, "utf-8");
+    console.log("✅ GAMEMOA favicon links injected into SPA index.html.");
+  }
+}

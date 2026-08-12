@@ -14,6 +14,11 @@ export default function App() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>gamemoa — 심심할 틈 없이, 게임을 한곳에</title>
         <meta name="description" content="설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼" />
+        <meta name="theme-color" content="#6366f1" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/site.webmanifest" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

@@ -11,6 +11,7 @@
     "test": "turbo test",
     "generate:registry": "tsx scripts/generate-game-registry.ts",
     "generate:game": "tsx scripts/generate-game.ts",
+    "generate:favicon": "tsx scripts/generate-favicon.ts",
     "architecture:check": "tsx scripts/verify-architecture.ts",
     "registry:check": "tsx scripts/check-registry.ts",
     "smoke:prod": "tsx scripts/verify-production.ts",
