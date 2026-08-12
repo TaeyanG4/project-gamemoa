@@ -1,5 +1,6 @@
 import { Link } from "react-router";
-import { Gamepad2, ShieldCheck, Zap, Globe, Sparkles } from "lucide-react";
+import { Gamepad2, Sparkles } from "lucide-react";
+
 
 export function Footer() {
   return (

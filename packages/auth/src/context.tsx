@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     const clientId = typeof window !== "undefined"
-      ? ((import.meta as any).env?.VITE_GOOGLE_CLIENT_ID ?? "")
+      ? ((import.meta as unknown as { env?: { VITE_GOOGLE_CLIENT_ID?: string } }).env?.VITE_GOOGLE_CLIENT_ID ?? "")
       : "";
 
     if (!clientId) {
@@ -93,7 +93,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    window.google.accounts.id.initialize({
+    const googleAuth = window.google.accounts.id;
+
+    googleAuth.initialize({
       client_id: clientId,
       callback: async (response: { credential: string }) => {
         try {
@@ -112,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancel_on_tap_outside: true,
     });
 
-    window.google.accounts.id.prompt((notification) => {
+    googleAuth.prompt((notification) => {
       if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
         // If One Tap is blocked/skipped, try popup mode by rendering invisible button and clicking it
         // Fallback: redirect to Google OAuth consent screen
@@ -120,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         tempDiv.style.position = "fixed";
         tempDiv.style.top = "-9999px";
         document.body.appendChild(tempDiv);
-        window.google!.accounts.id.renderButton(tempDiv, {
+        googleAuth.renderButton(tempDiv, {
           type: "icon",
           size: "large",
         });
@@ -131,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => document.body.removeChild(tempDiv), 5000);
       }
     });
+
   }, []);
 
   const loginWithDiscord = useCallback(() => {

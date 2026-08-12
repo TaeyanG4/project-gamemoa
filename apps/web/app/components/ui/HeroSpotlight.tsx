@@ -1,5 +1,6 @@
 import { Link } from "react-router";
-import { Play, Sparkles, Trophy, Zap, Clock } from "lucide-react";
+import { Play, Sparkles, Zap, Clock } from "lucide-react";
+
 import type { GameManifest } from "@gamemoa/game-sdk";
 
 interface HeroSpotlightProps {

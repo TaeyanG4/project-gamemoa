@@ -3,7 +3,8 @@ import { X, ShieldCheck, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@gamemoa/auth";
 
 export function LoginModal() {
-  const { isLoginModalOpen, closeLoginModal, loginWithGoogle, loginWithDiscord, error, clearError, isLoading } = useAuth();
+  const { isLoginModalOpen, closeLoginModal, loginWithGoogle, loginWithDiscord, error, clearError } = useAuth();
+
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
 

@@ -1,7 +1,7 @@
 import type { LeaderRecord } from "@gamemoa/shared";
 
 const API_URL = typeof window !== "undefined"
-  ? ((import.meta as any).env?.VITE_API_URL ?? "http://localhost:8787")
+  ? ((import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8787")
   : "http://localhost:8787";
 
 export const MOCK_LEADERBOARD: LeaderRecord[] = [
@@ -107,6 +107,19 @@ export async function submitScoreApi(payload: {
   }
 }
 
+interface ApiLeaderboardItem {
+  id: number | string;
+  playerName?: string;
+  nickname?: string;
+  gameId?: string;
+  score: number;
+  formattedScore?: string;
+  avatarUrl?: string;
+  avatar_url?: string;
+  createdAt?: string;
+  created_at?: string;
+}
+
 /**
  * Fetch leaderboard from Hono API backend
  */
@@ -116,7 +129,7 @@ export async function fetchLeaderboardApi(gameId = "all"): Promise<LeaderRecord[
       credentials: "include",
     });
     if (!res.ok) return [];
-    const data = await res.json();
+    const data = (await res.json()) as { leaderboard?: ApiLeaderboardItem[] };
     const list = data.leaderboard || [];
 
     const titleMap: Record<string, string> = {
@@ -125,20 +138,21 @@ export async function fetchLeaderboardApi(gameId = "all"): Promise<LeaderRecord[
       "aim-test": "에임 테스트",
     };
 
-    return list.map((item: any) => ({
+    return list.map((item) => ({
       id: String(item.id),
       playerName: item.playerName || item.nickname || "게스트",
       gameId: item.gameId || gameId,
-      gameTitle: titleMap[item.gameId] || item.gameId,
+      gameTitle: titleMap[item.gameId || ""] || item.gameId || "",
       score: item.score,
       formattedScore: item.formattedScore || `${item.score}`,
       avatarUrl: item.avatarUrl || item.avatar_url,
-      createdAt: item.createdAt || item.created_at,
+      createdAt: item.createdAt || item.created_at || "",
     }));
   } catch {
     return [];
   }
 }
+
 
 /**
  * Fetch user's personal bests from Hono API backend

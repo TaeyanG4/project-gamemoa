@@ -1,7 +1,6 @@
 const API_URL = typeof window !== "undefined"
-  ? ((import.meta as any).env?.VITE_API_URL ?? "http://localhost:8787")
+  ? ((import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8787")
   : "http://localhost:8787";
-
 
 export type SocialProvider = "google" | "discord";
 export type AuthProviderName = SocialProvider;
@@ -53,12 +52,13 @@ export async function loginGoogle(credential: string): Promise<AuthUser> {
     body: JSON.stringify({ credential }),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).detail ?? "Google 로그인에 실패했습니다.");
+    const err = (await res.json().catch(() => ({}))) as { detail?: string };
+    throw new Error(err.detail ?? "Google 로그인에 실패했습니다.");
   }
   const data = await res.json();
   return data.user as AuthUser;
 }
+
 
 /**
  * Returns the backend URL that initiates the Discord OAuth flow.

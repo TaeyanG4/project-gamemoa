@@ -17,9 +17,10 @@ const COLOR_FREQS: Record<MemoryColor, number> = {
 function playTone(freq: number, duration = 0.3) {
   if (typeof window === "undefined") return;
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";

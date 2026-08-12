@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { D1UserRepository, D1SessionRepository } from "@gamemoa/db";
+import { D1UserRepository, D1SessionRepository, type D1Database } from "@gamemoa/db";
 
 export type ApiEnv = {
   Bindings: {
-    DB: any;
+    DB: D1Database;
     GOOGLE_CLIENT_ID?: string;
     DISCORD_CLIENT_ID?: string;
     DISCORD_CLIENT_SECRET?: string;
@@ -12,6 +12,7 @@ export type ApiEnv = {
     FRONTEND_URL?: string;
   };
 };
+
 
 export const authRouter = new Hono<ApiEnv>();
 

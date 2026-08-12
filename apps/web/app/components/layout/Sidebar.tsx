@@ -4,14 +4,11 @@ import {
   Gamepad2, 
   Zap, 
   Trophy, 
-  Bookmark, 
   Sparkles, 
   Compass,
-  ChevronRight,
-  Menu,
   X
 } from "lucide-react";
-import { useState } from "react";
+
 
 interface SidebarProps {
   isMobileOpen: boolean;
