@@ -28,17 +28,12 @@ type Pages = {
   "/profile": {
     params: {};
   };
-  "/api/auth/callback/:provider": {
-    params: {
-      "provider": string;
-    };
-  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/games" | "/games/:slug" | "/ranking" | "/profile" | "/api/auth/callback/:provider";
+    page: "/" | "/games" | "/games/:slug" | "/ranking" | "/profile";
   };
   "routes/home.tsx": {
     id: "routes/home";
@@ -60,10 +55,6 @@ type RouteFiles = {
     id: "routes/profile";
     page: "/profile";
   };
-  "routes/api.auth.callback.$provider.tsx": {
-    id: "routes/api.auth.callback.$provider";
-    page: "/api/auth/callback/:provider";
-  };
 };
 
 type RouteModules = {
@@ -73,5 +64,4 @@ type RouteModules = {
   "routes/game-slug": typeof import("./app/routes/game-slug.tsx");
   "routes/ranking": typeof import("./app/routes/ranking.tsx");
   "routes/profile": typeof import("./app/routes/profile.tsx");
-  "routes/api.auth.callback.$provider": typeof import("./app/routes/api.auth.callback.$provider.tsx");
 };

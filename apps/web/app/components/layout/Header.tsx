@@ -76,13 +76,13 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                 className="flex items-center gap-2 p-1.5 pl-3 rounded-full bg-surface-raised border border-border hover:border-brand/50 transition-all cursor-pointer shadow-sm"
               >
                 <span className="text-xs font-bold text-text-primary max-w-[100px] truncate hidden md:inline">
-                  {user.name}
+                  {user.nickname}
                 </span>
                 <div className="w-7 h-7 rounded-full bg-brand text-white font-black text-xs flex items-center justify-center overflow-hidden border border-brand/40">
-                  {user.image ? (
-                    <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt={user.nickname} className="w-full h-full object-cover" />
                   ) : (
-                    user.name.slice(0, 2)
+                    user.nickname.slice(0, 2)
                   )}
                 </div>
               </button>
@@ -94,10 +94,14 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                   onMouseLeave={() => setShowUserDropdown(false)}
                 >
                   <div className="px-4 py-3 border-b border-border/60">
-                    <p className="text-xs font-bold text-text-primary truncate">{user.name}</p>
+                    <p className="text-xs font-bold text-text-primary truncate">{user.nickname}</p>
                     <p className="text-[11px] text-text-muted truncate">{user.email}</p>
-                    <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand border border-brand/20 capitalize">
-                      {user.provider} 계정
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {user.providers.map((p) => (
+                        <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand border border-brand/20 capitalize">
+                          {p} 계정
+                        </span>
+                      ))}
                     </div>
                   </div>
 
@@ -121,7 +125,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
                   <button
                     onClick={() => {
-                      logout();
+                      void logout();
                       setShowUserDropdown(false);
                     }}
                     className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-accent-red hover:bg-accent-red/10 transition-colors w-full text-left border-t border-border/40 mt-1 cursor-pointer"

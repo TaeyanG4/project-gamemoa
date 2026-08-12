@@ -1,6 +1,6 @@
 import { useAuth } from "@gamemoa/auth";
 import { Link, useNavigate } from "react-router";
-import { User, LogOut, Trophy, Gamepad2, ArrowLeft, ShieldCheck } from "lucide-react";
+import { User, LogOut, Trophy, Gamepad2, ArrowLeft } from "lucide-react";
 import { getLocalBestScore } from "@gamemoa/core";
 import { gameManifests } from "../features/catalog/registry";
 
@@ -50,27 +50,29 @@ export default function ProfilePage() {
       <div className="w-full bg-surface-raised rounded-3xl border border-border p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl">
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 rounded-full bg-brand/20 text-brand font-black text-2xl flex items-center justify-center border-2 border-brand/40 overflow-hidden shadow-md">
-            {user.image ? (
-              <img src={user.image} alt={user.name} className="w-full h-full object-cover" />
+            {user.avatar_url ? (
+              <img src={user.avatar_url} alt={user.nickname} className="w-full h-full object-cover" />
             ) : (
-              user.name.slice(0, 2)
+              user.nickname.slice(0, 2)
             )}
           </div>
 
           <div className="flex flex-col gap-1 text-center md:text-left">
-            <div className="flex items-center gap-2 justify-center md:justify-start">
-              <h1 className="text-2xl font-black text-text-primary">{user.name}</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-brand/10 text-brand border border-brand/20 uppercase">
-                {user.provider}
-              </span>
+            <div className="flex items-center gap-2 justify-center md:justify-start flex-wrap">
+              <h1 className="text-2xl font-black text-text-primary">{user.nickname}</h1>
+              {user.providers.map((p) => (
+                <span key={p} className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-brand/10 text-brand border border-brand/20 uppercase">
+                  {p}
+                </span>
+              ))}
             </div>
             <p className="text-xs text-text-secondary">{user.email}</p>
-            <p className="text-[11px] text-text-muted mt-1">가입일: {user.createdAt}</p>
+            <p className="text-[11px] text-text-muted mt-1">가입일: {user.created_at?.split("T")[0]}</p>
           </div>
         </div>
 
         <button
-          onClick={logout}
+          onClick={() => void logout()}
           className="flex items-center gap-2 px-6 py-2.5 bg-accent-red/10 text-accent-red border border-accent-red/30 rounded-2xl font-bold text-xs hover:bg-accent-red/20 transition-all cursor-pointer"
         >
           <LogOut className="w-4 h-4" />

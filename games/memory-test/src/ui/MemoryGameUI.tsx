@@ -65,6 +65,7 @@ export function MemoryGameUI() {
         if (isCancelled) return;
 
         const color = gameState.sequence[i];
+        if (!color) continue;
 
         // 1. Turn ON highlight & sound
         setActiveColor(color);
