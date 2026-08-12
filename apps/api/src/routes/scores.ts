@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { createContainer } from "../container.js";
+import { createContainer, evaluateAchievementsForUser } from "../container.js";
 import { scoreSubmissionSchema } from "@gamemoa/contracts";
 import type { ApiEnv } from "./auth.js";
 
@@ -14,7 +14,8 @@ scoresRouter.post("/", async (c) => {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const { sessionRepo, scoreUseCases } = createContainer(c.env.DB);
+    const container = createContainer(c.env.DB);
+    const { sessionRepo, scoreUseCases } = container;
 
     let authData;
     try {
@@ -59,12 +60,32 @@ scoresRouter.post("/", async (c) => {
       return c.json({ error: result.reason || "Invalid score" }, 400);
     }
 
+    // Progression side-effects: server-authoritative XP for this accepted, authenticated
+    // completion (idempotent by the saved score's own row id), then re-evaluate
+    // achievements. Never influences the score/leaderboard above.
+    let xpAwarded = 0;
+    let newlyUnlockedAchievements: string[] = [];
+    try {
+      const completion = await container.progressionUseCases.recordAcceptedGameCompletion({
+        userId,
+        gameId: result.saved.game_id,
+        sourceId: String(result.saved.id),
+      });
+      xpAwarded = completion.xpAwarded;
+      newlyUnlockedAchievements = await evaluateAchievementsForUser(container, userId);
+    } catch (progressionErr) {
+      // Progression bookkeeping must never fail the score submission itself.
+      console.error("Progression Update Error:", progressionErr);
+    }
+
     return c.json({
       success: true,
       score_id: result.saved.id,
       game_id: result.saved.game_id,
       score: result.saved.score,
       nickname: result.saved.nickname,
+      xpAwarded,
+      newlyUnlockedAchievements,
     });
   } catch (err) {
     console.error("Submit Score Error:", err);

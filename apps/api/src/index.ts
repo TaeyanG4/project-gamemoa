@@ -4,6 +4,8 @@ import { logger } from "hono/logger";
 import { authRouter } from "./routes/auth.js";
 import { scoresRouter } from "./routes/scores.js";
 import { personalizationRouter } from "./routes/personalization.js";
+import { progressionRouter } from "./routes/progression.js";
+import { profileRouter } from "./routes/profile.js";
 import type { ApiEnv } from "./routes/auth.js";
 
 const app = new Hono<ApiEnv>();
@@ -72,6 +74,8 @@ app.get("/api/health", (c) => {
 app.route("/api/auth", authRouter);
 app.route("/api/scores", scoresRouter);
 app.route("/api/personalization", personalizationRouter);
+app.route("/api/progression", progressionRouter);
+app.route("/api/profile", profileRouter);
 
 // 404 Handler
 app.notFound((c) => {

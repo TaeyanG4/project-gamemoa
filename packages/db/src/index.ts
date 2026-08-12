@@ -3,3 +3,5 @@ export * from "./d1/D1SessionRepository.js";
 export * from "./d1/D1ScoreRepository.js";
 export * from "./d1/D1PersonalizationRepository.js";
 export * from "./d1/D1AccountMergeRepository.js";
+export * from "./d1/D1ProgressionRepository.js";
+export * from "./d1/D1AchievementRepository.js";

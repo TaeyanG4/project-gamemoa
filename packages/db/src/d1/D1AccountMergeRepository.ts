@@ -107,12 +107,17 @@ export class D1AccountMergeRepository implements AccountMergeRepository {
 
   async mergeAccounts(primaryId: number, secondaryId: number): Promise<void> {
     // Primary-Wins atomic merge. D1 batch runs all statements as a single transaction:
-    // secondary gameplay/personalization/sessions are deleted, secondary OAuth identities are
+    // secondary gameplay/personalization/progression/sessions are deleted (never unioned
+    // into primary — this includes XP events and achievement unlocks, so no ghost XP or
+    // duplicated achievements survive the merge), secondary OAuth identities are
     // transferred to the primary, then the secondary user is deleted.
     const statements = [
       this.db.prepare(`DELETE FROM scores WHERE user_id = ?`).bind(secondaryId),
       this.db.prepare(`DELETE FROM user_favorites WHERE user_id = ?`).bind(secondaryId),
       this.db.prepare(`DELETE FROM user_recent_plays WHERE user_id = ?`).bind(secondaryId),
+      this.db.prepare(`DELETE FROM xp_events WHERE user_id = ?`).bind(secondaryId),
+      this.db.prepare(`DELETE FROM user_progress WHERE user_id = ?`).bind(secondaryId),
+      this.db.prepare(`DELETE FROM user_achievements WHERE user_id = ?`).bind(secondaryId),
       this.db.prepare(`DELETE FROM sessions WHERE user_id = ?`).bind(secondaryId),
       this.db
         .prepare(`UPDATE oauth_accounts SET user_id = ? WHERE user_id = ?`)

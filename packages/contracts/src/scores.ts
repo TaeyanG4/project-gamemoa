@@ -22,6 +22,10 @@ export const SubmitScoreResponseSchema = z.object({
   game_id: z.string().optional(),
   score: z.number().optional(),
   nickname: z.string().optional(),
+  // Progression side-effects of this accepted completion. XP never affects the score
+  // above — these fields are purely informational for client UX (e.g. a small XP toast).
+  xpAwarded: z.number().int().min(0).optional(),
+  newlyUnlockedAchievements: z.array(z.string()).optional(),
 });
 export type SubmitScoreResponse = z.infer<typeof SubmitScoreResponseSchema>;
 

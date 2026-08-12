@@ -9,7 +9,9 @@ export interface D1PreparedStatement {
   bind(...values: unknown[]): D1PreparedStatement;
   first<T = unknown>(colName?: string): Promise<T | null>;
   all<T = unknown>(): Promise<{ results: T[] }>;
-  run(): Promise<{ success: boolean }>;
+  /** `meta.changes` (when present) reports rows actually written by this statement —
+   * used to detect whether an `ON CONFLICT DO NOTHING` insert was a no-op. */
+  run(): Promise<{ success: boolean; meta?: { changes?: number } }>;
 }
 
 export class D1UserRepository implements UserRepository {
@@ -32,6 +34,9 @@ export class D1UserRepository implements UserRepository {
       created_at: String(row.created_at),
       updated_at: String(row.updated_at),
       providers,
+      country: row.country ? String(row.country) : null,
+      nickname_updated_at: row.nickname_updated_at ? String(row.nickname_updated_at) : null,
+      country_updated_at: row.country_updated_at ? String(row.country_updated_at) : null,
     };
   }
 
@@ -58,6 +63,11 @@ export class D1UserRepository implements UserRepository {
       created_at: String(oauthRow.created_at),
       updated_at: String(oauthRow.updated_at),
       providers,
+      country: oauthRow.country ? String(oauthRow.country) : null,
+      nickname_updated_at: oauthRow.nickname_updated_at
+        ? String(oauthRow.nickname_updated_at)
+        : null,
+      country_updated_at: oauthRow.country_updated_at ? String(oauthRow.country_updated_at) : null,
     };
   }
 
@@ -201,6 +211,34 @@ export class D1UserRepository implements UserRepository {
       .prepare(`DELETE FROM oauth_accounts WHERE user_id = ? AND provider = ?`)
       .bind(userId, provider)
       .run();
+  }
+
+  async updateNickname(userId: number, nickname: string, updatedAt: string): Promise<User> {
+    await this.db
+      .prepare(
+        `UPDATE users SET nickname = ?, nickname_updated_at = ?, updated_at = ? WHERE id = ?`,
+      )
+      .bind(nickname, updatedAt, updatedAt, userId)
+      .run();
+
+    const updated = await this.findById(userId);
+    if (!updated) {
+      throw new Error(`User ${userId} not found after nickname update`);
+    }
+    return updated;
+  }
+
+  async updateCountry(userId: number, country: string | null, updatedAt: string): Promise<User> {
+    await this.db
+      .prepare(`UPDATE users SET country = ?, country_updated_at = ?, updated_at = ? WHERE id = ?`)
+      .bind(country, updatedAt, updatedAt, userId)
+      .run();
+
+    const updated = await this.findById(userId);
+    if (!updated) {
+      throw new Error(`User ${userId} not found after country update`);
+    }
+    return updated;
   }
 
   private async getLastInsertId(): Promise<number> {

@@ -6,7 +6,7 @@ import {
   PersonalizationStateSchema,
 } from "@gamemoa/contracts";
 import type { ApiEnv } from "./auth.js";
-import { createContainer } from "../container.js";
+import { createContainer, evaluateAchievementsForUser } from "../container.js";
 
 export const personalizationRouter = new Hono<ApiEnv>();
 
@@ -54,10 +54,16 @@ personalizationRouter.post("/favorites/:gameId", async (c) => {
   }
 
   const gameId = c.req.param("gameId");
-  const { personalizationUseCases } = createContainer(c.env.DB);
+  const container = createContainer(c.env.DB);
 
   try {
-    await personalizationUseCases.addFavorite(user.id, gameId);
+    await container.personalizationUseCases.addFavorite(user.id, gameId);
+    try {
+      await evaluateAchievementsForUser(container, user.id);
+    } catch (achievementErr) {
+      // Achievement bookkeeping must never fail the Favorite action itself.
+      console.error("Achievement Evaluation Error:", achievementErr);
+    }
     return c.json({ success: true }, 200);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Invalid game";

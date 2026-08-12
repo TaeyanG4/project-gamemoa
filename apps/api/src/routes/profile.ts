@@ -1,0 +1,123 @@
+import type { Context } from "hono";
+import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
+import { UpdateNicknameRequestSchema, UpdateCountryRequestSchema } from "@gamemoa/contracts";
+import type { ApiEnv } from "./auth.js";
+import { createContainer } from "../container.js";
+
+export const profileRouter = new Hono<ApiEnv>();
+
+async function getAuthUserId(c: Context<ApiEnv>): Promise<number | null> {
+  const sessionId = getCookie(c, "gamemoa_session");
+  if (!sessionId || !c.env?.DB) return null;
+
+  try {
+    const { sessionRepo } = createContainer(c.env.DB);
+    const result = await sessionRepo.findSession(sessionId);
+    return result ? result.user.id : null;
+  } catch {
+    return null;
+  }
+}
+
+function profileError(
+  c: Context<ApiEnv>,
+  code: string,
+  message: string,
+  status: 400 | 401 | 404 | 429,
+  extra?: Record<string, unknown>,
+) {
+  return c.json({ error: { code, message }, ...(extra ?? {}) }, status);
+}
+
+// POST /api/profile/nickname — change the GAMEMOA nickname (independent from any OAuth
+// display name), subject to a centralized cooldown.
+profileRouter.post("/nickname", async (c) => {
+  const userId = await getAuthUserId(c);
+  if (!userId) {
+    return profileError(c, "UNAUTHORIZED", "Unauthenticated", 401);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = UpdateNicknameRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return profileError(c, "INVALID_NICKNAME", "닉네임을 입력해주세요.", 400);
+  }
+
+  const { profileUseCases } = createContainer(c.env.DB);
+  const result = await profileUseCases.updateNickname(userId, parsed.data.nickname);
+
+  if (!result.ok) {
+    if (result.code === "USER_NOT_FOUND") {
+      return profileError(c, result.code, "계정을 찾을 수 없습니다.", 404);
+    }
+    if (result.code === "NICKNAME_COOLDOWN_ACTIVE") {
+      return profileError(
+        c,
+        result.code,
+        "닉네임은 변경 후 일정 기간이 지나야 다시 변경할 수 있습니다.",
+        429,
+        { nextAllowedAt: result.nextAllowedAt },
+      );
+    }
+    return profileError(c, result.code, result.reason, 400);
+  }
+
+  return c.json(
+    {
+      success: true,
+      nickname: result.user.nickname,
+      nicknameUpdatedAt: result.user.nickname_updated_at,
+    },
+    200,
+  );
+});
+
+// POST /api/profile/country — update self-reported "국가/지역" (not verified nationality),
+// subject to a longer centralized cooldown. `country: null` means unset.
+profileRouter.post("/country", async (c) => {
+  const userId = await getAuthUserId(c);
+  if (!userId) {
+    return profileError(c, "UNAUTHORIZED", "Unauthenticated", 401);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = UpdateCountryRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return profileError(c, "INVALID_COUNTRY", "국가/지역 값이 올바르지 않습니다.", 400);
+  }
+
+  const { profileUseCases } = createContainer(c.env.DB);
+  const result = await profileUseCases.updateCountry(userId, parsed.data.country);
+
+  if (!result.ok) {
+    if (result.code === "USER_NOT_FOUND") {
+      return profileError(c, result.code, "계정을 찾을 수 없습니다.", 404);
+    }
+    if (result.code === "COUNTRY_COOLDOWN_ACTIVE") {
+      return profileError(
+        c,
+        result.code,
+        "국가/지역은 변경 후 일정 기간이 지나야 다시 변경할 수 있습니다.",
+        429,
+        { nextAllowedAt: result.nextAllowedAt },
+      );
+    }
+    return profileError(c, result.code, "국가/지역 값이 올바르지 않습니다.", 400);
+  }
+
+  return c.json(
+    {
+      success: true,
+      country: result.user.country ?? null,
+      countryUpdatedAt: result.user.country_updated_at,
+    },
+    200,
+  );
+});

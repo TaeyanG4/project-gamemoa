@@ -6,6 +6,12 @@ export interface User {
   created_at: string;
   updated_at: string;
   providers?: string[];
+  /** Self-reported ISO 3166-1 alpha-2 code ("국가/지역"), or null if unset. Not verified nationality. */
+  country?: string | null;
+  /** Timestamp of the last explicit nickname change; null before the first change. */
+  nickname_updated_at?: string | null;
+  /** Timestamp of the last explicit country/region change; null before the first change. */
+  country_updated_at?: string | null;
 }
 
 export interface OAuthAccount {
@@ -59,6 +65,8 @@ export interface UserRepository {
     providerEmail: string | null,
   ): Promise<void>;
   unlinkOAuthAccount(userId: number, provider: string): Promise<void>;
+  updateNickname(userId: number, nickname: string, updatedAt: string): Promise<User>;
+  updateCountry(userId: number, country: string | null, updatedAt: string): Promise<User>;
 }
 
 export interface SessionRepository {
@@ -141,4 +149,69 @@ export interface AccountMergeRepository {
   findPendingMergeChallenge(userA: number, userB: number): Promise<MergeChallenge | null>;
   consumeMergeChallenge(id: string): Promise<void>;
   mergeAccounts(primaryId: number, secondaryId: number): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
+// Progression (XP / Level)
+// ---------------------------------------------------------------------------
+
+export interface UserProgress {
+  user_id: number;
+  total_xp: number;
+  eligible_completions: number;
+  updated_at: string;
+}
+
+export interface RecordCompletionOutcome {
+  /** True when this exact source event was already recorded (idempotent no-op). */
+  duplicate: boolean;
+  /** 0 when duplicate, or when the daily per-user/per-game XP cap was already reached. */
+  xpAwarded: number;
+  totalXp: number;
+  eligibleCompletions: number;
+}
+
+export interface XpLeaderboardEntry {
+  userId: number;
+  nickname: string;
+  avatarUrl: string | null;
+  totalXp: number;
+}
+
+export interface ProgressionRepository {
+  /**
+   * Records one accepted, authenticated, XP-eligible game completion. Idempotent by
+   * (sourceType, sourceId): replaying the same source event never re-awards XP or
+   * re-increments eligibleCompletions. Applies the caller-supplied daily cap by only
+   * awarding `xpPerCompletion` XP while fewer than `dailyCapPerGame` XP-awarding
+   * completions have already been recorded for this user+game in the current UTC day.
+   */
+  recordGameCompletion(input: {
+    userId: number;
+    gameId: string;
+    sourceType: string;
+    sourceId: string;
+    xpPerCompletion: number;
+    dailyCapPerGame: number;
+  }): Promise<RecordCompletionOutcome>;
+
+  getUserProgress(userId: number): Promise<UserProgress | null>;
+  getXpLeaderboard(limit: number): Promise<XpLeaderboardEntry[]>;
+  /** 1-based global rank by total_xp, or null if the user has no progress row yet. */
+  getGlobalXpRank(userId: number): Promise<number | null>;
+}
+
+// ---------------------------------------------------------------------------
+// Achievements
+// ---------------------------------------------------------------------------
+
+export interface UnlockedAchievement {
+  achievementCode: string;
+  unlockedAt: string;
+}
+
+export interface AchievementRepository {
+  getUnlockedAchievements(userId: number): Promise<UnlockedAchievement[]>;
+  /** Idempotent: `unlocked` is false if the code was already unlocked for this user. */
+  unlockAchievement(userId: number, code: string): Promise<{ unlocked: boolean }>;
 }
