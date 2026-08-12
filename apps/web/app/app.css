@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "../../../games";
+@source "../../../packages";
 
 @theme {
   --color-brand: #6366f1;

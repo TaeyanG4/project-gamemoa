@@ -89,20 +89,20 @@ export function Game({ runtime }: GameProps) {
     startNewRound();
   }, [startNewRound]);
 
-  // Determine display based on phase
+  // Determine display based on phase with explicit hex background colors
   const getPhaseDisplay = () => {
     switch (roundState.phase) {
       case "waiting":
-        return { bg: "bg-neutral-800", text: "클릭하여 시작", subtext: `${NUM_ROUNDS}라운드 진행` };
+        return { bgColor: "#262626", text: "클릭하여 시작", subtext: `${NUM_ROUNDS}라운드 진행` };
       case "ready":
-        return { bg: "bg-red-600", text: "기다리세요...", subtext: "초록색이 되면 클릭!" };
+        return { bgColor: "#dc2626", text: "기다리세요...", subtext: "초록색이 되면 클릭!" };
       case "go":
-        return { bg: "bg-green-500", text: "지금 클릭!", subtext: "" };
+        return { bgColor: "#16a34a", text: "지금 클릭!", subtext: "" };
       case "too-early":
-        return { bg: "bg-yellow-600", text: "너무 빨랐어요!", subtext: "클릭하여 다시 시도" };
+        return { bgColor: "#d97706", text: "너무 빨랐어요!", subtext: "클릭하여 다시 시도" };
       case "result":
         return {
-          bg: "bg-blue-600",
+          bgColor: "#2563eb",
           text: `${roundState.reactionTimeMs}ms`,
           subtext: results.length >= NUM_ROUNDS
             ? `평균: ${calculateAverageReactionTime(results)}ms`
@@ -115,8 +115,8 @@ export function Game({ runtime }: GameProps) {
   const isGameComplete = results.length >= NUM_ROUNDS;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] w-full">
-      <div className="text-sm text-neutral-400 mb-4">
+    <div className="flex flex-col items-center justify-center min-h-[400px] w-full select-none">
+      <div className="text-sm text-neutral-400 mb-4 font-bold">
         라운드 {Math.min(round + 1, NUM_ROUNDS)} / {NUM_ROUNDS}
       </div>
 
@@ -129,19 +129,20 @@ export function Game({ runtime }: GameProps) {
               ? handleNextRound
               : handleScreenClick
         }
-        className={`w-full max-w-md aspect-[4/3] rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-colors duration-150 select-none ${display.bg}`}
+        style={{ backgroundColor: display.bgColor }}
+        className="w-full max-w-md aspect-[4/3] rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-colors duration-150 shadow-2xl border border-white/20 active:scale-[0.99]"
         aria-label={display.text}
       >
-        <span className="text-3xl font-bold text-white">{display.text}</span>
+        <span className="text-4xl font-black text-white drop-shadow-md">{display.text}</span>
         {display.subtext && (
-          <span className="text-lg text-white/80 mt-2">{display.subtext}</span>
+          <span className="text-base font-bold text-white/90 mt-3 drop-shadow-sm">{display.subtext}</span>
         )}
       </button>
 
       {results.length > 0 && (
         <div className="mt-6 flex gap-2 flex-wrap justify-center">
           {results.map((ms, i) => (
-            <span key={i} className="px-3 py-1 bg-neutral-700 rounded-full text-sm text-neutral-200">
+            <span key={i} className="px-3 py-1 bg-surface-raised border border-border rounded-full text-xs font-bold text-text-primary">
               R{i + 1}: {ms}ms
             </span>
           ))}
@@ -152,9 +153,9 @@ export function Game({ runtime }: GameProps) {
         <button
           type="button"
           onClick={handleRetry}
-          className="mt-4 px-6 py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-white transition-colors"
+          className="mt-6 px-8 py-3 bg-brand hover:bg-brand-dark rounded-2xl text-white font-extrabold shadow-lg transition-all cursor-pointer"
         >
-          다시 도전
+          다시 도전하기
         </button>
       )}
     </div>
