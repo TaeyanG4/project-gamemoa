@@ -1,16 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@gamemoa/shared": ["./packages/shared/src/index.ts"],
-      "@gamemoa/core": ["./packages/core/src/index.ts"],
-      "@gamemoa/db": ["./packages/db/src/index.ts"],
-      "@gamemoa/auth": ["./packages/auth/src/index.ts"],
-      "@gamemoa/ui": ["./packages/ui/src/index.ts"],
-      "@gamemoa/game-sdk": ["./packages/game-sdk/src/index.ts"],
-      "@gamemoa/game-reaction-time": ["./games/reaction-time/src/index.ts"],
-      "@gamemoa/game-memory-test": ["./games/memory-test/src/index.ts"]
-    },
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,

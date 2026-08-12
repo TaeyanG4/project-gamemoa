@@ -29,8 +29,9 @@ function isLocalhost(urlStr: string): boolean {
 // POST /api/auth/google
 authRouter.post("/google", async (c) => {
   try {
-    const body = await c.req.json<{ credential?: string }>().catch(() => ({}));
+    const body = (await c.req.json<{ credential?: string }>().catch(() => ({}))) as { credential?: string };
     const credential = body.credential;
+
 
     if (!credential) {
       return c.json({ error: "Credential is required" }, 400);

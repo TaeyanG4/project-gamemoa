@@ -163,8 +163,9 @@ export async function fetchUserBestsApi(): Promise<Record<string, number>> {
       credentials: "include",
     });
     if (!res.ok) return {};
-    const data = await res.json();
+    const data = (await res.json()) as { bests?: Record<string, number> };
     return data.bests || {};
+
   } catch {
     return {};
   }
