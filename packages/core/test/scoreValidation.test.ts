@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateScorePayload } from "../src/scores/scoreValidation.js";
+import { validateScorePayload } from "../src/domain/scoreValidation.js";
 
 test("validateScorePayload validates reaction-time scores", () => {
   assert.equal(validateScorePayload("reaction-time", 200).valid, true);
