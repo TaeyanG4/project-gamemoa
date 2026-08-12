@@ -11,7 +11,15 @@ function createMockD1Database(): {
   >;
   usersTable: Map<
     number,
-    { id: number; nickname: string; email: string | null; avatar_url: string | null }
+    {
+      id: number;
+      nickname: string;
+      email: string | null;
+      avatar_url: string | null;
+      country?: string | null;
+      nickname_updated_at?: string | null;
+      country_updated_at?: string | null;
+    }
   >;
   oauthTable: Map<string, { user_id: number; provider: string }>;
 } {
@@ -21,7 +29,15 @@ function createMockD1Database(): {
   >();
   const usersTable = new Map<
     number,
-    { id: number; nickname: string; email: string | null; avatar_url: string | null }
+    {
+      id: number;
+      nickname: string;
+      email: string | null;
+      avatar_url: string | null;
+      country?: string | null;
+      nickname_updated_at?: string | null;
+      country_updated_at?: string | null;
+    }
   >();
   const oauthTable = new Map<string, { user_id: number; provider: string }>();
 
@@ -31,6 +47,9 @@ function createMockD1Database(): {
     nickname: "TestGamer",
     email: "gamer@test.com",
     avatar_url: null,
+    country: "KR",
+    nickname_updated_at: "2026-01-01T00:00:00.000Z",
+    country_updated_at: null,
   });
 
   const db: D1Database = {
@@ -80,6 +99,9 @@ function createMockD1Database(): {
               avatar_url: user.avatar_url,
               user_created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
+              country: user.country ?? null,
+              nickname_updated_at: user.nickname_updated_at ?? null,
+              country_updated_at: user.country_updated_at ?? null,
             } as unknown as T;
           }
           return null;
@@ -127,6 +149,19 @@ test("D1SessionRepository hashes session token in DB and returns raw token", asy
   assert.ok(found);
   assert.equal(found.user.id, 1);
   assert.equal(found.user.nickname, "TestGamer");
+});
+
+test("D1SessionRepository surfaces country/nickname_updated_at/country_updated_at on the returned user", async () => {
+  const { db } = createMockD1Database();
+  const repo = new D1SessionRepository(db);
+
+  const session = await repo.createSession(1, 30);
+  const found = await repo.findSession(session.id);
+
+  assert.ok(found);
+  assert.equal(found.user.country, "KR");
+  assert.equal(found.user.nickname_updated_at, "2026-01-01T00:00:00.000Z");
+  assert.equal(found.user.country_updated_at, null);
 });
 
 test("D1SessionRepository supports legacy raw token and migrates it to hashed token", async () => {

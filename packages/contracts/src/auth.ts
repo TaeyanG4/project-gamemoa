@@ -10,6 +10,11 @@ export const AuthUserSchema = z.object({
   avatar_url: z.string().nullable(),
   providers: z.array(SocialProviderSchema),
   created_at: z.string(),
+  // Self-reported "국가/지역" (ISO 3166-1 alpha-2), not verified nationality. Optional so
+  // older cached responses without these fields still parse.
+  country: z.string().nullable().optional(),
+  nickname_updated_at: z.string().nullable().optional(),
+  country_updated_at: z.string().nullable().optional(),
 });
 export type AuthUser = z.infer<typeof AuthUserSchema>;
 

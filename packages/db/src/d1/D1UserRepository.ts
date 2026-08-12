@@ -138,6 +138,9 @@ export class D1UserRepository implements UserRepository {
       created_at: String(newUserRow?.created_at ?? new Date().toISOString()),
       updated_at: String(newUserRow?.updated_at ?? new Date().toISOString()),
       providers: [data.provider],
+      country: null,
+      nickname_updated_at: null,
+      country_updated_at: null,
     };
   }
 
