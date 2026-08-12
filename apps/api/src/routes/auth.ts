@@ -31,12 +31,21 @@ function isLocalhost(urlStr: string): boolean {
 
 // GET /api/auth/providers (non-secret readiness check)
 authRouter.get("/providers", (c) => {
+  const googleConfigured = Boolean(c.env?.GOOGLE_CLIENT_ID);
+  const discordConfigured = Boolean(
+    c.env?.DISCORD_CLIENT_ID &&
+    c.env?.DISCORD_CLIENT_SECRET &&
+    c.env?.DISCORD_REDIRECT_URI &&
+    c.env?.FRONTEND_URL,
+  );
+
   return c.json({
     google: {
-      configured: Boolean(c.env?.GOOGLE_CLIENT_ID),
+      configured: googleConfigured,
+      ...(googleConfigured ? { clientId: c.env.GOOGLE_CLIENT_ID } : {}),
     },
     discord: {
-      configured: Boolean(c.env?.DISCORD_CLIENT_ID && c.env?.DISCORD_CLIENT_SECRET),
+      configured: discordConfigured,
     },
   });
 });
