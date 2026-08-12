@@ -12,39 +12,39 @@
 
 ---
 
-## 블로커 / 현주소 (Blockers & Current Reality)
+## 완료 및 프로덕션 검증 (Completed & Production Verified)
 
-1. **게스트 랭킹 데이터베이스 저장 버그 (P0)**:
-   - 비인증 플레이어가 `POST /api/scores`를 호출하여 D1 `scores` 테이블에 `user_id IS NULL` 상태로 점수를 기록할 수 있는 결함 존재.
-2. **소셜 로그인 실제 프로덕션 적용 (P2)**:
-   - **Google / Discord 로그인**: 백엔드 OAuth 코드 구현되어 있으나 프로덕션 환경 변수/시크릿 미주입으로 `configured: false` 상태.
+- [x] **P0: Score API 인증 강제 & 계정 식별자 바인딩**
+  - `POST /api/scores`에 유효한 `gamemoa_session` 쿠키 필수화 (미인증 제출 시 401 Unauthorized 반환).
+  - 클라이언트 닉네임 변조를 차단하고 세션 유저 식별자(`user_id`, `nickname`, `avatar_url`)만 랭킹에 바인딩.
+- [x] **P0: 도메인 & 저장소 타입 및 쿼리 방어**
+  - `@gamemoa/core` `Score` 엔티티 및 `ScoreRepository` 인터페이스의 `userId` 필수화 (`number`).
+  - `D1ScoreRepository`에서 `user_id IS NOT NULL` 조건 추가로 레거시 게스트 기록 랭킹 노출 전면 차단.
+- [x] **P0: D1 마이그레이션 `0002_score_auth_integrity.sql` 적용**
+  - 프로덕션 D1 레거시 `user_id IS NULL` 게스트 점수 행 안전 제거.
+  - SQLite Trigger를 통한 `user_id IS NULL` 저장 차단 가드 구축.
+- [x] **P1: 프론트엔드 게스트 점수 서버 제출 차단 & 시도 시점 자격 캡처**
+  - 게임 시작 시점의 인증 상태로 랭킹 참여 자격(`rankingEligible`) 결정.
+  - 게스트 완료 결과 UI에 "게스트 기록은 이 기기에만 저장됩니다." 한국어 안내 및 로그인 버튼 렌더링.
+- [x] **P2: 소셜 로그인 실제 프로덕션 설정 & 단일 출처 (Single Source of Truth) 완료**
+  - Google OAuth Web Client ID 및 Discord OAuth Application 자격 증명을 GitHub Variables / Secrets에 등록.
+  - `GET /api/auth/providers` 프로덕션 진단 결과 `google.configured: true`, `discord.configured: true` 최종 통과 (`pnpm auth:prod:check` GREEN).
+  - `deploy.yml` 배포 파이프라인 연동 및 프로덕션 배포 출처 Provenance 일치 확인.
 
 ---
 
-## 진행 중인 스프린트 (Current Sprint)
+## 블로커 / 프로덕션 현황 (Blockers & Production Status)
 
-- [ ] **P0: Score API 인증 강제 & 계정 식별자 바인딩**
-  - `POST /api/scores`에 유효한 `gamemoa_session` 쿠키 필수화 (미인증 시 401 Unauthorized 반환).
-  - 클라이언트 닉네임 변조 차단 및 세션 사용자 식별자(`user_id`, `nickname`, `avatar_url`)만 랭킹에 바인딩.
-- [ ] **P0: 도메인 & 저장소 타입 및 쿼리 방어**
-  - `@gamemoa/core` `Score` 및 `ScoreRepository` interface에서 `userId` 필수화 (`number`).
-  - `D1ScoreRepository`에서 `user_id IS NOT NULL` 조건 추가로 레거시 게스트 기록 랭킹 노출 차단.
-- [ ] **P0: D1 마이그레이션 `0002_score_auth_integrity.sql` 구축**
-  - 기존 `user_id IS NULL` 레거시 게스트 점수 행 안전 제거.
-  - SQLite Trigger를 통한 `user_id IS NULL` 저장 차단 가드 구축.
-- [ ] **P1: 프론트엔드 게스트 점수 서버 제출 차단 & 시도 시점 자격 캡처**
-  - 게임 시작 시점의 인증 상태로 랭킹 참여 자격(`rankingEligible`) 결정.
-  - 게스트 완료 결과 UI에 "게스트 기록은 이 기기에만 저장됩니다." 한국어 안내 및 서버 POST 차단.
-- [ ] **P2: 소셜 로그인 프로덕션 배포 파이프라인 & 단일 출처 (Single Source of Truth) 정립**
-  - `GET /api/auth/providers`에서 공개 `google.clientId` 반환하도록 단일 출처화.
-  - `.github/workflows/deploy.yml` 배포 파이프라인 환경변수 전달 보장.
-  - `pnpm auth:prod:check` 검증기 구축.
+- **게스트 랭킹 버그**: ✅ 수정 완료 및 D1 마이그레이션 적용 완료 (`user_id IS NOT NULL` 강제)
+- **Google 소셜 로그인**: ✅ 프로덕션 활성화 완료 (`configured: true`, Client ID 정상 서빙)
+- **Discord 소셜 로그인**: ✅ 프로덕션 활성화 완료 (`configured: true`, OAuth2 Callback & State validation 준비 완료)
+- **Local / Remote Quality Gate**: `pnpm verify` & `pnpm smoke:prod` 100% PASS
 
 ---
 
 ## 다음 작업 (Next Action)
 
-- P0 / P1 / P2 스택 코드 수정, 마이그레이션 적용 및 `pnpm verify` 품질 게이트 검증.
+- 계정 프로필 UX polish 및 맞춤화 기능(Personalization) 동기화 고도화 또는 신규 미니게임 확장.
 
 ---
 

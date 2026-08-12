@@ -4,19 +4,19 @@
 
 ## 1. 📊 기능 및 인프라 구현 단계 현황
 
-| 단계         | 기능 및 작업 내용                                                                                                         | 상태              | 검증 방법                                                                                      |
-| :----------- | :------------------------------------------------------------------------------------------------------------------------ | :---------------- | :--------------------------------------------------------------------------------------------- |
-| **Phase 0**  | 모노레포 구축 (pnpm Workspaces, Turborepo, TypeScript, ESLint, Prettier)                                                  | ✅ 완료           | 품질 게이트 통과                                                                               |
-| **Phase 1**  | 웹 플랫폼 쉘 및 UI/UX 구축 (접이식 사이드바, 비주얼 스포트라이트, 카테고리 칩 필터)                                       | ✅ 완료           | React 19 + React Router v7 SPA 빌드 통과                                                       |
-| **Phase 2**  | 게이밍 미니게임 컬렉션 (반응속도 테스트, 순서 기억력 테스트, 에임 테스트, 타자 속도 테스트)                               | ✅ 완료           | 단위 테스트 및 반응형 UI 검증 완료                                                             |
-| **Phase 3**  | 서버리스 API 백엔드 구축 (Hono + Cloudflare Workers, Cloudflare D1 마이그레이션)                                          | ✅ 완료           | API Health Check 및 integration test 통과                                                      |
-| **Phase 4**  | OAuth 및 세션 인증 (코드/인프라: ✅ 구현 완료, Google/Discord 실제 프로덕션: ⚠️ 외부 Provider 설정 대기)                  | ⚠️ 외부 설정 대기 | `GET /api/auth/providers` 단일 출처 검증, `pnpm auth:prod:check` 및 GIS/Discord OAuth 2.0 흐름 |
-| **Phase 5**  | 인증 강제 리더보드 & 게스트 랭킹 차단 무결성 (D1 0002 마이그레이션 + ScoreUseCases + UX)                                  | ✅ 완료           | `POST /api/scores` 401 테스트, `user_id IS NOT NULL` D1 가드 및 시도 시점 자격 캡처            |
-| **Phase 6**  | 플러그인 아키텍처 및 이중 레지스트리 생성기 결정론적 자동화 (`scripts/registry-builder.ts`)                               | ✅ 완료           | `pnpm registry:check` (Prettier 포맷팅 후 0 diff 검증)                                         |
-| **Phase 7**  | Architecture Guard 및 안전 보안 가드 (Layer Boundary Guard, Origin/CSRF guard)                                            | ✅ 완료           | `pnpm architecture:check` 8개 규칙 전원 통과                                                   |
-| **Phase 8**  | CI/CD 파이프라인, 프로덕션 배포 파이프라인 및 배포 커밋 출처 검증 (Deployment Provenance)                                 | ✅ 완료           | GitHub Actions CI & Cloudflare Deploy 원격 통과                                                |
-| **Phase 9**  | 제품 무결성 & 게임 세션 UX (가짜 랭킹 제거, Web API client, 시도 라이프사이클, 60초 타자)                                 | ✅ 완료           | 랭킹/API/시도 라이프사이클/타자 단위 테스트 전원 통과                                          |
-| **Phase 10** | 크리티컬 버그 수정 & 게임 플레이 UX (타임아웃 검사기, 소셜진단/Fallback UI, 썸네일 복원, Memory/Typing 버그, 뷰포트 확대) | ✅ 완료           | `pnpm smoke:prod`, `pnpm verify` 및 단위 테스트 전원 통과                                      |
+| 단계         | 기능 및 작업 내용                                                                                                         | 상태    | 검증 방법                                                                           |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------ | :------ | :---------------------------------------------------------------------------------- |
+| **Phase 0**  | 모노레포 구축 (pnpm Workspaces, Turborepo, TypeScript, ESLint, Prettier)                                                  | ✅ 완료 | 품질 게이트 통과                                                                    |
+| **Phase 1**  | 웹 플랫폼 쉘 및 UI/UX 구축 (접이식 사이드바, 비주얼 스포트라이트, 카테고리 칩 필터)                                       | ✅ 완료 | React 19 + React Router v7 SPA 빌드 통과                                            |
+| **Phase 2**  | 게이밍 미니게임 컬렉션 (반응속도 테스트, 순서 기억력 테스트, 에임 테스트, 타자 속도 테스트)                               | ✅ 완료 | 단위 테스트 및 반응형 UI 검증 완료                                                  |
+| **Phase 3**  | 서버리스 API 백엔드 구축 (Hono + Cloudflare Workers, Cloudflare D1 마이그레이션)                                          | ✅ 완료 | API Health Check 및 integration test 통과                                           |
+| **Phase 4**  | OAuth 및 세션 인증 (Google GIS 및 Discord OAuth 2.0 프로덕션 활성화 완료)                                                 | ✅ 완료 | `pnpm auth:prod:check` GREEN 및 `GET /api/auth/providers` 프로덕션 검증 완료        |
+| **Phase 5**  | 인증 강제 리더보드 & 게스트 랭킹 차단 무결성 (D1 0002 마이그레이션 + ScoreUseCases + UX)                                  | ✅ 완료 | `POST /api/scores` 401 테스트, `user_id IS NOT NULL` D1 가드 및 시도 시점 자격 캡처 |
+| **Phase 6**  | 플러그인 아키텍처 및 이중 레지스트리 생성기 결정론적 자동화 (`scripts/registry-builder.ts`)                               | ✅ 완료 | `pnpm registry:check` (Prettier 포맷팅 후 0 diff 검증)                              |
+| **Phase 7**  | Architecture Guard 및 안전 보안 가드 (Layer Boundary Guard, Origin/CSRF guard)                                            | ✅ 완료 | `pnpm architecture:check` 8개 규칙 전원 통과                                        |
+| **Phase 8**  | CI/CD 파이프라인, 프로덕션 배포 파이프라인 및 배포 커밋 출처 검증 (Deployment Provenance)                                 | ✅ 완료 | GitHub Actions CI & Cloudflare Deploy 원격 통과                                     |
+| **Phase 9**  | 제품 무결성 & 게임 세션 UX (가짜 랭킹 제거, Web API client, 시도 라이프사이클, 60초 타자)                                 | ✅ 완료 | 랭킹/API/시도 라이프사이클/타자 단위 테스트 전원 통과                               |
+| **Phase 10** | 크리티컬 버그 수정 & 게임 플레이 UX (타임아웃 검사기, 소셜진단/Fallback UI, 썸네일 복원, Memory/Typing 버그, 뷰포트 확대) | ✅ 완료 | `pnpm smoke:prod`, `pnpm verify` 및 단위 테스트 전원 통과                           |
 
 ---
 
