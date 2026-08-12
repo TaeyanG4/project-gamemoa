@@ -32,6 +32,8 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 - [x] **UI 정리: 푸터 SEO 필러 제거**: "인기 태그" 태그 클라우드 및 2단 설명 문단 제거, 로고 옆 한 줄 태그라인으로 축소.
 - [x] **My Page 진행도 노출 (Phase C 1차 증분)**: 기존 `/profile` 페이지에 레벨/XP 진행 바(전체 XP 랭킹 포함) 및 도전과제 요약(달성 배지) 카드 추가 — `GET /api/progression/me`, `GET /api/progression/achievements` 소비.
 - [x] **My Page "내 프로필" / "기록" 탭 분리 + 게임 기록 카드 UI 개선 (Phase C 2차 증분)**: `/profile`을 별도 라우트로 쪼개지 않고 탭(세그먼트 컨트롤)으로 분리 — "내 프로필"(사용자 카드, 레벨/XP, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록). 게임별 최고 기록 카드는 실제 게임 썸네일 + accent 색상 배경(GameCard와 동일한 시각 언어), 전체 카드가 `/games/:slug`로 연결되는 클릭 가능한 링크, 계정 기록(트로피 아이콘, 굵은 강조)을 1차, 기기 기록을 보조 표시로 재구성, 기록 없는 게임은 "지금 도전해보세요" 안내로 개선. 섹션 헤더에 "N/M 도전" 완료 카운트 추가. Discord/Google 연결 리다이렉트는 "내 프로필" 탭으로 랜딩.
+- [x] **버그 수정: `/api/auth/me` 세션 조회가 country/nickname_updated_at/country_updated_at 미반환**: `D1SessionRepository`가 마이그레이션 0005 컬럼을 도입하기 전 작성된 자체 SELECT를 그대로 쓰고 있어 세 필드가 전혀 조회되지 않았고, `AuthUserSchema`에도 선언되지 않아 설령 조회되어도 Zod 파싱 시 제거되는 문제 — 웹 전체가 이 필드에 접근할 수 없었음(닉네임/국가 변경 UI의 전제조건). SELECT 확장 + 스키마 필드 추가 + 회귀 테스트로 수정.
+- [x] **닉네임/국가 변경 UI + 즐겨찾기·최근 플레이 카드 (Phase C 3차 증분, 이번 세션의 Next Action 완료)**: "내 프로필" 탭에 "프로필 설정" 카드 추가 — 닉네임 입력(`POST /api/profile/nickname`, `NICKNAME_COOLDOWN_ACTIVE` 시 다음 가능 날짜 안내) 및 국가/지역 셀렉트(`POST /api/profile/country`, "국적 인증"이 아님을 명시, 큐레이션된 ISO 3166-1 alpha-2 34개국 목록 — 백엔드는 전체 코드 허용, UI만 편의상 목록 제한). 즐겨찾기/최근 플레이 섹션은 기존 `usePersonalization()` 컨텍스트를 그대로 재사용(중복 fetch 없음). 세 카드(기록/즐겨찾기/최근 플레이) 공통 shell을 `GameLinkCard`로 리팩터링해 중복 제거.
 
 ---
 
@@ -45,7 +47,7 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 
 이번 세션 범위 밖 — 후속 세션에서 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-- **Phase C (잔여)**: 진행도 카드 노출 + "내 프로필"/"기록" 탭 분리 + 게임 기록 카드 UI 개선은 완료(위 참고). 남은 것: (1) 닉네임/국가 변경 UI (`POST /api/profile/nickname|country` 백엔드는 완료, UI 미연결 — 쿨다운 에러 메시지 처리 필요), (2) "내 프로필" 탭에 즐겨찾기/최근 플레이 카드 추가(`GET /api/personalization`), (3) 공개 프로필(`/profile/:id`) — 현재 `/profile`은 본인 전용이며 타인에게 공개되는 프로필 개념이 아직 없음. 별도 `/me`·`/account` 라우트로의 완전한 분리는 이번 탭 방식으로 사용자 요구를 충족했다고 판단되면 보류 가능 — 필요 시에만 진행.
+- **Phase C (잔여)**: 진행도 카드, "내 프로필"/"기록" 탭 분리, 게임 기록 카드 UI 개선, 닉네임/국가 변경 UI, 즐겨찾기/최근 플레이 카드까지 전부 완료(위 참고). 남은 것은 (1) 공개 프로필(`/profile/:id`) — 현재 `/profile`은 본인 전용이며 타인에게 공개되는 프로필 개념이 아직 없음, (2) 별도 `/me`·`/account` 완전 라우트 분리 — 현재 탭 방식으로 사용자 요구가 충족되는지 먼저 판단 후 필요 시에만 진행.
 - **Phase D~E**: Creator 모델(YouTube/CHZZK/SOOP/Twitch 채널 소유권 인증), Featured Creator 심사 엔진(6시간 자동 재심사 Cron), Creator 랭킹.
 - **Phase F~H**: Discord HTTP Interactions(서명 검증), 계정 연결, 서버 등록/검색/관리, 길드-로컬 XP(이번 세션의 XP 원장 패턴을 재사용하되 `source_type`을 분리한 별도 귀속 테이블 필요).
 - **Phase I**: 계정 통합 회귀 테스트 확장(Creator/Discord 식별자 포함), 최종 문서화, 프로덕션 검증.
@@ -60,24 +62,25 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 
 ## 다음 작업 (Next Action)
 
-**닉네임/국가 변경 UI + 즐겨찾기·최근 플레이 카드** — "내 프로필" 탭에 (1) 닉네임 변경 폼(이미 구현된
-`POST /api/profile/nickname` 연결, `NICKNAME_COOLDOWN_ACTIVE` 에러 시 다음 가능 시각 안내), (2) 국가/지역 선택
-UI("국적 인증"이 아닌 자기 신고임을 명확히 표기, `POST /api/profile/country` 연결, `COUNTRY_COOLDOWN_ACTIVE` 처리),
-(3) `GET /api/personalization` 기반 즐겨찾기/최근 플레이 카드를 추가. 그 다음에만 `/me`·`/account`·`/profile/:id`
-완전 라우트 분리 여부를 재검토(현재 탭 방식으로 사용자 요구가 충족되는지 먼저 확인). 새 세션은 본 문서와
-`docs/PROGRESSION.md`, `docs/ROADMAP.md`만으로 이어서 진행 가능.
+Phase C의 실질적인 항목은 모두 완료되었습니다. 다음 세션은 아래 중 하나를 사용자와 확인 후 선택해 진행하세요:
+
+1. **My Page 수동 검증**: 실제 로그인 세션으로 `/profile`의 두 탭(내 프로필/기록)을 열어 닉네임·국가 변경(쿨다운
+   에러 케이스 포함), 즐겨찾기/최근 플레이 카드, 게임 기록 카드가 실제 데이터로 의도대로 렌더링되는지 확인
+   (이번 세션은 로컬 브라우저에 OAuth 자격 증명이 없어 인증된 화면을 직접 클릭 검증하지 못했고, 타입체크/린트/유닛
+   테스트/프로덕션 빌드로만 검증했습니다).
+2. **Phase D 착수**: Creator 모델(YouTube/CHZZK/SOOP/Twitch 채널 소유권 인증) 스키마/유즈케이스 설계.
+3. **Phase F 착수**: Discord HTTP Interactions 서명 검증 + `/gamemoa link` 기초.
+
+새 세션은 본 문서와 `docs/PROGRESSION.md`, `docs/ROADMAP.md`만으로 이어서 진행 가능.
 
 ---
 
 ## 마지막 검증 상태 (Last Verified State)
 
 - **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
-- **Local Unit Tests**: core 68 / db 22 / api 34 — 전원 PASS
+- **Local Unit Tests**: core 68 / db 14 / api 36 / web 15 — 전원 PASS
 - **D1 마이그레이션 (로컬 + 프로덕션)**: 0005 적용 성공 (기존 0000~0004 위에 additive)
-- **최종 커밋 (Final SHA)**: `7a62e3001173b96e34fca78913f176544d8ebe56` (origin/main과 100% 일치)
-- **GitHub Actions CI**: GREEN (run `31641676948`)
-- **Cloudflare Deploy**: GREEN (run `31641758791`) — D1 프로덕션 마이그레이션 적용, API/Web Worker 배포, Health/Provenance 체크 전원 통과.
-- **운영 Provenance/Smoke (`pnpm smoke:prod`)**: API `/api/health` commit = Web `/version.json` commit = `7a62e3001173b96e34fca78913f176544d8ebe56` (= origin/main). 홈/게임/랭킹/프로필/미니게임/파비콘 자산 HTTP 200.
-- **프로덕션 직접 확인**: `GET /api/auth/discord` Location 헤더의 `redirect_uri`가 `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`로 LOGIN/LINK 공통 확인, 구 `GET /api/auth/link/discord/callback`은 404(제거됨), `GET /api/auth/link/discord`(미인증) 401. `GET /api/progression/leaderboard` 200, `GET /api/progression/me`(미인증) 401.
+- **최종 커밋 (Final SHA)**: push 직후 아래 갱신 예정 — 현재 로컬 HEAD는 `2407c21`대(커밋 메시지 참고), 원격 push/CI/Deploy/provenance 확인은 이 문서의 다음 갱신에서 반영.
+- **수동 UI 검증 한계**: 이번 세션은 로컬 브라우저에서 실제 OAuth 로그인을 수행할 수 없어(자격 증명 없음), 닉네임/국가 변경 폼과 즐겨찾기/최근 플레이 카드는 authenticated 화면을 직접 클릭 검증하지 못했습니다 — 타입체크/린트/유닛 테스트/프로덕션 빌드 성공으로 검증을 대체했습니다. 다음 세션 또는 사용자가 실제 로그인 후 확인 권장.
 - **알려진 이전 CI 이슈(해결됨)**: 이전 push(`774a7df`)는 신규 Korean 문서 3개의 Prettier 테이블 정렬 누락으로 Format Check 실패(run `31639575768`) → `pnpm format` 재실행 후 재푸시로 해결(참고용, 현재 최종 상태에는 영향 없음).
 - **시작 SHA**: `dbcb4591bfdb6aac3b6150b398509f6992f29a5c`
