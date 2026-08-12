@@ -9,6 +9,24 @@ export const scoresRouter = new Hono<ApiEnv>();
 // POST /api/scores
 scoresRouter.post("/", async (c) => {
   try {
+    const sessionId = getCookie(c, "gamemoa_session");
+    if (!sessionId) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const { sessionRepo, scoreUseCases } = createContainer(c.env.DB);
+
+    let authData;
+    try {
+      authData = await sessionRepo.findSession(sessionId);
+    } catch {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    if (!authData) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
     const rawBody = await c.req.json().catch(() => ({}));
     const parseResult = scoreSubmissionSchema.safeParse({
       gameId: rawBody.game_id ?? rawBody.gameId,
@@ -23,27 +41,11 @@ scoresRouter.post("/", async (c) => {
     }
 
     const { gameId, score } = parseResult.data;
-    const customNickname = typeof rawBody.nickname === "string" ? rawBody.nickname : "게스트";
 
-    let userId: number | null = null;
-    let nickname = customNickname;
-    let avatarUrl: string | null = null;
-
-    const { sessionRepo, scoreUseCases } = createContainer(c.env.DB);
-
-    const sessionId = getCookie(c, "gamemoa_session");
-    if (sessionId) {
-      try {
-        const authData = await sessionRepo.findSession(sessionId);
-        if (authData) {
-          userId = authData.user.id;
-          nickname = authData.user.nickname;
-          avatarUrl = authData.user.avatar_url;
-        }
-      } catch {
-        // Session lookup failure falls back to guest
-      }
-    }
+    // Server identity strictly from session user
+    const userId = authData.user.id;
+    const nickname = authData.user.nickname;
+    const avatarUrl = authData.user.avatar_url;
 
     const result = await scoreUseCases.submitScore({
       userId,

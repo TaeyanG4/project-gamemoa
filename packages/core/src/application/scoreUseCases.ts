@@ -12,7 +12,7 @@ export class ScoreUseCases {
   constructor(private scoreRepo: ScoreRepository) {}
 
   async submitScore(data: {
-    userId?: number | null;
+    userId: number;
     nickname: string;
     avatarUrl?: string | null;
     gameId: string;

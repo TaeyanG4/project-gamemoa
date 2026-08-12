@@ -11,7 +11,7 @@ class FakeScoreRepository implements ScoreRepository {
   public scores: Score[] = [];
 
   async saveScore(data: {
-    userId?: number | null;
+    userId: number;
     nickname: string;
     avatarUrl?: string | null;
     gameId: string;
@@ -19,7 +19,7 @@ class FakeScoreRepository implements ScoreRepository {
   }): Promise<Score> {
     const newScore: Score = {
       id: this.scores.length + 1,
-      user_id: data.userId ?? null,
+      user_id: data.userId,
       nickname: data.nickname,
       avatar_url: data.avatarUrl ?? null,
       game_id: data.gameId,
@@ -69,6 +69,7 @@ test("ScoreUseCases - submitScore validates score payload before persistence", a
 
   // Invalid score out of range for reaction-time (min: 50, max: 10000)
   const invalidRes = await useCases.submitScore({
+    userId: 101,
     gameId: "reaction-time",
     score: 1,
     nickname: "Tester",
@@ -78,6 +79,7 @@ test("ScoreUseCases - submitScore validates score payload before persistence", a
 
   // Valid score
   const validRes = await useCases.submitScore({
+    userId: 101,
     gameId: "reaction-time",
     score: 250,
     nickname: "Tester",
@@ -92,8 +94,8 @@ test("ScoreUseCases - getLeaderboard respects manifest ordering direction", asyn
   const useCases = new ScoreUseCases(repo);
 
   // reaction-time direction is 'asc' (lower is better)
-  await useCases.submitScore({ gameId: "reaction-time", score: 300, nickname: "Slow" });
-  await useCases.submitScore({ gameId: "reaction-time", score: 150, nickname: "Fast" });
+  await useCases.submitScore({ userId: 1, gameId: "reaction-time", score: 300, nickname: "Slow" });
+  await useCases.submitScore({ userId: 2, gameId: "reaction-time", score: 150, nickname: "Fast" });
 
   const reactionBoard = await useCases.getLeaderboard("reaction-time");
   assert.equal(reactionBoard[0]?.playerName, "Fast");
@@ -101,8 +103,8 @@ test("ScoreUseCases - getLeaderboard respects manifest ordering direction", asyn
   assert.equal(reactionBoard[1]?.playerName, "Slow");
 
   // memory-test direction is 'desc' (higher is better)
-  await useCases.submitScore({ gameId: "memory-test", score: 5, nickname: "Rookie" });
-  await useCases.submitScore({ gameId: "memory-test", score: 15, nickname: "Master" });
+  await useCases.submitScore({ userId: 3, gameId: "memory-test", score: 5, nickname: "Rookie" });
+  await useCases.submitScore({ userId: 4, gameId: "memory-test", score: 15, nickname: "Master" });
 
   const memoryBoard = await useCases.getLeaderboard("memory-test");
   assert.equal(memoryBoard[0]?.playerName, "Master");

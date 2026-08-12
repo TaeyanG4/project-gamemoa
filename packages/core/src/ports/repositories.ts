@@ -26,7 +26,7 @@ export interface Session {
 
 export interface Score {
   id: number;
-  user_id: number | null;
+  user_id: number;
   nickname: string;
   avatar_url: string | null;
   game_id: string;
@@ -60,7 +60,7 @@ export interface SessionRepository {
 
 export interface ScoreRepository {
   saveScore(data: {
-    userId?: number | null;
+    userId: number;
     nickname: string;
     avatarUrl?: string | null;
     gameId: string;

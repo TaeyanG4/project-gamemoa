@@ -27,6 +27,7 @@ export type GoogleLoginRequest = z.infer<typeof GoogleLoginRequestSchema>;
 export const AuthProvidersResponseSchema = z.object({
   google: z.object({
     configured: z.boolean(),
+    clientId: z.string().optional(),
   }),
   discord: z.object({
     configured: z.boolean(),

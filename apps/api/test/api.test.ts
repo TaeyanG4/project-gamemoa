@@ -56,27 +56,18 @@ test("POST /api/scores rejects foreign origin with 403 Forbidden", async () => {
   assert.match(data.error, /Forbidden/i);
 });
 
-test("POST /api/scores accepts allowed origin", async () => {
+test("POST /api/scores returns 401 Unauthorized without valid session cookie", async () => {
   const res = await app.request("http://localhost/api/scores", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Origin: "http://localhost:5173",
     },
-    body: JSON.stringify({ game_id: "reaction-time", score: "invalid-string" }),
+    body: JSON.stringify({ game_id: "reaction-time", score: 250 }),
   });
-  assert.equal(res.status, 400);
-});
-
-test("POST /api/scores rejects invalid score type with 400", async () => {
-  const res = await app.request("http://localhost/api/scores", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ game_id: "reaction-time", score: "not-a-number" }),
-  });
-  assert.equal(res.status, 400);
+  assert.equal(res.status, 401);
   const data = (await res.json()) as { error: string };
-  assert.equal(data.error, "Invalid payload");
+  assert.equal(data.error, "Unauthorized");
 });
 
 test("POST /api/auth/logout succeeds", async () => {
