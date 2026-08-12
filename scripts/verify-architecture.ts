@@ -41,6 +41,48 @@ function scanDir(dirPath: string, forbiddenImports: string[], ruleName: string) 
   }
 }
 
+function checkPackageJson(pkgPath: string, forbiddenDeps: string[], ruleName: string) {
+  if (!fs.existsSync(pkgPath)) return;
+  const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+  const allDeps = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
+  for (const forbidden of forbiddenDeps) {
+    if (allDeps[forbidden]) {
+      violations.push({
+        file: path.relative(rootDir, pkgPath),
+        rule: ruleName,
+        imported: forbidden,
+      });
+    }
+  }
+}
+
+function checkCorePureness(coreSrcDir: string) {
+  if (!fs.existsSync(coreSrcDir)) return;
+  const forbiddenTokens = ["window.", "localStorage.", "fetch(", "import.meta.env", "gamemoa.workers.dev"];
+  
+  const scan = (dir: string) => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        scan(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+        const content = fs.readFileSync(fullPath, "utf-8");
+        for (const token of forbiddenTokens) {
+          if (content.includes(token)) {
+            violations.push({
+              file: path.relative(rootDir, fullPath),
+              rule: "packages/core must not contain browser APIs, HTTP fetch calls, or environment URLs",
+              imported: token,
+            });
+          }
+        }
+      }
+    }
+  };
+  scan(coreSrcDir);
+}
+
 console.log("🔍 Checking Architecture Layer Boundaries...");
 
 // Rule 1: packages/core MUST NOT import hono, react, @cloudflare/*, @gamemoa/db
@@ -57,11 +99,11 @@ scanDir(
   "packages/contracts must only contain pure TypeScript types and Zod schemas"
 );
 
-// Rule 3: apps/web MUST NOT import @gamemoa/db
+// Rule 3: apps/web MUST NOT import @gamemoa/db or @gamemoa/auth
 scanDir(
   path.join(rootDir, "apps", "web", "app"),
-  ["@gamemoa/db"],
-  "apps/web must not import database adapters directly"
+  ["@gamemoa/db", "@gamemoa/auth"],
+  "apps/web must not import database adapters or legacy auth package directly"
 );
 
 // Rule 4: games/* MUST NOT import @gamemoa/db or hono
@@ -78,10 +120,20 @@ scanDir(
   "apps/api routes must use dependency injection container (Composition Root)"
 );
 
+// Rule 6: apps/web package.json MUST NOT depend on @gamemoa/db or @gamemoa/auth
+checkPackageJson(
+  path.join(rootDir, "apps", "web", "package.json"),
+  ["@gamemoa/db", "@gamemoa/auth"],
+  "apps/web package.json must not list database or legacy auth as dependencies"
+);
+
+// Rule 7: packages/core MUST be pure (no browser APIs, fetch, or hardcoded worker URLs)
+checkCorePureness(path.join(rootDir, "packages", "core", "src"));
+
 if (violations.length > 0) {
   console.error("\n❌ Architecture Layer Boundary Violations Found:");
   for (const v of violations) {
-    console.error(`  - [${v.rule}] ${v.file} imports "${v.imported}"`);
+    console.error(`  - [${v.rule}] ${v.file} imports/contains "${v.imported}"`);
   }
   process.exit(1);
 } else {

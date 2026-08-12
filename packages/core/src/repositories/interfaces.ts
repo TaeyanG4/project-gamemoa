@@ -60,6 +60,6 @@ export interface ScoreRepository {
     gameId: string;
     score: number;
   }): Promise<Score>;
-  getLeaderboard(gameId: string, limit?: number): Promise<Score[]>;
+  getLeaderboard(gameId: string, limit?: number, direction?: "asc" | "desc"): Promise<Score[]>;
   getUserPersonalBests(userId: number): Promise<Record<string, number>>;
 }

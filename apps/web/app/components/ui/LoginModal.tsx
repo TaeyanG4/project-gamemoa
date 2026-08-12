@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X, ShieldCheck, Loader2, AlertCircle } from "lucide-react";
-import { useAuth } from "@gamemoa/auth";
+import { useAuth } from "../../features/auth";
 
 export function LoginModal() {
   const { isLoginModalOpen, closeLoginModal, loginWithGoogle, loginWithDiscord, error, clearError } = useAuth();

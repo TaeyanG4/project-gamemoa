@@ -23,5 +23,6 @@ export const manifest: GameManifest = {
     direction: "asc",
     min: 500,
     max: 60000,
+    displaySuffix: " ms",
   },
 };

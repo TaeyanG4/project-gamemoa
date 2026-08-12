@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router";
 import { Search, Menu, Gamepad2, Bookmark, User, Command, LogOut, Trophy } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "@gamemoa/auth";
+import { useAuth } from "../../features/auth";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;

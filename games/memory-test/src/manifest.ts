@@ -23,6 +23,7 @@ export const memoryTestManifest: GameManifest = {
     direction: "desc",
     min: 1,
     max: 50,
+    displayPrefix: "Level ",
   },
 };
 

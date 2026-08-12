@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "@gamemoa/auth";
+import { useAuth } from "../features/auth";
 import { Link, useNavigate } from "react-router";
 import { User, LogOut, Trophy, Gamepad2, ArrowLeft } from "lucide-react";
-import { getLocalBestScore, fetchUserBestsApi } from "@gamemoa/core";
+import { formatScore } from "@gamemoa/game-sdk";
+import { getLocalBestScore, fetchUserBestsApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
 
 export function meta() {
@@ -106,9 +107,11 @@ export default function ProfilePage() {
             const localBest = getLocalBestScore(game.slug);
             const serverBest = serverBests[game.slug] ?? null;
 
+            const lowerIsBetter = game.scoreConfig?.direction === "asc";
+
             let best: number | null = null;
             if (serverBest !== null && localBest !== null) {
-              best = game.slug === "reaction-time" ? Math.min(serverBest, localBest) : Math.max(serverBest, localBest);
+              best = lowerIsBetter ? Math.min(serverBest, localBest) : Math.max(serverBest, localBest);
             } else {
               best = serverBest ?? localBest;
             }
@@ -131,7 +134,7 @@ export default function ProfilePage() {
                 <div className="text-right">
                   <span className="text-xs text-text-muted block">최고 기록</span>
                   <span className="font-black text-brand-light text-base">
-                    {best !== null ? (game.slug === "reaction-time" ? `${best} ms` : `Level ${best}`) : "기록 없음"}
+                    {best !== null ? formatScore(best, game.scoreConfig) : "기록 없음"}
                   </span>
                 </div>
               </div>

@@ -3,9 +3,9 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "@gamemoa/auth": "workspace:*",
+    "@gamemoa/contracts": "workspace:*",
     "@gamemoa/core": "workspace:*",
-    "@gamemoa/db": "workspace:*",
+    "@gamemoa/game-aim-test": "workspace:*",
     "@gamemoa/game-memory-test": "workspace:*",
     "@gamemoa/game-reaction-time": "workspace:*",
     "@gamemoa/game-sdk": "workspace:*",
@@ -15,8 +15,7 @@
     "lucide-react": "^0.513.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-router": "^7.7.0",
-    "@gamemoa/contracts": "workspace:*"
+    "react-router": "^7.7.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.0.0",
@@ -36,9 +35,6 @@
     "dev": "react-router dev",
     "build": "node -e \"const fs=require('fs'); fs.mkdirSync('build/server', {recursive:true}); if(!fs.existsSync('build/server/index.js')) fs.writeFileSync('build/server/index.js', 'export default {}');\" && react-router build",
     "typecheck": "tsc --noEmit",
-
-
-
     "lint": "eslint app/",
     "test": "tsx --test app/test/**/*.test.ts",
     "preview": "wrangler dev",

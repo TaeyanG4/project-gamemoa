@@ -1,4 +1,4 @@
-import type { Score, ScoreRepository } from "@gamemoa/core";
+import { GAME_MANIFEST_MAP, type Score, type ScoreRepository } from "@gamemoa/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export class D1ScoreRepository implements ScoreRepository {
@@ -43,11 +43,9 @@ export class D1ScoreRepository implements ScoreRepository {
     };
   }
 
-  async getLeaderboard(gameId: string, limit = 20): Promise<Score[]> {
-    // reaction-time & aim-test -> ASC (lower ms/time is better)
-    // memory-test & others -> DESC (higher level/score is better)
-    const isAscending = gameId === "reaction-time" || gameId === "aim-test";
-    const orderClause = isAscending ? "ASC" : "DESC";
+  async getLeaderboard(gameId: string, limit = 20, direction?: "asc" | "desc"): Promise<Score[]> {
+    const dir = direction ?? GAME_MANIFEST_MAP[gameId]?.scoreConfig?.direction ?? "desc";
+    const orderClause = dir === "asc" ? "ASC" : "DESC";
 
     const query =
       gameId === "all"
@@ -88,23 +86,19 @@ export class D1ScoreRepository implements ScoreRepository {
   }
 
   async getUserPersonalBests(userId: number): Promise<Record<string, number>> {
-    const games = ["reaction-time", "memory-test", "aim-test"];
+    const res = await this.db
+      .prepare(
+        `SELECT game_id, MIN(score) as min_score, MAX(score) as max_score FROM scores WHERE user_id = ? GROUP BY game_id`
+      )
+      .bind(userId)
+      .all<{ game_id: string; min_score: number; max_score: number }>();
+
     const bests: Record<string, number> = {};
 
-    for (const gameId of games) {
-      const isAscending = gameId === "reaction-time" || gameId === "aim-test";
-      const orderClause = isAscending ? "ASC" : "DESC";
-
-      const row = await this.db
-        .prepare(
-          `SELECT score FROM scores WHERE user_id = ? AND game_id = ? ORDER BY score ${orderClause} LIMIT 1`
-        )
-        .bind(userId, gameId)
-        .first<{ score: number }>();
-
-      if (row) {
-        bests[gameId] = row.score;
-      }
+    for (const row of res.results) {
+      const gId = String(row.game_id);
+      const dir = GAME_MANIFEST_MAP[gId]?.scoreConfig?.direction ?? "desc";
+      bests[gId] = dir === "asc" ? Number(row.min_score) : Number(row.max_score);
     }
 
     return bests;

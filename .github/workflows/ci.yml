@@ -28,6 +28,9 @@ jobs:
       - name: Architecture Check
         run: pnpm architecture:check
 
+      - name: Registry Freshness Check
+        run: pnpm registry:check
+
       - name: Typecheck
         run: pnpm typecheck
 

@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, type ComponentType } from "react";
 import { useParams, useNavigate } from "react-router";
 import { loadGame, gameManifests } from "../features/catalog/registry";
-import type { GameRuntimeContext, GameResult, GameProps } from "@gamemoa/game-sdk";
-import { saveLocalBestScore, submitScoreApi } from "@gamemoa/core";
+import { formatScore, type GameRuntimeContext, type GameResult, type GameProps } from "@gamemoa/game-sdk";
+import { saveLocalBestScore, submitScoreApi } from "../features/scores/api";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
 export default function GamePlay() {
@@ -62,14 +62,14 @@ export default function GamePlay() {
       console.log("Game completed with result:", gameResult);
       setResult(gameResult);
 
-      const lowerIsBetter = slug === "reaction-time" || slug === "aim-test";
+      const lowerIsBetter = manifest?.scoreConfig?.direction === "asc";
       saveLocalBestScore(slug, gameResult.score, lowerIsBetter);
       void submitScoreApi({ gameId: slug, score: gameResult.score });
     },
     cancel: () => {
       void navigate("/games");
     }
-  }), [navigate, slug]);
+  }), [navigate, slug, manifest]);
 
 
   if (error) {
@@ -128,7 +128,9 @@ export default function GamePlay() {
                 <h3 className="text-3xl font-extrabold mb-2 text-white">게임 종료!</h3>
                 <div className="mb-8 p-6 bg-surface-raised rounded-2xl border border-border">
                   <p className="text-text-secondary text-sm mb-1">점수</p>
-                  <p className="text-5xl font-black text-brand mb-4">{result.score}</p>
+                  <p className="text-5xl font-black text-brand mb-4">
+                    {formatScore(result.score, manifest?.scoreConfig)}
+                  </p>
 
                   {result.metadata && Object.keys(result.metadata).length > 0 && (
                     <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-border">

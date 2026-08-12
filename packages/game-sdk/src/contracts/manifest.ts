@@ -7,6 +7,21 @@ export interface ScoreConfig {
   readonly direction: "asc" | "desc";
   readonly min: number;
   readonly max: number;
+  /** Prefix prepended before the score number in display (e.g. "Level ") */
+  readonly displayPrefix?: string;
+  /** Suffix appended after the score number in display (e.g. " ms") */
+  readonly displaySuffix?: string;
+}
+
+/**
+ * Format a score value according to the ScoreConfig display rules.
+ * Falls back to plain string when no prefix/suffix is defined.
+ */
+export function formatScore(score: number, config: ScoreConfig | undefined): string {
+  if (!config) return String(score);
+  const prefix = config.displayPrefix ?? "";
+  const suffix = config.displaySuffix ?? "";
+  return `${prefix}${score}${suffix}`;
 }
 
 export interface GameManifest {

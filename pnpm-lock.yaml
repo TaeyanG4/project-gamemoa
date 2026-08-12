@@ -54,6 +54,9 @@ importers:
       '@gamemoa/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@gamemoa/game-sdk':
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
       '@gamemoa/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -82,18 +85,15 @@ importers:
 
   apps/web:
     dependencies:
-      '@gamemoa/auth':
-        specifier: workspace:*
-        version: link:../../packages/auth
       '@gamemoa/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
       '@gamemoa/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@gamemoa/db':
+      '@gamemoa/game-aim-test':
         specifier: workspace:*
-        version: link:../../packages/db
+        version: link:../../games/aim-test
       '@gamemoa/game-memory-test':
         specifier: workspace:*
         version: link:../../games/memory-test
@@ -245,19 +245,6 @@ importers:
       vitest:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
-
-  packages/auth:
-    dependencies:
-      react:
-        specifier: ^19.0.0
-        version: 19.2.8
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.18
-      typescript:
-        specifier: ^5.8.0
-        version: 5.9.3
 
   packages/contracts:
     dependencies:

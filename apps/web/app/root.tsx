@@ -8,7 +8,7 @@ import {
 
 import "./app.css";
 import { Layout } from "./components/layout/Layout";
-import { AuthProvider } from "@gamemoa/auth";
+import { AuthProvider } from "./features/auth";
 import { LoginModal } from "./components/ui/LoginModal";
 
 export default function App() {

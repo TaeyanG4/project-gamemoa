@@ -16,6 +16,7 @@
     "@gamemoa/contracts": "workspace:*",
     "@gamemoa/core": "workspace:*",
     "@gamemoa/db": "workspace:*",
+    "@gamemoa/game-sdk": "workspace:*",
     "@gamemoa/shared": "workspace:*",
     "hono": "^4.7.2",
     "zod": "^3.24.2"

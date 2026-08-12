@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createContainer } from "../container.js";
 import { scoreSubmissionSchema } from "@gamemoa/shared";
-import { validateScorePayload } from "../services/scoreValidation.js";
+import { validateScorePayload, GAME_MANIFEST_MAP } from "@gamemoa/core";
+import { formatScore } from "@gamemoa/game-sdk";
 import type { ApiEnv } from "./auth.js";
 
 export const scoresRouter = new Hono<ApiEnv>();
@@ -114,14 +115,8 @@ scoresRouter.get("/:gameId", async (c) => {
     const rawScores = await scoreRepo.getLeaderboard(gameId, 20);
 
     const leaderboard = rawScores.map((item) => {
-      let formattedScore = `${item.score}`;
-      if (item.game_id === "reaction-time") {
-        formattedScore = `${item.score} ms`;
-      } else if (item.game_id === "memory-test") {
-        formattedScore = `Level ${item.score}`;
-      } else if (item.game_id === "aim-test") {
-        formattedScore = `${item.score} ms`;
-      }
+      const manifest = GAME_MANIFEST_MAP[item.game_id];
+      const formattedScore = formatScore(item.score, manifest?.scoreConfig);
 
       return {
         id: item.id,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { Trophy, Medal } from "lucide-react";
-import { MOCK_LEADERBOARD, filterLeaderboard, fetchLeaderboardApi } from "@gamemoa/core";
+import { filterLeaderboard } from "@gamemoa/core";
+import { MOCK_LEADERBOARD, fetchLeaderboardApi } from "../features/scores/api";
 import type { LeaderRecord } from "@gamemoa/shared";
 import { gameManifests } from "../features/catalog/registry";
 

@@ -34,7 +34,8 @@ export const GAME_MANIFESTS: GameManifest[] = [
       "unit": "ms",
       "direction": "asc",
       "min": 500,
-      "max": 60000
+      "max": 60000,
+      "displaySuffix": " ms"
     }
   },
   {
@@ -69,7 +70,8 @@ export const GAME_MANIFESTS: GameManifest[] = [
       "unit": "Level",
       "direction": "desc",
       "min": 1,
-      "max": 50
+      "max": 50,
+      "displayPrefix": "Level "
     }
   },
   {
@@ -103,7 +105,8 @@ export const GAME_MANIFESTS: GameManifest[] = [
       "unit": "ms",
       "direction": "asc",
       "min": 50,
-      "max": 10000
+      "max": 10000,
+      "displaySuffix": " ms"
     }
   }
 ];
@@ -141,7 +144,8 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
       "unit": "ms",
       "direction": "asc",
       "min": 500,
-      "max": 60000
+      "max": 60000,
+      "displaySuffix": " ms"
     }
   },
   "memory-test": {
@@ -176,7 +180,8 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
       "unit": "Level",
       "direction": "desc",
       "min": 1,
-      "max": 50
+      "max": 50,
+      "displayPrefix": "Level "
     }
   },
   "reaction-time": {
@@ -210,7 +215,8 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
       "unit": "ms",
       "direction": "asc",
       "min": 50,
-      "max": 10000
+      "max": 10000,
+      "displaySuffix": " ms"
     }
   }
 };
