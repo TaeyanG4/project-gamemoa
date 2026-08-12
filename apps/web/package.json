@@ -34,7 +34,7 @@
   },
   "scripts": {
     "dev": "react-router dev",
-    "build": "tsx ../../scripts/prepare-web-build.ts && react-router build",
+    "build": "tsx ../../scripts/prepare-web-build.ts && react-router build && tsx ../../scripts/post-web-build.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint app/",
     "test": "tsx --test app/test/**/*.test.ts",
