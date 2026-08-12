@@ -1,9 +1,20 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { getCookie } from "hono/cookie";
+import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createContainer } from "../container.js";
 import type { ApiEnv } from "./auth.js";
 import { CreatorRankingQuerySchema, type CreatorPlatform } from "@gamemoa/contracts";
+import type { CreatorPlatformType } from "@gamemoa/core";
+import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
+
+function isLocalhost(urlStr: string): boolean {
+  try {
+    const url = new URL(urlStr);
+    return url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
 
 async function requireAuth(
   c: Context<ApiEnv>,
@@ -16,7 +27,25 @@ async function requireAuth(
   return { userId: result.user.id, user: { id: result.user.id, nickname: result.user.nickname } };
 }
 
+function getCreatorRedirectUri(c: Context<ApiEnv>, platform: CreatorPlatformType): string {
+  const envKey = `${platform}_REDIRECT_URI` as keyof ApiEnv["Bindings"];
+  const custom = c.env[envKey] as string | undefined;
+  if (custom) return custom;
+  return `${new URL(c.req.url).origin}/api/creators/verify/${platform.toLowerCase()}/callback`;
+}
+
 export const creatorsRouter = new Hono<ApiEnv>();
+
+// GET /api/creators/providers — returns non-secret readiness check for creator verification
+creatorsRouter.get("/providers", (c) => {
+  const adapters = getCreatorProviderAdapters(c.env);
+  return c.json({
+    YOUTUBE: { configured: adapters.YOUTUBE.isConfigured() },
+    TWITCH: { configured: adapters.TWITCH.isConfigured() },
+    CHZZK: { configured: adapters.CHZZK.isConfigured() },
+    SOOP: { configured: adapters.SOOP.isConfigured() },
+  });
+});
 
 // GET /api/creators/rankings
 creatorsRouter.get("/rankings", async (c) => {
@@ -86,4 +115,128 @@ creatorsRouter.get("/me", async (c) => {
         }
       : null,
   });
+});
+
+// GET /api/creators/verify/:platform — initiate OAuth ownership verification
+creatorsRouter.get("/verify/:platform", async (c) => {
+  const auth = await requireAuth(c);
+  const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
+  const rawPlatform = c.req.param("platform").toUpperCase();
+
+  const validPlatforms: CreatorPlatformType[] = ["YOUTUBE", "TWITCH", "CHZZK", "SOOP"];
+  if (!validPlatforms.includes(rawPlatform as CreatorPlatformType)) {
+    return c.redirect(`${frontendUrl}/profile?creator_verify=error&reason=invalid_platform`);
+  }
+
+  const platform = rawPlatform as CreatorPlatformType;
+  if (!auth) {
+    return c.redirect(
+      `${frontendUrl}/profile?creator_verify=unauthorized&platform=${platform.toLowerCase()}`,
+    );
+  }
+
+  const adapters = getCreatorProviderAdapters(c.env);
+  const adapter = adapters[platform];
+  if (!adapter || !adapter.isConfigured()) {
+    return c.redirect(
+      `${frontendUrl}/profile?creator_verify=unconfigured&platform=${platform.toLowerCase()}`,
+    );
+  }
+
+  const state = crypto.randomUUID();
+  const redirectUri = getCreatorRedirectUri(c, platform);
+
+  const payload = JSON.stringify({ state, userId: auth.userId, platform });
+  setCookie(c, "creator_verify_state", payload, {
+    httpOnly: true,
+    secure: !isLocalhost(c.req.url),
+    sameSite: "Lax",
+    maxAge: 600,
+    path: "/",
+  });
+
+  const authorizeUrl = adapter.getAuthorizeUrl(state, redirectUri);
+  return c.redirect(authorizeUrl);
+});
+
+// GET /api/creators/verify/:platform/callback — handle OAuth callback and verify channel ownership
+creatorsRouter.get("/verify/:platform/callback", async (c) => {
+  const rawPlatform = c.req.param("platform").toUpperCase() as CreatorPlatformType;
+  const code = c.req.query("code");
+  const state = c.req.query("state");
+  const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
+
+  const cookieState = getCookie(c, "creator_verify_state");
+  deleteCookie(c, "creator_verify_state", { path: "/" });
+
+  let intent: { state: string; userId: number; platform: CreatorPlatformType } | null = null;
+  if (cookieState) {
+    try {
+      const parsed = JSON.parse(cookieState) as {
+        state?: string;
+        userId?: number;
+        platform?: CreatorPlatformType;
+      };
+      if (
+        typeof parsed.state === "string" &&
+        typeof parsed.userId === "number" &&
+        typeof parsed.platform === "string"
+      ) {
+        intent = { state: parsed.state, userId: parsed.userId, platform: parsed.platform };
+      }
+    } catch {
+      intent = null;
+    }
+  }
+
+  if (!code || !state || !intent || intent.state !== state || intent.platform !== rawPlatform) {
+    return c.redirect(
+      `${frontendUrl}/profile?creator_verify=error&reason=state_mismatch&platform=${rawPlatform.toLowerCase()}`,
+    );
+  }
+
+  const auth = await requireAuth(c);
+  if (!auth || auth.userId !== intent.userId) {
+    return c.redirect(
+      `${frontendUrl}/profile?creator_verify=unauthorized&platform=${rawPlatform.toLowerCase()}`,
+    );
+  }
+
+  const adapters = getCreatorProviderAdapters(c.env);
+  const adapter = adapters[rawPlatform];
+  if (!adapter || !adapter.isConfigured()) {
+    return c.redirect(
+      `${frontendUrl}/profile?creator_verify=unconfigured&platform=${rawPlatform.toLowerCase()}`,
+    );
+  }
+
+  const redirectUri = getCreatorRedirectUri(c, rawPlatform);
+
+  try {
+    const channelInfo = await adapter.verifyOwnershipCode(code, redirectUri);
+    const { creatorUseCases } = createContainer(c.env.DB);
+    const result = await creatorUseCases.verifyChannelOwnership(auth.userId, channelInfo);
+
+    if (!result.ok) {
+      if (result.code === "CHANNEL_ALREADY_VERIFIED") {
+        return c.redirect(
+          `${frontendUrl}/profile?creator_verify=conflict&platform=${rawPlatform.toLowerCase()}`,
+        );
+      }
+      return c.redirect(
+        `${frontendUrl}/profile?creator_verify=error&platform=${rawPlatform.toLowerCase()}`,
+      );
+    }
+
+    return c.redirect(
+      `${frontendUrl}/profile?creator_verify=success&platform=${rawPlatform.toLowerCase()}&channel=${encodeURIComponent(
+        channelInfo.channelName,
+      )}`,
+    );
+  } catch (err) {
+    console.error(`Creator verification error for ${rawPlatform}:`, err);
+    return c.redirect(
+      `${frontendUrl}/profile?creator_verify=error&platform=${rawPlatform.toLowerCase()}`,
+    );
+  }
 });

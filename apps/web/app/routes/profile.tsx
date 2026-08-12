@@ -15,6 +15,8 @@ import {
   Settings,
   Bookmark,
   Clock,
+  Video,
+  CheckCircle2,
 } from "lucide-react";
 import { formatScore } from "@gamemoa/game-sdk";
 import type { GameManifest } from "@gamemoa/game-sdk";
@@ -29,6 +31,10 @@ import {
 } from "../features/auth/authService";
 import { fetchMyProgressApi, fetchMyAchievementsApi } from "../features/progression/api";
 import { updateNicknameApi, updateCountryApi } from "../features/profile/api";
+import {
+  fetchMyCreatorProfileApi,
+  fetchCreatorProvidersApi,
+} from "../features/creators/creatorApi";
 import { COUNTRY_OPTIONS } from "../lib/countries";
 import type {
   ConnectedProvider,
@@ -36,7 +42,9 @@ import type {
   CreateMergeChallengeResponse,
   ProgressResponse,
   AchievementSummaryResponse,
+  CreatorProfileDto,
 } from "@gamemoa/contracts";
+import type { CreatorPlatformType } from "@gamemoa/core";
 import { ACHIEVEMENT_DEFINITIONS, type AchievementCode } from "@gamemoa/core";
 import { ApiClientError } from "../lib/api";
 import { MergeModal } from "../components/ui/MergeModal";
@@ -176,6 +184,34 @@ export default function ProfilePage() {
   const [countryBusy, setCountryBusy] = useState(false);
   const [countryError, setCountryError] = useState<string | null>(null);
 
+  const [creatorProfile, setCreatorProfile] = useState<CreatorProfileDto | null>(null);
+  const [creatorProviders, setCreatorProviders] = useState<
+    Record<CreatorPlatformType, { configured: boolean }>
+  >({
+    YOUTUBE: { configured: false },
+    TWITCH: { configured: false },
+    CHZZK: { configured: false },
+    SOOP: { configured: false },
+  });
+
+  const refreshCreatorProfile = useCallback(async () => {
+    try {
+      const res = await fetchMyCreatorProfileApi();
+      setCreatorProfile(res.profile);
+    } catch {
+      setCreatorProfile(null);
+    }
+  }, []);
+
+  const refreshCreatorProviders = useCallback(async () => {
+    try {
+      const res = await fetchCreatorProvidersApi();
+      setCreatorProviders(res);
+    } catch {
+      // keep defaults
+    }
+  }, []);
+
   // Keep the settings inputs in sync with the latest saved user data (e.g. after a
   // successful update, or on first load) without clobbering an unrelated in-progress edit.
   useEffect(() => {
@@ -222,6 +258,8 @@ export default function ProfilePage() {
         .then(setServerBests)
         .catch(() => setServerBests({}));
       void refreshConnected();
+      void refreshCreatorProfile();
+      void refreshCreatorProviders();
       void fetchMyProgressApi()
         .then(setProgress)
         .catch(() => setProgress(null));
@@ -229,28 +267,52 @@ export default function ProfilePage() {
         .then(setAchievements)
         .catch(() => setAchievements(null));
     }
-  }, [isAuthenticated, user, refreshConnected]);
+  }, [isAuthenticated, user, refreshConnected, refreshCreatorProfile, refreshCreatorProviders]);
 
-  // Handle Discord link redirect status params
+  // Handle Discord link and Creator verify redirect status params
   useEffect(() => {
     const linkStatus = searchParams.get("link_status");
     const challenge = searchParams.get("challenge");
-    if (!linkStatus) return;
+    const creatorVerify = searchParams.get("creator_verify");
 
-    if (linkStatus === "success") {
-      setStatusMessage("로그인 수단이 연결되었습니다.");
-      void refreshConnected();
-    } else if (linkStatus === "already") {
-      setStatusMessage("이미 연결된 계정입니다.");
-    } else if (linkStatus === "conflict" && challenge) {
-      setMergeChallengeId(challenge);
-    } else if (linkStatus === "error") {
-      setStatusMessage("로그인 수단 연결 중 오류가 발생했습니다.");
+    if (linkStatus) {
+      if (linkStatus === "success") {
+        setStatusMessage("로그인 수단이 연결되었습니다.");
+        void refreshConnected();
+      } else if (linkStatus === "already") {
+        setStatusMessage("이미 연결된 계정입니다.");
+      } else if (linkStatus === "conflict" && challenge) {
+        setMergeChallengeId(challenge);
+      } else if (linkStatus === "error") {
+        setStatusMessage("로그인 수단 연결 중 오류가 발생했습니다.");
+      }
+      setActiveTab("profile");
+      setSearchParams({}, { replace: true });
+      return;
     }
-    setActiveTab("profile");
-    // clean the URL
-    setSearchParams({}, { replace: true });
-  }, [searchParams, refreshConnected, setSearchParams]);
+
+    if (creatorVerify) {
+      const channelName = searchParams.get("channel");
+      if (creatorVerify === "success") {
+        setStatusMessage(
+          `크리에이터 채널 소유권 인증이 완료되었습니다.${
+            channelName ? ` (${decodeURIComponent(channelName)})` : ""
+          }`,
+        );
+        void refreshCreatorProfile();
+      } else if (creatorVerify === "conflict") {
+        setStatusMessage("이 채널은 이미 다른 GAMEMOA 크리에이터 계정에 연동되어 있습니다.");
+      } else if (creatorVerify === "unconfigured") {
+        setStatusMessage("현재 해당 플랫폼 인증을 사용할 수 없습니다.");
+      } else if (creatorVerify === "unauthorized") {
+        setStatusMessage("로그인이 만료되었습니다. 다시 로그인 해주세요.");
+      } else if (creatorVerify === "error") {
+        setStatusMessage("크리에이터 채널 인증 중 오류가 발생했습니다.");
+      }
+      setActiveTab("profile");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, refreshConnected, refreshCreatorProfile, setSearchParams]);
 
   const isConnected = (provider: SocialProvider) => connected.some((p) => p.provider === provider);
 
@@ -742,6 +804,85 @@ export default function ProfilePage() {
                         )}
                         <span>연결</span>
                       </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Creator Channel Ownership Verification */}
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <Video className="w-5 h-5 text-brand" />
+                <h2 className="text-xl font-bold text-text-primary">크리에이터 채널 소유권 인증</h2>
+              </div>
+              <p className="text-xs text-text-muted">
+                공식 OAuth / API를 통해 해당 채널을 직접 소유하고 있음을 검증합니다. (셀프 텍스트
+                입력 및 웹 스크래핑 금지)
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {(["YOUTUBE", "CHZZK", "SOOP", "TWITCH"] as CreatorPlatformType[]).map((platform) => {
+                const verifiedAcc = creatorProfile?.platformAccounts?.find(
+                  (a) => a.platform === platform && a.verificationStatus === "VERIFIED",
+                );
+                const isConfigured = creatorProviders[platform]?.configured ?? false;
+
+                return (
+                  <div
+                    key={platform}
+                    className="flex flex-col justify-between p-4 rounded-2xl bg-surface-raised border border-border shadow-md gap-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-text-primary">{platform}</span>
+                        {verifiedAcc ? (
+                          <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-accent-green/10 text-accent-green border border-accent-green/30">
+                            <CheckCircle2 className="w-3 h-3 text-accent-green" />
+                            소유권 인증됨
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-surface text-text-muted border border-border">
+                            미인증
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {verifiedAcc ? (
+                      <div className="flex flex-col gap-1">
+                        <a
+                          href={verifiedAcc.channelUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-bold text-brand-light hover:underline truncate"
+                        >
+                          {verifiedAcc.channelName}{" "}
+                          {verifiedAcc.channelHandle ? `(${verifiedAcc.channelHandle})` : ""}
+                        </a>
+                        <p className="text-[10px] text-text-muted">
+                          ✓ GAMEMOA가 해당 사용자의 채널 소유권을 공식 API로 확인했습니다.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2 mt-1">
+                        {isConfigured ? (
+                          <a
+                            href={`/api/creators/verify/${platform.toLowerCase()}`}
+                            className="flex items-center justify-center gap-1.5 w-full py-2 bg-brand text-white border border-brand rounded-xl font-bold text-xs hover:bg-brand-dark transition-all cursor-pointer shadow-md"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>채널 소유권 인증</span>
+                          </a>
+                        ) : (
+                          <div className="w-full py-2 bg-surface text-text-muted border border-border rounded-xl font-bold text-xs text-center">
+                            현재 인증을 사용할 수 없습니다
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 );

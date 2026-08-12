@@ -463,6 +463,9 @@ export interface CreatorPlatformAccount {
   avatarUrl: string | null;
   verificationStatus: string;
   verifiedAt: string | null;
+  audienceCount?: number;
+  channelCreatedAt?: string | null;
+  metricsSyncedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -496,6 +499,10 @@ export interface CreatorRepository {
   findProfileById(
     creatorId: number,
   ): Promise<(CreatorProfile & { platformAccounts: CreatorPlatformAccount[] }) | null>;
+  findPlatformAccount(
+    platform: CreatorPlatformType,
+    platformUserId: string,
+  ): Promise<CreatorPlatformAccount | null>;
   upsertProfile(input: {
     userId: number;
     status: CreatorStatusType;
@@ -511,6 +518,18 @@ export interface CreatorRepository {
     channelUrl: string;
     avatarUrl?: string | null;
     verificationStatus?: string;
+  }): Promise<CreatorPlatformAccount>;
+  upsertPlatformAccount(input: {
+    creatorId: number;
+    platform: CreatorPlatformType;
+    platformUserId: string;
+    channelName: string;
+    channelHandle?: string | null;
+    channelUrl: string;
+    avatarUrl?: string | null;
+    verificationStatus?: string;
+    audienceCount?: number;
+    channelCreatedAt?: string | null;
   }): Promise<CreatorPlatformAccount>;
   getCreatorRankings(options: {
     mode: "score" | "xp";

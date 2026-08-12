@@ -7,6 +7,7 @@ import type {
   CreatorProfile,
   CreatorPlatformAccount,
 } from "../ports/repositories.js";
+import type { CreatorChannelInfo } from "../ports/creatorProvider.js";
 
 export class CreatorUseCases {
   constructor(private creatorRepo: CreatorRepository) {}
@@ -71,5 +72,64 @@ export class CreatorUseCases {
     userId: number,
   ): Promise<(CreatorProfile & { platformAccounts: CreatorPlatformAccount[] }) | null> {
     return this.creatorRepo.findProfileByUserId(userId);
+  }
+
+  async verifyChannelOwnership(
+    userId: number,
+    channelInfo: CreatorChannelInfo,
+  ): Promise<
+    | {
+        ok: true;
+        profile: CreatorProfile;
+        platformAccount: CreatorPlatformAccount;
+      }
+    | {
+        ok: false;
+        code: string;
+        message: string;
+      }
+  > {
+    // 1. Single-owner invariant: Check if another GAMEMOA user has ALREADY verified this identical platform + platformUserId channel
+    const existingPlatformAcc = await this.creatorRepo.findPlatformAccount(
+      channelInfo.platform,
+      channelInfo.platformUserId,
+    );
+
+    if (existingPlatformAcc && existingPlatformAcc.verificationStatus === "VERIFIED") {
+      const existingProfile = await this.creatorRepo.findProfileById(existingPlatformAcc.creatorId);
+      if (existingProfile && existingProfile.userId !== userId) {
+        return {
+          ok: false,
+          code: "CHANNEL_ALREADY_VERIFIED",
+          message: "이 채널은 이미 다른 GAMEMOA 크리에이터 계정에 연동되어 있습니다.",
+        };
+      }
+    }
+
+    // 2. Ensure Creator profile exists / is updated for this user (status: 'VERIFIED')
+    const profile = await this.creatorRepo.upsertProfile({
+      userId,
+      status: "VERIFIED",
+    });
+
+    // 3. Upsert platform account for this creator with canonical ID
+    const platformAccount = await this.creatorRepo.upsertPlatformAccount({
+      creatorId: profile.id,
+      platform: channelInfo.platform,
+      platformUserId: channelInfo.platformUserId,
+      channelName: channelInfo.channelName,
+      channelHandle: channelInfo.channelHandle,
+      channelUrl: channelInfo.channelUrl,
+      avatarUrl: channelInfo.avatarUrl,
+      verificationStatus: "VERIFIED",
+      audienceCount: channelInfo.audienceCount ?? 0,
+      channelCreatedAt: channelInfo.channelCreatedAt ?? null,
+    });
+
+    return {
+      ok: true,
+      profile,
+      platformAccount,
+    };
   }
 }

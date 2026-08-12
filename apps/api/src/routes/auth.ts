@@ -59,6 +59,19 @@ export type ApiEnv = {
     DISCORD_PUBLIC_KEY?: string;
     FRONTEND_URL?: string;
     COMMIT_SHA?: string;
+    YOUTUBE_CLIENT_ID?: string;
+    YOUTUBE_CLIENT_SECRET?: string;
+    YOUTUBE_REDIRECT_URI?: string;
+    TWITCH_CLIENT_ID?: string;
+    TWITCH_CLIENT_SECRET?: string;
+    TWITCH_REDIRECT_URI?: string;
+    CHZZK_CLIENT_ID?: string;
+    CHZZK_CLIENT_SECRET?: string;
+    CHZZK_REDIRECT_URI?: string;
+    SOOP_CLIENT_ID?: string;
+    SOOP_CLIENT_SECRET?: string;
+    SOOP_REDIRECT_URI?: string;
+    USE_MOCK_CREATOR_PROVIDERS?: string;
   };
 };
 

@@ -4,6 +4,8 @@ export * from "./domain/progression.js";
 export * from "./domain/achievements.js";
 export * from "./domain/profilePolicy.js";
 export * from "./ports/repositories.js";
+export * from "./ports/creatorProvider.js";
+
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";
 export * from "./application/personalizationUseCases.js";

@@ -9,6 +9,26 @@ import type {
 } from "@gamemoa/core";
 import type { D1Database } from "./D1UserRepository.js";
 
+function mapPlatformAccountRow(r: Record<string, unknown>): CreatorPlatformAccount {
+  return {
+    id: Number(r.id),
+    creatorId: Number(r.creator_id),
+    platform: String(r.platform) as CreatorPlatformType,
+    platformUserId: String(r.platform_user_id),
+    channelName: String(r.channel_name),
+    channelHandle: r.channel_handle ? String(r.channel_handle) : null,
+    channelUrl: String(r.channel_url),
+    avatarUrl: r.avatar_url ? String(r.avatar_url) : null,
+    verificationStatus: String(r.verification_status),
+    verifiedAt: r.verified_at ? String(r.verified_at) : null,
+    audienceCount: r.audience_count !== undefined ? Number(r.audience_count) : 0,
+    channelCreatedAt: r.channel_created_at ? String(r.channel_created_at) : null,
+    metricsSyncedAt: r.metrics_synced_at ? String(r.metrics_synced_at) : null,
+    createdAt: String(r.created_at),
+    updatedAt: String(r.updated_at),
+  };
+}
+
 export class D1CreatorRepository implements CreatorRepository {
   constructor(private db: D1Database) {}
 
@@ -38,20 +58,9 @@ export class D1CreatorRepository implements CreatorRepository {
       .bind(profile.id)
       .all<Record<string, unknown>>();
 
-    const platformAccounts: CreatorPlatformAccount[] = (accRes.results || []).map((r) => ({
-      id: Number(r.id),
-      creatorId: Number(r.creator_id),
-      platform: String(r.platform) as CreatorPlatformType,
-      platformUserId: String(r.platform_user_id),
-      channelName: String(r.channel_name),
-      channelHandle: r.channel_handle ? String(r.channel_handle) : null,
-      channelUrl: String(r.channel_url),
-      avatarUrl: r.avatar_url ? String(r.avatar_url) : null,
-      verificationStatus: String(r.verification_status),
-      verifiedAt: r.verified_at ? String(r.verified_at) : null,
-      createdAt: String(r.created_at),
-      updatedAt: String(r.updated_at),
-    }));
+    const platformAccounts: CreatorPlatformAccount[] = (accRes.results || []).map(
+      mapPlatformAccountRow,
+    );
 
     return { ...profile, platformAccounts };
   }
@@ -82,22 +91,26 @@ export class D1CreatorRepository implements CreatorRepository {
       .bind(creatorId)
       .all<Record<string, unknown>>();
 
-    const platformAccounts: CreatorPlatformAccount[] = (accRes.results || []).map((r) => ({
-      id: Number(r.id),
-      creatorId: Number(r.creator_id),
-      platform: String(r.platform) as CreatorPlatformType,
-      platformUserId: String(r.platform_user_id),
-      channelName: String(r.channel_name),
-      channelHandle: r.channel_handle ? String(r.channel_handle) : null,
-      channelUrl: String(r.channel_url),
-      avatarUrl: r.avatar_url ? String(r.avatar_url) : null,
-      verificationStatus: String(r.verification_status),
-      verifiedAt: r.verified_at ? String(r.verified_at) : null,
-      createdAt: String(r.created_at),
-      updatedAt: String(r.updated_at),
-    }));
+    const platformAccounts: CreatorPlatformAccount[] = (accRes.results || []).map(
+      mapPlatformAccountRow,
+    );
 
     return { ...profile, platformAccounts };
+  }
+
+  async findPlatformAccount(
+    platform: CreatorPlatformType,
+    platformUserId: string,
+  ): Promise<CreatorPlatformAccount | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT * FROM creator_platform_accounts WHERE platform = ? AND platform_user_id = ?`,
+      )
+      .bind(platform, platformUserId)
+      .first<Record<string, unknown>>();
+
+    if (!row) return null;
+    return mapPlatformAccountRow(row);
   }
 
   async upsertProfile(input: {
@@ -188,15 +201,61 @@ export class D1CreatorRepository implements CreatorRepository {
     avatarUrl?: string | null;
     verificationStatus?: string;
   }): Promise<CreatorPlatformAccount> {
+    return this.upsertPlatformAccount(input);
+  }
+
+  async upsertPlatformAccount(input: {
+    creatorId: number;
+    platform: CreatorPlatformType;
+    platformUserId: string;
+    channelName: string;
+    channelHandle?: string | null;
+    channelUrl: string;
+    avatarUrl?: string | null;
+    verificationStatus?: string;
+    audienceCount?: number;
+    channelCreatedAt?: string | null;
+  }): Promise<CreatorPlatformAccount> {
     const now = new Date().toISOString();
     const verStatus = input.verificationStatus ?? "VERIFIED";
     const verAt = verStatus === "VERIFIED" ? now : null;
+    const existing = await this.findPlatformAccount(input.platform, input.platformUserId);
+
+    if (existing) {
+      await this.db
+        .prepare(
+          `UPDATE creator_platform_accounts
+           SET creator_id = ?, channel_name = ?, channel_handle = ?, channel_url = ?, avatar_url = ?,
+               verification_status = ?, verified_at = ?, audience_count = ?, channel_created_at = ?,
+               metrics_synced_at = ?, updated_at = ?
+           WHERE platform = ? AND platform_user_id = ?`,
+        )
+        .bind(
+          input.creatorId,
+          input.channelName,
+          input.channelHandle ?? null,
+          input.channelUrl,
+          input.avatarUrl ?? null,
+          verStatus,
+          verAt,
+          input.audienceCount ?? existing.audienceCount ?? 0,
+          input.channelCreatedAt ?? existing.channelCreatedAt ?? null,
+          now,
+          now,
+          input.platform,
+          input.platformUserId,
+        )
+        .run();
+
+      const updated = await this.findPlatformAccount(input.platform, input.platformUserId);
+      if (updated) return updated;
+    }
 
     await this.db
       .prepare(
         `INSERT INTO creator_platform_accounts
-         (creator_id, platform, platform_user_id, channel_name, channel_handle, channel_url, avatar_url, verification_status, verified_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (creator_id, platform, platform_user_id, channel_name, channel_handle, channel_url, avatar_url, verification_status, verified_at, audience_count, channel_created_at, metrics_synced_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         input.creatorId,
@@ -208,6 +267,9 @@ export class D1CreatorRepository implements CreatorRepository {
         input.avatarUrl ?? null,
         verStatus,
         verAt,
+        input.audienceCount ?? 0,
+        input.channelCreatedAt ?? null,
+        now,
         now,
         now,
       )
@@ -217,20 +279,12 @@ export class D1CreatorRepository implements CreatorRepository {
       .prepare(`SELECT * FROM creator_platform_accounts WHERE rowid = last_insert_rowid()`)
       .first<Record<string, unknown>>();
 
-    return {
-      id: Number(row?.id ?? 0),
-      creatorId: input.creatorId,
-      platform: input.platform,
-      platformUserId: input.platformUserId,
-      channelName: input.channelName,
-      channelHandle: input.channelHandle ?? null,
-      channelUrl: input.channelUrl,
-      avatarUrl: input.avatarUrl ?? null,
-      verificationStatus: verStatus,
-      verifiedAt: verAt,
-      createdAt: now,
-      updatedAt: now,
-    };
+    if (row) return mapPlatformAccountRow(row);
+
+    const created = await this.findPlatformAccount(input.platform, input.platformUserId);
+    if (created) return created;
+
+    throw new Error("Failed to insert platform account");
   }
 
   async getCreatorRankings(options: {

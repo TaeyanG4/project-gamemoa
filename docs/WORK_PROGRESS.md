@@ -13,35 +13,35 @@
 
 ## 완료
 
-### Phase D: XP Ranking UI & Creator Model Foundation (이번 세션)
+### Phase E1: Creator Channel Ownership Verification (이번 세션)
 
-- [x] **D1 마이그레이션 `0010_creator_foundation.sql`**:
-  - `creator_profiles` (`user_id UNIQUE`, `status`, `featured_status`, `featured_reason`, `featured_since`, timestamps)
-  - `creator_platform_accounts` (`creator_id`, `platform`, `platform_user_id`, `channel_name`, `channel_handle`, `channel_url`, `avatar_url`, `verification_status`, `verified_at`, `UNIQUE(platform, platform_user_id)`)
-- [x] **계정 원칙 준수**:
-  - Creator는 독자 계정이 아니라 GAMEMOA User의 선택적 1:1 확장에 불과함 (`user_id UNIQUE`).
-- [x] **계층적 아키텍처 수호**:
-  - `@gamemoa/db`는 `GAME_MANIFEST_MAP`에 디커플링되어 순수 원시 데이터 반환.
-  - `@gamemoa/core`의 `CreatorUseCases`에서 게임 카탈로그 명세 기반 포맷팅 및 XP 레벨 공식 통합.
-- [x] **랭킹 & 통합 정보 구조 (IA) 완성 (`/ranking`)**:
-  - 최상위 모드 탭: `[🎮 게임 랭킹]`, `[⚡ 경험치 랭킹]`, `[🎥 스트리머 랭킹]`
-  - 스트리머 랭킹 서브 필터: `[전체]`, `[YouTube]`, `[CHZZK]`, `[SOOP]`, `[Twitch]` 플랫폼 필터 & `[게임 점수]` / `[경험치]` 지표 토글
-  - 검증된 크리에이터가 없는 초기 상태를 위한 정돈된 Empty State UI 제공.
-- [x] **단위/통합 테스트**: `creatorUseCases.test.ts` & `creators.test.ts` (100% 그린)
+- [x] **D1 마이그레이션 `0011_creator_metrics.sql`**:
+  - `creator_platform_accounts` 테이블에 `audience_count`, `channel_created_at`, `metrics_synced_at` 가산 컬럼 추가.
+- [x] **검증 원칙 준수**:
+  - 셀프 텍스트 입력, 디스플레이 네임 일치, 이메일 일치, 핸들 텍스트 입력 검증 절대 금지.
+  - 공식 OAuth 2.0 / 공식 API 전용 (웹 스크래핑 금지).
+  - 단일 소유권 인바리언트 (`UNIQUE(platform, platform_user_id)`).
+  - 인증에 사용된 임시 Access Token은 정품 채널 프로필/Canonical ID 조회 후 즉시 폐기하며 DB에 저장하지 않음.
+- [x] **도메인 & 어댑터 아키텍처**:
+  - Domain Port: `CreatorChannelInfo` & `CreatorProviderAdapter` (`packages/core/src/ports/creatorProvider.ts`)
+  - API Infrastructure: `YouTubeCreatorProvider`, `TwitchCreatorProvider`, `ChzzkCreatorProvider`, `SoopCreatorProvider`, `MockCreatorProvider` (`apps/api/src/infrastructure/creators/`)
+- [x] **API 엔드포인트 구현 (`apps/api/src/routes/creators.ts`)**:
+  - `GET /api/creators/providers`: 자격 증명 설정 상태 확인 (비비밀)
+  - `GET /api/creators/verify/:platform`: CSRF State 쿠키 생성 및 OAuth 인증 요청 리다이렉트
+  - `GET /api/creators/verify/:platform/callback`: OAuth Callback 수신, 토큰 교환, 소유권 확인, 세션 유저 검증, 단일 소유권 확인 및 프로필 업데이트
+- [x] **웹 프론트엔드 내 프로필 확장 (`apps/web/app/routes/profile.tsx`)**:
+  - "크리에이터 채널 소유권 인증" 카운터 카드 추가 (YouTube, CHZZK, SOOP, Twitch)
+  - 소유권 인증 완료 배지 및 채널 링크 표시 (`✓ GAMEMOA가 해당 사용자의 채널 소유권을 공식 API로 확인했습니다.`)
+  - 미설정 시 안전한 비활성화 배지 ("현재 인증을 사용할 수 없습니다") 표시
+- [x] **상세 한국어 문서화 (`docs/CREATOR_SYSTEM.md`)**:
+  - 아키텍처, 검증 원칙, 보안 모델, Canonical ID 매핑 및 개발자 포털 설정 안내 명시.
+- [x] **단위/통합 테스트**: `creatorOwnership.test.ts` (108/108) & `creators.test.ts` (68/68) 그린.
 
-### Phase H2: Discord Server Leaderboards & Commands (이전 세션)
+### Phase D: XP Ranking UI & Creator Model Foundation (이전 세션)
 
-- [x] **D1 마이그레이션 `0009_discord_guild_xp_weekly_idx.sql`**
-- [x] **KST 주간 경계 도메인 헬퍼 (`getStartOfWeekKst`)**
-- [x] **리포지토리 쿼리 & 유즈케이스 구현 (`getGuildXpLeaderboard`, `getGuildSummary`, `getGlobalGuildActivityRanking`, `getGuildGameLeaderboard`, `getGuildUserXpRank`)**
-- [x] **Discord 슬래시 커맨드 연결 (`/gamemoa rank`, `/gamemoa leaderboard`, `/gamemoa server`)**
-- [x] **웹 커뮤니티 UI 확장 (`/discord/servers/:slug`, `/discord` 위젯)**
-
-### Phase H1: Discord 길드 XP 귀속 파운데이션 & `/gamemoa play` (이전 세션)
-
-- [x] **D1 마이그레이션 `0008_discord_guild_xp.sql`**
-- [x] **3개 XP 개념의 엄격한 분리**
-- [x] **`/gamemoa play [game]` 슬래시 커맨드**
+- [x] **D1 마이그레이션 `0010_creator_foundation.sql`**
+- [x] **계정 원칙 준수 & 계층적 아키텍처 수호**
+- [x] **랭킹 & 통합 정보 구조 (IA) 완성 (`/ranking`)**
 
 ---
 
@@ -49,8 +49,10 @@
 
 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-- **Phase E**: Creator 채널 소유권 인증 + Featured 심사 엔진 (6시간 자동 재심사)
-- **Phase I**: 계정 통합 회귀 테스트 확장, 최종 문서화 및 프로덕션 배포 검증.
+1. **Phase E2 — Featured Creator Qualification, 6-hour Recheck & Manual Review**
+   - Featured 수동/자동 심사 기준 수립 (최소 시청자/구독자 기준 또는 운영진 수동 심사).
+   - 6시간 간격 자동 재심사 & 자격 미달 시 상태 자동 갱신 워크플로우.
+2. **Phase I — 계정 통합 회귀 테스트 & 프로덕션 검증**
 
 ---
 
