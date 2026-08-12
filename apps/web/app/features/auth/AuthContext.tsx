@@ -56,8 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus>({
-    google: false,
-    discord: false,
+    google: { configured: false },
+    discord: { configured: false },
   });
   const [error, setError] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
@@ -92,12 +92,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
 
     const clientId =
-      typeof window !== "undefined"
+      providerStatus.google.clientId ||
+      (typeof window !== "undefined"
         ? ((import.meta as unknown as { env?: { VITE_GOOGLE_CLIENT_ID?: string } }).env
             ?.VITE_GOOGLE_CLIENT_ID ?? "")
-        : "";
+        : "");
 
-    if (!clientId || !providerStatus.google) {
+    if (!clientId || !providerStatus.google.configured) {
       setError("Google 로그인이 아직 설정되지 않았습니다.");
       return;
     }
@@ -151,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithDiscord = useCallback(() => {
     setError(null);
-    if (!providerStatus.discord) {
+    if (!providerStatus.discord.configured) {
       setError("Discord 로그인이 아직 설정되지 않았습니다.");
       return;
     }

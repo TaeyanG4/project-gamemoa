@@ -11,19 +11,29 @@ export type { AuthUser, AuthMeResponse, SocialProvider };
 export type AuthProviderName = SocialProvider;
 
 export interface ProviderStatus {
-  google: boolean;
-  discord: boolean;
+  google: {
+    configured: boolean;
+    clientId?: string;
+  };
+  discord: {
+    configured: boolean;
+  };
 }
 
 export async function fetchProviderStatus(): Promise<ProviderStatus> {
   try {
     const data = await apiFetch("/api/auth/providers", AuthProvidersResponseSchema);
     return {
-      google: data.google.configured,
-      discord: data.discord.configured,
+      google: {
+        configured: data.google.configured,
+        ...(data.google.clientId !== undefined ? { clientId: data.google.clientId } : {}),
+      },
+      discord: {
+        configured: data.discord.configured,
+      },
     };
   } catch {
-    return { google: false, discord: false };
+    return { google: { configured: false }, discord: { configured: false } };
   }
 }
 

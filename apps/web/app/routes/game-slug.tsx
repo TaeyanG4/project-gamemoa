@@ -12,7 +12,7 @@ import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
 import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck } from "lucide-react";
 
-type SubmissionState = "idle" | "submitting" | "success" | "error";
+type SubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
 
 function formatMetadataKey(key: string): string {
   const map: Record<string, string> = {
@@ -48,9 +48,10 @@ export default function GamePlay() {
   const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<GameResult | null>(null);
 
-  // Attempt Lifecycle State
+  // Attempt Lifecycle State & Auth Eligibility
   const [attemptKey, setAttemptKey] = useState<number>(0);
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
+  const [rankingEligible, setRankingEligible] = useState<boolean>(() => isAuthenticated);
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
@@ -92,7 +93,7 @@ export default function GamePlay() {
     };
   }, [slug]);
 
-  // Handle Score Submission
+  // Handle Score Submission (Authenticated Attempts Only)
   const handleScoreSubmission = useCallback(
     async (scoreToSubmit: number) => {
       setSubmissionState("submitting");
@@ -103,9 +104,6 @@ export default function GamePlay() {
           gameId: slug,
           score: scoreToSubmit,
         };
-        if (user?.nickname) {
-          payload.nickname = user.nickname;
-        }
 
         const res = await submitScoreApi(payload);
 
@@ -120,7 +118,7 @@ export default function GamePlay() {
         setSubmissionError("네트워크 오류로 점수를 저장하지 못했습니다.");
       }
     },
-    [slug, user],
+    [slug],
   );
 
   // Reset / Retry Game Attempt
@@ -128,9 +126,10 @@ export default function GamePlay() {
     setResult(null);
     setSubmissionState("idle");
     setSubmissionError(null);
+    setRankingEligible(isAuthenticated);
     setSessionId(crypto.randomUUID());
     setAttemptKey((prev) => prev + 1);
-  }, []);
+  }, [isAuthenticated]);
 
   const { recordRecentPlay } = usePersonalization();
 
@@ -150,13 +149,26 @@ export default function GamePlay() {
         const lowerIsBetter = manifest?.scoreConfig?.direction === "asc";
         saveLocalBestScore(slug, gameResult.score, lowerIsBetter);
 
-        await handleScoreSubmission(gameResult.score);
+        if (rankingEligible) {
+          await handleScoreSubmission(gameResult.score);
+        } else {
+          setSubmissionState("guest");
+        }
       },
       cancel: () => {
         void navigate("/games");
       },
     }),
-    [sessionId, user, navigate, slug, manifest, handleScoreSubmission, recordRecentPlay],
+    [
+      sessionId,
+      user,
+      navigate,
+      slug,
+      manifest,
+      rankingEligible,
+      handleScoreSubmission,
+      recordRecentPlay,
+    ],
   );
 
   if (error) {
@@ -234,7 +246,9 @@ export default function GamePlay() {
               <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center">
                 <h3 className="text-3xl font-extrabold mb-2 text-white">게임 종료!</h3>
                 <div className="mb-6 p-6 bg-surface-raised rounded-2xl border border-border w-full max-w-md">
-                  <p className="text-text-secondary text-sm mb-1">최종 점수</p>
+                  <p className="text-text-secondary text-sm mb-1">
+                    {rankingEligible ? "최종 점수" : "기기 최고 기록"}
+                  </p>
                   <p className="text-5xl font-black text-brand mb-4">
                     {formatScore(result.score, manifest?.scoreConfig)}
                   </p>
@@ -260,6 +274,23 @@ export default function GamePlay() {
 
                   {/* Score Submission Status Indicator */}
                   <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-center">
+                    {submissionState === "guest" && (
+                      <div className="flex flex-col items-center gap-1.5">
+                        <span className="text-xs font-bold text-text-secondary">
+                          게스트 기록은 이 기기에만 저장됩니다.
+                        </span>
+                        <span className="text-[11px] text-text-muted">
+                          로그인하면 다음 플레이부터 랭킹에 참여할 수 있습니다.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={openLoginModal}
+                          className="mt-1 px-4 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-extrabold rounded-xl transition-colors cursor-pointer"
+                        >
+                          로그인
+                        </button>
+                      </div>
+                    )}
                     {submissionState === "submitting" && (
                       <span className="inline-flex items-center gap-2 text-xs font-bold text-brand animate-pulse">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />

@@ -75,7 +75,7 @@ export function LoginModal() {
           <div className="flex flex-col gap-1 w-full">
             <button
               onClick={handleGoogleLogin}
-              disabled={isGoogleLoading || isDiscordLoading || !providerStatus.google}
+              disabled={isGoogleLoading || isDiscordLoading || !providerStatus.google.configured}
               className="flex items-center justify-center gap-3 w-full py-4 px-4 bg-white hover:bg-slate-100 text-slate-900 font-extrabold rounded-2xl transition-all shadow-lg hover:scale-[1.02] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isGoogleLoading ? (
@@ -102,7 +102,7 @@ export function LoginModal() {
               )}
               <span>{isGoogleLoading ? "Google 로그인 중..." : "Google 계정으로 로그인"}</span>
             </button>
-            {!providerStatus.google && (
+            {!providerStatus.google.configured && (
               <span className="text-[11px] text-text-muted text-center font-medium">
                 Google 로그인이 아직 설정되지 않았습니다.
               </span>
@@ -113,7 +113,7 @@ export function LoginModal() {
           <div className="flex flex-col gap-1 w-full">
             <button
               onClick={handleDiscordLogin}
-              disabled={isGoogleLoading || isDiscordLoading || !providerStatus.discord}
+              disabled={isGoogleLoading || isDiscordLoading || !providerStatus.discord.configured}
               className="flex items-center justify-center gap-3 w-full py-4 px-4 bg-[#5865F2] hover:bg-[#4752C4] text-white font-extrabold rounded-2xl transition-all shadow-lg hover:scale-[1.02] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isDiscordLoading ? (
@@ -125,7 +125,7 @@ export function LoginModal() {
               )}
               <span>{isDiscordLoading ? "Discord 로그인 중..." : "Discord 계정으로 로그인"}</span>
             </button>
-            {!providerStatus.discord && (
+            {!providerStatus.discord.configured && (
               <span className="text-[11px] text-text-muted text-center font-medium">
                 Discord 로그인이 아직 설정되지 않았습니다.
               </span>
