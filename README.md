@@ -90,6 +90,9 @@ pnpm verify
 # 프로덕션 상태 및 SHA 검증 (시간 제한 & 무한 대기 방지 검사)
 pnpm smoke:prod
 
+# 프로덕션 소셜 로그인 설정 및 진단 상태 검사
+pnpm auth:prod:check
+
 # 코드 포맷 및 린트 검사
 pnpm format:check
 pnpm lint

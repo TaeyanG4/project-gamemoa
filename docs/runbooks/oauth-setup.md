@@ -32,13 +32,12 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
    - 프로덕션 frontend 도메인 등록
 7. 생성된 **Web Client ID** 복사 (예: `123456789-xxx.apps.googleusercontent.com`)
 
-### B. 환경 변수 설정
+### B. 환경 변수 및 단일 출처 설정
 
-- **Web Frontend (GitHub Actions Variables / Build Env)**:
-  - `VITE_GOOGLE_CLIENT_ID`: 생성된 Google Web Client ID
-  - `VITE_API_URL`: `https://gamemoa-api.gamemoa.workers.dev`
-- **API Worker (Wrangler / GitHub Actions)**:
+- **API Worker (Wrangler / GitHub Actions Variables)**:
   - `GOOGLE_CLIENT_ID`: 생성된 Google Web Client ID
+- **Web Frontend**:
+  - `GET /api/auth/providers` 엔드포인트를 통해 API 런타임으로부터 공개 Google Client ID (`providerStatus.google.clientId`)를 수신하여 Single Source of Truth로 사용합니다.
 
 ---
 

@@ -4,31 +4,30 @@
 
 ## 1. 📊 기능 및 인프라 구현 단계 현황
 
-| 단계         | 기능 및 작업 내용                                                                                                         | 상태              | 검증 방법                                                    |
-| :----------- | :------------------------------------------------------------------------------------------------------------------------ | :---------------- | :----------------------------------------------------------- |
-| **Phase 0**  | 모노레포 구축 (pnpm Workspaces, Turborepo, TypeScript, ESLint, Prettier)                                                  | ✅ 완료           | 품질 게이트 통과                                             |
-| **Phase 1**  | 웹 플랫폼 쉘 및 UI/UX 구축 (접이식 사이드바, 비주얼 스포트라이트, 카테고리 칩 필터)                                       | ✅ 완료           | React 19 + React Router v7 SPA 빌드 통과                     |
-| **Phase 2**  | 게이밍 미니게임 컬렉션 (반응속도 테스트, 순서 기억력 테스트, 에임 테스트, 타자 속도 테스트)                               | ✅ 완료           | 단위 테스트 및 반응형 UI 검증 완료                           |
-| **Phase 3**  | 서버리스 API 백엔드 구축 (Hono + Cloudflare Workers, Cloudflare D1 마이그레이션)                                          | ✅ 완료           | API Health Check 및 integration test 통과                    |
-| **Phase 4**  | OAuth 및 세션 인증 (Google/Discord OAuth 코드/서버 인프라: 완료, 실제 프로덕션 로그인: 외부 Provider 설정 대기)           | ⚠️ 외부 설정 대기 | 인프라 레이어 분리 및 GET /api/auth/providers 안전 진단 검증 |
-| **Phase 5**  | 리더보드, 개인 최고기록 및 프로필 연동 (D1 Persistence + ScoreUseCases)                                                   | ✅ 완료           | D1 데이터베이스 쿼리 집계 및 매니페스트 포맷팅               |
-| **Phase 6**  | 플러그인 아키텍처 및 이중 레지스트리 생성기 결정론적 자동화 (`scripts/registry-builder.ts`)                               | ✅ 완료           | `pnpm registry:check` (Prettier 포맷팅 후 0 diff 검증)       |
-| **Phase 7**  | Architecture Guard 및 안전 보안 가드 (Layer Boundary Guard, Origin/CSRF guard)                                            | ✅ 완료           | `pnpm architecture:check` 8개 규칙 전원 통과                 |
-| **Phase 8**  | CI/CD 파이프라인, 프로덕션 배포 파이프라인 및 배포 커밋 출처 검증 (Deployment Provenance)                                 | ✅ 완료           | GitHub Actions CI & Cloudflare Deploy 원격 통과              |
-| **Phase 9**  | 제품 무결성 & 게임 세션 UX (가짜 랭킹 제거, Web API client, 시도 라이프사이클, 60초 타자)                                 | ✅ 완료           | 랭킹/API/시도 라이프사이클/타자 단위 테스트 전원 통과        |
-| **Phase 10** | 크리티컬 버그 수정 & 게임 플레이 UX (타임아웃 검사기, 소셜진단/Fallback UI, 썸네일 복원, Memory/Typing 버그, 뷰포트 확대) | ✅ 완료           | `pnpm smoke:prod`, `pnpm verify` 및 단위 테스트 전원 통과    |
+| 단계         | 기능 및 작업 내용                                                                                                         | 상태              | 검증 방법                                                                                      |
+| :----------- | :------------------------------------------------------------------------------------------------------------------------ | :---------------- | :--------------------------------------------------------------------------------------------- |
+| **Phase 0**  | 모노레포 구축 (pnpm Workspaces, Turborepo, TypeScript, ESLint, Prettier)                                                  | ✅ 완료           | 품질 게이트 통과                                                                               |
+| **Phase 1**  | 웹 플랫폼 쉘 및 UI/UX 구축 (접이식 사이드바, 비주얼 스포트라이트, 카테고리 칩 필터)                                       | ✅ 완료           | React 19 + React Router v7 SPA 빌드 통과                                                       |
+| **Phase 2**  | 게이밍 미니게임 컬렉션 (반응속도 테스트, 순서 기억력 테스트, 에임 테스트, 타자 속도 테스트)                               | ✅ 완료           | 단위 테스트 및 반응형 UI 검증 완료                                                             |
+| **Phase 3**  | 서버리스 API 백엔드 구축 (Hono + Cloudflare Workers, Cloudflare D1 마이그레이션)                                          | ✅ 완료           | API Health Check 및 integration test 통과                                                      |
+| **Phase 4**  | OAuth 및 세션 인증 (코드/인프라: ✅ 구현 완료, Google/Discord 실제 프로덕션: ⚠️ 외부 Provider 설정 대기)                  | ⚠️ 외부 설정 대기 | `GET /api/auth/providers` 단일 출처 검증, `pnpm auth:prod:check` 및 GIS/Discord OAuth 2.0 흐름 |
+| **Phase 5**  | 인증 강제 리더보드 & 게스트 랭킹 차단 무결성 (D1 0002 마이그레이션 + ScoreUseCases + UX)                                  | ✅ 완료           | `POST /api/scores` 401 테스트, `user_id IS NOT NULL` D1 가드 및 시도 시점 자격 캡처            |
+| **Phase 6**  | 플러그인 아키텍처 및 이중 레지스트리 생성기 결정론적 자동화 (`scripts/registry-builder.ts`)                               | ✅ 완료           | `pnpm registry:check` (Prettier 포맷팅 후 0 diff 검증)                                         |
+| **Phase 7**  | Architecture Guard 및 안전 보안 가드 (Layer Boundary Guard, Origin/CSRF guard)                                            | ✅ 완료           | `pnpm architecture:check` 8개 규칙 전원 통과                                                   |
+| **Phase 8**  | CI/CD 파이프라인, 프로덕션 배포 파이프라인 및 배포 커밋 출처 검증 (Deployment Provenance)                                 | ✅ 완료           | GitHub Actions CI & Cloudflare Deploy 원격 통과                                                |
+| **Phase 9**  | 제품 무결성 & 게임 세션 UX (가짜 랭킹 제거, Web API client, 시도 라이프사이클, 60초 타자)                                 | ✅ 완료           | 랭킹/API/시도 라이프사이클/타자 단위 테스트 전원 통과                                          |
+| **Phase 10** | 크리티컬 버그 수정 & 게임 플레이 UX (타임아웃 검사기, 소셜진단/Fallback UI, 썸네일 복원, Memory/Typing 버그, 뷰포트 확대) | ✅ 완료           | `pnpm smoke:prod`, `pnpm verify` 및 단위 테스트 전원 통과                                      |
 
 ---
 
 ## 2. ⚙️ 현재 작업 (Current Phase)
 
-- **크리티컬 버그 수정 및 게임 플레이 UX 안정화 완수 (Critical Bug Fix & Gameplay UX Stabilization)**:
-  - **프로덕션 검증 시간 제한 (P0)**: HTTP 타임아웃 및 하드 타임아웃(90초)을 갖춘 재사용 가능한 `pnpm smoke:prod` 스크립트 작성 및 `deploy.yml` 연동.
-  - **소셜 로그인 안전 진단 (P1)**: `/api/auth/providers` 진단 엔드포인트 구축, 웹 UI에 미설정 안내 메시지("Google/Discord 로그인이 아직 설정되지 않았습니다.")와 함께 비활성화 처리하여 500 에러 및 크래시 방지. 한국어 런북 (`docs/runbooks/oauth-setup.md`) 제공.
-  - **게임 썸네일 자산 복원 & CI 검증 (P2)**: `aim-test` 및 `typing-test` SVG 썸네일 생성, `registry:check` 자산 검증 추가, `GameCard` onError Fallback UI 구현.
-  - **Memory Test 버그 수정 & Runtime 연동 (P3)**: 패드 불필요 텍스트 라벨 제거, 비패드 영역 오인 클릭 실패 방지, `GameProps`/`runtime` 연동, 시퀀스 레벨 점수 계산 (`level - 1`) 및 1회만 complete 호출.
-  - **Typing Test 공백 & 오타 시각화 (P4)**: `white-space: pre-wrap` 및 `\u00A0` 렌더링으로 단어 간격 유지, 오타 입력 시 실제 입력한 글자를 빨간색으로 시각화 및 백스페이스 수정 지원.
-  - **게임 화면 크기 확대 (P5)**: 데스크톱 1920x1080/1366x768 환경에서 화면의 75~90%를 활용하도록 max-width (`max-w-6xl`) 및 개별 게임 뷰포트 영역 확대.
+- **인증 및 랭킹 무결성 완수 (Authentication & Ranking Integrity Sprint)**:
+  - **게스트 랭킹 서버 persistence 차단 (P0)**: `POST /api/scores`에 유효한 `gamemoa_session` 쿠키 검증을 필수화하여 비인증 제출 시 401 Unauthorized 반환. 클라이언트 닉네임 변조를 무효화하고 세션 사용자의 `user_id`, `nickname`, `avatar_url`만 단일 진실의 출처로 바인딩.
+  - **도메인/포트/저장소 타입 및 쿼리 강화 (P0)**: `@gamemoa/core` canonical `Score` 엔티티 및 `ScoreRepository` 인터페이스의 `userId`를 `number`로 필수화. `D1ScoreRepository.getLeaderboard` SQL 쿼리에 `WHERE user_id IS NOT NULL` 조건 추가.
+  - **D1 0002 마이그레이션 & DB 가드 (P0)**: 신규 순방향 마이그레이션 `0002_score_auth_integrity.sql`을 작성하여 레거시 `user_id IS NULL` 행을 안전하게 정리하고, SQLite `BEFORE INSERT` trigger 가드로 `user_id IS NULL` 생성을 차단.
+  - **프론트엔드 시도 라이프사이클 자격 캡처 & 게스트 UI (P1)**: 게임 시도 시작 시점의 인증 상태로 랭킹 참여 자격(`rankingEligible`)을 캡처하여 인증 상태 레이스 조건 방지. 게스트 완료 시 서버 API 호출 없이 로컬 기록만 업데이트하며, "게스트 기록은 이 기기에만 저장됩니다." 한국어 안내 및 로그인 버튼 렌더링.
+  - **소셜 로그인 단일 출처 & 배포 파이프라인 (P2)**: `GET /api/auth/providers`에서 공개 `google.clientId`를 반환하도록 일원화하여 컴파일 타임 `VITE_GOOGLE_CLIENT_ID` 의존성 제거. `.github/workflows/deploy.yml` 배포 명령에 프로덕션 변수를 전달하도록 개선하고 `pnpm auth:prod:check` 검증기 구축.
 
 ---
 
