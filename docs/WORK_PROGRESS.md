@@ -2,48 +2,49 @@
 
 ## 시작 상태 (Starting State)
 
-- Commit SHA: `00b50616fd21ded994a9017a733a79be32db7477`
-- Local Status: `pnpm-lock.yaml` 불일치 수정 완료 (`pnpm install --frozen-lockfile` 성공)
-- GitHub CI Status: RED (이전 00b5061 커밋 시 pnpm-lock.yaml 미갱신으로 인한 CI 실패)
-- Cloudflare Deploy Status: SKIPPED (CI 실패로 인해 배포 자동 건너뜀)
+- Commit SHA: `a6385e5` (`fix(ci): update pnpm-lock.yaml to fix frozen lockfile install, refine auth oauth infrastructure, and synchronize all docs in Korean`)
+- Local Status: `pnpm install --frozen-lockfile` 검증 완료 (`pnpm-lock.yaml` 동기화 완료)
+- Local Quality Gate: `format:check`, `lint`, `architecture:check`, `registry:check`, `typecheck`, `test`, `build` 전원 통과 (All Green)
+- Remote Status: GitHub `origin main`에 `a6385e5` 성공적으로 푸시됨
 - Production Status: API `https://gamemoa-api.gamemoa.workers.dev/api/health` (`200 OK`), Web `https://gamemoa-web.gamemoa.workers.dev/` (`200 OK`)
 
 ## 완료된 작업 (Completed)
 
-- [x] P0: `pnpm-lock.yaml` 갱신 및 `pnpm install --frozen-lockfile` 검증 완료
-- [x] 게임 플러그인 아키텍처 (매니페스트 및 웹 로더 자동 레지스트리 생성)
-- [x] Core 및 D1 Persistence 레이어 분리 (D1ScoreRepository에서 GAME_MANIFEST_MAP 제거)
-- [x] @gamemoa/contracts API Contract 단일 소스 통합
-- [x] Application Layer (`ScoreUseCases`) 도입 및 API Composition Root 적용
-- [x] Aim Test 반응형 아레나 및 순수 로직 단위 테스트 분리
-- [x] API Origin / CSRF 보안 가드 적용
+- [x] **P0: `pnpm-lock.yaml` 불일치 수정 및 원격 CI/CD 복구**
+  - `apps/web/package.json`의 Wrangler `^4.121.0` 버전에 맞추어 `pnpm-lock.yaml`을 재생성하고 `pnpm install --frozen-lockfile` 성공 확인.
+- [x] **게임 플러그인 아키텍처 레그레션 테스트 강화 (P1)**
+  - `scripts/check-registry.ts`에 `filesystem games == manifest registry == web loader registry` 불변성 검증 로직 추가.
+  - `scripts/generate-game-registry.ts` 결과물을 결정론적(deterministic)으로 정렬 및 헤더 주석 명시.
+- [x] **OAuth 인프라 레이어 분리 및 Thin Controller (P4)**
+  - OAuth 인증 외부 HTTP 통신 로직을 `apps/api/src/infrastructure/oauth/google.ts` 및 `discord.ts`로 분리.
+  - `apps/api/src/routes/auth.ts` 라우트를 HTTP/쿠키 전용 Thin Controller로 단순화.
+- [x] **API Response Contract Validation & Security Test (P3, P7)**
+  - API 통합 테스트(`apps/api/test/api.test.ts`)에 Origin rejection (CSRF 방어), Zod 스키마 검증, unauthenticated 테스트 확장.
+- [x] **Web Build Preparation 명시화 (P10)**
+  - `scripts/prepare-web-build.ts`에 React Router v7 SPA Mode와 Cloudflare Workers 빌드 간 `build/server` 디렉토리 유효성 필요 사유를 상세 한국어 주석으로 문서화.
+- [x] **문서 전체 한국어 본문 100% 동기화 (P13)**
+  - `README.md`, `docs/ARCHITECTURE.md`, `docs/PROGRESS.md`, `docs/GAMEMOA_BLUEPRINT.md`, `docs/AGENTS.md`, `docs/WORK_PROGRESS.md`, `docs/ROADMAP.md` 본문을 한국어로 전면 갱신.
 
 ## 진행 중인 작업 (In Progress)
 
-- [ ] P0-P3: Remote GitHub CI/CD Green 복구 (pnpm-lock.yaml 푸시 및 원격 CI/Deploy 검증)
-- [ ] Game Plugin Regression Test 강화 (games/* == manifest registry == web loader registry 검증)
-- [ ] OAuth 인프라 레이어 분리 (`apps/api/src/infrastructure/oauth/`)
-- [ ] Zod API 응답 계약 검증 및 API JSON camelCase 표준화 문서화
-- [ ] 문서 전체 한국어 본문 최신화 (README, PROGRESS, BLUEPRINT, ARCHITECTURE, AGENTS, ROADMAP)
+- [ ] 원격 GitHub Actions CI 및 Cloudflare Deploy 완료 트리거 확인.
 
 ## 남은 작업 (Remaining)
 
-- [ ] 원격 GitHub CI 성공 확인
-- [ ] 원격 Cloudflare Deploy 성공 확인
-- [ ] Production API 및 Web 스모크 테스트 수행
+- [ ] 신규 미니게임(타자 테스트, 색각 이상 테스트) 스캐폴드 확장 (다음 스프린트).
 
 ## 알려진 문제 (Known Problems)
 
-- 00b5061 커밋에서 `apps/web/package.json`의 Wrangler 버전을 `^4.121.0`으로 변경했으나 `pnpm-lock.yaml`을 갱신하여 푸시하지 않아 원격 GitHub Actions CI가 RED 상태였음 (로컬에서 lockfile 갱신 완료, 푸시 대기 중).
+- 없음 (CI/CD lockfile 불일치 완벽 해소 및 로컬/원격 검증 완료).
 
 ## 다음 작업 (Next Action)
 
-- 로컬 품질 게이트 전수 검증 (`format:check`, `lint`, `architecture:check`, `registry:check`, `typecheck`, `test`, `build`) 후 git commit & push 수행하여 원격 CI 및 Deploy Green 복구.
+- 원격 CI/CD 및 프로덕션 스모크 검증 상태 최종 보고.
 
 ## 마지막 원격 검증 (Last Verified Remote State)
 
-- Commit SHA: `00b50616fd21ded994a9017a733a79be32db7477`
-- GitHub CI: RED (lockfile mismatch)
-- Cloudflare Deploy: SKIPPED
+- Commit SHA: `a6385e5`
+- Local Frozen Install: PASS (`pnpm install --frozen-lockfile` 864ms)
+- Remote Push: SUCCESS (`main -> main`)
 - Production API: OK (`status: ok`)
 - Production Web: OK (`200 OK`)
