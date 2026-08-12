@@ -1,4 +1,8 @@
-import type { CreatorProviderAdapter, CreatorChannelInfo } from "@gamemoa/core";
+import type {
+  CreatorProviderAdapter,
+  CreatorChannelInfo,
+  CreatorChannelMetrics,
+} from "@gamemoa/core";
 
 export class YouTubeCreatorProvider implements CreatorProviderAdapter {
   public platform = "YOUTUBE" as const;
@@ -6,6 +10,7 @@ export class YouTubeCreatorProvider implements CreatorProviderAdapter {
   constructor(
     private clientId?: string,
     private clientSecret?: string,
+    private apiKey?: string,
   ) {}
 
   isConfigured(): boolean {
@@ -110,5 +115,55 @@ export class YouTubeCreatorProvider implements CreatorProviderAdapter {
     }
 
     return result;
+  }
+
+  /**
+   * 공식 공개 데이터 API(API Key 기반)로 채널 지표를 재조회합니다.
+   * 사용자 OAuth 토큰 없이 canonical channel ID만으로 동작합니다.
+   * API Key 미설정 시 자동 재심사 미지원 → MANUAL_REVIEW 라우팅.
+   */
+  supportsAutomaticMetricRefresh(): boolean {
+    return Boolean(this.apiKey);
+  }
+
+  async fetchChannelMetrics(platformUserId: string): Promise<CreatorChannelMetrics> {
+    if (!this.apiKey) {
+      throw new Error("YOUTUBE_API_KEY not configured for automatic metric refresh");
+    }
+
+    const params = new URLSearchParams({
+      part: "snippet,statistics",
+      id: platformUserId,
+      key: this.apiKey,
+    });
+
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?${params.toString()}`);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`YouTube channels API (metric refresh) failed: ${res.status} ${errText}`);
+    }
+
+    const data = (await res.json()) as {
+      items?: Array<{
+        snippet?: { publishedAt?: string };
+        statistics?: { subscriberCount?: string };
+      }>;
+    };
+
+    const item = data.items?.[0];
+    if (!item) {
+      return { audienceCount: null, channelCreatedAt: null };
+    }
+
+    const subscriberCount = item.statistics?.subscriberCount
+      ? Number(item.statistics.subscriberCount)
+      : null;
+
+    return {
+      audienceCount:
+        subscriberCount !== null && !Number.isNaN(subscriberCount) ? subscriberCount : null,
+      channelCreatedAt: item.snippet?.publishedAt ?? null,
+    };
   }
 }

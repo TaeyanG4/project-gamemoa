@@ -104,3 +104,74 @@
    SOOP_CLIENT_ID=your_soop_client_id
    SOOP_CLIENT_SECRET=your_soop_client_secret
    ```
+
+---
+
+## 6. Featured Creator 심사 시스템 (Phase E2A)
+
+### 6-1. 개념 구분
+
+| 개념         | 의미                                                                | 상태 저장 위치                                  |
+| :----------- | :------------------------------------------------------------------ | :---------------------------------------------- |
+| **Creator**  | 공식 OAuth/API로 채널 소유권이 검증된 크리에이터                    | `creator_profiles.status = 'VERIFIED'`          |
+| **Featured** | GAMEMOA 기준(공개 채널 지표) 기반 자격 심사 결과 (표시/필터링 전용) | `creator_profiles.featured_status = 'FEATURED'` |
+| **Partner**  | 향후 직접 파트너십 (이번 단계 범위 밖)                              | —                                               |
+
+**철칙**: Featured 상태는 절대 게임 점수(Score)/XP/랭킹 순위를 변경하지 않습니다.
+
+### 6-2. 심사 기준 정책 (`packages/core/src/domain/featuredPolicy.ts`)
+
+순수 도메인 정책으로 모든 기준이 단일 파일에 상수로 문서화되어 있습니다 (`FEATURED_POLICY`).
+
+| 상수                                    | 값      | 의미                                                             |
+| :-------------------------------------- | :------ | :--------------------------------------------------------------- |
+| `ACQUISITION_AUDIENCE_MIN`              | 10,000  | 이 미만 → `NOT_ELIGIBLE`                                         |
+| `ACQUISITION_AUDIENCE_AUTO`             | 12,000  | 이 이상 → 자동 심사 후보                                         |
+| `ACQUISITION_CHANNEL_AGE_MIN_DAYS`      | 90일    | 이 미만 → `NOT_ELIGIBLE`                                         |
+| `ACQUISITION_CHANNEL_AGE_AUTO_DAYS`     | 120일   | 이 이상 → 자동 심사 후보                                         |
+| `RETENTION_AUDIENCE_FLOOR`              | 8,000   | E2B 재검증 하이스테리시스용 문서화 기준 (E2A에서 배지 제거 없음) |
+| `REVIEW_INTERVAL_MS`                    | 6시간   | 1차 심사 주기                                                    |
+| `RETRY_INTERVAL_MS`                     | 6시간   | 실패 재시도 주기                                                 |
+| `MAX_ATTEMPTS`                          | 5회     | 초과 시 `MANUAL_REVIEW` 종결                                     |
+| `MAX_BATCH_SIZE` / `DEFAULT_BATCH_SIZE` | 50 / 20 | 스케줄 배치 상한 (unbounded scan 금지)                           |
+
+**의사 결정 규칙**:
+
+1. **초기 심사 (OAuth 콜백 스냅샷)**: 콜백 스냅샷만으로는 `FEATURED`를 절대 부여하지 않습니다.
+   - 소유권 미검증 → `NOT_ELIGIBLE`
+   - 지표 누락/모호 → `MANUAL_REVIEW` (추정 금지)
+   - 기준 미달 → `NOT_ELIGIBLE`
+   - 완전 충족 → `AUTO_REVIEW_PENDING` (6시간 후 신선한 공식 지표로 재심사)
+2. **6시간 재심사 (신선한 공식 지표)**: `FEATURED` / `NOT_ELIGIBLE` / `MANUAL_REVIEW`만 결정.
+3. **하이스테리시스**: E2A에서는 획득 기준(10,000) 단일 기준을 사용하며, 유지 기준(8,000)은 E2B에서 활성화합니다 (배지 제거 보수 정책).
+
+### 6-3. 심사 잡 모델 (`creator_review_jobs`)
+
+- 소유권 인증 성공 시 해당 플랫폼 계정마다 심사 잡을 생성/리셋 (`createOrResetJob`, 멱등).
+- 상태: `AUTO_REVIEW_PENDING` → (`FEATURED` | `NOT_ELIGIBLE` | `MANUAL_REVIEW`), 실패 시 `FAILED_RETRYABLE`.
+- `completeJob`은 활성 상태 잡만 전이하며 `meta.changes`로 멱등성을 보장합니다 (중복 실행 시 프로필 전이 생략).
+- 재시도 5회 초과 시 `MANUAL_REVIEW`로 종결됩니다.
+
+### 6-4. 6시간 자동 재심사 스케줄러
+
+- Cloudflare Cron Trigger `0 */6 * * *` (wrangler.jsonc `triggers.crons`) → `scheduled` 핸들러 (`apps/api/src/index.ts`).
+- `runDueFeaturedReviews`: 예정 시각이 지난 잡만 바운디드 배치(기본 20, 최대 50)로 처리하며, 단일 잡/프로바이더 실패가 배치 전체를 막지 않습니다.
+- 사용자 OAuth 토큰은 저장하지 않으며, 공식 app-level/공개 API로만 지표를 재조회합니다.
+
+### 6-5. 플랫폼별 지표 재조회 (자동 심사 지원 매트릭스)
+
+| 플랫폼  | 공식 지표 API (사용자 토큰 불필요)                                                                    | audienceCount   | channelCreatedAt              | 자동 심사                |
+| :------ | :---------------------------------------------------------------------------------------------------- | :-------------- | :---------------------------- | :----------------------- |
+| YouTube | `GET /youtube/v3/channels?part=snippet,statistics&id={id}&key={YOUTUBE_API_KEY}`                      | subscriberCount | ✅ (publishedAt)              | 지원                     |
+| Twitch  | App Access Token(Client Credentials) + `helix/users?id=` + `helix/channels/followers?broadcaster_id=` | followers total | ✅ (created_at)               | 지원                     |
+| CHZZK   | `GET /open/v1/channels?channelIds=` (Client-Id/Client-Secret 헤더)                                    | followerCount   | ❌ (미제공) → `MANUAL_REVIEW` | 제한적                   |
+| SOOP    | 공개 지표 조회 불가 (사용자 토큰 필요)                                                                | —               | —                             | 미지원 → `MANUAL_REVIEW` |
+
+- **CHZZK/SOOP**처럼 필수 지표를 공식 API로 제공하지 않는 플랫폼은 추정 금지 원칙에 따라 `MANUAL_REVIEW`로 안전하게 라우팅됩니다.
+- YouTube 지표 재조회에는 별도 `YOUTUBE_API_KEY` 환경변수가 필요합니다 (OAuth Client ID와 별개).
+
+### 6-6. E2B 예고 (향후 확장)
+
+- 수동 심사(운영진 리뷰) 관리 도구 및 Featured 해제(revalidation) 워크플로우.
+- `RETENTION_AUDIENCE_FLOOR`(8,000) 기반 하이스테리시스 적용.
+- 기존 Featured Creator의 재검증 주기 7~30일 수준으로 조정 (`FUTURE_REVALIDATION_INTERVAL_DAYS_MIN/MAX`).

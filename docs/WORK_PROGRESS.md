@@ -5,15 +5,35 @@
 **GAMEMOA 플레이어 플랫폼 확장 스프린트 (My Page / Creator Ranking / Discord Community)** — 지금까지
 **Phase B(진행도 파운데이션)**, **Phase C(My Page)**, **Phase D(XP 랭킹 UI & Creator 모델 파운데이션)**,
 **Phase F(Discord HTTP Interactions 파운데이션)**, **Phase G(Discord 서버 시스템 & 커뮤니티 Hub)**,
-**Phase H1(Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`)**, **Phase H2(Discord 서버 리더보드 & 커맨드)**를 완수했습니다.
+**Phase H1(Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`)**, **Phase H2(Discord 서버 리더보드 & 커맨드)**,
+**Phase E1(Creator 채널 소유권 검증)**, **Phase E2A(Featured Creator 자격 심사 엔진)**를 완수했습니다.
 전체 스프린트 단계 구조는 `docs/ROADMAP.md` §1, 상세 설계는 `docs/PROGRESSION.md`(진행도),
-`docs/DISCORD_INTEGRATION.md`(Discord)를 참고하세요.
+`docs/DISCORD_INTEGRATION.md`(Discord), `docs/CREATOR_SYSTEM.md`(Creator)를 참고하세요.
 
 ---
 
 ## 완료
 
-### Phase E1: Creator Channel Ownership Verification (이번 세션)
+### Phase E2A: Featured Creator Qualification Engine & 6-Hour Automatic Recheck (이번 세션)
+
+- [x] **순수 도메인 정책 (`packages/core/src/domain/featuredPolicy.ts`)**:
+  - `FEATURED_POLICY` 상수: 획득 기준(구독자/팔로워 10,000 · 채널 90일), 자동 심사 기준(12,000 · 120일), 유지 기준(8,000, E2B 하이스테리시스), 심사/재시도 주기 6시간, 재시도 상한 5회, 배치 상한 50.
+  - 초기 심사(콜백 스냅샷)는 절대 `FEATURED`를 부여하지 않음 — `AUTO_REVIEW_PENDING`/`NOT_ELIGIBLE`/`MANUAL_REVIEW`만 결정, 지표 누락 시 추정 금지.
+- [x] **심사 잡 모델 (D1 마이그레이션 `0012_creator_review_jobs.sql`)**:
+  - `creator_review_jobs` 테이블 + `D1CreatorReviewRepository` (멱등 `createOrResetJob`/`completeJob`, 바운디드 `listDuePendingJobs`, `markJobFailed`).
+- [x] **6시간 자동 재심사 스케줄러 (Cloudflare Cron `0 */6 * * *`)**:
+  - `apps/api/src/index.ts` `scheduled` 핸들러 → `runDueFeaturedReviews` (잡 단위 실패 격리, 재시도 5회 초과 시 `MANUAL_REVIEW` 종결).
+- [x] **플랫폼별 공식 지표 재조회**:
+  - YouTube `channels?part=snippet,statistics&key=YOUTUBE_API_KEY` (공개 API), Twitch App Access Token + `helix/users` + `helix/channels/followers` (total), CHZZK `open/v1/channels` (생성일 미제공 → `MANUAL_REVIEW`), SOOP 미지원(사용자 토큰 필요) → `MANUAL_REVIEW`.
+  - 사용자 OAuth 토큰 미저장 원칙 유지 (app-level/공개 API 전용).
+- [x] **API & 계약**:
+  - `GET /api/creators/me`에 `featuredReview` 상태 및 계정 지표(`audienceCount`, `channelCreatedAt`, `metricsSyncedAt`) 포함 (`packages/contracts` DTO 확장).
+- [x] **웹 UI (`apps/web/app/routes/profile.tsx`)**:
+  - "Featured 심사 상태" 카드: ★ Featured Creator / 자동 심사 대기 / 추가 확인 필요 / 기준 미달 / 재시도 대기 표시.
+- [x] **테스트**: `featuredPolicy.test.ts` (정책 결정 매트릭스) & `featuredReviewUseCases.test.ts` (승급/탈락/수동심사/실패 격리/재시도 상한/멱등/스코어 불변) & 스케줄러 통합 테스트 전원 그린.
+- [x] **한국어 문서화 (`docs/CREATOR_SYSTEM.md` §6)**: 정책, 잡 모델, 스케줄러, 플랫폼 매트릭스, E2B 예고.
+
+### Phase E1: Creator Channel Ownership Verification (이전 세션)
 
 - [x] **D1 마이그레이션 `0011_creator_metrics.sql`**:
   - `creator_platform_accounts` 테이블에 `audience_count`, `channel_created_at`, `metrics_synced_at` 가산 컬럼 추가.
@@ -49,13 +69,14 @@
 
 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-1. **Phase E2 — Featured Creator Qualification, 6-hour Recheck & Manual Review**
-   - Featured 수동/자동 심사 기준 수립 (최소 시청자/구독자 기준 또는 운영진 수동 심사).
-   - 6시간 간격 자동 재심사 & 자격 미달 시 상태 자동 갱신 워크플로우.
+1. **Phase E2B — Featured Creator Manual Review, Revalidation & Admin Safety**
+   - 운영진 수동 심사(Manual Review) 관리 도구 및 심사 API/UI.
+   - `RETENTION_AUDIENCE_FLOOR`(8,000) 기반 하이스테리시스 및 Featured 해제(revalidation) 워크플로우.
+   - 기존 Featured Creator 재검증 주기(7~30일) 적용 (`FUTURE_REVALIDATION_INTERVAL_DAYS_MIN/MAX`).
 2. **Phase I — 계정 통합 회귀 테스트 & 프로덕션 검증**
 
 ---
 
 ## 다음 작업 (Next Action)
 
-`Phase E — Creator Ownership Verification & Featured Qualification Engine`
+`Phase E2B — Featured Creator Manual Review, Revalidation & Admin Safety`

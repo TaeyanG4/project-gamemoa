@@ -71,7 +71,7 @@
 
 플레이어 플랫폼 확장 스프린트는 여러 세션에 걸쳐 단계적으로 진행됩니다 (`docs/WORK_PROGRESS.md`의 Next Action 참고):
 
-1. **Phase D~E: Creator 모델** — 채널 소유권 인증(YouTube/CHZZK/SOOP/Twitch), Featured Creator 심사 엔진, Creator 랭킹.
+1. **Phase E2B: Featured Creator 수동 심사 & 재검증** — 운영진 수동 심사(Manual Review) 관리 도구, `RETENTION_AUDIENCE_FLOOR`(8,000) 기반 하이스테리시스 및 Featured 해제 워크플로우, 재검증 주기(7~30일) 적용. (E2A 자동 심사 엔진은 완료)
 2. **Phase G~H: Discord 서버 시스템** — 서버 등록/검색/관리 페이지, 길드-로컬 XP, `/gamemoa rank|leaderboard|play|server`.
 3. **Phase C 잔여**: 공개 프로필(`/profile/:id`), 필요 시 `/me`·`/account` 완전 라우트 분리.
 4. **신규 미니게임 확장**: 색각 이상 테스트(color-test), 숫자 암기 테스트(number-memory), CPS 테스트(cps-test).
@@ -89,6 +89,7 @@
 
 ## 5. 📜 주요 변경 이력 (History)
 
+- **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase E2A(Featured Creator 자격 심사 엔진) 완수 — 순수 도메인 정책(`featuredPolicy.ts`), 심사 잡 모델(마이그레이션 `0012`), 6시간 Cron 스케줄러, 플랫폼별 공식 지표 재조회(YouTube/Twitch/CHZZK), 실패 격리·재시도·수동 심사 라우팅.
 - **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase C 완료(My Page 탭 분리, 닉네임/국가 UI, 즐겨찾기/최근 플레이) + Discord 계정 연결 redirect_uri 버그 수정 + `/api/auth/me` 필드 누락 버그 수정 + 푸터 정리 + Phase F(Discord HTTP Interactions: Ed25519 서명 검증, `/gamemoa link|profile|games`, 1회용 연동 토큰) 완수.
 - **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase B(진행도 파운데이션) 완수 — 서버 권위 XP 원장/일일 상한/멱등성, 결정론적 레벨 공식, 7종 초기 도전과제, 닉네임/국가·지역 정책 중앙화(쿨다운), `/api/progression/*` 및 `/api/profile/*` 신규 API, 계정 통합 시 Secondary 진행도 삭제 정합성 확장.
 - **2026-08-13**: 계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 완수 — Google/Discord 별도 계정 기본, 게스트 즐겨찾기 로그인 전용화 및 v1→v2 마이그레이션, OAuth 공급자 연결/연결해제, Primary Account Wins 원자 통합, Google JWT/JWKS 검증, 프로필 계정 관리 UX, GAMEMOA 파비콘 자산.

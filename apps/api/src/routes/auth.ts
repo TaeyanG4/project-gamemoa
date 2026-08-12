@@ -61,6 +61,8 @@ export type ApiEnv = {
     COMMIT_SHA?: string;
     YOUTUBE_CLIENT_ID?: string;
     YOUTUBE_CLIENT_SECRET?: string;
+    /** YouTube Data API key (public data) — 6시간 자동 재심사용 공식 지표 조회. */
+    YOUTUBE_API_KEY?: string;
     YOUTUBE_REDIRECT_URI?: string;
     TWITCH_CLIENT_ID?: string;
     TWITCH_CLIENT_SECRET?: string;

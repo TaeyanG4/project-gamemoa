@@ -98,7 +98,10 @@ creatorsRouter.get("/me", async (c) => {
   }
 
   const { creatorUseCases } = createContainer(c.env.DB);
-  const profile = await creatorUseCases.getCreatorProfileByUserId(auth.userId);
+  const [profile, featuredReview] = await Promise.all([
+    creatorUseCases.getCreatorProfileByUserId(auth.userId),
+    creatorUseCases.getFeaturedReviewState(auth.userId),
+  ]);
 
   return c.json({
     profile: profile
@@ -112,6 +115,14 @@ creatorsRouter.get("/me", async (c) => {
           createdAt: profile.createdAt,
           updatedAt: profile.updatedAt,
           platformAccounts: profile.platformAccounts,
+          featuredReview: featuredReview
+            ? {
+                status: featuredReview.status,
+                reason: featuredReview.lastError ?? null,
+                nextCheckAt: featuredReview.nextCheckAt,
+                attemptCount: featuredReview.attemptCount,
+              }
+            : null,
         }
       : null,
   });

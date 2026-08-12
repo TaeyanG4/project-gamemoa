@@ -866,6 +866,15 @@ export default function ProfilePage() {
                         <p className="text-[10px] text-text-muted">
                           ✓ GAMEMOA가 해당 사용자의 채널 소유권을 공식 API로 확인했습니다.
                         </p>
+                        {verifiedAcc.audienceCount !== undefined &&
+                          verifiedAcc.audienceCount > 0 && (
+                            <p className="text-[10px] text-text-muted">
+                              구독자/팔로워 {verifiedAcc.audienceCount.toLocaleString()}명
+                              {verifiedAcc.metricsSyncedAt
+                                ? ` · 지표 동기화 ${verifiedAcc.metricsSyncedAt.split("T")[0]}`
+                                : ""}
+                            </p>
+                          )}
                       </div>
                     ) : (
                       <div className="flex items-center justify-between gap-2 mt-1">
@@ -888,6 +897,30 @@ export default function ProfilePage() {
                 );
               })}
             </div>
+
+            {/* Featured Creator 심사 상태 */}
+            {creatorProfile && (
+              <div className="flex flex-col gap-1 p-4 rounded-2xl bg-surface-raised border border-border shadow-md">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4 h-4 text-accent-yellow" />
+                  <h3 className="text-sm font-bold text-text-primary">Featured 심사 상태</h3>
+                </div>
+                {creatorProfile.featuredStatus === "FEATURED" ? (
+                  <p className="text-xs font-bold text-accent-yellow">
+                    ★ Featured Creator
+                    {creatorProfile.featuredSince
+                      ? ` (${creatorProfile.featuredSince.split("T")[0]} 선정)`
+                      : ""}
+                  </p>
+                ) : (
+                  <FeaturedReviewStatusLine profile={creatorProfile} />
+                )}
+                <p className="text-[10px] text-text-muted">
+                  Featured는 공식 채널 지표 기반 자격(구독자/팔로워 12,000+ · 채널 120일+)이며 게임
+                  점수·XP·랭킹 순위에는 영향을 주지 않습니다.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -960,4 +993,48 @@ export default function ProfilePage() {
       )}
     </div>
   );
+}
+
+function FeaturedReviewStatusLine({ profile }: { profile: CreatorProfileDto }) {
+  const review = profile.featuredReview;
+  const reason = profile.featuredReason;
+
+  if (!review) {
+    return (
+      <p className="text-xs font-bold text-text-muted">
+        채널 소유권 인증 완료 후 자동 심사가 시작됩니다. (약 6시간 후 첫 심사)
+      </p>
+    );
+  }
+
+  switch (review.status) {
+    case "AUTO_REVIEW_PENDING":
+      return (
+        <p className="text-xs font-bold text-accent-yellow">
+          자동 심사 대기 중
+          {review.nextCheckAt ? ` (다음 심사 ${review.nextCheckAt.split("T")[0]})` : ""}
+        </p>
+      );
+    case "NOT_ELIGIBLE":
+      return (
+        <p className="text-xs font-bold text-text-muted">
+          현재 기준 미달{reason ? ` — ${reason}` : ""}
+        </p>
+      );
+    case "MANUAL_REVIEW":
+      return (
+        <p className="text-xs font-bold text-text-muted">
+          추가 확인 필요{reason ? ` — ${reason}` : ""}
+        </p>
+      );
+    case "FAILED_RETRYABLE":
+      return (
+        <p className="text-xs font-bold text-accent-yellow">
+          자동 심사 일시 실패 (재시도 대기)
+          {review.nextCheckAt ? ` — 다음 재시도 ${review.nextCheckAt.split("T")[0]}` : ""}
+        </p>
+      );
+    default:
+      return null;
+  }
 }

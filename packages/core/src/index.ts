@@ -3,6 +3,8 @@ export * from "./domain/scoreValidation.js";
 export * from "./domain/progression.js";
 export * from "./domain/achievements.js";
 export * from "./domain/profilePolicy.js";
+export * from "./domain/discordGuildPolicy.js";
+export * from "./domain/featuredPolicy.js";
 export * from "./ports/repositories.js";
 export * from "./ports/creatorProvider.js";
 

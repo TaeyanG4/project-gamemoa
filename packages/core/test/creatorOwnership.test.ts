@@ -47,6 +47,26 @@ class MemoryCreatorRepo implements CreatorRepository {
     );
   }
 
+  async findPlatformAccountById(platformAccountId: number): Promise<CreatorPlatformAccount | null> {
+    return this.platformAccounts.find((a) => a.id === platformAccountId) || null;
+  }
+
+  async updatePlatformAccountMetrics(
+    platformAccountId: number,
+    input: { audienceCount: number | null; channelCreatedAt: string | null; syncedAt: string },
+  ): Promise<CreatorPlatformAccount> {
+    const idx = this.platformAccounts.findIndex((a) => a.id === platformAccountId);
+    if (idx < 0) throw new Error("platform account not found");
+    this.platformAccounts[idx] = {
+      ...this.platformAccounts[idx],
+      audienceCount: input.audienceCount ?? 0,
+      channelCreatedAt: input.channelCreatedAt ?? null,
+      metricsSyncedAt: input.syncedAt,
+      updatedAt: input.syncedAt,
+    };
+    return this.platformAccounts[idx];
+  }
+
   async upsertProfile(input: {
     userId: number;
     status: CreatorStatusType;

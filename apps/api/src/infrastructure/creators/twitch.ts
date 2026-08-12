@@ -1,7 +1,18 @@
-import type { CreatorProviderAdapter, CreatorChannelInfo } from "@gamemoa/core";
+import type {
+  CreatorProviderAdapter,
+  CreatorChannelInfo,
+  CreatorChannelMetrics,
+} from "@gamemoa/core";
+
+interface TwitchAppTokenCache {
+  token: string;
+  expiresAt: number;
+}
 
 export class TwitchCreatorProvider implements CreatorProviderAdapter {
   public platform = "TWITCH" as const;
+
+  private appTokenCache: TwitchAppTokenCache | null = null;
 
   constructor(
     private clientId?: string,
@@ -96,5 +107,97 @@ export class TwitchCreatorProvider implements CreatorProviderAdapter {
     }
 
     return result;
+  }
+
+  /**
+   * App Access Token(Client Credentials Grant, 사용자 토큰 아님)으로 공식 지표를 재조회합니다.
+   * - 계정 생성일: GET /helix/users?id=...
+   * - 팔로워 수: GET /helix/channels/followers?broadcaster_id=... (app token은 total만 반환,
+   *   전체 목록은 broadcaster/moderator 사용자 스코프 필요 — 우리는 total만 사용)
+   */
+  supportsAutomaticMetricRefresh(): boolean {
+    return Boolean(this.clientId && this.clientSecret);
+  }
+
+  private async getAppAccessToken(): Promise<string> {
+    if (this.appTokenCache && this.appTokenCache.expiresAt > Date.now()) {
+      return this.appTokenCache.token;
+    }
+    if (!this.clientId || !this.clientSecret) {
+      throw new Error("Twitch OAuth credentials not configured");
+    }
+
+    const res = await fetch("https://id.twitch.tv/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        grant_type: "client_credentials",
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Twitch app token exchange failed: ${res.status} ${errText}`);
+    }
+
+    const data = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!data.access_token) {
+      throw new Error("No app access token returned from Twitch");
+    }
+
+    const expiresInMs = (data.expires_in ?? 3600) * 1000;
+    this.appTokenCache = {
+      token: data.access_token,
+      expiresAt: Date.now() + Math.max(expiresInMs - 60_000, 60_000),
+    };
+    return data.access_token;
+  }
+
+  private helixHeaders(accessToken: string): Record<string, string> {
+    return {
+      Authorization: `Bearer ${accessToken}`,
+      "Client-Id": this.clientId ?? "",
+    };
+  }
+
+  async fetchChannelMetrics(platformUserId: string): Promise<CreatorChannelMetrics> {
+    if (!this.clientId || !this.clientSecret) {
+      throw new Error("Twitch OAuth credentials not configured");
+    }
+
+    const appToken = await this.getAppAccessToken();
+
+    const userRes = await fetch(
+      `https://api.twitch.tv/helix/users?id=${encodeURIComponent(platformUserId)}`,
+      { headers: this.helixHeaders(appToken) },
+    );
+    if (!userRes.ok) {
+      const errText = await userRes.text();
+      throw new Error(`Twitch users API (metric refresh) failed: ${userRes.status} ${errText}`);
+    }
+    const userData = (await userRes.json()) as {
+      data?: Array<{ created_at?: string }>;
+    };
+    const user = userData.data?.[0];
+    const channelCreatedAt = user?.created_at ?? null;
+
+    const followersRes = await fetch(
+      `https://api.twitch.tv/helix/channels/followers?broadcaster_id=${encodeURIComponent(
+        platformUserId,
+      )}&first=1`,
+      { headers: this.helixHeaders(appToken) },
+    );
+    if (!followersRes.ok) {
+      const errText = await followersRes.text();
+      throw new Error(
+        `Twitch channels/followers API (metric refresh) failed: ${followersRes.status} ${errText}`,
+      );
+    }
+    const followersData = (await followersRes.json()) as { total?: number };
+    const audienceCount = typeof followersData.total === "number" ? followersData.total : null;
+
+    return { audienceCount, channelCreatedAt };
   }
 }

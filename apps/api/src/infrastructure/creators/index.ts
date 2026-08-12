@@ -14,6 +14,7 @@ export { MockCreatorProvider } from "./mockProvider.js";
 export function getCreatorProviderAdapters(env: {
   YOUTUBE_CLIENT_ID?: string;
   YOUTUBE_CLIENT_SECRET?: string;
+  YOUTUBE_API_KEY?: string;
   TWITCH_CLIENT_ID?: string;
   TWITCH_CLIENT_SECRET?: string;
   CHZZK_CLIENT_ID?: string;
@@ -34,7 +35,11 @@ export function getCreatorProviderAdapters(env: {
   }
 
   return {
-    YOUTUBE: new YouTubeCreatorProvider(env.YOUTUBE_CLIENT_ID, env.YOUTUBE_CLIENT_SECRET),
+    YOUTUBE: new YouTubeCreatorProvider(
+      env.YOUTUBE_CLIENT_ID,
+      env.YOUTUBE_CLIENT_SECRET,
+      env.YOUTUBE_API_KEY,
+    ),
     TWITCH: new TwitchCreatorProvider(env.TWITCH_CLIENT_ID, env.TWITCH_CLIENT_SECRET),
     CHZZK: new ChzzkCreatorProvider(env.CHZZK_CLIENT_ID, env.CHZZK_CLIENT_SECRET),
     SOOP: new SoopCreatorProvider(env.SOOP_CLIENT_ID, env.SOOP_CLIENT_SECRET),

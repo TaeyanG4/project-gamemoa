@@ -1,6 +1,7 @@
 import type {
   CreatorProviderAdapter,
   CreatorChannelInfo,
+  CreatorChannelMetrics,
   CreatorPlatformType,
 } from "@gamemoa/core";
 
@@ -10,11 +11,19 @@ export class MockCreatorProvider implements CreatorProviderAdapter {
     private configured = true,
     private mockResult?: CreatorChannelInfo,
     private mockError?: string,
+    private metricsOverride?: CreatorChannelMetrics,
   ) {}
 
   isConfigured(): boolean {
     return this.configured;
   }
+
+  /** 테스트 전용: 자동 재심사 지원 여부를 오버라이드합니다. */
+  setMetricsRefreshSupported(supported: boolean): void {
+    this.metricsRefreshSupported = supported;
+  }
+
+  private metricsRefreshSupported = true;
 
   getAuthorizeUrl(state: string, redirectUri: string): string {
     const params = new URLSearchParams();
@@ -42,6 +51,20 @@ export class MockCreatorProvider implements CreatorProviderAdapter {
       channelHandle: `@mock_${code}`,
       channelUrl: `https://${this.platform.toLowerCase()}.com/mock_${code}`,
       avatarUrl: `https://mock.gamemoa.dev/avatars/${code}.png`,
+      audienceCount: 15000,
+      channelCreatedAt: "2023-01-01T00:00:00Z",
+    };
+  }
+
+  supportsAutomaticMetricRefresh(): boolean {
+    return this.configured && this.metricsRefreshSupported;
+  }
+
+  async fetchChannelMetrics(_platformUserId: string): Promise<CreatorChannelMetrics> {
+    if (this.metricsOverride) {
+      return this.metricsOverride;
+    }
+    return {
       audienceCount: 15000,
       channelCreatedAt: "2023-01-01T00:00:00Z",
     };

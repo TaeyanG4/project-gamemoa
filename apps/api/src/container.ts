@@ -9,6 +9,7 @@ import {
   D1DiscordLinkRepository,
   D1DiscordGuildRepository,
   D1CreatorRepository,
+  D1CreatorReviewRepository,
 } from "@gamemoa/db";
 import {
   ScoreUseCases,
@@ -34,6 +35,7 @@ import {
   type DiscordLinkRepository,
   type DiscordGuildRepository,
   type CreatorRepository,
+  type CreatorReviewRepository,
 } from "@gamemoa/core";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -48,6 +50,7 @@ export interface AppContainer {
   discordLinkRepo: DiscordLinkRepository;
   discordGuildRepo: DiscordGuildRepository;
   creatorRepo: CreatorRepository;
+  creatorReviewRepo: CreatorReviewRepository;
 
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
@@ -75,6 +78,7 @@ export function createContainer(db: D1Database): AppContainer {
   const discordLinkRepo = new D1DiscordLinkRepository(db);
   const discordGuildRepo = new D1DiscordGuildRepository(db);
   const creatorRepo = new D1CreatorRepository(db);
+  const creatorReviewRepo = new D1CreatorReviewRepository(db);
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -88,7 +92,7 @@ export function createContainer(db: D1Database): AppContainer {
   const discordGuildDirectoryUseCases = new DiscordGuildDirectoryUseCases(discordGuildRepo);
   const discordGuildManagementUseCases = new DiscordGuildManagementUseCases(discordGuildRepo);
   const discordGuildXpUseCases = new DiscordGuildXpUseCases(discordGuildRepo, userRepo);
-  const creatorUseCases = new CreatorUseCases(creatorRepo);
+  const creatorUseCases = new CreatorUseCases(creatorRepo, creatorReviewRepo);
 
   return {
     userRepo,
@@ -101,6 +105,7 @@ export function createContainer(db: D1Database): AppContainer {
     discordLinkRepo,
     discordGuildRepo,
     creatorRepo,
+    creatorReviewRepo,
 
     scoreUseCases,
     personalizationUseCases,

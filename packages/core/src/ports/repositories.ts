@@ -492,6 +492,50 @@ export interface CreatorRankEntry {
   rank: number;
 }
 
+export type CreatorReviewJobStatus =
+  "AUTO_REVIEW_PENDING" | "FEATURED" | "NOT_ELIGIBLE" | "MANUAL_REVIEW" | "FAILED_RETRYABLE";
+
+export interface CreatorReviewJob {
+  id: number;
+  creatorPlatformAccountId: number;
+  status: CreatorReviewJobStatus;
+  initialAudience: number | null;
+  initialChannelCreatedAt: string | null;
+  nextCheckAt: string;
+  attemptCount: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
+export interface CreatorReviewRepository {
+  /** 가장 최근 심사/재심사 결과 (프로필 단위 프레젠테이션용). */
+  findLatestJobByAccountIds(creatorPlatformAccountIds: number[]): Promise<CreatorReviewJob | null>;
+  /** 아직 활성 상태(진행/재시도 대기)인 계정의 잡을 조회. */
+  findActiveJobByAccountId(creatorPlatformAccountId: number): Promise<CreatorReviewJob | null>;
+  /** 활성 잡이 없으면 신규 생성, 있으면 스냅샷/다음 심사 시각을 리셋(멱등). */
+  createOrResetJob(input: {
+    creatorPlatformAccountId: number;
+    initialAudience: number | null;
+    initialChannelCreatedAt: string | null;
+    nextCheckAt: string;
+  }): Promise<CreatorReviewJob>;
+  /** 예정 시각이 지난 진행/재시도 잡을 바운디드 배치로 조회 (unbounded scan 금지). */
+  listDuePendingJobs(limit: number, nowIso: string): Promise<CreatorReviewJob[]>;
+  /** 재시도 가능 실패 기록. attempt_count 1 증가. */
+  markJobFailed(id: number, error: string, nextCheckAt: string, nowIso: string): Promise<void>;
+  /**
+   * 잡을 종결 상태로 전이. 동시 실행/중복 실행 시 이미 전이된 잡은 false 반환(멱등).
+   * 성공 시에만 호출자가 Featured 프로필 전이를 수행해야 합니다.
+   */
+  completeJob(
+    id: number,
+    status: Exclude<CreatorReviewJobStatus, "AUTO_REVIEW_PENDING" | "FAILED_RETRYABLE">,
+    completedAt: string,
+  ): Promise<boolean>;
+}
+
 export interface CreatorRepository {
   findProfileByUserId(
     userId: number,
@@ -499,6 +543,7 @@ export interface CreatorRepository {
   findProfileById(
     creatorId: number,
   ): Promise<(CreatorProfile & { platformAccounts: CreatorPlatformAccount[] }) | null>;
+  findPlatformAccountById(platformAccountId: number): Promise<CreatorPlatformAccount | null>;
   findPlatformAccount(
     platform: CreatorPlatformType,
     platformUserId: string,
@@ -531,6 +576,15 @@ export interface CreatorRepository {
     audienceCount?: number;
     channelCreatedAt?: string | null;
   }): Promise<CreatorPlatformAccount>;
+  /** 스케줄 재심사 성공 시 공식 지표를 갱신하고 metrics_synced_at를 갱신합니다. */
+  updatePlatformAccountMetrics(
+    platformAccountId: number,
+    input: {
+      audienceCount: number | null;
+      channelCreatedAt: string | null;
+      syncedAt: string;
+    },
+  ): Promise<CreatorPlatformAccount>;
   getCreatorRankings(options: {
     mode: "score" | "xp";
     gameId?: string;

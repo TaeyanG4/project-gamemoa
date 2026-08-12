@@ -1,4 +1,8 @@
-import type { CreatorProviderAdapter, CreatorChannelInfo } from "@gamemoa/core";
+import type {
+  CreatorProviderAdapter,
+  CreatorChannelInfo,
+  CreatorChannelMetrics,
+} from "@gamemoa/core";
 
 export class SoopCreatorProvider implements CreatorProviderAdapter {
   public platform = "SOOP" as const;
@@ -82,5 +86,19 @@ export class SoopCreatorProvider implements CreatorProviderAdapter {
       avatarUrl: userData.profile_image || null,
       audienceCount: userData.fan_count || 0,
     };
+  }
+
+  /**
+   * SOOP 공식 Open API는 방송국 정보(user/stationinfo) 조회에 사용자 access_token을
+   * 요구하며 공개(app-level) 지표 조회를 제공하지 않습니다. E1 원칙에 따라 사용자
+   * OAuth 토큰을 영속하지 않으므로 자동 재심사를 지원하지 않습니다.
+   * → 상위 정책이 MANUAL_REVIEW로 안전하게 라우팅합니다.
+   */
+  supportsAutomaticMetricRefresh(): boolean {
+    return false;
+  }
+
+  async fetchChannelMetrics(_platformUserId: string): Promise<CreatorChannelMetrics> {
+    throw new Error("SOOP automatic metric refresh is unsupported without user token");
   }
 }

@@ -20,10 +20,27 @@ export const CreatorPlatformAccountDtoSchema = z.object({
   avatarUrl: z.string().nullable(),
   verificationStatus: z.string(),
   verifiedAt: z.string().nullable(),
+  audienceCount: z.number(),
+  channelCreatedAt: z.string().nullable(),
+  metricsSyncedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
 export type CreatorPlatformAccountDto = z.infer<typeof CreatorPlatformAccountDtoSchema>;
+
+export const CreatorFeaturedReviewSchema = z.object({
+  status: z.enum([
+    "AUTO_REVIEW_PENDING",
+    "FEATURED",
+    "NOT_ELIGIBLE",
+    "MANUAL_REVIEW",
+    "FAILED_RETRYABLE",
+  ]),
+  reason: z.string().nullable(),
+  nextCheckAt: z.string().nullable(),
+  attemptCount: z.number(),
+});
+export type CreatorFeaturedReview = z.infer<typeof CreatorFeaturedReviewSchema>;
 
 export const CreatorProfileDtoSchema = z.object({
   id: z.number(),
@@ -35,6 +52,7 @@ export const CreatorProfileDtoSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
   platformAccounts: z.array(CreatorPlatformAccountDtoSchema),
+  featuredReview: CreatorFeaturedReviewSchema.nullable(),
 });
 export type CreatorProfileDto = z.infer<typeof CreatorProfileDtoSchema>;
 

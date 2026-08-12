@@ -10,6 +10,9 @@ import { discordRouter } from "./routes/discordInteractions.js";
 import { discordLinkRouter } from "./routes/discordLink.js";
 import { discordGuildsRouter } from "./routes/discordGuilds.js";
 import { creatorsRouter } from "./routes/creators.js";
+import { createContainer } from "./container.js";
+import { getCreatorProviderAdapters } from "./infrastructure/creators/index.js";
+import { FEATURED_POLICY } from "@gamemoa/core";
 import type { ApiEnv } from "./routes/auth.js";
 
 const app = new Hono<ApiEnv>();
@@ -96,4 +99,40 @@ app.onError((err, c) => {
   return c.json({ error: err.message || "Internal Server Error" }, 500);
 });
 
-export default app;
+/**
+ * Phase E2A: Featured Creator 자동 재심사 스케줄러 (Cron: 6시간 간격).
+ * - 예정 시각이 지난 AUTO_REVIEW_PENDING / FAILED_RETRYABLE 잡만 바운디드 배치로 처리.
+ * - 단일 잡/프로바이더 실패가 배치 전체를 막지 않음 (잡 단위 FAILED_RETRYABLE 처리).
+ * - 사용자 OAuth 토큰은 저장하지 않으며, 공식 app-level/공개 API만 사용합니다.
+ */
+async function scheduledHandler(
+  _controller: ScheduledController,
+  env: ApiEnv["Bindings"],
+  ctx: ExecutionContext,
+): Promise<void> {
+  const adapters = getCreatorProviderAdapters(env);
+  const { creatorUseCases } = createContainer(env.DB);
+
+  ctx.waitUntil(
+    creatorUseCases
+      .runDueFeaturedReviews({
+        adapters,
+        batchSize: FEATURED_POLICY.DEFAULT_BATCH_SIZE,
+      })
+      .then((summary) => {
+        console.log(
+          `[creator-review] scheduled run done: processed=${summary.processed} featured=${summary.featured} notEligible=${summary.notEligible} manualReview=${summary.manualReview} failed=${summary.failed}`,
+        );
+      })
+      .catch((err) => {
+        console.error("[creator-review] scheduled run crashed:", err);
+      }),
+  );
+}
+
+export { app };
+
+export default {
+  fetch: app.fetch,
+  scheduled: scheduledHandler,
+};

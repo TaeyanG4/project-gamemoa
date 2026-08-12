@@ -8,3 +8,4 @@ export * from "./d1/D1AchievementRepository.js";
 export * from "./d1/D1DiscordLinkRepository.js";
 export * from "./d1/D1DiscordGuildRepository.js";
 export * from "./d1/D1CreatorRepository.js";
+export * from "./d1/D1CreatorReviewRepository.js";

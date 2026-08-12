@@ -1,4 +1,8 @@
-import type { CreatorProviderAdapter, CreatorChannelInfo } from "@gamemoa/core";
+import type {
+  CreatorProviderAdapter,
+  CreatorChannelInfo,
+  CreatorChannelMetrics,
+} from "@gamemoa/core";
 
 export class ChzzkCreatorProvider implements CreatorProviderAdapter {
   public platform = "CHZZK" as const;
@@ -86,6 +90,57 @@ export class ChzzkCreatorProvider implements CreatorProviderAdapter {
       channelUrl: `https://chzzk.naver.com/${channelId}`,
       avatarUrl: content.channelImageUrl || null,
       audienceCount: content.followerCount || 0,
+    };
+  }
+
+  /**
+   * CHZZK 공식 Open API의 채널 정보 조회(GET /open/v1/channels?channelIds=)는
+   * Client 인증(Client-Id/Client-Secret 헤더)만으로 동작하여 사용자 토큰 없이 팔로워 수를
+   * 재조회할 수 있습니다. 단, 공식 API는 채널 생성일을 제공하지 않으므로
+   * fetchChannelMetrics는 channelCreatedAt=null을 반환하며, 이 경우 상위 정책이
+   * MANUAL_REVIEW로 안전하게 라우팅합니다.
+   */
+  supportsAutomaticMetricRefresh(): boolean {
+    return Boolean(this.clientId && this.clientSecret);
+  }
+
+  async fetchChannelMetrics(platformUserId: string): Promise<CreatorChannelMetrics> {
+    if (!this.clientId || !this.clientSecret) {
+      throw new Error("CHZZK OAuth credentials not configured");
+    }
+
+    const params = new URLSearchParams({ channelIds: platformUserId });
+    const res = await fetch(
+      `https://openapi.chzzk.naver.com/open/v1/channels?${params.toString()}`,
+      {
+        headers: {
+          "Client-Id": this.clientId,
+          "Client-Secret": this.clientSecret,
+        },
+      },
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`CHZZK channels API (metric refresh) failed: ${res.status} ${errText}`);
+    }
+
+    const data = (await res.json()) as {
+      content?: {
+        data?: Array<{ followerCount?: number }>;
+      };
+    };
+
+    const first = data.content?.data?.[0];
+    const followerCount =
+      first?.followerCount !== undefined && first.followerCount !== null
+        ? Number(first.followerCount)
+        : null;
+
+    // 공식 API가 채널 생성일을 제공하지 않음 → UNKNOWN으로 명시 (추정 금지)
+    return {
+      audienceCount: followerCount !== null && !Number.isNaN(followerCount) ? followerCount : null,
+      channelCreatedAt: null,
     };
   }
 }

@@ -113,6 +113,44 @@ export class D1CreatorRepository implements CreatorRepository {
     return mapPlatformAccountRow(row);
   }
 
+  async findPlatformAccountById(platformAccountId: number): Promise<CreatorPlatformAccount | null> {
+    const row = await this.db
+      .prepare(`SELECT * FROM creator_platform_accounts WHERE id = ?`)
+      .bind(platformAccountId)
+      .first<Record<string, unknown>>();
+
+    if (!row) return null;
+    return mapPlatformAccountRow(row);
+  }
+
+  async updatePlatformAccountMetrics(
+    platformAccountId: number,
+    input: {
+      audienceCount: number | null;
+      channelCreatedAt: string | null;
+      syncedAt: string;
+    },
+  ): Promise<CreatorPlatformAccount> {
+    await this.db
+      .prepare(
+        `UPDATE creator_platform_accounts
+         SET audience_count = ?, channel_created_at = ?, metrics_synced_at = ?, updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(
+        input.audienceCount,
+        input.channelCreatedAt,
+        input.syncedAt,
+        input.syncedAt,
+        platformAccountId,
+      )
+      .run();
+
+    const updated = await this.findPlatformAccountById(platformAccountId);
+    if (!updated) throw new Error("Failed to update platform account metrics");
+    return updated;
+  }
+
   async upsertProfile(input: {
     userId: number;
     status: CreatorStatusType;

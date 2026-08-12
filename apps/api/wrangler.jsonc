@@ -16,4 +16,7 @@
   "vars": {
     "COMMIT_SHA": "dev",
   },
+  "triggers": {
+    "crons": ["0 */6 * * *"],
+  },
 }

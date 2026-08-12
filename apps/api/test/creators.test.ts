@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import app from "../src/index.js";
+import { app } from "../src/index.js";
 
 function createMockDb(sessionUser?: { id: number; nickname: string }) {
   return {
@@ -139,4 +139,143 @@ test("GET /api/creators/verify/:platform/callback rejects state mismatch", async
   const location = res.headers.get("location");
   assert.ok(location?.includes("creator_verify=error"));
   assert.ok(location?.includes("state_mismatch"));
+});
+
+test("GET /api/creators/me returns featuredReview and platform account metrics when present", async () => {
+  const mockEnv = {
+    DB: {
+      prepare(sql: string) {
+        if (sql.includes("JOIN users u ON s.user_id = u.id")) {
+          return {
+            bind() {
+              return {
+                async first() {
+                  return {
+                    session_id: "valid_session",
+                    user_id: 7,
+                    expires_at: new Date(Date.now() + 86400000).toISOString(),
+                    session_created_at: new Date().toISOString(),
+                    nickname: "Tester",
+                    email: null,
+                    avatar_url: null,
+                    user_created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    country: "KR",
+                    nickname_updated_at: null,
+                    country_updated_at: null,
+                  };
+                },
+              };
+            },
+          };
+        }
+        if (sql.includes("creator_profiles WHERE user_id =")) {
+          return {
+            bind() {
+              return {
+                async first() {
+                  return {
+                    id: 1,
+                    user_id: 7,
+                    status: "VERIFIED",
+                    featured_status: "NONE",
+                    featured_reason: "자동 심사 대기",
+                    featured_since: null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                  };
+                },
+              };
+            },
+          };
+        }
+        if (sql.includes("creator_platform_accounts WHERE creator_id =")) {
+          return {
+            bind() {
+              return {
+                async all() {
+                  return {
+                    results: [
+                      {
+                        id: 11,
+                        creator_id: 1,
+                        platform: "YOUTUBE",
+                        platform_user_id: "UC123",
+                        channel_name: "Test Channel",
+                        channel_handle: null,
+                        channel_url: "https://youtube.com/@test",
+                        avatar_url: null,
+                        verification_status: "VERIFIED",
+                        verified_at: new Date().toISOString(),
+                        audience_count: 25000,
+                        channel_created_at: "2023-01-01T00:00:00.000Z",
+                        metrics_synced_at: new Date().toISOString(),
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                      },
+                    ],
+                  };
+                },
+              };
+            },
+          };
+        }
+        if (sql.includes("creator_review_jobs")) {
+          return {
+            bind() {
+              return {
+                async first() {
+                  return {
+                    id: 21,
+                    creator_platform_account_id: 11,
+                    status: "AUTO_REVIEW_PENDING",
+                    initial_audience: 25000,
+                    initial_channel_created_at: "2023-01-01T00:00:00.000Z",
+                    next_check_at: new Date(Date.now() + 6 * 3600000).toISOString(),
+                    attempt_count: 0,
+                    last_error: null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    completed_at: null,
+                  };
+                },
+              };
+            },
+          };
+        }
+        return {
+          bind() {
+            return {
+              async first() {
+                return null;
+              },
+              async all() {
+                return { results: [] };
+              },
+              async run() {
+                return { success: true };
+              },
+            };
+          },
+        };
+      },
+    },
+  };
+
+  const res = await app.request(
+    "/api/creators/me",
+    { headers: { Cookie: "gamemoa_session=valid_session" } },
+    mockEnv as any,
+  );
+  assert.equal(res.status, 200);
+
+  const json = (await res.json()) as any;
+  const profile = json.profile;
+  assert.equal(profile.status, "VERIFIED");
+  assert.equal(profile.platformAccounts[0].platform, "YOUTUBE");
+  assert.equal(profile.platformAccounts[0].audienceCount, 25000);
+  assert.equal(profile.platformAccounts[0].channelCreatedAt, "2023-01-01T00:00:00.000Z");
+  assert.equal(profile.featuredReview.status, "AUTO_REVIEW_PENDING");
+  assert.equal(profile.featuredReview.attemptCount, 0);
+  assert.ok(profile.featuredReview.nextCheckAt);
 });
