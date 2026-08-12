@@ -10,10 +10,10 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "deploy": "pnpm --filter @gamemoa/api deploy && pnpm --filter @gamemoa/web deploy",
-    "d1:migrate": "pnpm --filter @gamemoa/api wrangler d1 migrations apply DB --local",
+    "d1:migrate": "pnpm exec wrangler d1 migrations apply DB --local --config apps/api/wrangler.jsonc",
+    "d1:migrate:prod": "pnpm exec wrangler d1 migrations apply DB --remote --config apps/api/wrangler.jsonc",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
-
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
@@ -24,7 +24,8 @@
     "tsx": "^4.23.12",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0",
-    "typescript-eslint": "^8.25.0"
+    "typescript-eslint": "^8.25.0",
+    "wrangler": "^4.121.0"
   },
   "dependencies": {
     "tslib": "^2.8.1"

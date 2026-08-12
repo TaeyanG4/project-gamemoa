@@ -80,7 +80,7 @@ authRouter.post("/google", async (c) => {
     setCookie(c, "gamemoa_session", session.id, {
       httpOnly: true,
       secure,
-      sameSite: "Lax",
+      sameSite: secure ? "None" : "Lax",
       maxAge: 30 * 24 * 60 * 60,
       path: "/",
     });
@@ -205,7 +205,7 @@ authRouter.get("/discord/callback", async (c) => {
   setCookie(c, "gamemoa_session", session.id, {
     httpOnly: true,
     secure,
-    sameSite: "Lax",
+    sameSite: secure ? "None" : "Lax",
     maxAge: 30 * 24 * 60 * 60,
     path: "/",
   });

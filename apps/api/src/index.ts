@@ -14,14 +14,15 @@ app.use(
   "*",
   cors({
     origin: (origin, c) => {
-      const allowedFrontend = c.env?.FRONTEND_URL;
-      if (!origin) return allowedFrontend || "http://localhost:5173";
-      if (allowedFrontend && origin === allowedFrontend) return origin;
+      const allowedFrontend = c.env?.FRONTEND_URL || "https://gamemoa-web.gamemoa.workers.dev";
+      if (!origin) return allowedFrontend;
+      if (origin === allowedFrontend || origin === "https://gamemoa-web.gamemoa.workers.dev") return origin;
       if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
         return origin;
       }
-      return allowedFrontend || "http://localhost:5173";
+      return allowedFrontend;
     },
+
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],

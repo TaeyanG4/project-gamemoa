@@ -1,6 +1,16 @@
-const API_URL = typeof window !== "undefined"
-  ? ((import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL ?? "http://localhost:8787")
-  : "http://localhost:8787";
+function getApiUrl(): string {
+  if (typeof window !== "undefined") {
+    const envUrl = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL;
+    if (envUrl) return envUrl;
+    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+      return "http://localhost:8787";
+    }
+  }
+  return "https://gamemoa-api.gamemoa.workers.dev";
+}
+
+const API_URL = getApiUrl();
+
 
 export type SocialProvider = "google" | "discord";
 export type AuthProviderName = SocialProvider;

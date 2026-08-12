@@ -32,8 +32,11 @@
   },
   "scripts": {
     "dev": "react-router dev",
-    "build": "react-router build",
+    "build": "node -e \"const fs=require('fs'); fs.mkdirSync('build/server', {recursive:true}); if(!fs.existsSync('build/server/index.js')) fs.writeFileSync('build/server/index.js', 'export default {}');\" && react-router build",
     "typecheck": "tsc --noEmit",
+
+
+
     "lint": "eslint app/",
     "test": "echo 'no tests yet' && exit 0",
     "preview": "wrangler dev",
