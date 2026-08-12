@@ -80,7 +80,10 @@ Phase C의 실질적인 항목은 모두 완료되었습니다. 다음 세션은
 - **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
 - **Local Unit Tests**: core 68 / db 14 / api 36 / web 15 — 전원 PASS
 - **D1 마이그레이션 (로컬 + 프로덕션)**: 0005 적용 성공 (기존 0000~0004 위에 additive)
-- **최종 커밋 (Final SHA)**: push 직후 아래 갱신 예정 — 현재 로컬 HEAD는 `2407c21`대(커밋 메시지 참고), 원격 push/CI/Deploy/provenance 확인은 이 문서의 다음 갱신에서 반영.
+- **최종 커밋 (Final SHA)**: `1b27d63adfd772be23dcdfd0c0414705f5211068` (origin/main과 100% 일치)
+- **GitHub Actions CI**: GREEN (run `31644243377`)
+- **Cloudflare Deploy**: GREEN (run `31644330936`) — D1 프로덕션 마이그레이션 적용, API/Web Worker 배포, Health/Provenance 체크 전원 통과.
+- **운영 Provenance/Smoke (`pnpm smoke:prod`)**: API `/api/health` commit = Web `/version.json` commit = `1b27d63adfd772be23dcdfd0c0414705f5211068` (= origin/main). 홈/게임/랭킹/프로필/미니게임/파비콘 자산 HTTP 200. `POST /api/profile/nickname`·`POST /api/profile/country`(미인증) 401 프로덕션 확인.
 - **수동 UI 검증 한계**: 이번 세션은 로컬 브라우저에서 실제 OAuth 로그인을 수행할 수 없어(자격 증명 없음), 닉네임/국가 변경 폼과 즐겨찾기/최근 플레이 카드는 authenticated 화면을 직접 클릭 검증하지 못했습니다 — 타입체크/린트/유닛 테스트/프로덕션 빌드 성공으로 검증을 대체했습니다. 다음 세션 또는 사용자가 실제 로그인 후 확인 권장.
 - **알려진 이전 CI 이슈(해결됨)**: 이전 push(`774a7df`)는 신규 Korean 문서 3개의 Prettier 테이블 정렬 누락으로 Format Check 실패(run `31639575768`) → `pnpm format` 재실행 후 재푸시로 해결(참고용, 현재 최종 상태에는 영향 없음).
 - **시작 SHA**: `dbcb4591bfdb6aac3b6150b398509f6992f29a5c`
