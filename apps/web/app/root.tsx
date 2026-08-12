@@ -3,6 +3,7 @@ import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import "./app.css";
 import { Layout } from "./components/layout/Layout";
 import { AuthProvider } from "./features/auth";
+import { PersonalizationProvider } from "./features/personalization";
 import { LoginModal } from "./components/ui/LoginModal";
 
 export default function App() {
@@ -26,10 +27,12 @@ export default function App() {
       </head>
       <body className="bg-surface text-text-primary antialiased">
         <AuthProvider>
-          <Layout>
-            <Outlet />
-          </Layout>
-          <LoginModal />
+          <PersonalizationProvider>
+            <Layout>
+              <Outlet />
+            </Layout>
+            <LoginModal />
+          </PersonalizationProvider>
         </AuthProvider>
         <ScrollRestoration />
         <Scripts />

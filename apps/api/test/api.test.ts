@@ -106,3 +106,10 @@ test("GET /api/scores/:gameId matches LeaderboardResponseSchema", async () => {
   assert.ok(parsed.success, "Response matches LeaderboardResponseSchema");
   assert.equal(parsed.data.game_id || parsed.data.gameId, "reaction-time");
 });
+
+test("GET /api/personalization returns 401 unauthenticated without session cookie", async () => {
+  const res = await app.request("http://localhost/api/personalization");
+  assert.equal(res.status, 401);
+  const data = (await res.json()) as { error: string };
+  assert.equal(data.error, "Unauthenticated");
+});

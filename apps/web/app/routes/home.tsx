@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Gamepad2, Sparkles } from "lucide-react";
+import { Gamepad2, Sparkles, Clock, Bookmark } from "lucide-react";
 import { gameManifests } from "../features/catalog/registry";
 import { GameCard } from "../components/ui/GameCard";
 import { HeroSpotlight } from "../components/ui/HeroSpotlight";
 import { CategoryChips } from "../components/ui/CategoryChips";
+import { usePersonalization } from "../features/personalization";
 
 export function meta() {
   return [
@@ -20,21 +21,78 @@ export default function Home() {
   const initialCategory = searchParams.get("category") || "all";
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
+  const { favoriteGameIds, recentPlays } = usePersonalization();
+
   const featuredGame = useMemo(() => {
     return gameManifests.find((g) => g.slug === FEATURED_SLUG) ?? gameManifests[0];
   }, []);
 
   const filteredGames = useMemo(() => {
     if (selectedCategory === "all") return gameManifests;
+    if (selectedCategory === "favorites") {
+      return gameManifests.filter(
+        (game) => favoriteGameIds.includes(game.slug) || favoriteGameIds.includes(game.id),
+      );
+    }
     return gameManifests.filter((game) => game.categories.includes(selectedCategory));
-  }, [selectedCategory]);
+  }, [selectedCategory, favoriteGameIds]);
+
+  const recentGames = useMemo(() => {
+    return recentPlays
+      .map((r) => gameManifests.find((g) => g.slug === r.gameId || g.id === r.gameId))
+      .filter((g): g is (typeof gameManifests)[0] => Boolean(g))
+      .slice(0, 4);
+  }, [recentPlays]);
+
+  const favoriteGames = useMemo(() => {
+    return favoriteGameIds
+      .map((id) => gameManifests.find((g) => g.slug === id || g.id === id))
+      .filter((g): g is (typeof gameManifests)[0] => Boolean(g))
+      .slice(0, 4);
+  }, [favoriteGameIds]);
 
   return (
-    <div className="flex flex-col w-full px-4 md:px-8 py-6 gap-10 max-w-7xl mx-auto">
+    <div className="flex flex-col w-full px-4 md:px-8 py-6 gap-10 max-w-7xl mx-auto flex-1">
       {/* MiniGame.com Style Hero Spotlight Banner */}
       {featuredGame && (
         <section className="w-full">
           <HeroSpotlight game={featuredGame} />
+        </section>
+      )}
+
+      {/* Personalized Section: Recent Plays */}
+      {recentGames.length > 0 && (
+        <section className="flex flex-col gap-4 w-full">
+          <div className="flex items-center justify-between border-b border-border/40 pb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-brand" />
+              <h3 className="text-xl font-black text-text-primary tracking-tight">최근 플레이</h3>
+            </div>
+            <span className="text-xs font-bold text-text-muted">{recentGames.length}개</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {recentGames.map((game) => (
+              <GameCard key={game.slug} {...game} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Personalized Section: Favorites */}
+      {favoriteGames.length > 0 && (
+        <section className="flex flex-col gap-4 w-full">
+          <div className="flex items-center justify-between border-b border-border/40 pb-3">
+            <div className="flex items-center gap-2">
+              <Bookmark className="w-5 h-5 text-amber-400 fill-amber-400" />
+              <h3 className="text-xl font-black text-text-primary tracking-tight">내 즐겨찾기</h3>
+            </div>
+            <span className="text-xs font-bold text-text-muted">{favoriteGames.length}개</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {favoriteGames.map((game) => (
+              <GameCard key={game.slug} {...game} />
+            ))}
+          </div>
         </section>
       )}
 
@@ -68,7 +126,9 @@ export default function Home() {
 
           {filteredGames.length === 0 && (
             <div className="col-span-full py-16 text-center text-text-muted bg-surface-raised rounded-3xl border border-border border-dashed">
-              해당 카테고리에 준비된 게임이 없습니다.
+              {selectedCategory === "favorites"
+                ? "아직 즐겨찾기한 게임이 없습니다."
+                : "해당 카테고리에 준비된 게임이 없습니다."}
             </div>
           )}
         </div>

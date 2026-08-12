@@ -9,6 +9,7 @@ import {
 } from "@gamemoa/game-sdk";
 import { saveLocalBestScore, submitScoreApi } from "../features/scores/api";
 import { useAuth } from "../features/auth";
+import { usePersonalization } from "../features/personalization";
 import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck } from "lucide-react";
 
 type SubmissionState = "idle" | "submitting" | "success" | "error";
@@ -131,13 +132,17 @@ export default function GamePlay() {
     setAttemptKey((prev) => prev + 1);
   }, []);
 
+  const { recordRecentPlay } = usePersonalization();
+
   // Game Runtime Context
   const runtime = useMemo<GameRuntimeContext>(
     () => ({
       sessionId,
       user: user ? { id: String(user.id), displayName: user.nickname } : null,
-      emit: () => {
-        // Event logging intentionally silent in production
+      emit: (event) => {
+        if (event && event.type === "game_started") {
+          void recordRecentPlay(slug);
+        }
       },
       complete: async (gameResult) => {
         setResult(gameResult);
@@ -151,7 +156,7 @@ export default function GamePlay() {
         void navigate("/games");
       },
     }),
-    [sessionId, user, navigate, slug, manifest, handleScoreSubmission],
+    [sessionId, user, navigate, slug, manifest, handleScoreSubmission, recordRecentPlay],
   );
 
   if (error) {

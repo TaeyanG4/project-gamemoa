@@ -4,6 +4,7 @@ import { Gamepad2, Search } from "lucide-react";
 import { gameManifests } from "../features/catalog/registry";
 import { GameCard } from "../components/ui/GameCard";
 import { CategoryChips } from "../components/ui/CategoryChips";
+import { usePersonalization } from "../features/personalization";
 
 export function meta() {
   return [
@@ -20,6 +21,8 @@ export default function Games() {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
+  const { favoriteGameIds } = usePersonalization();
+
   const filteredGames = useMemo(() => {
     return gameManifests.filter((game) => {
       const matchesSearch =
@@ -28,11 +31,15 @@ export default function Games() {
         game.shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCategory =
-        selectedCategory === "all" || game.categories.includes(selectedCategory);
+        selectedCategory === "all"
+          ? true
+          : selectedCategory === "favorites"
+            ? favoriteGameIds.includes(game.slug) || favoriteGameIds.includes(game.id)
+            : game.categories.includes(selectedCategory);
 
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery, selectedCategory, favoriteGameIds]);
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-7xl mx-auto flex-1">
@@ -73,7 +80,9 @@ export default function Games() {
 
         {filteredGames.length === 0 && (
           <div className="col-span-full py-20 text-center text-text-muted bg-surface-raised rounded-3xl border border-border border-dashed">
-            검색 결과와 일치하는 게임이 없습니다.
+            {selectedCategory === "favorites"
+              ? "아직 즐겨찾기한 게임이 없습니다."
+              : "검색 결과와 일치하는 게임이 없습니다."}
           </div>
         )}
       </div>
