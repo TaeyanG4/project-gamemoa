@@ -15,7 +15,6 @@ export const PersonalizationStateSchema = z.object({
 export type PersonalizationState = z.infer<typeof PersonalizationStateSchema>;
 
 export const ImportGuestPersonalizationRequestSchema = z.object({
-  guestFavorites: z.array(z.string()),
   guestRecentPlays: z.array(RecentPlaySchema),
 });
 

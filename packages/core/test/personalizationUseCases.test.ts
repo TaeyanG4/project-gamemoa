@@ -44,12 +44,8 @@ class MemoryPersonalizationRepository implements PersonalizationRepository {
 
   async importGuestData(
     userId: number,
-    guestFavorites: string[],
     guestRecentPlays: { gameId: string; lastPlayedAt: string }[],
   ): Promise<void> {
-    for (const f of guestFavorites) {
-      await this.addFavorite(userId, f);
-    }
     for (const r of guestRecentPlays) {
       await this.recordRecentPlay(userId, r.gameId, r.lastPlayedAt);
     }
@@ -87,7 +83,7 @@ test("PersonalizationUseCases handles recent plays deduplication and limit", asy
   assert.equal(state.recentPlays[0].gameId, "reaction-time");
 });
 
-test("PersonalizationUseCases imports guest data correctly with union and max timestamp", async () => {
+test("PersonalizationUseCases imports guest recent plays but NOT guest favorites", async () => {
   const repo = new MemoryPersonalizationRepository();
   const useCases = new PersonalizationUseCases(repo);
 
@@ -95,22 +91,18 @@ test("PersonalizationUseCases imports guest data correctly with union and max ti
   await useCases.addFavorite(1, "reaction-time");
   await useCases.recordRecentPlay(1, "aim-test");
 
-  // Guest data to import
-  const guestFavs = ["aim-test", "typing-test", "deleted-game"];
+  // Guest data to import: only recent plays (favorites are no longer imported)
   const guestRecent = [
     { gameId: "typing-test", lastPlayedAt: "2026-08-13T00:00:00Z" },
     { gameId: "invalid-game", lastPlayedAt: "2026-08-13T00:00:00Z" },
   ];
 
-  const state = await useCases.importGuestData(1, guestFavs, guestRecent);
+  const state = await useCases.importGuestData(1, guestRecent);
 
-  // Union of favorites (valid games only)
-  assert.ok(state.favoriteGameIds.includes("reaction-time"));
-  assert.ok(state.favoriteGameIds.includes("aim-test"));
-  assert.ok(state.favoriteGameIds.includes("typing-test"));
-  assert.ok(!state.favoriteGameIds.includes("deleted-game"));
+  // Favorites must remain only the pre-existing account favorite (no guest favorites imported)
+  assert.deepEqual(state.favoriteGameIds, ["reaction-time"]);
 
-  // Valid recent plays only
+  // Valid recent plays only (invalid game filtered out)
   const recentIds = state.recentPlays.map((r) => r.gameId);
   assert.ok(recentIds.includes("aim-test"));
   assert.ok(recentIds.includes("typing-test"));

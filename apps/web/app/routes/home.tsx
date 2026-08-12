@@ -6,6 +6,7 @@ import { GameCard } from "../components/ui/GameCard";
 import { HeroSpotlight } from "../components/ui/HeroSpotlight";
 import { CategoryChips } from "../components/ui/CategoryChips";
 import { usePersonalization } from "../features/personalization";
+import { useAuth } from "../features/auth";
 
 export function meta() {
   return [
@@ -22,10 +23,19 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
   const { favoriteGameIds, recentPlays } = usePersonalization();
+  const { isAuthenticated, openLoginModal } = useAuth();
 
   const featuredGame = useMemo(() => {
     return gameManifests.find((g) => g.slug === FEATURED_SLUG) ?? gameManifests[0];
   }, []);
+
+  const handleSelectCategory = (categoryId: string) => {
+    if (categoryId === "favorites" && !isAuthenticated) {
+      openLoginModal();
+      return;
+    }
+    setSelectedCategory(categoryId);
+  };
 
   const filteredGames = useMemo(() => {
     if (selectedCategory === "all") return gameManifests;
@@ -79,7 +89,7 @@ export default function Home() {
       )}
 
       {/* Personalized Section: Favorites */}
-      {favoriteGames.length > 0 && (
+      {isAuthenticated && favoriteGames.length > 0 && (
         <section className="flex flex-col gap-4 w-full">
           <div className="flex items-center justify-between border-b border-border/40 pb-3">
             <div className="flex items-center gap-2">
@@ -113,7 +123,7 @@ export default function Home() {
           <div className="w-full sm:w-auto">
             <CategoryChips
               selectedCategory={selectedCategory}
-              onSelectCategory={setSelectedCategory}
+              onSelectCategory={handleSelectCategory}
             />
           </div>
         </div>

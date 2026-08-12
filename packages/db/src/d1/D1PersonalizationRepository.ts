@@ -60,19 +60,11 @@ export class D1PersonalizationRepository implements PersonalizationRepository {
 
   async importGuestData(
     userId: number,
-    guestFavorites: string[],
     guestRecentPlays: { gameId: string; lastPlayedAt: string }[],
   ): Promise<void> {
     const now = new Date().toISOString();
 
-    // 1. Import Favorites (Union)
-    for (const gameId of guestFavorites) {
-      if (typeof gameId === "string" && gameId.trim().length > 0) {
-        await this.addFavorite(userId, gameId.trim());
-      }
-    }
-
-    // 2. Import Recent Plays (Max timestamp per game)
+    // Import Recent Plays only (Max timestamp per game). Guest favorites are NOT imported.
     for (const recent of guestRecentPlays) {
       if (recent && typeof recent.gameId === "string" && recent.gameId.trim().length > 0) {
         const timestamp = recent.lastPlayedAt || now;

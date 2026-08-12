@@ -32,7 +32,7 @@ function isValidGame(gameId: string): boolean {
 }
 
 export function PersonalizationProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, openLoginModal } = useAuth();
   const [favoriteGameIds, setFavoriteGameIds] = useState<string[]>([]);
   const [recentPlays, setRecentPlays] = useState<{ gameId: string; lastPlayedAt: string }[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -42,14 +42,13 @@ export function PersonalizationProvider({ children }: { children: React.ReactNod
   const loadState = useCallback(async () => {
     setIsLoading(true);
     if (user) {
-      // User is logged in: Check if we need one-time guest -> account import
+      // User is logged in: perform one-time guest recent-plays import (favorites are NOT imported).
       const guestData = getGuestPersonalization();
-      const hasGuestData = guestData.favoriteGameIds.length > 0 || guestData.recentPlays.length > 0;
+      const hasGuestData = guestData.recentPlays.length > 0;
 
       if (hasGuestData) {
         try {
           const imported = await importGuestPersonalizationApi({
-            guestFavorites: guestData.favoriteGameIds,
             guestRecentPlays: guestData.recentPlays,
           });
           setFavoriteGameIds(imported.favoriteGameIds.filter(isValidGame));
@@ -62,7 +61,6 @@ export function PersonalizationProvider({ children }: { children: React.ReactNod
             setFavoriteGameIds(serverState.favoriteGameIds.filter(isValidGame));
             setRecentPlays(serverState.recentPlays.filter((r) => isValidGame(r.gameId)));
           } catch {
-            setFavoriteGameIds(guestData.favoriteGameIds.filter(isValidGame));
             setRecentPlays(guestData.recentPlays.filter((r) => isValidGame(r.gameId)));
           }
         }
@@ -77,9 +75,9 @@ export function PersonalizationProvider({ children }: { children: React.ReactNod
         }
       }
     } else {
-      // Guest User
+      // Guest User: favorites are login-only, so guest favorites are always empty.
       const guestData = getGuestPersonalization();
-      setFavoriteGameIds(guestData.favoriteGameIds.filter(isValidGame));
+      setFavoriteGameIds([]);
       setRecentPlays(guestData.recentPlays.filter((r) => isValidGame(r.gameId)));
     }
     setIsLoading(false);
@@ -105,6 +103,12 @@ export function PersonalizationProvider({ children }: { children: React.ReactNod
     async (gameId: string) => {
       if (!isValidGame(gameId)) return;
 
+      // Guests cannot favorite. Prompt login instead of persisting a guest favorite.
+      if (!user) {
+        openLoginModal();
+        return;
+      }
+
       const currentlyFav = favoriteGameIds.includes(gameId);
       const updatedFavs = currentlyFav
         ? favoriteGameIds.filter((id) => id !== gameId)
@@ -112,25 +116,18 @@ export function PersonalizationProvider({ children }: { children: React.ReactNod
 
       setFavoriteGameIds(updatedFavs);
 
-      if (user) {
-        try {
-          if (currentlyFav) {
-            await removeFavoriteApi(gameId);
-          } else {
-            await addFavoriteApi(gameId);
-          }
-        } catch {
-          // Revert optimistic UI if server update fails
-          setFavoriteGameIds(favoriteGameIds);
+      try {
+        if (currentlyFav) {
+          await removeFavoriteApi(gameId);
+        } else {
+          await addFavoriteApi(gameId);
         }
-      } else {
-        saveGuestPersonalization({
-          favoriteGameIds: updatedFavs,
-          recentPlays,
-        });
+      } catch {
+        // Revert optimistic UI if server update fails
+        setFavoriteGameIds(favoriteGameIds);
       }
     },
-    [user, favoriteGameIds, recentPlays],
+    [user, favoriteGameIds, openLoginModal],
   );
 
   const recordRecentPlay = useCallback(
@@ -151,12 +148,11 @@ export function PersonalizationProvider({ children }: { children: React.ReactNod
         }
       } else {
         saveGuestPersonalization({
-          favoriteGameIds,
           recentPlays: updatedRecent,
         });
       }
     },
-    [user, favoriteGameIds, recentPlays],
+    [user, recentPlays],
   );
 
   return (

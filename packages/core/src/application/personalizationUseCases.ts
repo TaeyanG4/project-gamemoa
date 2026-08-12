@@ -48,13 +48,11 @@ export class PersonalizationUseCases {
 
   async importGuestData(
     userId: number,
-    guestFavorites: string[],
     guestRecentPlays: { gameId: string; lastPlayedAt: string }[],
   ): Promise<PersonalizationState> {
-    const validFavorites = (guestFavorites || []).filter(isPublishedGame);
     const validRecent = (guestRecentPlays || []).filter((r) => r && isPublishedGame(r.gameId));
 
-    await this.repo.importGuestData(userId, validFavorites, validRecent);
+    await this.repo.importGuestData(userId, validRecent);
     return this.getPersonalizationState(userId);
   }
 }

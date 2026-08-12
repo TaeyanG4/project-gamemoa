@@ -125,7 +125,6 @@ personalizationRouter.post("/import", async (c) => {
   const { personalizationUseCases } = createContainer(c.env.DB);
   const updatedState = await personalizationUseCases.importGuestData(
     user.id,
-    parsed.data.guestFavorites,
     parsed.data.guestRecentPlays,
   );
 

@@ -28,7 +28,6 @@ export async function recordRecentPlayApi(gameId: string): Promise<void> {
 }
 
 export async function importGuestPersonalizationApi(payload: {
-  guestFavorites: string[];
   guestRecentPlays: { gameId: string; lastPlayedAt: string }[];
 }): Promise<PersonalizationState> {
   return apiFetch("/api/personalization/import", PersonalizationStateSchema, {

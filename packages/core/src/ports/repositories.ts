@@ -95,7 +95,6 @@ export interface PersonalizationRepository {
 
   importGuestData(
     userId: number,
-    guestFavorites: string[],
     guestRecentPlays: { gameId: string; lastPlayedAt: string }[],
   ): Promise<void>;
 }

@@ -5,6 +5,7 @@ import { gameManifests } from "../features/catalog/registry";
 import { GameCard } from "../components/ui/GameCard";
 import { CategoryChips } from "../components/ui/CategoryChips";
 import { usePersonalization } from "../features/personalization";
+import { useAuth } from "../features/auth";
 
 export function meta() {
   return [
@@ -22,6 +23,15 @@ export default function Games() {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
   const { favoriteGameIds } = usePersonalization();
+  const { isAuthenticated, openLoginModal } = useAuth();
+
+  const handleSelectCategory = (categoryId: string) => {
+    if (categoryId === "favorites" && !isAuthenticated) {
+      openLoginModal();
+      return;
+    }
+    setSelectedCategory(categoryId);
+  };
 
   const filteredGames = useMemo(() => {
     return gameManifests.filter((game) => {
@@ -70,7 +80,7 @@ export default function Games() {
       </div>
 
       {/* Category Chips Bar */}
-      <CategoryChips selectedCategory={selectedCategory} onSelectCategory={setSelectedCategory} />
+      <CategoryChips selectedCategory={selectedCategory} onSelectCategory={handleSelectCategory} />
 
       {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
