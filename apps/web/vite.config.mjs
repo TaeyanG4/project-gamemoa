@@ -9,6 +9,9 @@ export default defineConfig({
       strict: false,
     },
   },
+  resolve: {
+    dedupe: ["react", "react-dom", "react-router"],
+  },
   plugins: [
     tailwindcss(),
     reactRouter(),
