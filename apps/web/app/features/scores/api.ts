@@ -8,6 +8,41 @@ import {
 import { GAME_MANIFEST_MAP } from "@gamemoa/core";
 import { apiFetch } from "../../lib/api";
 
+let activePlayToken: string | null = null;
+
+export function consumeActivePlayToken(): string | null {
+  const token = activePlayToken;
+  activePlayToken = null;
+  return token;
+}
+
+export function setActivePlayToken(token: string | null): void {
+  activePlayToken = token;
+}
+
+export function extractPlayTokenFromLocation(): string | null {
+  if (typeof window === "undefined") return null;
+  const hash = window.location.hash;
+  if (!hash || !hash.includes("play_token=")) return null;
+
+  try {
+    const hashStr = hash.startsWith("#") ? hash.substring(1) : hash;
+    const params = new URLSearchParams(hashStr);
+    const token = params.get("play_token");
+    if (token) {
+      activePlayToken = token;
+      params.delete("play_token");
+      const newHash = params.toString() ? `#${params.toString()}` : "";
+      const newUrl = window.location.pathname + window.location.search + newHash;
+      window.history.replaceState(null, "", newUrl);
+      return token;
+    }
+  } catch {
+    // Ignore URL parse errors
+  }
+  return null;
+}
+
 export function getLocalBestScore(gameId: string): number | null {
   if (typeof window === "undefined" || !window.localStorage) return null;
   const raw = localStorage.getItem(`gamemoa_best_${gameId}`);
@@ -31,13 +66,16 @@ export async function submitScoreApi(payload: {
   gameId: string;
   score: number;
   nickname?: string;
+  playToken?: string | null;
 }): Promise<SubmitScoreResponse> {
+  const tokenToUse = payload.playToken || consumeActivePlayToken();
   return await apiFetch("/api/scores", SubmitScoreResponseSchema, {
     method: "POST",
     body: JSON.stringify({
       game_id: payload.gameId,
       score: payload.score,
       nickname: payload.nickname,
+      ...(tokenToUse ? { play_token: tokenToUse } : {}),
     }),
   });
 }

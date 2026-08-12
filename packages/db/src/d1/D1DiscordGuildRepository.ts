@@ -6,6 +6,8 @@ import type {
   DiscordGuildRegistrationStatus,
   DiscordCandidateGuild,
   DiscordRegistrationChallenge,
+  DiscordPlayContext,
+  DiscordGuildXpEvent,
 } from "@gamemoa/core";
 import type { D1Database } from "./D1UserRepository.js";
 
@@ -322,5 +324,122 @@ export class D1DiscordGuildRepository implements DiscordGuildRepository {
       .all<Record<string, unknown>>();
 
     return (rows.results || []).map(mapGuildRow);
+  }
+
+  async createPlayContext(input: {
+    guildId: string;
+    discordUserId: string;
+    userId: number;
+    gameId?: string | null;
+    ttlSeconds?: number;
+  }): Promise<{ token: string; expiresAt: string }> {
+    const token = generateRandomToken();
+    const tokenHash = await hashToken(token);
+    const createdAt = new Date().toISOString();
+    const ttl = input.ttlSeconds ?? 900; // default 15 mins
+    const expiresAt = new Date(Date.now() + ttl * 1000).toISOString();
+    const gameId = input.gameId ?? null;
+
+    await this.db
+      .prepare(
+        `INSERT INTO discord_play_contexts (token_hash, guild_id, discord_user_id, user_id, game_id, created_at, expires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(
+        tokenHash,
+        input.guildId,
+        input.discordUserId,
+        input.userId,
+        gameId,
+        createdAt,
+        expiresAt,
+      )
+      .run();
+
+    return { token, expiresAt };
+  }
+
+  async findPlayContextByToken(token: string): Promise<DiscordPlayContext | null> {
+    const tokenHash = await hashToken(token);
+    const row = await this.db
+      .prepare(
+        `SELECT token_hash, guild_id, discord_user_id, user_id, game_id, created_at, expires_at, consumed_at
+         FROM discord_play_contexts WHERE token_hash = ?`,
+      )
+      .bind(tokenHash)
+      .first<Record<string, unknown>>();
+
+    if (!row) return null;
+
+    return {
+      tokenHash: String(row.token_hash),
+      guildId: String(row.guild_id),
+      discordUserId: String(row.discord_user_id),
+      userId: Number(row.user_id),
+      gameId: row.game_id ? String(row.game_id) : null,
+      createdAt: String(row.created_at),
+      expiresAt: String(row.expires_at),
+      consumedAt: row.consumed_at ? String(row.consumed_at) : null,
+    };
+  }
+
+  async consumePlayContextByToken(token: string): Promise<void> {
+    const tokenHash = await hashToken(token);
+    const now = new Date().toISOString();
+    await this.db
+      .prepare(`UPDATE discord_play_contexts SET consumed_at = ? WHERE token_hash = ?`)
+      .bind(now, tokenHash)
+      .run();
+  }
+
+  async attributeGuildXp(input: {
+    guildId: string;
+    userId: number;
+    sourceXpEventId: number;
+    amount: number;
+  }): Promise<DiscordGuildXpEvent | null> {
+    const now = new Date().toISOString();
+    await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO discord_guild_xp_events (guild_id, user_id, source_xp_event_id, amount, created_at)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .bind(input.guildId, input.userId, input.sourceXpEventId, input.amount, now)
+      .run();
+
+    const row = await this.db
+      .prepare(`SELECT * FROM discord_guild_xp_events WHERE source_xp_event_id = ?`)
+      .bind(input.sourceXpEventId)
+      .first<Record<string, unknown>>();
+
+    if (!row) return null;
+    return {
+      id: Number(row.id),
+      guildId: String(row.guild_id),
+      userId: Number(row.user_id),
+      sourceXpEventId: Number(row.source_xp_event_id),
+      amount: Number(row.amount),
+      createdAt: String(row.created_at),
+    };
+  }
+
+  async getGuildUserXp(guildId: string, userId: number): Promise<number> {
+    const row = await this.db
+      .prepare(
+        `SELECT SUM(amount) as total FROM discord_guild_xp_events WHERE guild_id = ? AND user_id = ?`,
+      )
+      .bind(guildId, userId)
+      .first<{ total: number | null }>();
+
+    return row?.total ?? 0;
+  }
+
+  async getGuildTotalXp(guildId: string): Promise<number> {
+    const row = await this.db
+      .prepare(`SELECT SUM(amount) as total FROM discord_guild_xp_events WHERE guild_id = ?`)
+      .bind(guildId)
+      .first<{ total: number | null }>();
+
+    return row?.total ?? 0;
   }
 }

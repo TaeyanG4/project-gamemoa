@@ -21,6 +21,7 @@ import {
   DiscordGuildRegistrationUseCases,
   DiscordGuildDirectoryUseCases,
   DiscordGuildManagementUseCases,
+  DiscordGuildXpUseCases,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -55,6 +56,7 @@ export interface AppContainer {
   discordGuildRegistrationUseCases: DiscordGuildRegistrationUseCases;
   discordGuildDirectoryUseCases: DiscordGuildDirectoryUseCases;
   discordGuildManagementUseCases: DiscordGuildManagementUseCases;
+  discordGuildXpUseCases: DiscordGuildXpUseCases;
 }
 
 export function createContainer(db: D1Database): AppContainer {
@@ -79,6 +81,7 @@ export function createContainer(db: D1Database): AppContainer {
   const discordGuildRegistrationUseCases = new DiscordGuildRegistrationUseCases(discordGuildRepo);
   const discordGuildDirectoryUseCases = new DiscordGuildDirectoryUseCases(discordGuildRepo);
   const discordGuildManagementUseCases = new DiscordGuildManagementUseCases(discordGuildRepo);
+  const discordGuildXpUseCases = new DiscordGuildXpUseCases(discordGuildRepo, userRepo);
 
   return {
     userRepo,
@@ -102,6 +105,7 @@ export function createContainer(db: D1Database): AppContainer {
     discordGuildRegistrationUseCases,
     discordGuildDirectoryUseCases,
     discordGuildManagementUseCases,
+    discordGuildXpUseCases,
   };
 }
 

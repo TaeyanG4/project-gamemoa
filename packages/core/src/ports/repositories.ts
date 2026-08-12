@@ -169,6 +169,7 @@ export interface RecordCompletionOutcome {
   xpAwarded: number;
   totalXp: number;
   eligibleCompletions: number;
+  xpEventId?: number | undefined;
 }
 
 export interface XpLeaderboardEntry {
@@ -286,6 +287,26 @@ export interface DiscordRegistrationChallenge {
   consumedAt: string | null;
 }
 
+export interface DiscordPlayContext {
+  tokenHash: string;
+  guildId: string;
+  discordUserId: string;
+  userId: number;
+  gameId: string | null;
+  createdAt: string;
+  expiresAt: string;
+  consumedAt: string | null;
+}
+
+export interface DiscordGuildXpEvent {
+  id: number;
+  guildId: string;
+  userId: number;
+  sourceXpEventId: number;
+  amount: number;
+  createdAt: string;
+}
+
 export interface DiscordGuildRepository {
   createRegistrationChallenge(input: {
     userId: number;
@@ -329,4 +350,24 @@ export interface DiscordGuildRepository {
   isGuildManager(guildId: string, userId: number): Promise<boolean>;
   addGuildManager(guildId: string, userId: number, role?: string): Promise<void>;
   getUserManagedGuilds(userId: number): Promise<DiscordGuild[]>;
+
+  createPlayContext(input: {
+    guildId: string;
+    discordUserId: string;
+    userId: number;
+    gameId?: string | null;
+    ttlSeconds?: number;
+  }): Promise<{ token: string; expiresAt: string }>;
+  findPlayContextByToken(token: string): Promise<DiscordPlayContext | null>;
+  consumePlayContextByToken(token: string): Promise<void>;
+
+  attributeGuildXp(input: {
+    guildId: string;
+    userId: number;
+    sourceXpEventId: number;
+    amount: number;
+  }): Promise<DiscordGuildXpEvent | null>;
+
+  getGuildUserXp(guildId: string, userId: number): Promise<number>;
+  getGuildTotalXp(guildId: string): Promise<number>;
 }

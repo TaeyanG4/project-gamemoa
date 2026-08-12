@@ -5,6 +5,7 @@ export const scoreSubmissionSchema = z.object({
   score: z.number().min(0, "Score cannot be negative"),
   grade: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  playToken: z.string().optional(),
   timestamp: z.number().default(() => Date.now()),
 });
 export type ScoreSubmission = z.infer<typeof scoreSubmissionSchema>;
@@ -13,6 +14,8 @@ export const SubmitScoreRequestSchema = z.object({
   game_id: z.string().min(1, "Game ID is required"),
   score: z.number().finite("Score must be a finite number"),
   nickname: z.string().optional(),
+  play_token: z.string().optional(),
+  playToken: z.string().optional(),
 });
 export type SubmitScoreRequest = z.infer<typeof SubmitScoreRequestSchema>;
 
@@ -25,6 +28,8 @@ export const SubmitScoreResponseSchema = z.object({
   // Progression side-effects of this accepted completion. XP never affects the score
   // above — these fields are purely informational for client UX (e.g. a small XP toast).
   xpAwarded: z.number().int().min(0).optional(),
+  guildXpAwarded: z.number().int().min(0).optional(),
+  guildId: z.string().optional(),
   newlyUnlockedAchievements: z.array(z.string()).optional(),
 });
 export type SubmitScoreResponse = z.infer<typeof SubmitScoreResponseSchema>;

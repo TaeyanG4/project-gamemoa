@@ -7,7 +7,11 @@ import {
   type GameResult,
   type GameProps,
 } from "@gamemoa/game-sdk";
-import { saveLocalBestScore, submitScoreApi } from "../features/scores/api";
+import {
+  saveLocalBestScore,
+  submitScoreApi,
+  extractPlayTokenFromLocation,
+} from "../features/scores/api";
 import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
 import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck } from "lucide-react";
@@ -60,6 +64,7 @@ export default function GamePlay() {
   // Load Game Module
   useEffect(() => {
     let isMounted = true;
+    extractPlayTokenFromLocation();
 
     async function init() {
       try {

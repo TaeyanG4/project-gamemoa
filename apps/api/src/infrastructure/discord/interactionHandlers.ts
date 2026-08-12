@@ -42,6 +42,8 @@ export async function handleGamemoaCommand(
       return handleLinkCommand(container, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.PROFILE:
       return handleProfileCommand(container, discordUser);
+    case DISCORD_SUBCOMMANDS.PLAY:
+      return handlePlayCommand(container, interaction, discordUser, frontendUrl);
     default:
       return ephemeral("알 수 없는 명령어입니다.");
   }
@@ -99,4 +101,51 @@ async function handleProfileCommand(
   return ephemeral(
     `**${user.nickname}**\n레벨 ${summary.level} · 총 ${summary.totalXp.toLocaleString()} XP`,
   );
+}
+
+async function handlePlayCommand(
+  container: AppContainer,
+  interaction: DiscordInteraction,
+  discordUser: DiscordInteractionUser,
+  frontendUrl: string,
+): Promise<DiscordInteractionResponse> {
+  const guildId = interaction.guild_id;
+  if (!guildId) {
+    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+  }
+
+  const subCommandOptions = interaction.data?.options?.[0]?.options;
+  const gameOption = subCommandOptions?.find((o) => o.name === "game")?.value;
+  const selectedGameId = typeof gameOption === "string" ? gameOption.trim() : null;
+
+  try {
+    const playCtx = await container.discordGuildXpUseCases.createPlayContextFromInteraction({
+      guildId,
+      discordUserId: discordUser.id,
+      gameId: selectedGameId,
+    });
+
+    const targetPath =
+      selectedGameId && GAME_MANIFEST_MAP[selectedGameId]
+        ? `/games/${GAME_MANIFEST_MAP[selectedGameId].slug}#play_token=${encodeURIComponent(playCtx.token)}`
+        : `/games#play_token=${encodeURIComponent(playCtx.token)}`;
+
+    const playUrl = `${frontendUrl}${targetPath}`;
+    const gameTitle =
+      selectedGameId && GAME_MANIFEST_MAP[selectedGameId]
+        ? GAME_MANIFEST_MAP[selectedGameId].title
+        : null;
+
+    const gameText = gameTitle ? ` **${gameTitle}**` : "";
+
+    return ephemeral(
+      `🎮 **${playCtx.guildName}** 기여 플레이 링크가 발급되었습니다!${gameText}\n` +
+        `아래 링크를 통해 게임을 플레이하면 이 서버에 XP가 기여됩니다:\n` +
+        `${playUrl}\n\n` +
+        `⏱️ 이 링크는 15분간 유효하며 1회만 사용할 수 있습니다.`,
+    );
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "플레이 링크 생성에 실패했습니다.";
+    return ephemeral(errorMsg);
+  }
 }

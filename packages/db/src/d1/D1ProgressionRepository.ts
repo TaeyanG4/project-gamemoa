@@ -31,6 +31,7 @@ export class D1ProgressionRepository implements ProgressionRepository {
         xpAwarded: 0,
         totalXp: progress?.total_xp ?? 0,
         eligibleCompletions: progress?.eligible_completions ?? 0,
+        xpEventId: Number(existing.id),
       };
     }
 
@@ -97,12 +98,17 @@ export class D1ProgressionRepository implements ProgressionRepository {
       .run();
 
     const progress = await this.getUserProgress(input.userId);
+    const createdEvent = await this.db
+      .prepare(`SELECT id FROM xp_events WHERE source_type = ? AND source_id = ?`)
+      .bind(input.sourceType, input.sourceId)
+      .first<{ id: number }>();
 
     return {
       duplicate: false,
       xpAwarded,
       totalXp: progress?.total_xp ?? xpAwarded,
       eligibleCompletions: progress?.eligible_completions ?? 1,
+      xpEventId: createdEvent ? Number(createdEvent.id) : undefined,
     };
   }
 

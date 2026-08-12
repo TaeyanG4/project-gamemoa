@@ -34,6 +34,7 @@ scoresRouter.post("/", async (c) => {
       score: rawBody.score,
       grade: rawBody.grade,
       metadata: rawBody.metadata,
+      playToken: rawBody.playToken ?? rawBody.play_token,
       timestamp: rawBody.timestamp,
     });
 
@@ -64,6 +65,8 @@ scoresRouter.post("/", async (c) => {
     // completion (idempotent by the saved score's own row id), then re-evaluate
     // achievements. Never influences the score/leaderboard above.
     let xpAwarded = 0;
+    let guildXpAwarded = 0;
+    let guildId: string | undefined = undefined;
     let newlyUnlockedAchievements: string[] = [];
     try {
       const completion = await container.progressionUseCases.recordAcceptedGameCompletion({
@@ -72,6 +75,21 @@ scoresRouter.post("/", async (c) => {
         sourceId: String(result.saved.id),
       });
       xpAwarded = completion.xpAwarded;
+
+      if (parseResult.data.playToken && completion.xpEventId) {
+        const guildAttr = await container.discordGuildXpUseCases.attributeCompletionToGuild({
+          userId,
+          gameId: result.saved.game_id,
+          sourceXpEventId: completion.xpEventId,
+          xpAmount: xpAwarded,
+          playToken: parseResult.data.playToken,
+        });
+        if (guildAttr.attributed) {
+          guildXpAwarded = guildAttr.amount ?? 0;
+          guildId = guildAttr.guildId;
+        }
+      }
+
       newlyUnlockedAchievements = await evaluateAchievementsForUser(container, userId);
     } catch (progressionErr) {
       // Progression bookkeeping must never fail the score submission itself.
@@ -85,6 +103,7 @@ scoresRouter.post("/", async (c) => {
       score: result.saved.score,
       nickname: result.saved.nickname,
       xpAwarded,
+      ...(guildXpAwarded > 0 || guildId ? { guildXpAwarded, guildId } : {}),
       newlyUnlockedAchievements,
     });
   } catch (err) {

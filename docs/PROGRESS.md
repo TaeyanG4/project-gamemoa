@@ -21,10 +21,18 @@
 | **Phase 12** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase B: 진행도(XP/레벨/도전과제) 파운데이션** (My Page/Creator/Discord의 하위 기반)                                                                 | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0005 로컬 적용 검증, 신규 단위/통합 테스트 전원 통과                            |
 | **Phase 13** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase C 완료(My Page 탭 분리, 닉네임/국가 UI, 즐겨찾기/최근 플레이) + Discord `잘못된 redirect_uri` 버그 수정 + Phase F(Discord HTTP Interactions)** | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0006 로컬 적용 검증, Ed25519 실서명 테스트 포함 신규 단위/통합 테스트 전원 통과 |
 | **Phase 14** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase G: Discord 서버 시스템 (서버 등록 / 디렉토리·검색 / 공개 서버 페이지 / 서버 관리)**                                                            | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0007 로컬 적용 검증, 단위/통합 테스트 전원 통과                                 |
+| **Phase 15** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase H1: Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`**                                                                                        | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0008 로컬 적용 검증, 100/100 단위 테스트 전원 통과                              |
 
 ---
 
 ## 2. ⚙️ 현재 작업 (Current Phase)
+
+- **GAMEMOA 플레이어 플랫폼 확장 스프린트 — Phase H1: Discord 길드 XP 귀속 파운데이션 (Phase 15)**:
+  - **3개 XP 개념 엄격 분리**: Global GAMEMOA XP, Discord Guild-local User XP, Discord Guild Activity XP. (유저의 기존 글로벌 XP 25,000 보유 시에도 길드 가입 시 Guild XP = 0에서 시작).
+  - **서버 권위 귀속 & 1회용 Play Context**: `/gamemoa play [game]` 슬래시 커맨드로 매니페스트 기반 기여 플레이 링크 및 1회용 Play Context 토큰(`discord_play_contexts`, 15분 만료) 생성. DB에는 SHA-256 해시만 보관.
+  - **Referer 누출 차단 보안**: 웹 SPA 로드 시 URL Fragment(`#play_token=...`)에서 메모리로 즉시 추출 후 `history.replaceState`로 URL 제거.
+  - **1:1 원자적 귀속 제약조건**: 마이그레이션 `0008_discord_guild_xp.sql` — `discord_guild_xp_events` 테이블 `UNIQUE(source_xp_event_id)` 제약조건으로 단 1개의 글로벌 `xp_events` 행에 대해 최대 1개의 길드 XP 귀속만 발생하도록 강제.
+  - **원자적 계산 & 일일 상한 연동**: 점수 완료 시 실제 지급된 글로벌 XP(+10 또는 상한 달성 시 0)와 100% 동기화되어 귀속. 게임 점수 불변 유지.
 
 - **GAMEMOA 플레이어 플랫폼 확장 스프린트 — Phase G: Discord 서버 시스템 (Phase 14)**:
   - **개념 분리**: 일반 GAMEMOA 게임 랭킹(`/ranking`)과 Discord 서버 커뮤니티 페이지(`/discord/*`)를 완전히 분리.

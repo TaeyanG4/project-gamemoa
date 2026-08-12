@@ -12,6 +12,7 @@ export interface RecordCompletionResult {
   capped: boolean;
   eligibleCompletions: number;
   progress: ProgressionSummary;
+  xpEventId?: number | undefined;
 }
 
 export class ProgressionUseCases {
@@ -43,6 +44,7 @@ export class ProgressionUseCases {
       capped: !outcome.duplicate && outcome.xpAwarded === 0,
       eligibleCompletions: outcome.eligibleCompletions,
       progress: getProgressionSummary(outcome.totalXp),
+      xpEventId: outcome.xpEventId,
     };
   }
 
