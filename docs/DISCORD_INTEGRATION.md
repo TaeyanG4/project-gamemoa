@@ -91,18 +91,22 @@ Discord 서버 기능은 다음 웹 전용 라우트에 위치합니다:
 ## 5. 데이터 모델
 
 ### `0006_discord_link.sql`
+
 - `discord_link_challenges` (`token_hash`, `discord_user_id`, `discord_username`, `created_at`, `expires_at`, `consumed_at`)
 
 ### `0007_discord_guilds.sql`
+
 - `discord_guilds`: `guild_id`(PRIMARY KEY, canonical identity), `slug`(UNIQUE), `name`, `icon_url`, `description`, `visibility`('PUBLIC'|'UNLISTED'|'PRIVATE'), `registration_status`('ACTIVE'|'DISABLED'), `registered_by_user_id`, `registered_at`, `first_seen_at`, `last_seen_at`, `updated_at`.
 - `discord_guild_managers`: `guild_id`, `user_id`, `role`('OWNER'|'MANAGER'), `created_at`, `updated_at`, `PRIMARY KEY (guild_id, user_id)`.
 - `discord_server_registration_challenges`: `token_hash`, `user_id`, `manageable_guilds_json`, `created_at`, `expires_at`, `consumed_at`.
 
 ### `0008_discord_guild_xp.sql`
+
 - `discord_play_contexts`: `token_hash`(PK), `guild_id`, `discord_user_id`, `user_id`, `game_id`, `created_at`, `expires_at`, `consumed_at`.
 - `discord_guild_xp_events`: `id`(PK), `guild_id`, `user_id`, `source_xp_event_id`(UNIQUE), `amount`, `created_at`.
 
 ### `0009_discord_guild_xp_weekly_idx.sql`
+
 - `idx_discord_guild_xp_guild_created`: `(guild_id, created_at)` 인덱스 추가.
 
 ---
