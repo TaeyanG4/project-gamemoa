@@ -20,7 +20,7 @@ export class ScoreUseCases {
   }): Promise<{ valid: boolean; reason?: string; saved?: Score }> {
     const valResult = validateScorePayload(data.gameId, data.score);
     if (!valResult.valid) {
-      return { valid: false, reason: valResult.reason };
+      return { valid: false, ...(valResult.reason ? { reason: valResult.reason } : {}) };
     }
 
     const saved = await this.scoreRepo.saveScore(data);

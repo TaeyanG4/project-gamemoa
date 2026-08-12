@@ -7,4 +7,5 @@ export const GAME_LOADERS: Record<string, GameLoader> = {
   "aim-test": () => import("@gamemoa/game-aim-test"),
   "memory-test": () => import("@gamemoa/game-memory-test"),
   "reaction-time": () => import("@gamemoa/game-reaction-time"),
+  "typing-test": () => import("@gamemoa/game-typing-test"),
 };

@@ -59,7 +59,11 @@ app.get("/", (c) => {
 app.get("/api/health", (c) => {
   return c.json({
     status: "ok",
-    commit: c.env?.COMMIT_SHA || process.env.COMMIT_SHA || "dev",
+    commit:
+      c.env?.COMMIT_SHA ||
+      (globalThis as unknown as { process?: { env?: { COMMIT_SHA?: string } } }).process?.env
+        ?.COMMIT_SHA ||
+      "dev",
   });
 });
 

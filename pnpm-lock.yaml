@@ -102,6 +102,9 @@ importers:
       "@gamemoa/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
+      "@gamemoa/game-typing-test":
+        specifier: workspace:*
+        version: link:../../games/typing-test
       "@gamemoa/shared":
         specifier: workspace:*
         version: link:../../packages/shared
@@ -244,6 +247,31 @@ importers:
       vitest:
         specifier: ^3.2.0
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
+
+  games/typing-test:
+    dependencies:
+      "@gamemoa/game-sdk":
+        specifier: workspace:*
+        version: link:../../packages/game-sdk
+      "@gamemoa/shared":
+        specifier: workspace:*
+        version: link:../../packages/shared
+      react:
+        specifier: ^19.1.0
+        version: 19.2.8
+    devDependencies:
+      "@types/node":
+        specifier: ^22.10.0
+        version: 22.20.1
+      "@types/react":
+        specifier: ^19.1.0
+        version: 19.2.18
+      tsx:
+        specifier: ^4.23.12
+        version: 4.23.12
+      typescript:
+        specifier: ^5.8.0
+        version: 5.9.3
 
   packages/contracts:
     dependencies:

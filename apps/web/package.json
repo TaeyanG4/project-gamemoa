@@ -8,6 +8,7 @@
     "@gamemoa/game-aim-test": "workspace:*",
     "@gamemoa/game-memory-test": "workspace:*",
     "@gamemoa/game-reaction-time": "workspace:*",
+    "@gamemoa/game-typing-test": "workspace:*",
     "@gamemoa/game-sdk": "workspace:*",
     "@gamemoa/shared": "workspace:*",
     "@gamemoa/ui": "workspace:*",

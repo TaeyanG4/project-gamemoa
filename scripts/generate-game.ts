@@ -58,6 +58,19 @@ const pkgJson = {
 };
 fs.writeFileSync(path.join(gameDir, "package.json"), JSON.stringify(pkgJson, null, 2));
 
+// 1b. Register dependency in apps/web/package.json
+const webPkgPath = path.join(rootDir, "apps", "web", "package.json");
+if (fs.existsSync(webPkgPath)) {
+  const webPkg = JSON.parse(fs.readFileSync(webPkgPath, "utf-8"));
+  webPkg.dependencies = webPkg.dependencies || {};
+  webPkg.dependencies[`@gamemoa/game-${slug}`] = "workspace:*";
+  // Sort dependencies alphabetically
+  webPkg.dependencies = Object.fromEntries(
+    Object.entries(webPkg.dependencies).sort(([a], [b]) => a.localeCompare(b)),
+  );
+  fs.writeFileSync(webPkgPath, JSON.stringify(webPkg, null, 2) + "\n", "utf-8");
+}
+
 // 2. tsconfig.json
 const tsconfig = {
   extends: "../../tsconfig.base.json",
