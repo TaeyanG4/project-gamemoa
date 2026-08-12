@@ -29,7 +29,7 @@ export class D1SessionRepository implements SessionRepository {
                 u.id as user_id, u.nickname, u.email, u.avatar_url, u.created_at as user_created_at, u.updated_at
          FROM sessions s
          JOIN users u ON s.user_id = u.id
-         WHERE s.id = ?`
+         WHERE s.id = ?`,
       )
       .bind(sessionId)
       .first<Record<string, unknown>>();

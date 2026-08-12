@@ -3,7 +3,14 @@ import { X, ShieldCheck, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "../../features/auth";
 
 export function LoginModal() {
-  const { isLoginModalOpen, closeLoginModal, loginWithGoogle, loginWithDiscord, error, clearError } = useAuth();
+  const {
+    isLoginModalOpen,
+    closeLoginModal,
+    loginWithGoogle,
+    loginWithDiscord,
+    error,
+    clearError,
+  } = useAuth();
 
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isDiscordLoading, setIsDiscordLoading] = useState(false);
@@ -54,7 +61,10 @@ export function LoginModal() {
           <div className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-accent-red/10 border border-accent-red/30 text-accent-red text-xs font-semibold">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
-            <button onClick={clearError} className="ml-auto p-1 hover:bg-accent-red/20 rounded-full cursor-pointer">
+            <button
+              onClick={clearError}
+              className="ml-auto p-1 hover:bg-accent-red/20 rounded-full cursor-pointer"
+            >
               <X className="w-3 h-3" />
             </button>
           </div>

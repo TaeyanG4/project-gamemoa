@@ -1,23 +1,25 @@
 import { useState, useEffect } from "react";
 import { Play, RotateCcw, Brain } from "lucide-react";
-import { 
-  type MemoryColor, 
-  generateNextColor, 
-  evaluateGrade, 
-  createInitialState 
+import {
+  type MemoryColor,
+  generateNextColor,
+  evaluateGrade,
+  createInitialState,
 } from "../engine/memoryEngine";
 
 const COLOR_FREQS: Record<MemoryColor, number> = {
-  red: 261.63,   // C4
+  red: 261.63, // C4
   green: 329.63, // E4
-  blue: 392.00,  // G4
-  yellow: 523.25,// C5
+  blue: 392.0, // G4
+  yellow: 523.25, // C5
 };
 
 function playTone(freq: number, duration = 0.3) {
   if (typeof window === "undefined") return;
   try {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
 
@@ -106,7 +108,7 @@ export function MemoryGameUI() {
       // Game Over
       playTone(150, 0.5); // Low error tone
       const newBest = Math.max(gameState.bestLevel, gameState.level - 1);
-      
+
       setGameState((prev) => ({
         ...prev,
         status: "game-over",
@@ -208,19 +210,25 @@ export function MemoryGameUI() {
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Red Pad"
                 style={{
-                  background: activeColor === "red"
-                    ? "linear-gradient(135deg, #ff4d4d 0%, #dc2626 100%)"
-                    : "linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)",
-                  boxShadow: activeColor === "red"
-                    ? "0 0 50px #ef4444, inset 0 4px 20px rgba(255,255,255,0.7)"
-                    : "inset 0 4px 12px rgba(255,255,255,0.2)",
+                  background:
+                    activeColor === "red"
+                      ? "linear-gradient(135deg, #ff4d4d 0%, #dc2626 100%)"
+                      : "linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)",
+                  boxShadow:
+                    activeColor === "red"
+                      ? "0 0 50px #ef4444, inset 0 4px 20px rgba(255,255,255,0.7)"
+                      : "inset 0 4px 12px rgba(255,255,255,0.2)",
                 }}
                 className={`relative w-full h-full rounded-tl-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
-                  activeColor === "red" ? "border-white z-20 scale-[0.98]" : "border-red-400/40 hover:brightness-125"
+                  activeColor === "red"
+                    ? "border-white z-20 scale-[0.98]"
+                    : "border-red-400/40 hover:brightness-125"
                 }`}
               >
                 <div className="absolute top-1/4 left-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute bottom-3 right-3 text-[11px] font-black text-white/40 tracking-wider">RED</span>
+                <span className="absolute bottom-3 right-3 text-[11px] font-black text-white/40 tracking-wider">
+                  RED
+                </span>
               </button>
 
               {/* GREEN PAD (Top Right) */}
@@ -229,19 +237,25 @@ export function MemoryGameUI() {
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Green Pad"
                 style={{
-                  background: activeColor === "green"
-                    ? "linear-gradient(135deg, #34d399 0%, #059669 100%)"
-                    : "linear-gradient(135deg, #047857 0%, #064e3b 100%)",
-                  boxShadow: activeColor === "green"
-                    ? "0 0 50px #10b981, inset 0 4px 20px rgba(255,255,255,0.7)"
-                    : "inset 0 4px 12px rgba(255,255,255,0.2)",
+                  background:
+                    activeColor === "green"
+                      ? "linear-gradient(135deg, #34d399 0%, #059669 100%)"
+                      : "linear-gradient(135deg, #047857 0%, #064e3b 100%)",
+                  boxShadow:
+                    activeColor === "green"
+                      ? "0 0 50px #10b981, inset 0 4px 20px rgba(255,255,255,0.7)"
+                      : "inset 0 4px 12px rgba(255,255,255,0.2)",
                 }}
                 className={`relative w-full h-full rounded-tr-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
-                  activeColor === "green" ? "border-white z-20 scale-[0.98]" : "border-emerald-400/40 hover:brightness-125"
+                  activeColor === "green"
+                    ? "border-white z-20 scale-[0.98]"
+                    : "border-emerald-400/40 hover:brightness-125"
                 }`}
               >
                 <div className="absolute top-1/4 right-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute bottom-3 left-3 text-[11px] font-black text-white/40 tracking-wider">GREEN</span>
+                <span className="absolute bottom-3 left-3 text-[11px] font-black text-white/40 tracking-wider">
+                  GREEN
+                </span>
               </button>
 
               {/* BLUE PAD (Bottom Left) */}
@@ -250,19 +264,25 @@ export function MemoryGameUI() {
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Blue Pad"
                 style={{
-                  background: activeColor === "blue"
-                    ? "linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)"
-                    : "linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)",
-                  boxShadow: activeColor === "blue"
-                    ? "0 0 50px #3b82f6, inset 0 4px 20px rgba(255,255,255,0.7)"
-                    : "inset 0 4px 12px rgba(255,255,255,0.2)",
+                  background:
+                    activeColor === "blue"
+                      ? "linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)"
+                      : "linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%)",
+                  boxShadow:
+                    activeColor === "blue"
+                      ? "0 0 50px #3b82f6, inset 0 4px 20px rgba(255,255,255,0.7)"
+                      : "inset 0 4px 12px rgba(255,255,255,0.2)",
                 }}
                 className={`relative w-full h-full rounded-bl-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
-                  activeColor === "blue" ? "border-white z-20 scale-[0.98]" : "border-blue-400/40 hover:brightness-125"
+                  activeColor === "blue"
+                    ? "border-white z-20 scale-[0.98]"
+                    : "border-blue-400/40 hover:brightness-125"
                 }`}
               >
                 <div className="absolute bottom-1/4 left-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute top-3 right-3 text-[11px] font-black text-white/40 tracking-wider">BLUE</span>
+                <span className="absolute top-3 right-3 text-[11px] font-black text-white/40 tracking-wider">
+                  BLUE
+                </span>
               </button>
 
               {/* YELLOW PAD (Bottom Right) */}
@@ -271,25 +291,33 @@ export function MemoryGameUI() {
                 disabled={gameState.status !== "user-turn"}
                 aria-label="Yellow Pad"
                 style={{
-                  background: activeColor === "yellow"
-                    ? "linear-gradient(135deg, #fcd34d 0%, #d97706 100%)"
-                    : "linear-gradient(135deg, #b45309 0%, #78350f 100%)",
-                  boxShadow: activeColor === "yellow"
-                    ? "0 0 50px #f59e0b, inset 0 4px 20px rgba(255,255,255,0.7)"
-                    : "inset 0 4px 12px rgba(255,255,255,0.2)",
+                  background:
+                    activeColor === "yellow"
+                      ? "linear-gradient(135deg, #fcd34d 0%, #d97706 100%)"
+                      : "linear-gradient(135deg, #b45309 0%, #78350f 100%)",
+                  boxShadow:
+                    activeColor === "yellow"
+                      ? "0 0 50px #f59e0b, inset 0 4px 20px rgba(255,255,255,0.7)"
+                      : "inset 0 4px 12px rgba(255,255,255,0.2)",
                 }}
                 className={`relative w-full h-full rounded-br-full border-2 transition-all duration-150 cursor-pointer overflow-hidden ${
-                  activeColor === "yellow" ? "border-white z-20 scale-[0.98]" : "border-amber-400/40 hover:brightness-125"
+                  activeColor === "yellow"
+                    ? "border-white z-20 scale-[0.98]"
+                    : "border-amber-400/40 hover:brightness-125"
                 }`}
               >
                 <div className="absolute bottom-1/4 right-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute top-3 left-3 text-[11px] font-black text-white/40 tracking-wider">YELLOW</span>
+                <span className="absolute top-3 left-3 text-[11px] font-black text-white/40 tracking-wider">
+                  YELLOW
+                </span>
               </button>
             </div>
 
             {/* Center Digital LED Console Hub */}
             <div className="absolute w-[100px] h-[100px] sm:w-[110px] sm:h-[110px] rounded-full bg-gradient-to-b from-[#18181b] to-[#09090b] border-[8px] sm:border-[10px] border-[#0a0a0c] shadow-[0_0_30px_rgba(0,0,0,1)] flex flex-col items-center justify-center pointer-events-none z-30">
-              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest mt-1">STAGE</span>
+              <span className="text-[10px] font-black text-text-muted uppercase tracking-widest mt-1">
+                STAGE
+              </span>
               <span className="text-2xl sm:text-3xl font-black text-accent-green font-mono">
                 {String(gameState.level).padStart(2, "0")}
               </span>
@@ -305,9 +333,7 @@ export function MemoryGameUI() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-5xl font-black text-white">
-              Level {gameState.level - 1}
-            </span>
+            <span className="text-5xl font-black text-white">Level {gameState.level - 1}</span>
             <div className="flex items-center justify-center gap-2 mt-2">
               <span className="text-xs text-text-muted">달성 등급:</span>
               <span className="px-3 py-0.5 rounded-lg bg-brand/20 text-brand-light font-black border border-brand/30">

@@ -29,11 +29,11 @@
     "typescript": "^5.8.0",
     "vite": "^6.3.0",
     "vitest": "^3.2.0",
-    "wrangler": "^4.14.0"
+    "wrangler": "^4.121.0"
   },
   "scripts": {
     "dev": "react-router dev",
-    "build": "node -e \"const fs=require('fs'); fs.mkdirSync('build/server', {recursive:true}); if(!fs.existsSync('build/server/index.js')) fs.writeFileSync('build/server/index.js', 'export default {}');\" && react-router build",
+    "build": "tsx ../../scripts/prepare-web-build.ts && react-router build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint app/",
     "test": "tsx --test app/test/**/*.test.ts",

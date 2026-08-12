@@ -12,9 +12,5 @@ export default defineConfig({
   resolve: {
     dedupe: ["react", "react-dom", "react-router"],
   },
-  plugins: [
-    tailwindcss(),
-    reactRouter(),
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
-  ],
+  plugins: [tailwindcss(), reactRouter(), cloudflare({ viteEnvironment: { name: "ssr" } })],
 });

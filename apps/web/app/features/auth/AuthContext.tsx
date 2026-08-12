@@ -35,7 +35,12 @@ declare global {
             auto_select?: boolean;
             cancel_on_tap_outside?: boolean;
           }) => void;
-          prompt: (notification?: (n: { isNotDisplayed: () => boolean; isSkippedMoment: () => boolean }) => void) => void;
+          prompt: (
+            notification?: (n: {
+              isNotDisplayed: () => boolean;
+              isSkippedMoment: () => boolean;
+            }) => void,
+          ) => void;
           renderButton: (element: HTMLElement, config: Record<string, unknown>) => void;
           revoke: (hint: string, callback: () => void) => void;
         };
@@ -78,9 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(() => {
     setError(null);
 
-    const clientId = typeof window !== "undefined"
-      ? ((import.meta as unknown as { env?: { VITE_GOOGLE_CLIENT_ID?: string } }).env?.VITE_GOOGLE_CLIENT_ID ?? "")
-      : "";
+    const clientId =
+      typeof window !== "undefined"
+        ? ((import.meta as unknown as { env?: { VITE_GOOGLE_CLIENT_ID?: string } }).env
+            ?.VITE_GOOGLE_CLIENT_ID ?? "")
+        : "";
 
     if (!clientId) {
       setError("Google Client ID가 설정되지 않았습니다.");
@@ -104,7 +111,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsLoginModalOpen(false);
           setError(null);
         } catch (err) {
-          setError(err instanceof Error ? err.message : "Google 로그인에 실패했습니다. 다시 시도해주세요.");
+          setError(
+            err instanceof Error ? err.message : "Google 로그인에 실패했습니다. 다시 시도해주세요.",
+          );
         } finally {
           setIsLoading(false);
         }
@@ -130,7 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => document.body.removeChild(tempDiv), 5000);
       }
     });
-
   }, []);
 
   const loginWithDiscord = useCallback(() => {

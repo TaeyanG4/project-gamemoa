@@ -194,14 +194,14 @@ packages/shared -> feature-specific code
 
 ## 3.1 언어 / 런타임
 
-| 영역 | 선택 |
-|---|---|
-| Application language | TypeScript |
-| Browser | Modern evergreen browsers |
-| Server runtime | Cloudflare Workers |
-| Package manager | pnpm |
-| Monorepo orchestration | Turborepo |
-| Module format | ESM |
+| 영역                   | 선택                      |
+| ---------------------- | ------------------------- |
+| Application language   | TypeScript                |
+| Browser                | Modern evergreen browsers |
+| Server runtime         | Cloudflare Workers        |
+| Package manager        | pnpm                      |
+| Monorepo orchestration | Turborepo                 |
+| Module format          | ESM                       |
 
 TypeScript 설정:
 
@@ -470,16 +470,9 @@ gamemoa/
 ## 5.2 Game manifest
 
 ```ts
-export type GameMode =
-  | "single"
-  | "local-multi"
-  | "online-multi";
+export type GameMode = "single" | "local-multi" | "online-multi";
 
-export type GameStatus =
-  | "draft"
-  | "beta"
-  | "published"
-  | "hidden";
+export type GameStatus = "draft" | "beta" | "published" | "hidden";
 
 export interface GameManifest {
   id: string;
@@ -515,12 +508,10 @@ import type { ComponentType } from "react";
 
 export interface GameRuntimeContext {
   sessionId: string;
-  user:
-    | {
-        id: string;
-        displayName: string;
-      }
-    | null;
+  user: {
+    id: string;
+    displayName: string;
+  } | null;
 
   emit: (event: GameClientEvent) => void;
   complete: (result: GameResult) => Promise<void>;
@@ -698,10 +689,7 @@ socialProviders: {
 UI provider 배열:
 
 ```ts
-export const enabledAuthProviders = [
-  "google",
-  "discord",
-] as const;
+export const enabledAuthProviders = ["google", "discord"] as const;
 ```
 
 추후 추가는 배열/config 확장으로 해결한다.
@@ -2044,30 +2032,30 @@ games/reaction-time/src/scoring.ts
 
 # 31. 의사결정 요약
 
-| 주제 | 결정 |
-|---|---|
-| Architecture | Modular Monolith |
-| Game extensibility | Plugin Registry |
-| Language | TypeScript |
-| Web | React Router + React + Vite |
-| Hosting | Cloudflare Workers |
-| DB | D1 |
-| ORM | Drizzle |
-| Auth | Better Auth |
-| OAuth | Google + Discord |
-| Realtime | Separate Worker + Durable Objects |
-| WebSocket | Hibernation API |
-| Validation | Zod |
-| Client state | React local + Zustand selectively |
-| Testing | Vitest + Cloudflare integration + Playwright |
-| Styling | Tailwind |
-| Monorepo | pnpm + Turborepo |
-| CI/CD | GitHub Actions |
-| PR preview | Worker version preview alias |
-| Prod deploy | version upload → smoke → deploy |
-| DB migration | expand → migrate → contract |
-| Logs | Workers Observability |
-| Abuse | Turnstile/rate limiting when needed |
+| 주제               | 결정                                         |
+| ------------------ | -------------------------------------------- |
+| Architecture       | Modular Monolith                             |
+| Game extensibility | Plugin Registry                              |
+| Language           | TypeScript                                   |
+| Web                | React Router + React + Vite                  |
+| Hosting            | Cloudflare Workers                           |
+| DB                 | D1                                           |
+| ORM                | Drizzle                                      |
+| Auth               | Better Auth                                  |
+| OAuth              | Google + Discord                             |
+| Realtime           | Separate Worker + Durable Objects            |
+| WebSocket          | Hibernation API                              |
+| Validation         | Zod                                          |
+| Client state       | React local + Zustand selectively            |
+| Testing            | Vitest + Cloudflare integration + Playwright |
+| Styling            | Tailwind                                     |
+| Monorepo           | pnpm + Turborepo                             |
+| CI/CD              | GitHub Actions                               |
+| PR preview         | Worker version preview alias                 |
+| Prod deploy        | version upload → smoke → deploy              |
+| DB migration       | expand → migrate → contract                  |
+| Logs               | Workers Observability                        |
+| Abuse              | Turnstile/rate limiting when needed          |
 
 ---
 

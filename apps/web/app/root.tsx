@@ -1,10 +1,4 @@
-import {
-  Links,
-  Meta,
-  Outlet,
-  Scripts,
-  ScrollRestoration,
-} from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 
 import "./app.css";
 import { Layout } from "./components/layout/Layout";
@@ -21,7 +15,10 @@ export default function App() {
         <meta name="description" content="설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
         {/* Google Identity Services library for OAuth login */}
         <script src="https://accounts.google.com/gsi/client" async defer />
         <Meta />

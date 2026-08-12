@@ -1,16 +1,11 @@
 import type { GameModule, GameManifest } from "@gamemoa/game-sdk";
 import { GAME_MANIFESTS } from "@gamemoa/core";
+import { GAME_LOADERS } from "./gameLoaders.generated.js";
 
-type GameLoader = () => Promise<{ default: GameModule } | GameModule>;
-
-export const gameRegistry: Record<string, GameLoader> = {
-  "reaction-time": () => import("@gamemoa/game-reaction-time"),
-  "memory-test": () => import("@gamemoa/game-memory-test"),
-  "aim-test": () => import("@gamemoa/game-aim-test"),
-};
+export const gameRegistry = GAME_LOADERS;
 
 export const gameManifests: GameManifest[] = GAME_MANIFESTS.filter(
-  (m) => m.status === "published" || m.status === "beta"
+  (m) => m.status === "published" || m.status === "beta",
 );
 
 export async function loadGame(slug: string): Promise<GameModule | null> {

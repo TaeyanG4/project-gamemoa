@@ -14,7 +14,6 @@ export type ApiEnv = {
   };
 };
 
-
 export const authRouter = new Hono<ApiEnv>();
 
 // Helper to check if request is localhost
@@ -30,9 +29,10 @@ function isLocalhost(urlStr: string): boolean {
 // POST /api/auth/google
 authRouter.post("/google", async (c) => {
   try {
-    const body = (await c.req.json<{ credential?: string }>().catch(() => ({}))) as { credential?: string };
+    const body = (await c.req.json<{ credential?: string }>().catch(() => ({}))) as {
+      credential?: string;
+    };
     const credential = body.credential;
-
 
     if (!credential) {
       return c.json({ error: "Credential is required" }, 400);
@@ -40,7 +40,7 @@ authRouter.post("/google", async (c) => {
 
     // Verify Google ID Token via Google's tokeninfo endpoint
     const tokenInfoRes = await fetch(
-      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`,
     );
 
     if (!tokenInfoRes.ok) {
@@ -98,7 +98,8 @@ authRouter.post("/google", async (c) => {
 // GET /api/auth/discord
 authRouter.get("/discord", async (c) => {
   const clientId = c.env.DISCORD_CLIENT_ID;
-  const redirectUri = c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/discord/callback`;
+  const redirectUri =
+    c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/discord/callback`;
 
   if (!clientId) {
     return c.text("DISCORD_CLIENT_ID is not configured", 500);
@@ -139,7 +140,8 @@ authRouter.get("/discord/callback", async (c) => {
 
   const clientId = c.env.DISCORD_CLIENT_ID;
   const clientSecret = c.env.DISCORD_CLIENT_SECRET;
-  const redirectUri = c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/discord/callback`;
+  const redirectUri =
+    c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/discord/callback`;
   const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
 
   if (!clientId || !clientSecret) {

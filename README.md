@@ -2,7 +2,7 @@
 
 > **설치 없이 웹 브라우저에서 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼**
 
-GAMEMOA는 모듈러 모노레포(Modular Monolith) 기반으로 설계된 미니게임 플랫폼입니다.  
+GAMEMOA는 **Game Plugin Architecture** 및 **Clean Layered Monorepo Architecture** 기반으로 설계된 미니게임 플랫폼입니다.  
 CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만에 플레이 가능한 비주얼 스포트라이트와 고밀도 게임 카탈로그를 제공합니다.
 
 ---
@@ -15,7 +15,15 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - **오늘의 추천 게임 스포트라이트**: 대형 비주얼 카드와 1-클릭 실행 버튼
   - **카테고리 칩 필터 바**: 페이지 전환 없는 실시간 1-클릭 라이브 필터링
   - **16:10 고밀도 게이밍 카드**: 호버 플레이 오버레이 및 소요 시간 안내
-- ⏱️ **밀리초(ms) 단위 정밀 반응속도 및 기억력 테스트 게임**: 부정클릭 방지, 5회 평균값 계산 및 S~F 등급 판정
+- 🎮 **게이머 필수 테스트 미니게임 컬렉션**:
+  - ⏱️ **반응속도 테스트 (Reaction Time)**: 밀리초(ms) 단위 반응속도 측정 및 S~F 등급 판정
+  - 🧠 **순서 기억력 테스트 (Memory Test)**: 패턴 시퀀스 암기 및 최고 레벨 도전
+  - 🎯 **에임 테스트 (Aim Test)**: 30개 무작위 타겟 정밀 타격 반응속도 측정
+- 🧩 **Game Plugin Architecture**:
+  - 빌드 타임 자동 레지스트리 생성기 (`generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
+- 🛡️ **Clean Monorepo & Architecture Guard**:
+  - `packages/core` (Domain, Application, Ports), `packages/db` (Cloudflare D1 Persistence), `@gamemoa/contracts` (Single Source of Truth Schemas)
+  - CI 자동화 Architecture Guard (`architecture:check`, `registry:check`)로 레이어 위반 차단
 - ☁️ **Cloudflare Free Tier Production Architecture**:
   - **Hono + Cloudflare Workers**: 고성능 서버리스 API 백엔드
   - **Cloudflare D1**: 글로벌 에지 데이터베이스 (유저, 세션, 게임 점수, 랭킹)
@@ -27,7 +35,8 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
 ## 🚀 로컬 실행 방법 (Quick Start)
 
 ### 1. 사전 준비 (Prerequisites)
-- **Node.js**: v20 이상 (추천: v22 LTS)
+
+- **Node.js**: v22 LTS 이상
 - **pnpm**: v9 이상
 
 ```bash
@@ -69,13 +78,22 @@ pnpm --filter @gamemoa/api dev
 ## 🛠️ 검증 및 빌드 스크립트 (Scripts)
 
 ```bash
-# 코드 린트 (ESLint)
+# 코드 포맷 및 린트 검사
+pnpm format:check
 pnpm lint
 
-# TypeScript 타입 검사
-pnpm typecheck
+# 아키텍처 레이어 경계 검사 & 레지스트리 최신성 검사
+pnpm architecture:check
+pnpm registry:check
 
-# 단위 테스트 실행
+# 게임 레지스트리 자동 생성
+pnpm generate:registry
+
+# 새 게임 스캐폴딩 생성
+pnpm generate:game
+
+# TypeScript 타입 검사 & 단위 테스트
+pnpm typecheck
 pnpm test
 
 # 전체 프로젝트 빌드 (Turbo build)
@@ -86,15 +104,15 @@ pnpm build
 
 ## 🏗️ 기술 스택 (Tech Stack)
 
-| 영역 | 기술 스택 |
-|---|---|
-| **Frontend** | React 19, React Router v7 (Framework Mode), Tailwind CSS v4 |
-| **Backend** | Hono, TypeScript, Zod Validation |
-| **Database** | Cloudflare D1 (SQL) & Repository Abstraction Layer |
-| **Auth** | Google OAuth (GIS), Discord OAuth 2.0, HttpOnly Cookie Session |
-| **Runtime / Hosting** | Cloudflare Workers & Cloudflare Pages / Static Assets |
-| **CI/CD** | GitHub Actions & Wrangler CLI |
-| **Monorepo** | pnpm workspaces, Turborepo |
+| 영역                  | 기술 스택                                                      |
+| --------------------- | -------------------------------------------------------------- |
+| **Frontend**          | React 19, React Router v7 (SPA Mode), Tailwind CSS v4          |
+| **Backend**           | Hono, TypeScript, Zod Validation                               |
+| **Database**          | Cloudflare D1 (SQL) & Repository Abstraction Layer             |
+| **Auth**              | Google OAuth (GIS), Discord OAuth 2.0, HttpOnly Cookie Session |
+| **Runtime / Hosting** | Cloudflare Workers & Cloudflare Pages / Static Assets          |
+| **CI/CD**             | GitHub Actions & Wrangler CLI                                  |
+| **Monorepo**          | pnpm workspaces, Turborepo                                     |
 
 ---
 
@@ -103,21 +121,23 @@ pnpm build
 ```text
 gamemoa/
 ├── apps/
-│   ├── web/                   # 웹 UI & SSR Server (React Router v7 + Cloudflare)
-│   └── api/                   # Hono API Backend (Cloudflare Workers / Node.js portable)
+│   ├── web/                   # React Router v7 SPA 웹 프론트엔드
+│   └── api/                   # Hono API Backend (Workers / Node.js portable)
 ├── games/
-│   ├── reaction-time/         # 반응속도 테스트 게임
-│   └── memory-test/           # 순서 기억력 테스트 게임
+│   ├── reaction-time/         # 반응속도 테스트 게임 (@gamemoa/game-reaction-time)
+│   ├── memory-test/           # 순서 기억력 테스트 게임 (@gamemoa/game-memory-test)
+│   └── aim-test/              # 에임 테스트 게임 (@gamemoa/game-aim-test)
 ├── packages/
-│   ├── auth/                  # Client Auth Service & Auth Context
-│   ├── core/                  # 도메인 모델, 비즈니스 서비스 & Repository 인터페이스
-│   ├── db/                    # D1 Repository 구현체, 마이그레이션 & SQL 스키마
+│   ├── contracts/             # Zod 요청/응답 스키마 & API Single Source of Truth
+│   ├── core/                  # Pure Domain, Application Use Cases & Ports (No Infra/Browser deps)
+│   ├── db/                    # Cloudflare D1 Repository 구현체 & SQL schema
 │   ├── game-sdk/              # 게임 모듈 공통 계약 & 스코어링 인터페이스
 │   ├── shared/                # Zod 공통 검증 스키마 & 타입
 │   └── ui/                    # 공통 UI 컴포넌트 & GameShell
-├── docs/                      # 문서 및 진행 상황 기록 (WORK_PROGRESS.md)
+├── scripts/                   # Architecture Guard & Registry Generator 스크립트
+├── docs/                      # 아키텍처, 작업 진행 상황 & 로드맵 (WORK_PROGRESS.md, ROADMAP.md)
 ├── GAMEMOA_BLUEPRINT.md       # 아키텍처 및 시스템 설계 명세서
-└── AGENTS.md                  # AI 코딩 및 개발 규칙 명세서
+└── AGENTS.md                  # 코딩 및 개발 규칙 명세서
 ```
 
 ---

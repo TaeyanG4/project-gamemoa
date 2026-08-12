@@ -5,7 +5,8 @@ export const memoryTestManifest: GameManifest = {
   slug: "memory-test",
   title: "순서 기억력 테스트",
   shortDescription: "깜빡이는 색상 순서를 기억하고 순서대로 똑같이 누르세요!",
-  description: "점점 길어지는 패턴을 완벽히 기억해보세요. 당신의 단기 기억력 한계는 어디까지일까요?",
+  description:
+    "점점 길어지는 패턴을 완벽히 기억해보세요. 당신의 단기 기억력 한계는 어디까지일까요?",
   modes: ["single"],
   status: "published",
   categories: ["brain", "popular"],

@@ -5,14 +5,11 @@ import globals from "globals";
 
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/.turbo/**", "**/.wrangler/**"]
+    ignores: ["**/node_modules/**", "**/dist/**", "**/.turbo/**", "**/.wrangler/**"],
   },
   {
     files: ["**/*.{ts,tsx}"],
-    extends: [
-      js.configs.recommended,
-      ...tseslint.configs.strict,
-    ],
+    extends: [js.configs.recommended, ...tseslint.configs.strict],
     languageOptions: {
       ecmaVersion: 2022,
       globals: {
@@ -27,6 +24,6 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "warn",
-    }
-  }
+    },
+  },
 );

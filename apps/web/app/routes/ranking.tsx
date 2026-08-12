@@ -135,9 +135,7 @@ export default function Ranking() {
                           </span>
                         )}
                         {rank > 3 && (
-                          <span className="text-text-muted font-bold px-3">
-                            #{rank}
-                          </span>
+                          <span className="text-text-muted font-bold px-3">#{rank}</span>
                         )}
                       </td>
 
@@ -145,7 +143,11 @@ export default function Ranking() {
                       <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
                           {record.avatarUrl ? (
-                            <img src={record.avatarUrl} alt={record.playerName} className="w-full h-full object-cover" />
+                            <img
+                              src={record.avatarUrl}
+                              alt={record.playerName}
+                              className="w-full h-full object-cover"
+                            />
                           ) : (
                             record.playerName.slice(0, 2)
                           )}

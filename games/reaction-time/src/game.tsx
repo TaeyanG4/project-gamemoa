@@ -104,9 +104,10 @@ export function Game({ runtime }: GameProps) {
         return {
           bgColor: "#2563eb",
           text: `${roundState.reactionTimeMs}ms`,
-          subtext: results.length >= NUM_ROUNDS
-            ? `평균: ${calculateAverageReactionTime(results)}ms`
-            : `라운드 ${results.length}/${NUM_ROUNDS}`,
+          subtext:
+            results.length >= NUM_ROUNDS
+              ? `평균: ${calculateAverageReactionTime(results)}ms`
+              : `라운드 ${results.length}/${NUM_ROUNDS}`,
         };
     }
   };
@@ -135,14 +136,19 @@ export function Game({ runtime }: GameProps) {
       >
         <span className="text-4xl font-black text-white drop-shadow-md">{display.text}</span>
         {display.subtext && (
-          <span className="text-base font-bold text-white/90 mt-3 drop-shadow-sm">{display.subtext}</span>
+          <span className="text-base font-bold text-white/90 mt-3 drop-shadow-sm">
+            {display.subtext}
+          </span>
         )}
       </button>
 
       {results.length > 0 && (
         <div className="mt-6 flex gap-2 flex-wrap justify-center">
           {results.map((ms, i) => (
-            <span key={i} className="px-3 py-1 bg-surface-raised border border-border rounded-full text-xs font-bold text-text-primary">
+            <span
+              key={i}
+              className="px-3 py-1 bg-surface-raised border border-border rounded-full text-xs font-bold text-text-primary"
+            >
               R{i + 1}: {ms}ms
             </span>
           ))}

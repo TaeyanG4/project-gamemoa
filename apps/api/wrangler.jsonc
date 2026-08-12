@@ -3,16 +3,14 @@
   "name": "gamemoa-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-12",
-  "compatibility_flags": [
-    "nodejs_compat"
-  ],
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "gamemoa-d1",
       "database_id": "e55f84c5-e3a3-4547-8aa3-7a8ec186a02e",
-      "migrations_dir": "../../packages/db/migrations"
-    }
-  ]
+      "migrations_dir": "../../packages/db/migrations",
+    },
+  ],
 }

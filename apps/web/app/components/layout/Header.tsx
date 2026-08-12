@@ -25,7 +25,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
       <div className="w-full px-4 h-16 flex items-center justify-between gap-4">
         {/* Left: Mobile Toggle & Brand Logo */}
         <div className="flex items-center gap-3">
-          <button 
+          <button
             className="lg:hidden p-2 rounded-xl text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors cursor-pointer"
             onClick={onToggleMobileSidebar}
             aria-label="메뉴 열기"
@@ -38,13 +38,19 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
               <Gamepad2 className="w-5 h-5 text-white" />
             </div>
             <span className="font-extrabold text-xl tracking-tight text-text-primary">
-              game<span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-accent-purple">moa</span>
+              game
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-accent-purple">
+                moa
+              </span>
             </span>
           </Link>
         </div>
 
         {/* Center: Search Bar */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md hidden sm:flex items-center relative">
+        <form
+          onSubmit={handleSearchSubmit}
+          className="flex-1 max-w-md hidden sm:flex items-center relative"
+        >
           <Search className="w-4 h-4 text-text-muted absolute left-3.5 pointer-events-none" />
           <input
             type="text"
@@ -80,7 +86,11 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                 </span>
                 <div className="w-7 h-7 rounded-full bg-brand text-white font-black text-xs flex items-center justify-center overflow-hidden border border-brand/40">
                   {user.avatar_url ? (
-                    <img src={user.avatar_url} alt={user.nickname} className="w-full h-full object-cover" />
+                    <img
+                      src={user.avatar_url}
+                      alt={user.nickname}
+                      className="w-full h-full object-cover"
+                    />
                   ) : (
                     user.nickname.slice(0, 2)
                   )}
@@ -89,7 +99,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
               {/* User Dropdown Menu */}
               {showUserDropdown && (
-                <div 
+                <div
                   className="absolute right-0 mt-2 w-56 bg-surface-raised border border-border rounded-2xl shadow-2xl py-2 flex flex-col z-50 animate-in fade-in zoom-in-95 duration-150"
                   onMouseLeave={() => setShowUserDropdown(false)}
                 >
@@ -98,7 +108,10 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                     <p className="text-[11px] text-text-muted truncate">{user.email}</p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {user.providers.map((p) => (
-                        <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand border border-brand/20 capitalize">
+                        <span
+                          key={p}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand border border-brand/20 capitalize"
+                        >
                           {p} 계정
                         </span>
                       ))}

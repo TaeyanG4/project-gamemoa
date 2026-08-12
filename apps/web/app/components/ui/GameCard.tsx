@@ -21,22 +21,22 @@ export function GameCard({
   estimatedRoundSeconds,
 }: GameCardProps) {
   return (
-    <Link 
+    <Link
       to={`/games/${slug}`}
       className="group relative flex flex-col bg-surface-raised rounded-2xl overflow-hidden border border-border/80 hover:border-brand/50 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-brand/10 select-none block"
     >
       {/* Thumbnail Aspect 16:9 */}
-      <div 
+      <div
         className="w-full aspect-[16/10] relative flex items-center justify-center p-6 overflow-hidden bg-surface-overlay"
         style={{
-          background: `radial-gradient(circle at center, ${accent}25 0%, rgba(15, 19, 31, 0.95) 100%)`
+          background: `radial-gradient(circle at center, ${accent}25 0%, rgba(15, 19, 31, 0.95) 100%)`,
         }}
       >
         {/* Top Badges */}
         <div className="absolute top-3 left-3 z-10 flex gap-1.5">
           {modes.slice(0, 2).map((mode) => (
-            <span 
-              key={mode} 
+            <span
+              key={mode}
               className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-md border border-white/10 tracking-wider"
             >
               {mode}
@@ -52,7 +52,7 @@ export function GameCard({
             className="w-24 h-24 object-contain rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300"
           />
         ) : (
-          <div 
+          <div
             className="w-24 h-24 rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300 flex items-center justify-center text-white font-extrabold text-xl"
             style={{ backgroundColor: accent }}
           >
@@ -67,7 +67,7 @@ export function GameCard({
           </div>
         </div>
       </div>
-      
+
       {/* Content Info */}
       <div className="p-4 flex flex-col flex-1 gap-1.5 bg-surface-raised">
         <div className="flex items-center justify-between gap-2">
@@ -80,7 +80,7 @@ export function GameCard({
         <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed flex-1">
           {shortDescription}
         </p>
-        
+
         {estimatedRoundSeconds && (
           <div className="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted mt-2 pt-2 border-t border-border/40">
             <Clock className="w-3 h-3 text-brand-light" />

@@ -60,7 +60,11 @@ export default function ProfilePage() {
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 rounded-full bg-brand/20 text-brand font-black text-2xl flex items-center justify-center border-2 border-brand/40 overflow-hidden shadow-md">
             {user.avatar_url ? (
-              <img src={user.avatar_url} alt={user.nickname} className="w-full h-full object-cover" />
+              <img
+                src={user.avatar_url}
+                alt={user.nickname}
+                className="w-full h-full object-cover"
+              />
             ) : (
               user.nickname.slice(0, 2)
             )}
@@ -70,13 +74,18 @@ export default function ProfilePage() {
             <div className="flex items-center gap-2 justify-center md:justify-start flex-wrap">
               <h1 className="text-2xl font-black text-text-primary">{user.nickname}</h1>
               {user.providers.map((p) => (
-                <span key={p} className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-brand/10 text-brand border border-brand/20 uppercase">
+                <span
+                  key={p}
+                  className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-brand/10 text-brand border border-brand/20 uppercase"
+                >
                   {p}
                 </span>
               ))}
             </div>
             <p className="text-xs text-text-secondary">{user.email}</p>
-            <p className="text-[11px] text-text-muted mt-1">가입일: {user.created_at?.split("T")[0]}</p>
+            <p className="text-[11px] text-text-muted mt-1">
+              가입일: {user.created_at?.split("T")[0]}
+            </p>
           </div>
         </div>
 
@@ -111,7 +120,9 @@ export default function ProfilePage() {
 
             let best: number | null = null;
             if (serverBest !== null && localBest !== null) {
-              best = lowerIsBetter ? Math.min(serverBest, localBest) : Math.max(serverBest, localBest);
+              best = lowerIsBetter
+                ? Math.min(serverBest, localBest)
+                : Math.max(serverBest, localBest);
             } else {
               best = serverBest ?? localBest;
             }

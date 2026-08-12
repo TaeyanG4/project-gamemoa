@@ -1,4 +1,4 @@
-import { GAME_MANIFEST_MAP, type Score, type ScoreRepository } from "@gamemoa/core";
+import type { Score, ScoreRepository, UserPersonalBestAggregate } from "@gamemoa/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export class D1ScoreRepository implements ScoreRepository {
@@ -16,7 +16,7 @@ export class D1ScoreRepository implements ScoreRepository {
     await this.db
       .prepare(
         `INSERT INTO scores (user_id, nickname, avatar_url, game_id, score, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.userId ?? null,
@@ -24,7 +24,7 @@ export class D1ScoreRepository implements ScoreRepository {
         data.avatarUrl ?? null,
         data.gameId,
         data.score,
-        createdAt
+        createdAt,
       )
       .run();
 
@@ -43,18 +43,20 @@ export class D1ScoreRepository implements ScoreRepository {
     };
   }
 
-  async getLeaderboard(gameId: string, limit = 20, direction?: "asc" | "desc"): Promise<Score[]> {
-    const dir = direction ?? GAME_MANIFEST_MAP[gameId]?.scoreConfig?.direction ?? "desc";
-    const orderClause = dir === "asc" ? "ASC" : "DESC";
+  async getLeaderboard(
+    gameId: string,
+    limit = 20,
+    direction: "asc" | "desc" = "desc",
+  ): Promise<Score[]> {
+    const orderClause = direction === "asc" ? "ASC" : "DESC";
 
     const query =
       gameId === "all"
         ? `SELECT * FROM scores ORDER BY created_at DESC LIMIT ?`
         : `SELECT * FROM scores WHERE game_id = ? ORDER BY score ${orderClause}, created_at ASC LIMIT 100`;
 
-    const prepared = gameId === "all"
-      ? this.db.prepare(query).bind(limit)
-      : this.db.prepare(query).bind(gameId);
+    const prepared =
+      gameId === "all" ? this.db.prepare(query).bind(limit) : this.db.prepare(query).bind(gameId);
 
     const res = await prepared.all<Record<string, unknown>>();
 
@@ -85,22 +87,18 @@ export class D1ScoreRepository implements ScoreRepository {
     return leaderboard;
   }
 
-  async getUserPersonalBests(userId: number): Promise<Record<string, number>> {
+  async getUserPersonalBests(userId: number): Promise<UserPersonalBestAggregate[]> {
     const res = await this.db
       .prepare(
-        `SELECT game_id, MIN(score) as min_score, MAX(score) as max_score FROM scores WHERE user_id = ? GROUP BY game_id`
+        `SELECT game_id, MIN(score) as min_score, MAX(score) as max_score FROM scores WHERE user_id = ? GROUP BY game_id`,
       )
       .bind(userId)
       .all<{ game_id: string; min_score: number; max_score: number }>();
 
-    const bests: Record<string, number> = {};
-
-    for (const row of res.results) {
-      const gId = String(row.game_id);
-      const dir = GAME_MANIFEST_MAP[gId]?.scoreConfig?.direction ?? "desc";
-      bests[gId] = dir === "asc" ? Number(row.min_score) : Number(row.max_score);
-    }
-
-    return bests;
+    return res.results.map((row) => ({
+      game_id: String(row.game_id),
+      min_score: Number(row.min_score),
+      max_score: Number(row.max_score),
+    }));
   }
 }

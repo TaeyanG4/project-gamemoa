@@ -10,24 +10,42 @@ const app = new Hono<ApiEnv>();
 // Middleware
 app.use("*", logger());
 
+function isAllowedOrigin(origin: string | undefined, frontendUrl?: string): boolean {
+  if (!origin) return true;
+  const allowed = frontendUrl || "https://gamemoa-web.gamemoa.workers.dev";
+  if (origin === allowed || origin === "https://gamemoa-web.gamemoa.workers.dev") return true;
+  if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) return true;
+  return false;
+}
+
 app.use(
   "*",
   cors({
     origin: (origin, c) => {
       const allowedFrontend = c.env?.FRONTEND_URL || "https://gamemoa-web.gamemoa.workers.dev";
       if (!origin) return allowedFrontend;
-      if (origin === allowedFrontend || origin === "https://gamemoa-web.gamemoa.workers.dev") return origin;
-      if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) {
-        return origin;
-      }
+      if (isAllowedOrigin(origin, allowedFrontend)) return origin;
       return allowedFrontend;
     },
-
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
+
+// CSRF / Origin Guard for state-changing HTTP requests
+app.use("*", async (c, next) => {
+  const method = c.req.method.toUpperCase();
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(method)) {
+    const origin = c.req.header("Origin");
+    const allowedFrontend = c.env?.FRONTEND_URL || "https://gamemoa-web.gamemoa.workers.dev";
+
+    if (origin && !isAllowedOrigin(origin, allowedFrontend)) {
+      return c.json({ error: "Forbidden: Origin verification failed" }, 403);
+    }
+  }
+  await next();
+});
 
 // Health check
 app.get("/", (c) => {

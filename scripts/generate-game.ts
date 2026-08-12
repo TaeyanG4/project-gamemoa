@@ -10,7 +10,10 @@ if (!rawSlug) {
   process.exit(1);
 }
 
-const slug = rawSlug.toLowerCase().trim().replace(/[^a-z0-9-]/g, "");
+const slug = rawSlug
+  .toLowerCase()
+  .trim()
+  .replace(/[^a-z0-9-]/g, "");
 const rootDir = process.cwd();
 const gameDir = path.join(rootDir, "games", slug);
 
@@ -38,13 +41,13 @@ const pkgJson = {
   dependencies: {
     "@gamemoa/game-sdk": "workspace:*",
     "@gamemoa/shared": "workspace:*",
-    "react": "^19.1.0",
+    react: "^19.1.0",
   },
   devDependencies: {
     "@types/node": "^22.10.0",
     "@types/react": "^19.1.0",
-    "tsx": "^4.23.12",
-    "typescript": "^5.8.0",
+    tsx: "^4.23.12",
+    typescript: "^5.8.0",
   },
   scripts: {
     typecheck: "tsc --noEmit",
@@ -67,7 +70,10 @@ const tsconfig = {
 fs.writeFileSync(path.join(gameDir, "tsconfig.json"), JSON.stringify(tsconfig, null, 2));
 
 // 3. src/manifest.ts
-const titleName = slug.split("-").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(" ");
+const titleName = slug
+  .split("-")
+  .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+  .join(" ");
 const manifestCode = `import type { GameManifest } from "@gamemoa/game-sdk";
 
 export const manifest: GameManifest = {

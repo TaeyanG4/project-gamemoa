@@ -34,6 +34,12 @@ export interface Score {
   created_at: string;
 }
 
+export interface UserPersonalBestAggregate {
+  game_id: string;
+  min_score: number;
+  max_score: number;
+}
+
 export interface UserRepository {
   findById(id: number): Promise<User | null>;
   findByOAuth(provider: string, providerUserId: string): Promise<User | null>;
@@ -61,5 +67,5 @@ export interface ScoreRepository {
     score: number;
   }): Promise<Score>;
   getLeaderboard(gameId: string, limit?: number, direction?: "asc" | "desc"): Promise<Score[]>;
-  getUserPersonalBests(userId: number): Promise<Record<string, number>>;
+  getUserPersonalBests(userId: number): Promise<UserPersonalBestAggregate[]>;
 }

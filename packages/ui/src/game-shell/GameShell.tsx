@@ -17,9 +17,7 @@ export function GameShell({ title, children, onBack }: GameShellProps) {
         )}
         <h1 className="game-shell-title">{title}</h1>
       </div>
-      <div className="game-shell-content">
-        {children}
-      </div>
+      <div className="game-shell-content">{children}</div>
     </div>
   );
 }

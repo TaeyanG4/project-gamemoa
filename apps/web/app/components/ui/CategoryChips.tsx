@@ -1,11 +1,4 @@
-import { 
-  Flame, 
-  Sparkles, 
-  Zap, 
-  Brain, 
-  Gamepad2, 
-  Bookmark 
-} from "lucide-react";
+import { Flame, Sparkles, Zap, Brain, Gamepad2, Bookmark } from "lucide-react";
 
 export interface CategoryOption {
   id: string;

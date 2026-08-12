@@ -1,7 +1,12 @@
 import { useEffect, useState, useMemo, type ComponentType } from "react";
 import { useParams, useNavigate } from "react-router";
 import { loadGame, gameManifests } from "../features/catalog/registry";
-import { formatScore, type GameRuntimeContext, type GameResult, type GameProps } from "@gamemoa/game-sdk";
+import {
+  formatScore,
+  type GameRuntimeContext,
+  type GameResult,
+  type GameProps,
+} from "@gamemoa/game-sdk";
 import { saveLocalBestScore, submitScoreApi } from "../features/scores/api";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 
@@ -15,7 +20,7 @@ export default function GamePlay() {
   const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<GameResult | null>(null);
 
-  const manifest = useMemo(() => gameManifests.find(m => m.slug === slug), [slug]);
+  const manifest = useMemo(() => gameManifests.find((m) => m.slug === slug), [slug]);
 
   useEffect(() => {
     let isMounted = true;
@@ -52,25 +57,27 @@ export default function GamePlay() {
     };
   }, [slug]);
 
-  const runtime = useMemo<GameRuntimeContext>(() => ({
-    sessionId: crypto.randomUUID(),
-    user: null,
-    emit: (event) => {
-      console.log("Game event emitted:", event);
-    },
-    complete: async (gameResult) => {
-      console.log("Game completed with result:", gameResult);
-      setResult(gameResult);
+  const runtime = useMemo<GameRuntimeContext>(
+    () => ({
+      sessionId: crypto.randomUUID(),
+      user: null,
+      emit: (event) => {
+        console.log("Game event emitted:", event);
+      },
+      complete: async (gameResult) => {
+        console.log("Game completed with result:", gameResult);
+        setResult(gameResult);
 
-      const lowerIsBetter = manifest?.scoreConfig?.direction === "asc";
-      saveLocalBestScore(slug, gameResult.score, lowerIsBetter);
-      void submitScoreApi({ gameId: slug, score: gameResult.score });
-    },
-    cancel: () => {
-      void navigate("/games");
-    }
-  }), [navigate, slug, manifest]);
-
+        const lowerIsBetter = manifest?.scoreConfig?.direction === "asc";
+        saveLocalBestScore(slug, gameResult.score, lowerIsBetter);
+        void submitScoreApi({ gameId: slug, score: gameResult.score });
+      },
+      cancel: () => {
+        void navigate("/games");
+      },
+    }),
+    [navigate, slug, manifest],
+  );
 
   if (error) {
     return (

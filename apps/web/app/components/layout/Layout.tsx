@@ -12,17 +12,15 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col w-full selection:bg-brand/30 selection:text-text-primary bg-surface text-text-primary">
-      <Header onToggleMobileSidebar={() => setIsMobileSidebarOpen(prev => !prev)} />
-      
+      <Header onToggleMobileSidebar={() => setIsMobileSidebarOpen((prev) => !prev)} />
+
       <div className="flex-1 flex w-full">
-        <Sidebar 
-          isMobileOpen={isMobileSidebarOpen} 
-          onMobileClose={() => setIsMobileSidebarOpen(false)} 
+        <Sidebar
+          isMobileOpen={isMobileSidebarOpen}
+          onMobileClose={() => setIsMobileSidebarOpen(false)}
         />
-        
-        <main className="flex-1 w-full min-w-0 flex flex-col">
-          {children}
-        </main>
+
+        <main className="flex-1 w-full min-w-0 flex flex-col">{children}</main>
       </div>
 
       <Footer />

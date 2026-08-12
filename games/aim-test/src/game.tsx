@@ -1,39 +1,28 @@
 import { useState, useCallback, useRef } from "react";
 import type { GameProps } from "@gamemoa/game-sdk";
 import { Target, RotateCcw, Play } from "lucide-react";
-
-const TOTAL_TARGETS = 30;
-const ARENA_WIDTH = 500;
-const ARENA_HEIGHT = 350;
-const TARGET_RADIUS = 24;
-
-interface TargetPosition {
-  x: number;
-  y: number;
-}
+import {
+  TOTAL_TARGETS,
+  generateRandomPercentagePos,
+  calculateAverageMs,
+  type TargetPercentagePos,
+} from "./logic.js";
 
 export function Game({ runtime }: GameProps) {
   const [phase, setPhase] = useState<"ready" | "playing" | "finished">("ready");
   const [targetCount, setTargetCount] = useState(0);
-  const [targetPos, setTargetPos] = useState<TargetPosition>({ x: 250, y: 175 });
+  const [targetPos, setTargetPos] = useState<TargetPercentagePos>({ xPercent: 50, yPercent: 50 });
   const [totalMs, setTotalMs] = useState<number | null>(null);
 
   const startTimeRef = useRef<number>(0);
 
-  const generateRandomPos = useCallback((): TargetPosition => {
-    const margin = TARGET_RADIUS + 10;
-    const x = Math.floor(Math.random() * (ARENA_WIDTH - margin * 2)) + margin;
-    const y = Math.floor(Math.random() * (ARENA_HEIGHT - margin * 2)) + margin;
-    return { x, y };
-  }, []);
-
   const handleStart = useCallback(() => {
     setPhase("playing");
     setTargetCount(1);
-    setTargetPos(generateRandomPos());
+    setTargetPos(generateRandomPercentagePos());
     startTimeRef.current = Date.now();
     runtime.emit({ type: "game_started", at: Date.now() });
-  }, [generateRandomPos, runtime]);
+  }, [runtime]);
 
   const handleTargetClick = useCallback(() => {
     if (phase !== "playing") return;
@@ -51,7 +40,7 @@ export function Game({ runtime }: GameProps) {
         durationMs: elapsedMs,
         metadata: {
           targets: TOTAL_TARGETS,
-          avgPerTargetMs: Math.round(elapsedMs / TOTAL_TARGETS),
+          avgPerTargetMs: calculateAverageMs(elapsedMs, TOTAL_TARGETS),
         },
         clientStartedAt: startTimeRef.current,
         clientEndedAt: endTime,
@@ -59,9 +48,9 @@ export function Game({ runtime }: GameProps) {
       runtime.emit({ type: "game_completed", at: endTime });
     } else {
       setTargetCount((prev) => prev + 1);
-      setTargetPos(generateRandomPos());
+      setTargetPos(generateRandomPercentagePos());
     }
-  }, [phase, targetCount, generateRandomPos, runtime]);
+  }, [phase, targetCount, runtime]);
 
   const handleRetry = useCallback(() => {
     setPhase("ready");
@@ -71,6 +60,7 @@ export function Game({ runtime }: GameProps) {
 
   return (
     <div className="flex flex-col items-center justify-center w-full select-none">
+      {/* Top Info Bar */}
       <div className="flex items-center justify-between w-full max-w-[500px] mb-4 px-2">
         <span className="text-sm font-bold text-text-secondary flex items-center gap-1.5">
           <Target className="w-4 h-4 text-brand" />
@@ -78,16 +68,13 @@ export function Game({ runtime }: GameProps) {
         </span>
         {totalMs !== null && (
           <span className="text-sm font-black text-brand-light">
-            총 시간: {totalMs}ms (평균 {Math.round(totalMs / TOTAL_TARGETS)}ms)
+            총 시간: {totalMs}ms (평균 {calculateAverageMs(totalMs)}ms)
           </span>
         )}
       </div>
 
-      {/* Arena */}
-      <div
-        className="relative rounded-2xl bg-surface-sidebar border border-border overflow-hidden cursor-crosshair shadow-inner"
-        style={{ width: ARENA_WIDTH, height: ARENA_HEIGHT }}
-      >
+      {/* Responsive Arena (aspect 4/3 up to max-w 500px) */}
+      <div className="relative w-full max-w-[500px] aspect-[4/3] rounded-2xl bg-surface-sidebar border border-border overflow-hidden cursor-crosshair shadow-inner">
         {phase === "ready" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-black/60 backdrop-blur-sm z-10">
             <h3 className="text-2xl font-black text-white mb-2">에임 테스트</h3>
@@ -110,12 +97,11 @@ export function Game({ runtime }: GameProps) {
             type="button"
             onClick={handleTargetClick}
             style={{
-              left: `${targetPos.x - TARGET_RADIUS}px`,
-              top: `${targetPos.y - TARGET_RADIUS}px`,
-              width: `${TARGET_RADIUS * 2}px`,
-              height: `${TARGET_RADIUS * 2}px`,
+              left: `${targetPos.xPercent}%`,
+              top: `${targetPos.yPercent}%`,
+              transform: "translate(-50%, -50%)",
             }}
-            className="absolute rounded-full bg-gradient-to-tr from-rose-500 to-red-400 border-2 border-white shadow-lg flex items-center justify-center transition-all duration-75 active:scale-90 cursor-pointer animate-pulse"
+            className="absolute w-11 h-11 rounded-full bg-gradient-to-tr from-rose-500 to-red-400 border-2 border-white shadow-lg flex items-center justify-center transition-transform duration-75 active:scale-90 cursor-pointer animate-pulse"
             aria-label="Target"
           >
             <div className="w-2.5 h-2.5 rounded-full bg-white" />
@@ -127,7 +113,7 @@ export function Game({ runtime }: GameProps) {
             <h3 className="text-3xl font-black text-white mb-1">테스트 완료!</h3>
             <p className="text-4xl font-black text-brand mb-2">{totalMs} ms</p>
             <p className="text-xs text-text-muted mb-6">
-              타겟당 평균 반응시간: {totalMs !== null ? Math.round(totalMs / TOTAL_TARGETS) : 0} ms
+              타겟당 평균 반응시간: {totalMs !== null ? calculateAverageMs(totalMs) : 0} ms
             </p>
 
             <button

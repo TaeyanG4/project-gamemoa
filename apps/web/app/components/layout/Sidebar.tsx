@@ -1,14 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { 
-  Flame, 
-  Gamepad2, 
-  Zap, 
-  Trophy, 
-  Sparkles, 
-  Compass,
-  X
-} from "lucide-react";
-
+import { Flame, Gamepad2, Zap, Trophy, Sparkles, Compass, X } from "lucide-react";
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -37,10 +28,12 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
             <div className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
               탐색 메뉴
             </div>
-            
+
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = currentPath === item.path || (item.path !== "/" && currentPath.startsWith(item.path));
+              const isActive =
+                currentPath === item.path ||
+                (item.path !== "/" && currentPath.startsWith(item.path));
 
               return (
                 <Link
@@ -52,8 +45,10 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
                       : "text-text-secondary hover:text-text-primary hover:bg-surface-raised"
                   }`}
                 >
-                  <Icon className={`w-5 h-5 shrink-0 transition-transform group-hover/btn:scale-110 ${isActive ? "text-white" : "text-brand-light"}`} />
-                  
+                  <Icon
+                    className={`w-5 h-5 shrink-0 transition-transform group-hover/btn:scale-110 ${isActive ? "text-white" : "text-brand-light"}`}
+                  />
+
                   <span className="text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap overflow-hidden">
                     {item.label}
                   </span>
@@ -82,14 +77,17 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
       {isMobileOpen && (
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onMobileClose} />
-          
+
           <div className="relative flex flex-col w-72 max-w-[80vw] bg-surface-sidebar border-r border-border h-full p-4 z-10 shadow-2xl animate-in slide-in-from-left duration-200">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
               <div className="flex items-center gap-2">
                 <Gamepad2 className="w-6 h-6 text-brand" />
                 <span className="font-bold text-lg text-text-primary">메뉴</span>
               </div>
-              <button onClick={onMobileClose} className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised">
+              <button
+                onClick={onMobileClose}
+                className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>

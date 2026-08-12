@@ -39,7 +39,7 @@ export class D1UserRepository implements UserRepository {
       .prepare(
         `SELECT u.* FROM oauth_accounts o 
          JOIN users u ON o.user_id = u.id 
-         WHERE o.provider = ? AND o.provider_user_id = ?`
+         WHERE o.provider = ? AND o.provider_user_id = ?`,
       )
       .bind(provider, providerUserId)
       .first<Record<string, unknown>>();
@@ -86,7 +86,7 @@ export class D1UserRepository implements UserRepository {
       if (needsUpdate) {
         await this.db
           .prepare(
-            `UPDATE users SET email = ?, avatar_url = ?, updated_at = datetime('now') WHERE id = ?`
+            `UPDATE users SET email = ?, avatar_url = ?, updated_at = datetime('now') WHERE id = ?`,
           )
           .bind(updatedEmail, updatedAvatar, existingUser.id)
           .run();
@@ -100,7 +100,7 @@ export class D1UserRepository implements UserRepository {
     // Insert new user
     await this.db
       .prepare(
-        `INSERT INTO users (nickname, email, avatar_url, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))`
+        `INSERT INTO users (nickname, email, avatar_url, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))`,
       )
       .bind(data.nickname, data.email, data.avatarUrl)
       .run();
@@ -114,7 +114,7 @@ export class D1UserRepository implements UserRepository {
     // Insert oauth record
     await this.db
       .prepare(
-        `INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_email) VALUES (?, ?, ?, ?)`
+        `INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_email) VALUES (?, ?, ?, ?)`,
       )
       .bind(userId, data.provider, data.providerUserId, data.email)
       .run();
@@ -140,9 +140,7 @@ export class D1UserRepository implements UserRepository {
   }
 
   private async getLastInsertId(): Promise<number> {
-    const res = await this.db
-      .prepare(`SELECT last_insert_rowid() as id`)
-      .first<{ id: number }>();
+    const res = await this.db.prepare(`SELECT last_insert_rowid() as id`).first<{ id: number }>();
 
     return res?.id ?? 0;
   }

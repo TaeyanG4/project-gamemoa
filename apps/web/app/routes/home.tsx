@@ -24,10 +24,10 @@ export default function Home() {
     if (selectedCategory === "all") return gameManifests;
     if (selectedCategory === "popular") return gameManifests;
     if (selectedCategory === "reaction") {
-      return gameManifests.filter(g => g.modes.includes("single") || g.slug.includes("reaction"));
+      return gameManifests.filter((g) => g.modes.includes("single") || g.slug.includes("reaction"));
     }
     if (selectedCategory === "brain") {
-      return gameManifests.filter(g => g.modes.includes("single"));
+      return gameManifests.filter((g) => g.modes.includes("single"));
     }
     if (selectedCategory === "arcade") {
       return gameManifests;
@@ -49,7 +49,9 @@ export default function Home() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/60 pb-4">
           <div className="flex items-center gap-2.5">
             <Gamepad2 className="w-6 h-6 text-brand" />
-            <h2 className="text-2xl font-black text-text-primary tracking-tight">미니게임 라인업</h2>
+            <h2 className="text-2xl font-black text-text-primary tracking-tight">
+              미니게임 라인업
+            </h2>
             <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
               {filteredGames.length}개
             </span>
@@ -57,9 +59,9 @@ export default function Home() {
 
           {/* Category Pills Bar */}
           <div className="w-full sm:w-auto">
-            <CategoryChips 
-              selectedCategory={selectedCategory} 
-              onSelectCategory={setSelectedCategory} 
+            <CategoryChips
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
             />
           </div>
         </div>
