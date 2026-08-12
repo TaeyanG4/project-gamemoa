@@ -9,6 +9,8 @@
     }
   },
   "dependencies": {
+    "@gamemoa/contracts": "workspace:*",
+    "@gamemoa/game-sdk": "workspace:*",
     "@gamemoa/shared": "workspace:*"
   },
   "devDependencies": {

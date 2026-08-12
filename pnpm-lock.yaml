@@ -271,6 +271,12 @@ importers:
 
   packages/core:
     dependencies:
+      '@gamemoa/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@gamemoa/game-sdk':
+        specifier: workspace:*
+        version: link:../game-sdk
       '@gamemoa/shared':
         specifier: workspace:*
         version: link:../shared
