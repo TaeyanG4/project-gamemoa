@@ -26,19 +26,19 @@
 
 ## 진행 중
 
-- GitHub Actions CI / Cloudflare Deploy / 배포 커밋 출처(Provenance) 검증.
+- 없음 (스프린트 구현 및 운영 검증 완료).
 
 ---
 
 ## 남은 작업
 
-- 원격 `origin/main` 푸시 후 CI GREEN, Cloudflare Deploy GREEN, API/Web Provenance SHA 일치, 프로덕션 스모크 통과 검증.
+- 없음.
 
 ---
 
 ## 블로커
 
-- 없음 (로컬 품질 게이트 및 단위 테스트 전원 PASS).
+- 없음 (로컬 품질 게이트, 단위 테스트, GitHub CI, Cloudflare Deploy 및 운영 Provenance/Smoke 전원 PASS).
 
 ---
 
@@ -52,5 +52,8 @@
 
 - **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
 - **Local Unit Tests**: core 25 / api 28 / db 4 / web 10 / games — 전원 PASS
-- **D1 마이그레이션 (로컬)**: 0003 / 0004 적용 성공
-- **Starting SHA**: `053f16d86320db4d020141ac7986ad94fb88d041`
+- **D1 마이그레이션 (로컬 + 프로덕션)**: 0003 / 0004 적용 성공
+- **GitHub Actions CI**: GREEN (최종 origin/main HEAD 기준)
+- **Cloudflare Deploy**: GREEN (API/Web Worker 배포 성공)
+- **운영 Provenance/Smoke**: `/api/health` commit 및 Web `/version.json` commit = 최종 origin/main HEAD 일치; 홈/게임/랭킹/프로필/미니게임 및 favicon 자산(/favicon.svg, /favicon.ico, /apple-touch-icon.png, /favicon-192x192.png, /site.webmanifest) HTTP 200
+- **시작 SHA**: `053f16d86320db4d020141ac7986ad94fb88d041`
