@@ -28,6 +28,9 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 - [x] **문서**: `docs/PROGRESSION.md` 신규 작성(Korean), `docs/ARCHITECTURE.md`/`docs/ROADMAP.md`/`docs/PROGRESS.md`/`README.md` 갱신.
 - [x] **품질 게이트**: `pnpm verify` (frozen install/format/architecture/registry/lint/typecheck/test/build) 전원 PASS.
 - [x] **원격 검증**: `git push origin main` → GitHub Actions CI GREEN → Cloudflare Deploy GREEN(D1 프로덕션 마이그레이션 0005 적용 포함) → `pnpm smoke:prod` API/Web provenance 및 신규 엔드포인트 프로덕션 200/401 확인 완료.
+- [x] **버그 수정: Discord 계정 연결 `잘못된 OAuth2 redirect_uri`**: LOGIN(`/api/auth/discord`)과 LINK(`/api/auth/link/discord`)가 서로 다른 `redirect_uri`를 Discord에 전송하던 문제(Discord Developer Portal에는 LOGIN용 하나만 등록되어 있어 LINK 시도가 즉시 거부됨) — 두 흐름 모두 동일한 등록된 `redirect_uri`를 사용하도록 통합(`getDiscordRedirectUri`), LOGIN/LINK 구분은 경로가 아닌 state 쿠키로 판별. Discord Developer Portal 설정 변경 불필요. 회귀 테스트 추가, 프로덕션에서 실제 redirect_uri 값 확인 완료.
+- [x] **UI 정리: 푸터 SEO 필러 제거**: "인기 태그" 태그 클라우드 및 2단 설명 문단 제거, 로고 옆 한 줄 태그라인으로 축소.
+- [x] **My Page 진행도 노출 (Phase C 1차 증분)**: 기존 `/profile` 페이지에 레벨/XP 진행 바(전체 XP 랭킹 포함) 및 도전과제 요약(달성 배지) 카드 추가 — `GET /api/progression/me`, `GET /api/progression/achievements` 소비. `/me`·`/account` 라우트 분리는 아직 수행하지 않음(아래 남은 작업 참고).
 
 ---
 
@@ -41,7 +44,7 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 
 이번 세션 범위 밖 — 후속 세션에서 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-- **Phase C**: My Page(`/me`) 대시보드, Account Center(`/account`), Public Profile(`/profile/:id`) UI. 이번 세션에서 만든 `/api/progression/*`, `/api/profile/*`를 소비.
+- **Phase C (잔여)**: 진행도 카드는 `/profile`에 이미 노출됨(위 완료 참고). 남은 것은 IA 분리 — `/me`(대시보드) / `/account`(계정 관리) / `/profile/:id`(공개 프로필)로 나누고 기존 `/profile` 링크에 redirect 전략 적용. 닉네임/국가 변경 UI(`POST /api/profile/nickname|country`는 백엔드 완료, UI 미연결), 즐겨찾기/최근 플레이 카드도 대시보드에 추가.
 - **Phase D~E**: Creator 모델(YouTube/CHZZK/SOOP/Twitch 채널 소유권 인증), Featured Creator 심사 엔진(6시간 자동 재심사 Cron), Creator 랭킹.
 - **Phase F~H**: Discord HTTP Interactions(서명 검증), 계정 연결, 서버 등록/검색/관리, 길드-로컬 XP(이번 세션의 XP 원장 패턴을 재사용하되 `source_type`을 분리한 별도 귀속 테이블 필요).
 - **Phase I**: 계정 통합 회귀 테스트 확장(Creator/Discord 식별자 포함), 최종 문서화, 프로덕션 검증.
@@ -56,12 +59,12 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 
 ## 다음 작업 (Next Action)
 
-**Phase C: My Page(`/me`) 대시보드 구현** — `GET /api/progression/me`(레벨/XP), `GET /api/progression/achievements`,
-기존 `GET /api/scores/user/me`(개인 기록), `GET /api/personalization`(즐겨찾기/최근 플레이), `GET /api/auth/accounts`
-(연결된 계정)를 하나의 번들형 대시보드 API(`GET /api/me/dashboard` 신설 고려) 또는 클라이언트 병렬 호출로 묶어
-`/me` 라우트에 새 페이지를 구성. 기존 `/profile` 라우트와의 관계(리다이렉트/역할 분리: `/me`=대시보드,
-`/account`=계정 관리, `/profile/:id`=공개 프로필)를 먼저 결정할 것 — 현재 `/profile`이 계정 관리 기능을 담당 중이므로
-분리/redirect 전략을 세워야 함. 새 세션은 본 문서와 `docs/PROGRESSION.md`, `docs/ROADMAP.md`만으로 이어서 진행 가능.
+**Phase C 마무리: My Page IA 분리 + 즐겨찾기/최근 플레이 카드 + 닉네임/국가 변경 UI** — 레벨/XP·도전과제 카드는
+이미 `/profile`에 노출되어 있음(완료 참고). 다음 세션은: (1) 기존 `/profile`을 `/me`(개인 대시보드)와
+`/account`(계정 관리: 연결된 로그인 계정 + 향후 Creator 설정)로 분리하고 구 `/profile` 경로에 redirect 적용,
+(2) 대시보드에 `GET /api/personalization`(즐겨찾기/최근 플레이) 카드 추가, (3) 이미 구현된
+`POST /api/profile/nickname`/`POST /api/profile/country`를 계정 관리 UI에 연결(쿨다운 에러 메시지 처리 포함).
+새 세션은 본 문서와 `docs/PROGRESSION.md`, `docs/ROADMAP.md`만으로 이어서 진행 가능.
 
 ---
 
@@ -70,8 +73,10 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 - **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
 - **Local Unit Tests**: core 68 / db 22 / api 34 — 전원 PASS
 - **D1 마이그레이션 (로컬 + 프로덕션)**: 0005 적용 성공 (기존 0000~0004 위에 additive)
-- **최종 커밋 (Final SHA)**: `22a240af84b18cc149c914f990800cbde8217c6c` (origin/main과 100% 일치)
-- **GitHub Actions CI**: GREEN (최종 SHA 기준, run `31639739137`) — 첫 push(`774a7df`)는 신규 Korean 문서 3개의 Prettier 테이블 정렬 누락으로 Format Check 실패(run `31639575768`) → `pnpm format` 재실행 후 재푸시로 해결.
-- **Cloudflare Deploy**: GREEN (run `31639800610`) — D1 프로덕션 마이그레이션 적용, API/Web Worker 배포, Health/Provenance 체크 전원 통과.
-- **운영 Provenance/Smoke (`pnpm smoke:prod`)**: API `/api/health` commit = Web `/version.json` commit = `22a240af84b18cc149c914f990800cbde8217c6c` (= origin/main). 홈/게임/랭킹/프로필/미니게임/파비콘 자산 HTTP 200. 신규 `GET /api/progression/leaderboard` 프로덕션 200 확인(`{"entries":[]}` — 아직 XP 이벤트 없음, 정상), `GET /api/progression/me` 미인증 401 확인.
+- **최종 커밋 (Final SHA)**: `7a62e3001173b96e34fca78913f176544d8ebe56` (origin/main과 100% 일치)
+- **GitHub Actions CI**: GREEN (run `31641676948`)
+- **Cloudflare Deploy**: GREEN (run `31641758791`) — D1 프로덕션 마이그레이션 적용, API/Web Worker 배포, Health/Provenance 체크 전원 통과.
+- **운영 Provenance/Smoke (`pnpm smoke:prod`)**: API `/api/health` commit = Web `/version.json` commit = `7a62e3001173b96e34fca78913f176544d8ebe56` (= origin/main). 홈/게임/랭킹/프로필/미니게임/파비콘 자산 HTTP 200.
+- **프로덕션 직접 확인**: `GET /api/auth/discord` Location 헤더의 `redirect_uri`가 `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`로 LOGIN/LINK 공통 확인, 구 `GET /api/auth/link/discord/callback`은 404(제거됨), `GET /api/auth/link/discord`(미인증) 401. `GET /api/progression/leaderboard` 200, `GET /api/progression/me`(미인증) 401.
+- **알려진 이전 CI 이슈(해결됨)**: 이전 push(`774a7df`)는 신규 Korean 문서 3개의 Prettier 테이블 정렬 누락으로 Format Check 실패(run `31639575768`) → `pnpm format` 재실행 후 재푸시로 해결(참고용, 현재 최종 상태에는 영향 없음).
 - **시작 SHA**: `dbcb4591bfdb6aac3b6150b398509f6992f29a5c`
