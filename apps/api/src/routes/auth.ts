@@ -68,6 +68,15 @@ function isLocalhost(urlStr: string): boolean {
   }
 }
 
+// Discord only has ONE redirect_uri registered in its Developer Portal (DISCORD_REDIRECT_URI,
+// pointing at /api/auth/discord/callback). Both the LOGIN flow and the LINK flow must send
+// this exact same redirect_uri to the authorize endpoint AND the token exchange, or Discord
+// rejects the request with "잘못된 OAuth2 redirect_uri" before the user ever sees a prompt.
+// LOGIN vs LINK intent is distinguished by which state cookie is present, not by the path.
+export function getDiscordRedirectUri(c: Context<ApiEnv>): string {
+  return c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/discord/callback`;
+}
+
 // GET /api/auth/providers (non-secret readiness check)
 authRouter.get("/providers", (c) => {
   const googleConfigured = Boolean(c.env?.GOOGLE_CLIENT_ID);
@@ -141,8 +150,7 @@ authRouter.post("/google", async (c) => {
 // GET /api/auth/discord
 authRouter.get("/discord", async (c) => {
   const clientId = c.env.DISCORD_CLIENT_ID;
-  const redirectUri =
-    c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/discord/callback`;
+  const redirectUri = getDiscordRedirectUri(c);
 
   if (!clientId) {
     return c.text("DISCORD_CLIENT_ID is not configured", 500);
@@ -167,10 +175,81 @@ authRouter.get("/discord", async (c) => {
   return c.redirect(discordUrl);
 });
 
-// GET /api/auth/discord/callback
+// GET /api/auth/discord/callback — handles BOTH the LOGIN flow and the LINK flow, since
+// both must share the single redirect_uri registered with Discord (see
+// getDiscordRedirectUri above). A `discord_link_state` cookie present means this callback
+// belongs to an in-progress LINK (started at /api/auth/link/discord); otherwise it's a
+// normal LOGIN callback (started at /api/auth/discord).
 authRouter.get("/discord/callback", async (c) => {
   const code = c.req.query("code");
   const state = c.req.query("state");
+  const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
+
+  const linkStateCookie = getCookie(c, "discord_link_state");
+  if (linkStateCookie) {
+    deleteCookie(c, "discord_link_state", { path: "/" });
+
+    let linkIntent: { state: string; userId: number } | null = null;
+    try {
+      const parsed = JSON.parse(linkStateCookie) as { state?: string; userId?: number };
+      if (typeof parsed.state === "string" && typeof parsed.userId === "number") {
+        linkIntent = { state: parsed.state, userId: parsed.userId };
+      }
+    } catch {
+      linkIntent = null;
+    }
+
+    if (!code || !state || !linkIntent || linkIntent.state !== state) {
+      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+    }
+
+    // Re-validate the current authenticated session belongs to the same user that started the link.
+    const auth = await requireAuth(c);
+    if (!auth || auth.userId !== linkIntent.userId) {
+      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+    }
+
+    const clientId = c.env.DISCORD_CLIENT_ID;
+    const clientSecret = c.env.DISCORD_CLIENT_SECRET;
+    const redirectUri = getDiscordRedirectUri(c);
+
+    if (!clientId || !clientSecret) {
+      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+    }
+    const exchangeResult = await exchangeDiscordCode({ code, clientId, clientSecret, redirectUri });
+    if (!exchangeResult.valid || !exchangeResult.profile) {
+      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+    }
+
+    const profile = exchangeResult.profile;
+    const { identityUseCases } = createContainer(c.env.DB);
+    const result = await identityUseCases.linkProvider(
+      auth.userId,
+      "discord",
+      profile.id,
+      profile.email,
+    );
+
+    if (!result.ok) {
+      if (result.code === "ACCOUNT_ALREADY_LINKED") {
+        const { accountMergeUseCases } = createContainer(c.env.DB);
+        const challenge = await accountMergeUseCases.startMergeChallenge(
+          auth.userId,
+          result.conflictUserId,
+          "discord",
+          profile.id,
+        );
+        return c.redirect(
+          `${frontendUrl}/profile?link_status=conflict&provider=discord&challenge=${encodeURIComponent(challenge.challengeId)}`,
+        );
+      }
+      return c.redirect(`${frontendUrl}/profile?link_status=already&provider=discord`);
+    }
+
+    return c.redirect(`${frontendUrl}/profile?link_status=success&provider=discord`);
+  }
+
+  // ---- Normal LOGIN callback ----
   const cookieState = getCookie(c, "discord_oauth_state");
 
   if (!code || !state || !cookieState || cookieState !== state) {
@@ -182,9 +261,7 @@ authRouter.get("/discord/callback", async (c) => {
 
   const clientId = c.env.DISCORD_CLIENT_ID;
   const clientSecret = c.env.DISCORD_CLIENT_SECRET;
-  const redirectUri =
-    c.env.DISCORD_REDIRECT_URI || `${new URL(c.req.url).origin}/api/auth/discord/callback`;
-  const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
+  const redirectUri = getDiscordRedirectUri(c);
 
   if (!clientId || !clientSecret) {
     return c.text("Discord client secret not configured", 500);
@@ -376,7 +453,7 @@ authRouter.get("/link/discord", async (c) => {
   if (!clientId) {
     return c.text("DISCORD_CLIENT_ID is not configured", 500);
   }
-  const redirectUri = `${new URL(c.req.url).origin}/api/auth/link/discord/callback`;
+  const redirectUri = getDiscordRedirectUri(c);
 
   const state = crypto.randomUUID();
   const statePayload = JSON.stringify({ state, userId: auth.userId });
@@ -390,82 +467,6 @@ authRouter.get("/link/discord", async (c) => {
 
   const discordUrl = buildDiscordAuthorizeUrl({ clientId, redirectUri, state });
   return c.redirect(discordUrl);
-});
-
-// GET /api/auth/link/discord/callback — Discord OAuth LINK callback
-authRouter.get("/link/discord/callback", async (c) => {
-  const code = c.req.query("code");
-  const state = c.req.query("state");
-  const cookieState = getCookie(c, "discord_link_state");
-  const frontendUrl = c.env.FRONTEND_URL || `${new URL(c.req.url).origin}`;
-
-  let linkIntent: { state: string; userId: number } | null = null;
-  try {
-    if (cookieState) {
-      const parsed = JSON.parse(cookieState) as { state?: string; userId?: number };
-      if (typeof parsed.state === "string" && typeof parsed.userId === "number") {
-        linkIntent = { state: parsed.state, userId: parsed.userId };
-      }
-    }
-  } catch {
-    linkIntent = null;
-  }
-  deleteCookie(c, "discord_link_state", { path: "/" });
-
-  if (!code || !state || !linkIntent || linkIntent.state !== state) {
-    return c.redirect(`${frontendUrl}/profile?link_status=error`);
-  }
-
-  // Re-validate the current authenticated session belongs to the same user
-  const auth = await requireAuth(c);
-  if (!auth || auth.userId !== linkIntent.userId) {
-    return c.redirect(`${frontendUrl}/profile?link_status=error`);
-  }
-
-  const clientId = c.env.DISCORD_CLIENT_ID;
-  const clientSecret = c.env.DISCORD_CLIENT_SECRET;
-  const redirectUri = `${new URL(c.req.url).origin}/api/auth/link/discord/callback`;
-
-  if (!clientId || !clientSecret) {
-    return c.redirect(`${frontendUrl}/profile?link_status=error`);
-  }
-  const exchangeResult = await exchangeDiscordCode({
-    code,
-    clientId,
-    clientSecret,
-    redirectUri,
-  });
-
-  if (!exchangeResult.valid || !exchangeResult.profile) {
-    return c.redirect(`${frontendUrl}/profile?link_status=error`);
-  }
-
-  const profile = exchangeResult.profile;
-  const { identityUseCases } = createContainer(c.env.DB);
-  const result = await identityUseCases.linkProvider(
-    auth.userId,
-    "discord",
-    profile.id,
-    profile.email,
-  );
-
-  if (!result.ok) {
-    if (result.code === "ACCOUNT_ALREADY_LINKED") {
-      const { accountMergeUseCases } = createContainer(c.env.DB);
-      const challenge = await accountMergeUseCases.startMergeChallenge(
-        auth.userId,
-        result.conflictUserId,
-        "discord",
-        profile.id,
-      );
-      return c.redirect(
-        `${frontendUrl}/profile?link_status=conflict&provider=discord&challenge=${encodeURIComponent(challenge.challengeId)}`,
-      );
-    }
-    return c.redirect(`${frontendUrl}/profile?link_status=already&provider=discord`);
-  }
-
-  return c.redirect(`${frontendUrl}/profile?link_status=success&provider=discord`);
 });
 
 // DELETE /api/auth/link/:provider — detach a provider from the current account
