@@ -5,12 +5,16 @@ export class D1ScoreRepository implements ScoreRepository {
   constructor(private db: D1Database) {}
 
   async saveScore(data: {
-    userId?: number | null;
+    userId: number;
     nickname: string;
     avatarUrl?: string | null;
     gameId: string;
     score: number;
   }): Promise<Score> {
+    if (!data.userId || typeof data.userId !== "number") {
+      throw new Error("Valid userId is required to save score");
+    }
+
     const createdAt = new Date().toISOString();
 
     await this.db
@@ -19,8 +23,8 @@ export class D1ScoreRepository implements ScoreRepository {
          VALUES (?, ?, ?, ?, ?, ?)`,
       )
       .bind(
-        data.userId ?? null,
-        data.nickname || "게스트",
+        data.userId,
+        data.nickname || "플레이어",
         data.avatarUrl ?? null,
         data.gameId,
         data.score,
@@ -34,8 +38,8 @@ export class D1ScoreRepository implements ScoreRepository {
 
     return {
       id: Number(row?.id ?? 0),
-      user_id: data.userId ?? null,
-      nickname: data.nickname || "게스트",
+      user_id: data.userId,
+      nickname: data.nickname || "플레이어",
       avatar_url: data.avatarUrl ?? null,
       game_id: data.gameId,
       score: data.score,
@@ -52,24 +56,25 @@ export class D1ScoreRepository implements ScoreRepository {
 
     const query =
       gameId === "all"
-        ? `SELECT * FROM scores ORDER BY created_at DESC LIMIT ?`
-        : `SELECT * FROM scores WHERE game_id = ? ORDER BY score ${orderClause}, created_at ASC LIMIT 100`;
+        ? `SELECT * FROM scores WHERE user_id IS NOT NULL ORDER BY created_at DESC LIMIT ?`
+        : `SELECT * FROM scores WHERE user_id IS NOT NULL AND game_id = ? ORDER BY score ${orderClause}, created_at ASC LIMIT 100`;
 
     const prepared =
       gameId === "all" ? this.db.prepare(query).bind(limit) : this.db.prepare(query).bind(gameId);
 
     const res = await prepared.all<Record<string, unknown>>();
 
-    // Deduplicate top score per user/nickname
-    const seen = new Set<string>();
+    // Deduplicate top score per authenticated user
+    const seen = new Set<number>();
     const leaderboard: Score[] = [];
 
     for (const row of res.results) {
-      const userId = row.user_id ? Number(row.user_id) : null;
-      const key = userId ? `u_${userId}` : `n_${String(row.nickname)}`;
+      if (row.user_id === null || row.user_id === undefined) continue;
+      const userId = Number(row.user_id);
+      if (isNaN(userId)) continue;
 
-      if (seen.has(key)) continue;
-      seen.add(key);
+      if (seen.has(userId)) continue;
+      seen.add(userId);
 
       leaderboard.push({
         id: Number(row.id),
