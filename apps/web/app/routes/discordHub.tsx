@@ -2,13 +2,17 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import {
   fetchMyManagedGuilds,
+  fetchGlobalGuildRanking,
   getDiscordRegisterAuthUrl,
 } from "../features/discord/discordGuildApi";
-import type { DiscordGuildDto } from "@gamemoa/contracts";
+import type { DiscordGuildDto, GlobalGuildRankEntryDto } from "@gamemoa/contracts";
+import { Trophy } from "lucide-react";
 
 export default function DiscordHubRoute() {
   const [managedGuilds, setManagedGuilds] = useState<DiscordGuildDto[]>([]);
+  const [weeklyRanking, setWeeklyRanking] = useState<GlobalGuildRankEntryDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRanking, setLoadingRanking] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -22,6 +26,11 @@ export default function DiscordHubRoute() {
         setManagedGuilds([]);
       })
       .finally(() => setLoading(false));
+
+    fetchGlobalGuildRanking("weekly", 5, 0)
+      .then((res) => setWeeklyRanking(res.guilds))
+      .catch(() => setWeeklyRanking([]))
+      .finally(() => setLoadingRanking(false));
   }, []);
 
   return (
@@ -182,8 +191,60 @@ export default function DiscordHubRoute() {
           )}
         </div>
 
-        {/* Sidebar Status & Features */}
+        {/* Sidebar Column */}
         <div className="space-y-6">
+          {/* Restrained Weekly Server Activity Ranking Widget */}
+          <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 backdrop-blur-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-purple-400" />
+                <span>이번 주 서버 활동 랭킹</span>
+              </h3>
+              <span className="text-[10px] text-slate-500 font-mono">PUBLIC</span>
+            </div>
+
+            {loadingRanking ? (
+              <div className="text-xs text-slate-400 text-center py-4">랭킹 불러오는 중...</div>
+            ) : weeklyRanking.length === 0 ? (
+              <div className="text-xs text-slate-400 text-center py-4">
+                이번 주 등록된 서버 활동이 없습니다
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {weeklyRanking.map((g) => (
+                  <Link
+                    key={g.guildId}
+                    to={`/discord/servers/${g.slug}`}
+                    className="flex items-center justify-between rounded-xl bg-white/5 p-2.5 transition-colors hover:bg-white/10"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold bg-slate-800 text-purple-300">
+                        #{g.rank}
+                      </span>
+                      {g.iconUrl ? (
+                        <img
+                          src={g.iconUrl}
+                          alt={g.name}
+                          className="h-6 w-6 rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-600/30 text-[10px] font-bold text-purple-200">
+                          {g.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="truncate text-xs font-semibold text-slate-200">
+                        {g.name}
+                      </span>
+                    </div>
+                    <span className="text-xs font-extrabold text-purple-300 font-mono ml-2">
+                      {g.weeklyXp.toLocaleString()} XP
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Quick Guide Card */}
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 backdrop-blur-sm space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -200,7 +261,9 @@ export default function DiscordHubRoute() {
               </li>
               <li className="flex gap-2">
                 <span className="text-indigo-400 font-bold">3.</span>
-                <span>서버별 랭킹 및 XP 수집 기능은 Phase H에서 출시될 예정입니다.</span>
+                <span>
+                  /gamemoa play로 게임을 플레이하면 이 서버에 XP가 기여되며 주간 랭킹에 집계됩니다.
+                </span>
               </li>
             </ul>
           </div>

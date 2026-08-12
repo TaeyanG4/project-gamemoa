@@ -44,6 +44,12 @@ export async function handleGamemoaCommand(
       return handleProfileCommand(container, discordUser);
     case DISCORD_SUBCOMMANDS.PLAY:
       return handlePlayCommand(container, interaction, discordUser, frontendUrl);
+    case DISCORD_SUBCOMMANDS.RANK:
+      return handleRankCommand(container, interaction, discordUser);
+    case DISCORD_SUBCOMMANDS.LEADERBOARD:
+      return handleLeaderboardCommand(container, interaction, frontendUrl);
+    case DISCORD_SUBCOMMANDS.SERVER:
+      return handleServerCommand(container, interaction, frontendUrl);
     default:
       return ephemeral("알 수 없는 명령어입니다.");
   }
@@ -148,4 +154,121 @@ async function handlePlayCommand(
     const errorMsg = err instanceof Error ? err.message : "플레이 링크 생성에 실패했습니다.";
     return ephemeral(errorMsg);
   }
+}
+
+async function handleRankCommand(
+  container: AppContainer,
+  interaction: DiscordInteraction,
+  discordUser: DiscordInteractionUser,
+): Promise<DiscordInteractionResponse> {
+  const guildId = interaction.guild_id;
+  if (!guildId) {
+    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+  }
+
+  const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
+  if (!guild || guild.registration_status !== "ACTIVE") {
+    return ephemeral(
+      "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+    );
+  }
+
+  const oauthAccount = await container.userRepo.findOAuthAccount("discord", discordUser.id);
+  if (!oauthAccount) {
+    return ephemeral(
+      "GAMEMOA 계정이 Discord와 연결되어 있지 않습니다. `/gamemoa link` 명령어로 계정을 먼저 연결해 주세요.",
+    );
+  }
+
+  const rankSummary = await container.discordGuildXpUseCases.getUserGuildRankSummary(
+    guildId,
+    discordUser.id,
+    "alltime",
+  );
+
+  if (!rankSummary.rank || rankSummary.totalXp <= 0) {
+    return ephemeral(
+      `🏆 **${guild.name}**\n아직 이 서버에 기여한 XP가 없습니다. \`/gamemoa play\` 명령어로 게임을 플레이해보세요!`,
+    );
+  }
+
+  const nickname = rankSummary.nickname || discordUser.global_name || discordUser.username;
+  return ephemeral(
+    `🏆 **${guild.name}** 내 **${nickname}** 님의 활동 현황\n` +
+      `• 서버 기여 XP: **${rankSummary.totalXp.toLocaleString()} XP**\n` +
+      `• 서버 순위: **#${rankSummary.rank}**`,
+  );
+}
+
+async function handleLeaderboardCommand(
+  container: AppContainer,
+  interaction: DiscordInteraction,
+  frontendUrl: string,
+): Promise<DiscordInteractionResponse> {
+  const guildId = interaction.guild_id;
+  if (!guildId) {
+    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+  }
+
+  const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
+  if (!guild || guild.registration_status !== "ACTIVE") {
+    return ephemeral(
+      "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+    );
+  }
+
+  const leaderboard = await container.discordGuildXpUseCases.getGuildLeaderboard(
+    guildId,
+    "alltime",
+    10,
+    0,
+  );
+
+  const serverUrl = `${frontendUrl}/discord/servers/${guild.slug}`;
+
+  if (leaderboard.entries.length === 0) {
+    return publicMessage(
+      `📊 **${guild.name}** 서버 XP 리더보드\n` +
+        `아직 등록된 활동 XP가 없습니다. \`/gamemoa play\`로 첫 기여를 시작해보세요!\n\n` +
+        `👉 전체 랭킹 보기: ${serverUrl}`,
+    );
+  }
+
+  const lines = leaderboard.entries.map(
+    (e) => `${e.rank}. **${e.nickname}** — ${e.xp.toLocaleString()} XP`,
+  );
+
+  return publicMessage(
+    `📊 **${guild.name}** 서버 XP 리더보드 (Top 10)\n${lines.join("\n")}\n\n` +
+      `👉 전체 랭킹 보기: ${serverUrl}`,
+  );
+}
+
+async function handleServerCommand(
+  container: AppContainer,
+  interaction: DiscordInteraction,
+  frontendUrl: string,
+): Promise<DiscordInteractionResponse> {
+  const guildId = interaction.guild_id;
+  if (!guildId) {
+    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+  }
+
+  const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
+  if (!guild || guild.registration_status !== "ACTIVE") {
+    return ephemeral(
+      "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+    );
+  }
+
+  const summary = await container.discordGuildXpUseCases.getGuildSummary(guildId);
+  const serverUrl = `${frontendUrl}/discord/servers/${guild.slug}`;
+
+  return publicMessage(
+    `🏰 **${guild.name}** 서버 정보 요약\n` +
+      `• 전체 활동 XP: **${summary.totalXp.toLocaleString()} XP**\n` +
+      `• 이번 주 활동 XP: **${summary.weeklyXp.toLocaleString()} XP**\n` +
+      `• GAMEMOA 참여자: **${summary.participantCount}명**\n\n` +
+      `🌐 웹 커뮤니티 페이지: ${serverUrl}`,
+  );
 }

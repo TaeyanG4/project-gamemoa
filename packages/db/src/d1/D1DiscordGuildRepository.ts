@@ -8,6 +8,10 @@ import type {
   DiscordRegistrationChallenge,
   DiscordPlayContext,
   DiscordGuildXpEvent,
+  GuildXpLeaderboardEntry,
+  GlobalGuildRankEntry,
+  ServerGameLeaderboardEntry,
+  GuildSummaryData,
 } from "@gamemoa/core";
 import type { D1Database } from "./D1UserRepository.js";
 
@@ -441,5 +445,217 @@ export class D1DiscordGuildRepository implements DiscordGuildRepository {
       .first<{ total: number | null }>();
 
     return row?.total ?? 0;
+  }
+
+  async getGuildXpLeaderboard(
+    guildId: string,
+    startOfWeekIso?: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<{ entries: GuildXpLeaderboardEntry[]; total: number }> {
+    const hasWeekFilter = Boolean(startOfWeekIso);
+
+    const countQuery = hasWeekFilter
+      ? `SELECT COUNT(DISTINCT user_id) as total FROM discord_guild_xp_events WHERE guild_id = ? AND created_at >= ?`
+      : `SELECT COUNT(DISTINCT user_id) as total FROM discord_guild_xp_events WHERE guild_id = ?`;
+
+    const countStmt = hasWeekFilter
+      ? this.db.prepare(countQuery).bind(guildId, startOfWeekIso)
+      : this.db.prepare(countQuery).bind(guildId);
+
+    const countRow = await countStmt.first<{ total: number }>();
+    const total = countRow?.total ?? 0;
+
+    const dataQuery = hasWeekFilter
+      ? `SELECT e.user_id, u.nickname, u.avatar_url, SUM(e.amount) as xp
+         FROM discord_guild_xp_events e
+         JOIN users u ON u.id = e.user_id
+         WHERE e.guild_id = ? AND e.created_at >= ?
+         GROUP BY e.user_id
+         ORDER BY xp DESC, e.user_id ASC
+         LIMIT ? OFFSET ?`
+      : `SELECT e.user_id, u.nickname, u.avatar_url, SUM(e.amount) as xp
+         FROM discord_guild_xp_events e
+         JOIN users u ON u.id = e.user_id
+         WHERE e.guild_id = ?
+         GROUP BY e.user_id
+         ORDER BY xp DESC, e.user_id ASC
+         LIMIT ? OFFSET ?`;
+
+    const dataStmt = hasWeekFilter
+      ? this.db.prepare(dataQuery).bind(guildId, startOfWeekIso, limit, offset)
+      : this.db.prepare(dataQuery).bind(guildId, limit, offset);
+
+    const res = await dataStmt.all<Record<string, unknown>>();
+
+    const entries: GuildXpLeaderboardEntry[] = (res.results || []).map((row, idx) => ({
+      userId: Number(row.user_id),
+      nickname: String(row.nickname),
+      avatarUrl: row.avatar_url ? String(row.avatar_url) : null,
+      xp: Number(row.xp),
+      rank: offset + idx + 1,
+    }));
+
+    return { entries, total };
+  }
+
+  async getGuildSummary(guildId: string, startOfWeekIso: string): Promise<GuildSummaryData> {
+    const row = await this.db
+      .prepare(
+        `SELECT
+           COALESCE(SUM(amount), 0) as total_xp,
+           COALESCE(SUM(CASE WHEN created_at >= ? THEN amount ELSE 0 END), 0) as weekly_xp,
+           COUNT(DISTINCT user_id) as participant_count
+         FROM discord_guild_xp_events
+         WHERE guild_id = ?`,
+      )
+      .bind(startOfWeekIso, guildId)
+      .first<{ total_xp: number; weekly_xp: number; participant_count: number }>();
+
+    return {
+      totalXp: Number(row?.total_xp ?? 0),
+      weeklyXp: Number(row?.weekly_xp ?? 0),
+      participantCount: Number(row?.participant_count ?? 0),
+    };
+  }
+
+  async getGlobalGuildActivityRanking(
+    startOfWeekIso?: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<{ guilds: GlobalGuildRankEntry[]; total: number }> {
+    const countRow = await this.db
+      .prepare(
+        `SELECT COUNT(*) as total FROM discord_guilds
+         WHERE visibility = 'PUBLIC' AND registration_status = 'ACTIVE'`,
+      )
+      .first<{ total: number }>();
+
+    const total = countRow?.total ?? 0;
+
+    const hasWeekFilter = Boolean(startOfWeekIso);
+    const orderCol = hasWeekFilter ? "weekly_xp" : "total_xp";
+
+    const query = `
+      SELECT
+        g.guild_id, g.slug, g.name, g.icon_url,
+        COALESCE(SUM(e.amount), 0) as total_xp,
+        COALESCE(SUM(CASE WHEN e.created_at >= ? THEN e.amount ELSE 0 END), 0) as weekly_xp,
+        COUNT(DISTINCT e.user_id) as participant_count
+      FROM discord_guilds g
+      LEFT JOIN discord_guild_xp_events e ON e.guild_id = g.guild_id
+      WHERE g.visibility = 'PUBLIC' AND g.registration_status = 'ACTIVE'
+      GROUP BY g.guild_id
+      ORDER BY ${orderCol} DESC, g.guild_id ASC
+      LIMIT ? OFFSET ?
+    `;
+
+    const res = await this.db
+      .prepare(query)
+      .bind(startOfWeekIso ?? "", limit, offset)
+      .all<Record<string, unknown>>();
+
+    const guilds: GlobalGuildRankEntry[] = (res.results || []).map((row, idx) => ({
+      guildId: String(row.guild_id),
+      slug: String(row.slug),
+      name: String(row.name),
+      iconUrl: row.icon_url ? String(row.icon_url) : null,
+      totalXp: Number(row.total_xp),
+      weeklyXp: Number(row.weekly_xp),
+      participantCount: Number(row.participant_count),
+      rank: offset + idx + 1,
+    }));
+
+    return { guilds, total };
+  }
+
+  async getGuildGameLeaderboard(
+    guildId: string,
+    gameId: string,
+    direction: "asc" | "desc" = "desc",
+    limit = 20,
+  ): Promise<ServerGameLeaderboardEntry[]> {
+    const orderClause = direction === "asc" ? "ASC" : "DESC";
+
+    const query = `
+      SELECT s.id, s.user_id, u.nickname, u.avatar_url, s.game_id, s.score, s.created_at
+      FROM scores s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.user_id IS NOT NULL AND s.game_id = ?
+        AND s.user_id IN (SELECT DISTINCT user_id FROM discord_guild_xp_events WHERE guild_id = ?)
+      ORDER BY s.score ${orderClause}, s.created_at ASC
+      LIMIT 100
+    `;
+
+    const res = await this.db.prepare(query).bind(gameId, guildId).all<Record<string, unknown>>();
+
+    const seen = new Set<number>();
+    const leaderboard: ServerGameLeaderboardEntry[] = [];
+
+    for (const row of res.results || []) {
+      const userId = Number(row.user_id);
+      if (isNaN(userId) || seen.has(userId)) continue;
+      seen.add(userId);
+
+      leaderboard.push({
+        id: Number(row.id),
+        userId,
+        nickname: String(row.nickname),
+        avatarUrl: row.avatar_url ? String(row.avatar_url) : null,
+        gameId: String(row.game_id),
+        score: Number(row.score),
+        formattedScore: String(row.score),
+        createdAt: String(row.created_at),
+      });
+
+      if (leaderboard.length >= limit) break;
+    }
+
+    return leaderboard;
+  }
+
+  async getGuildUserXpRank(
+    guildId: string,
+    userId: number,
+    startOfWeekIso?: string,
+  ): Promise<{ totalXp: number; rank: number | null }> {
+    const hasWeekFilter = Boolean(startOfWeekIso);
+
+    const userXpQuery = hasWeekFilter
+      ? `SELECT SUM(amount) as xp FROM discord_guild_xp_events WHERE guild_id = ? AND user_id = ? AND created_at >= ?`
+      : `SELECT SUM(amount) as xp FROM discord_guild_xp_events WHERE guild_id = ? AND user_id = ?`;
+
+    const userXpStmt = hasWeekFilter
+      ? this.db.prepare(userXpQuery).bind(guildId, userId, startOfWeekIso)
+      : this.db.prepare(userXpQuery).bind(guildId, userId);
+
+    const userXpRow = await userXpStmt.first<{ xp: number | null }>();
+    const totalXp = userXpRow?.xp ?? 0;
+
+    if (totalXp <= 0) {
+      return { totalXp: 0, rank: null };
+    }
+
+    const allUsersQuery = hasWeekFilter
+      ? `SELECT user_id, SUM(amount) as xp FROM discord_guild_xp_events WHERE guild_id = ? AND created_at >= ? GROUP BY user_id ORDER BY xp DESC, user_id ASC`
+      : `SELECT user_id, SUM(amount) as xp FROM discord_guild_xp_events WHERE guild_id = ? GROUP BY user_id ORDER BY xp DESC, user_id ASC`;
+
+    const allUsersStmt = hasWeekFilter
+      ? this.db.prepare(allUsersQuery).bind(guildId, startOfWeekIso)
+      : this.db.prepare(allUsersQuery).bind(guildId);
+
+    const res = await allUsersStmt.all<Record<string, unknown>>();
+
+    const rows = res.results || [];
+    let rank: number | null = null;
+    for (let idx = 0; idx < rows.length; idx++) {
+      const item = rows[idx];
+      if (item && Number(item.user_id) === userId) {
+        rank = idx + 1;
+        break;
+      }
+    }
+
+    return { totalXp, rank };
   }
 }

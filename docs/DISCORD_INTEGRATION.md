@@ -1,6 +1,6 @@
 # GAMEMOA Discord 연동 (DISCORD_INTEGRATION)
 
-이 문서는 GAMEMOA 플레이어 플랫폼 확장 스프린트의 **Phase F: Discord HTTP Interactions 파운데이션**, **Phase G: Discord 서버 시스템 & 커뮤니티 Hub**, 그리고 **Phase H1: Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`**를 설명합니다.
+이 문서는 GAMEMOA 플레이어 플랫폼 확장 스프린트의 **Phase F: Discord HTTP Interactions 파운데이션**, **Phase G: Discord 서버 시스템 & 커뮤니티 Hub**, **Phase H1: Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`**, 그리고 **Phase H2: Discord 서버 리더보드 & 커맨드**를 설명합니다.
 
 > 📌 **핵심 아키텍처 원칙**:
 >
@@ -8,12 +8,13 @@
 > - **Gateway 없음**: `discord.js` 등 WebSocket 기반 봇 데몬 없이 Hono Worker HTTP Interactions 및 OAuth 2.0만 사용합니다.
 > - **권한 없는 임의 등록 불가**: 클라이언트 제출 arbitrary `guild_id`는 거부되며, Discord OAuth `guilds` 스코프 기반 1회용 인증으로 `MANAGE_GUILD` / `ADMINISTRATOR` 권한이 증명된 길드만 등록 가능합니다.
 > - **장기 access_token 미저장**: 권한 확인 직후 access_token은 즉시 폐기되며 DB에 보관되지 않습니다.
-> - **3가지 XP 개념의 엄격한 분리 (Phase H1 Invariant)**:
+> - **3가지 XP 개념의 엄격한 분리 (Phase H Invariants)**:
 >   1. **Global GAMEMOA User XP** (글로벌 사용자 활동 레벨)
 >   2. **Discord Guild-local User XP** (특정 서버 내 사용자 기여 XP)
 >   3. **Discord Guild Activity XP** (서버 전체 누적 활동 XP)
 >   - 25,000 global XP를 가진 유저가 새로운 Guild A에 참여하더라도 **Guild A XP = 0**에서 시작합니다.
 >   - 길드 XP 귀속액은 해당 승인된 점수 완료로 **실제 지급된 글로벌 XP(+10 또는 일일 상한 시 0)**와 정확히 동일합니다.
+>   - **KST 주간 경계**: 월요일 00:00:00 Asia/Seoul (KST) = 일요일 15:00:00 UTC 기준 주간 리더보드 집계. 영구 XP 데이터는 절대로 삭제되거나 초기화되지 않습니다.
 
 ---
 
@@ -41,9 +42,9 @@ Discord 사용자 → /gamemoa 슬래시 커맨드
 
 Discord 서버 기능은 다음 웹 전용 라우트에 위치합니다:
 
-- `/discord`: GAMEMOA × Discord 커뮤니티 Hub (내 관리 서버, 계정 연결 상태)
+- `/discord`: GAMEMOA × Discord 커뮤니티 Hub (내 관리 서버, 주간 서버 활동 랭킹)
 - `/discord/servers`: 공개 서버 디렉토리 & 검색 + 서버 등록 위저드
-- `/discord/servers/:slug`: 공개 서버 페이지
+- `/discord/servers/:slug`: 공개 서버 페이지 (서버 XP, 주간 XP, 게임별 랭킹 탭)
 - `/discord/servers/:slug/manage`: 서버 관리 페이지 (설명/vanity slug/가시성 변경, 등록 해제)
 
 ### 서버 등록 OAuth 흐름
@@ -70,37 +71,46 @@ Discord 서버 기능은 다음 웹 전용 라우트에 위치합니다:
 
 ---
 
-## 4. 데이터 모델
+## 4. Phase H2 — Discord 서버 리더보드 & 커맨드
+
+### 슬래시 커맨드 확장
+
+- `/gamemoa rank`: 이 Discord 서버 내 나의 GAMEMOA 순위와 기여 XP 확인 (미연동/미등록 서버 거부)
+- `/gamemoa leaderboard`: 이 Discord 서버의 Top 10 XP 리더보드 & 웹 서버 페이지 링크 제공
+- `/gamemoa server`: 이 Discord 서버의 활동 정보 요약 (전체 XP, 주간 XP, 참여자 수)
+
+### 리더보드 & API 구현
+
+- **길드 내 XP 랭킹**: `SELECT e.user_id, u.nickname, SUM(e.amount) as xp FROM discord_guild_xp_events ... ORDER BY xp DESC, e.user_id ASC`
+- **주간 경계 계산**: `getStartOfWeekKst` helper를 통해 `created_at >= startOfWeekIso` 조건 적용.
+- **전역 서버 활동 랭킹**: `ACTIVE` + `PUBLIC` 가시성 서버만 포함. `PRIVATE`/`UNLISTED` 서버는 전역 활동 랭킹 목록에서 유출되지 않도록 엄격 격리.
+- **서버 게임 랭킹**: canonical `scores` 테이블에서 해당 서버 기여 참여자(`user_id IN (SELECT DISTINCT user_id FROM discord_guild_xp_events WHERE guild_id = ?)`)의 최고 기록을 매니페스트 scoreConfig 방향에 맞춰 조회.
+
+---
+
+## 5. 데이터 모델
 
 ### `0006_discord_link.sql`
-
 - `discord_link_challenges` (`token_hash`, `discord_user_id`, `discord_username`, `created_at`, `expires_at`, `consumed_at`)
 
 ### `0007_discord_guilds.sql`
-
 - `discord_guilds`: `guild_id`(PRIMARY KEY, canonical identity), `slug`(UNIQUE), `name`, `icon_url`, `description`, `visibility`('PUBLIC'|'UNLISTED'|'PRIVATE'), `registration_status`('ACTIVE'|'DISABLED'), `registered_by_user_id`, `registered_at`, `first_seen_at`, `last_seen_at`, `updated_at`.
 - `discord_guild_managers`: `guild_id`, `user_id`, `role`('OWNER'|'MANAGER'), `created_at`, `updated_at`, `PRIMARY KEY (guild_id, user_id)`.
 - `discord_server_registration_challenges`: `token_hash`, `user_id`, `manageable_guilds_json`, `created_at`, `expires_at`, `consumed_at`.
 
 ### `0008_discord_guild_xp.sql`
-
 - `discord_play_contexts`: `token_hash`(PK), `guild_id`, `discord_user_id`, `user_id`, `game_id`, `created_at`, `expires_at`, `consumed_at`.
 - `discord_guild_xp_events`: `id`(PK), `guild_id`, `user_id`, `source_xp_event_id`(UNIQUE), `amount`, `created_at`.
 
+### `0009_discord_guild_xp_weekly_idx.sql`
+- `idx_discord_guild_xp_guild_created`: `(guild_id, created_at)` 인덱스 추가.
+
 ---
 
-## 5. 필요한 설정값 & 명령어 등록
+## 6. 필요한 설정값 & 명령어 등록
 
 | 변수                     | 종류 | 용도                                                              |
 | ------------------------ | ---- | ----------------------------------------------------------------- |
 | `DISCORD_APPLICATION_ID` | 공개 | CLI 명령어 등록 스크립트                                          |
 | `DISCORD_PUBLIC_KEY`     | 공개 | Worker Interaction Ed25519 서명 검증                              |
 | `DISCORD_BOT_TOKEN`      | 비밀 | 로컬 명령어 등록 스크립트 전용 (`pnpm discord:commands:register`) |
-
----
-
-## 6. 다음 단계 (Phase H2)
-
-- **Phase H2: Discord Server Leaderboards & Commands**:
-  - `/gamemoa rank`, `/gamemoa leaderboard`, `/gamemoa server` 슬래시 커맨드 연결
-  - Discord 서버별 랭킹 UI (길드 내 개인 랭킹 / 주간 랭킹 / 전역 서버 활동 랭킹)

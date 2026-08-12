@@ -51,3 +51,45 @@ export const ServerSearchQuerySchema = z.object({
   offset: z.coerce.number().min(0).optional().default(0),
 });
 export type ServerSearchQuery = z.infer<typeof ServerSearchQuerySchema>;
+
+// Phase H2 Contracts
+
+export const GuildXpLeaderboardEntrySchema = z.object({
+  userId: z.number(),
+  nickname: z.string(),
+  avatarUrl: z.string().nullable(),
+  xp: z.number(),
+  rank: z.number(),
+});
+export type GuildXpLeaderboardEntryDto = z.infer<typeof GuildXpLeaderboardEntrySchema>;
+
+export const GlobalGuildRankEntrySchema = z.object({
+  guildId: z.string(),
+  slug: z.string(),
+  name: z.string(),
+  iconUrl: z.string().nullable(),
+  totalXp: z.number(),
+  weeklyXp: z.number(),
+  participantCount: z.number(),
+  rank: z.number(),
+});
+export type GlobalGuildRankEntryDto = z.infer<typeof GlobalGuildRankEntrySchema>;
+
+export const ServerGameLeaderboardEntrySchema = z.object({
+  id: z.number(),
+  userId: z.number(),
+  nickname: z.string(),
+  avatarUrl: z.string().nullable(),
+  gameId: z.string(),
+  score: z.number(),
+  formattedScore: z.string(),
+  createdAt: z.string(),
+});
+export type ServerGameLeaderboardEntryDto = z.infer<typeof ServerGameLeaderboardEntrySchema>;
+
+export const GuildSummarySchema = z.object({
+  totalXp: z.number(),
+  weeklyXp: z.number(),
+  participantCount: z.number(),
+});
+export type GuildSummaryDto = z.infer<typeof GuildSummarySchema>;

@@ -307,6 +307,42 @@ export interface DiscordGuildXpEvent {
   createdAt: string;
 }
 
+export interface GuildXpLeaderboardEntry {
+  userId: number;
+  nickname: string;
+  avatarUrl: string | null;
+  xp: number;
+  rank: number;
+}
+
+export interface GlobalGuildRankEntry {
+  guildId: string;
+  slug: string;
+  name: string;
+  iconUrl: string | null;
+  totalXp: number;
+  weeklyXp: number;
+  participantCount: number;
+  rank: number;
+}
+
+export interface ServerGameLeaderboardEntry {
+  id: number;
+  userId: number;
+  nickname: string;
+  avatarUrl: string | null;
+  gameId: string;
+  score: number;
+  formattedScore: string;
+  createdAt: string;
+}
+
+export interface GuildSummaryData {
+  totalXp: number;
+  weeklyXp: number;
+  participantCount: number;
+}
+
 export interface DiscordGuildRepository {
   createRegistrationChallenge(input: {
     userId: number;
@@ -370,4 +406,33 @@ export interface DiscordGuildRepository {
 
   getGuildUserXp(guildId: string, userId: number): Promise<number>;
   getGuildTotalXp(guildId: string): Promise<number>;
+
+  // Phase H2 Query Methods
+  getGuildXpLeaderboard(
+    guildId: string,
+    startOfWeekIso?: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<{ entries: GuildXpLeaderboardEntry[]; total: number }>;
+
+  getGuildSummary(guildId: string, startOfWeekIso: string): Promise<GuildSummaryData>;
+
+  getGlobalGuildActivityRanking(
+    startOfWeekIso?: string,
+    limit?: number,
+    offset?: number,
+  ): Promise<{ guilds: GlobalGuildRankEntry[]; total: number }>;
+
+  getGuildGameLeaderboard(
+    guildId: string,
+    gameId: string,
+    direction?: "asc" | "desc",
+    limit?: number,
+  ): Promise<ServerGameLeaderboardEntry[]>;
+
+  getGuildUserXpRank(
+    guildId: string,
+    userId: number,
+    startOfWeekIso?: string,
+  ): Promise<{ totalXp: number; rank: number | null }>;
 }

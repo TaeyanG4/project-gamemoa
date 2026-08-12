@@ -1,4 +1,12 @@
-import type { DiscordGuildRepository, UserRepository } from "../ports/repositories.js";
+import { getStartOfWeekKst } from "../domain/discordGuildPolicy.js";
+import type {
+  DiscordGuildRepository,
+  UserRepository,
+  GuildXpLeaderboardEntry,
+  GlobalGuildRankEntry,
+  ServerGameLeaderboardEntry,
+  GuildSummaryData,
+} from "../ports/repositories.js";
 import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
 
 export class DiscordGuildXpUseCases {
@@ -93,7 +101,7 @@ export class DiscordGuildXpUseCases {
     await this.guildRepo.consumePlayContextByToken(trimmedToken);
 
     // Attribute XP to guild (1:1 with awarded global XP, 0 if capped)
-    const xpEvent = await this.guildRepo.attributeGuildXp({
+    await this.guildRepo.attributeGuildXp({
       guildId: playCtx.guildId,
       userId: input.userId,
       sourceXpEventId: input.sourceXpEventId,
@@ -113,5 +121,62 @@ export class DiscordGuildXpUseCases {
 
   async getGuildTotalXp(guildId: string): Promise<number> {
     return this.guildRepo.getGuildTotalXp(guildId);
+  }
+
+  async getGuildLeaderboard(
+    guildId: string,
+    period: "alltime" | "weekly" = "alltime",
+    limit = 20,
+    offset = 0,
+  ): Promise<{ entries: GuildXpLeaderboardEntry[]; total: number }> {
+    const startOfWeekIso = period === "weekly" ? getStartOfWeekKst() : undefined;
+    return this.guildRepo.getGuildXpLeaderboard(guildId, startOfWeekIso, limit, offset);
+  }
+
+  async getGuildSummary(guildId: string): Promise<GuildSummaryData> {
+    const startOfWeekIso = getStartOfWeekKst();
+    return this.guildRepo.getGuildSummary(guildId, startOfWeekIso);
+  }
+
+  async getGlobalGuildRanking(
+    period: "alltime" | "weekly" = "alltime",
+    limit = 20,
+    offset = 0,
+  ): Promise<{ guilds: GlobalGuildRankEntry[]; total: number }> {
+    const startOfWeekIso = period === "weekly" ? getStartOfWeekKst() : undefined;
+    return this.guildRepo.getGlobalGuildActivityRanking(startOfWeekIso, limit, offset);
+  }
+
+  async getGuildGameLeaderboard(
+    guildId: string,
+    gameId: string,
+    limit = 20,
+  ): Promise<ServerGameLeaderboardEntry[]> {
+    const manifest = GAME_MANIFEST_MAP[gameId];
+    const direction = manifest?.scoreConfig?.direction ?? "desc";
+    return this.guildRepo.getGuildGameLeaderboard(guildId, gameId, direction, limit);
+  }
+
+  async getUserGuildRankSummary(
+    guildId: string,
+    discordUserId: string,
+    period: "alltime" | "weekly" = "alltime",
+  ): Promise<{ totalXp: number; rank: number | null; nickname?: string }> {
+    const oauthAccount = await this.userRepo.findOAuthAccount("discord", discordUserId);
+    if (!oauthAccount) {
+      return { totalXp: 0, rank: null };
+    }
+    const user = await this.userRepo.findById(oauthAccount.user_id);
+    const startOfWeekIso = period === "weekly" ? getStartOfWeekKst() : undefined;
+    const res = await this.guildRepo.getGuildUserXpRank(
+      guildId,
+      oauthAccount.user_id,
+      startOfWeekIso,
+    );
+    return {
+      totalXp: res.totalXp,
+      rank: res.rank,
+      ...(user ? { nickname: user.nickname } : {}),
+    };
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Discord Guild domain policy rules for Phase G.
+ * Discord Guild domain policy rules for Phase G & H.
  * Pure domain logic: no D1, Hono, HTTP, or browser dependencies.
  */
 
@@ -99,4 +99,30 @@ export function slugifyGuildName(name: string): string {
     return `${bounded}-hub`;
   }
   return bounded;
+}
+
+/**
+ * Calculates the start of the current week (Monday 00:00:00 Asia/Seoul KST)
+ * and returns it as an ISO 8601 UTC string (e.g. "2026-08-09T15:00:00.000Z").
+ * Asia/Seoul is UTC+9. Monday 00:00 KST equals Sunday 15:00 UTC of the previous day.
+ */
+export function getStartOfWeekKst(now: Date = new Date()): string {
+  const kstMs = now.getTime() + 9 * 60 * 60 * 1000;
+  const kstDate = new Date(kstMs);
+
+  const day = kstDate.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+
+  const kstMidnightMs = Date.UTC(
+    kstDate.getUTCFullYear(),
+    kstDate.getUTCMonth(),
+    kstDate.getUTCDate() - daysSinceMonday,
+    0,
+    0,
+    0,
+    0,
+  );
+
+  const startOfWeekUtcMs = kstMidnightMs - 9 * 60 * 60 * 1000;
+  return new Date(startOfWeekUtcMs).toISOString();
 }

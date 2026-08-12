@@ -143,6 +143,10 @@ export class DiscordGuildDirectoryUseCases {
   async getUserManagedGuilds(userId: number): Promise<DiscordGuild[]> {
     return this.guildRepo.getUserManagedGuilds(userId);
   }
+
+  async getGuildByGuildId(guildId: string): Promise<DiscordGuild | null> {
+    return this.guildRepo.findByGuildId(guildId);
+  }
 }
 
 export class DiscordGuildManagementUseCases {

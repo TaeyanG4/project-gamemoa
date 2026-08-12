@@ -11,6 +11,9 @@ export const DISCORD_SUBCOMMANDS = {
   PROFILE: "profile",
   GAMES: "games",
   PLAY: "play",
+  RANK: "rank",
+  LEADERBOARD: "leaderboard",
+  SERVER: "server",
 } as const;
 
 export type DiscordSubcommand = (typeof DISCORD_SUBCOMMANDS)[keyof typeof DISCORD_SUBCOMMANDS];
@@ -56,6 +59,21 @@ export const GAMEMOA_DISCORD_COMMAND = {
           choices: gameChoices,
         },
       ],
+    },
+    {
+      type: OPTION_TYPE_SUB_COMMAND,
+      name: DISCORD_SUBCOMMANDS.RANK,
+      description: "이 Discord 서버 내 나의 GAMEMOA 순위와 기여 XP를 확인합니다",
+    },
+    {
+      type: OPTION_TYPE_SUB_COMMAND,
+      name: DISCORD_SUBCOMMANDS.LEADERBOARD,
+      description: "이 Discord 서버의 GAMEMOA XP 리더보드를 확인합니다",
+    },
+    {
+      type: OPTION_TYPE_SUB_COMMAND,
+      name: DISCORD_SUBCOMMANDS.SERVER,
+      description: "이 Discord 서버의 GAMEMOA 활동 정보 요약을 확인합니다",
     },
   ],
 } as const;

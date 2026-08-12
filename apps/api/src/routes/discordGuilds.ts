@@ -131,6 +131,24 @@ discordGuildsRouter.get("/search", async (c) => {
   });
 });
 
+// GET /api/discord/guilds/ranking?period=alltime|weekly&limit=...&offset=...
+discordGuildsRouter.get("/ranking", async (c) => {
+  const period = c.req.query("period") === "weekly" ? "weekly" : "alltime";
+  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 20), 1), 50);
+  const offset = Math.max(Number(c.req.query("offset") ?? 0), 0);
+
+  const { discordGuildXpUseCases } = createContainer(c.env.DB);
+  const result = await discordGuildXpUseCases.getGlobalGuildRanking(period, limit, offset);
+
+  return c.json({
+    guilds: result.guilds,
+    total: result.total,
+    period,
+    limit,
+    offset,
+  });
+});
+
 // GET /api/discord/guilds/my
 discordGuildsRouter.get("/my", async (c) => {
   const auth = await requireAuth(c);
@@ -151,7 +169,7 @@ discordGuildsRouter.get("/by-slug/:slug", async (c) => {
   const slug = c.req.param("slug");
   const auth = await requireAuth(c);
 
-  const { discordGuildDirectoryUseCases } = createContainer(c.env.DB);
+  const { discordGuildDirectoryUseCases, discordGuildXpUseCases } = createContainer(c.env.DB);
   const result = await discordGuildDirectoryUseCases.getGuildPageBySlug(slug, auth?.userId);
 
   if (result.status === "NOT_FOUND") {
@@ -168,9 +186,86 @@ discordGuildsRouter.get("/by-slug/:slug", async (c) => {
     );
   }
 
+  const guildId = result.guild.guild_id;
+  const summary = await discordGuildXpUseCases.getGuildSummary(guildId);
+  const topAllTime = await discordGuildXpUseCases.getGuildLeaderboard(guildId, "alltime", 10, 0);
+  const topWeekly = await discordGuildXpUseCases.getGuildLeaderboard(guildId, "weekly", 10, 0);
+
   return c.json({
     guild: mapGuildToDto(result.guild),
     isManager: result.isManager,
+    summary,
+    topAllTime: topAllTime.entries,
+    topWeekly: topWeekly.entries,
+  });
+});
+
+// GET /api/discord/guilds/by-slug/:slug/xp-leaderboard
+discordGuildsRouter.get("/by-slug/:slug/xp-leaderboard", async (c) => {
+  const slug = c.req.param("slug");
+  const auth = await requireAuth(c);
+  const period = c.req.query("period") === "weekly" ? "weekly" : "alltime";
+  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 20), 1), 50);
+  const offset = Math.max(Number(c.req.query("offset") ?? 0), 0);
+
+  const { discordGuildDirectoryUseCases, discordGuildXpUseCases } = createContainer(c.env.DB);
+  const pageResult = await discordGuildDirectoryUseCases.getGuildPageBySlug(slug, auth?.userId);
+
+  if (pageResult.status === "NOT_FOUND") {
+    return c.json({ error: { code: "NOT_FOUND", message: "Guild not found" } }, 404);
+  }
+  if (pageResult.status === "FORBIDDEN") {
+    return c.json(
+      { error: { code: "PRIVATE_GUILD_ACCESS_DENIED", message: "This server is private" } },
+      403,
+    );
+  }
+
+  const result = await discordGuildXpUseCases.getGuildLeaderboard(
+    pageResult.guild.guild_id,
+    period,
+    limit,
+    offset,
+  );
+
+  return c.json({
+    entries: result.entries,
+    total: result.total,
+    period,
+    limit,
+    offset,
+  });
+});
+
+// GET /api/discord/guilds/by-slug/:slug/games/:gameId
+discordGuildsRouter.get("/by-slug/:slug/games/:gameId", async (c) => {
+  const slug = c.req.param("slug");
+  const gameId = c.req.param("gameId");
+  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 20), 1), 50);
+  const auth = await requireAuth(c);
+
+  const { discordGuildDirectoryUseCases, discordGuildXpUseCases } = createContainer(c.env.DB);
+  const pageResult = await discordGuildDirectoryUseCases.getGuildPageBySlug(slug, auth?.userId);
+
+  if (pageResult.status === "NOT_FOUND") {
+    return c.json({ error: { code: "NOT_FOUND", message: "Guild not found" } }, 404);
+  }
+  if (pageResult.status === "FORBIDDEN") {
+    return c.json(
+      { error: { code: "PRIVATE_GUILD_ACCESS_DENIED", message: "This server is private" } },
+      403,
+    );
+  }
+
+  const leaderboard = await discordGuildXpUseCases.getGuildGameLeaderboard(
+    pageResult.guild.guild_id,
+    gameId,
+    limit,
+  );
+
+  return c.json({
+    gameId,
+    leaderboard,
   });
 });
 

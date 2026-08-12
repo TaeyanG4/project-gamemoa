@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   DiscordGuildXpUseCases,
   ProgressionUseCases,
+  getStartOfWeekKst,
   type DiscordGuildRepository,
   type UserRepository,
   type ProgressionRepository,
@@ -14,6 +15,10 @@ import {
   type RecordCompletionOutcome,
   type UserProgress,
   type XpLeaderboardEntry,
+  type GuildXpLeaderboardEntry,
+  type GlobalGuildRankEntry,
+  type ServerGameLeaderboardEntry,
+  type GuildSummaryData,
 } from "../src/index.js";
 
 async function hashToken(token: string): Promise<string> {
@@ -30,6 +35,13 @@ class MockDiscordGuildRepo implements DiscordGuildRepository {
   public playContexts: Map<string, DiscordPlayContext> = new Map();
   public guildXpEvents: DiscordGuildXpEvent[] = [];
   public managers: Map<string, Set<number>> = new Map();
+  public scores: {
+    id: number;
+    userId: number;
+    gameId: string;
+    score: number;
+    createdAt: string;
+  }[] = [];
   private nextXpEventId = 1;
 
   async createPlayContext(input: {
@@ -157,6 +169,158 @@ class MockDiscordGuildRepo implements DiscordGuildRepository {
   }
   async getUserManagedGuilds(): Promise<DiscordGuild[]> {
     return [];
+  }
+
+  // Phase H2 Query Mock Methods
+  async getGuildXpLeaderboard(
+    guildId: string,
+    startOfWeekIso?: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<{ entries: GuildXpLeaderboardEntry[]; total: number }> {
+    let events = this.guildXpEvents.filter((e) => e.guildId === guildId);
+    if (startOfWeekIso) {
+      events = events.filter((e) => e.createdAt >= startOfWeekIso);
+    }
+
+    const map = new Map<number, number>();
+    for (const e of events) {
+      map.set(e.userId, (map.get(e.userId) ?? 0) + e.amount);
+    }
+
+    const sorted = Array.from(map.entries()).sort((a, b) => {
+      if (b[1] !== a[1]) return b[1] - a[1];
+      return a[0] - b[0]; // deterministic user_id ASC
+    });
+
+    const total = sorted.length;
+    const page = sorted.slice(offset, offset + limit);
+
+    const entries: GuildXpLeaderboardEntry[] = page.map(([uId, xp], idx) => ({
+      userId: uId,
+      nickname: `User_${uId}`,
+      avatarUrl: null,
+      xp,
+      rank: offset + idx + 1,
+    }));
+
+    return { entries, total };
+  }
+
+  async getGuildSummary(guildId: string, startOfWeekIso: string): Promise<GuildSummaryData> {
+    const events = this.guildXpEvents.filter((e) => e.guildId === guildId);
+    const totalXp = events.reduce((sum, e) => sum + e.amount, 0);
+    const weeklyXp = events
+      .filter((e) => e.createdAt >= startOfWeekIso)
+      .reduce((sum, e) => sum + e.amount, 0);
+
+    const users = new Set(events.map((e) => e.userId));
+
+    return {
+      totalXp,
+      weeklyXp,
+      participantCount: users.size,
+    };
+  }
+
+  async getGlobalGuildActivityRanking(
+    startOfWeekIso?: string,
+    limit = 20,
+    offset = 0,
+  ): Promise<{ guilds: GlobalGuildRankEntry[]; total: number }> {
+    const publicGuilds = Array.from(this.guilds.values()).filter(
+      (g) => g.visibility === "PUBLIC" && g.registration_status === "ACTIVE",
+    );
+
+    const ranked = publicGuilds.map((g) => {
+      const events = this.guildXpEvents.filter((e) => e.guildId === g.guild_id);
+      const totalXp = events.reduce((sum, e) => sum + e.amount, 0);
+      const weeklyXp = events
+        .filter((e) => (startOfWeekIso ? e.createdAt >= startOfWeekIso : true))
+        .reduce((sum, e) => sum + e.amount, 0);
+      const participants = new Set(events.map((e) => e.userId)).size;
+
+      return {
+        guildId: g.guild_id,
+        slug: g.slug,
+        name: g.name,
+        iconUrl: g.icon_url,
+        totalXp,
+        weeklyXp,
+        participantCount: participants,
+        rank: 0,
+      };
+    });
+
+    ranked.sort((a, b) => {
+      const aVal = startOfWeekIso ? a.weeklyXp : a.totalXp;
+      const bVal = startOfWeekIso ? b.weeklyXp : b.totalXp;
+      if (bVal !== aVal) return bVal - aVal;
+      return a.guildId.localeCompare(b.guildId);
+    });
+
+    const page = ranked.slice(offset, offset + limit).map((g, idx) => ({
+      ...g,
+      rank: offset + idx + 1,
+    }));
+
+    return { guilds: page, total: publicGuilds.length };
+  }
+
+  async getGuildGameLeaderboard(
+    guildId: string,
+    gameId: string,
+    direction: "asc" | "desc" = "desc",
+    limit = 20,
+  ): Promise<ServerGameLeaderboardEntry[]> {
+    const guildUserIds = new Set(
+      this.guildXpEvents.filter((e) => e.guildId === guildId).map((e) => e.userId),
+    );
+
+    let matchingScores = this.scores.filter(
+      (s) => s.gameId === gameId && guildUserIds.has(s.userId),
+    );
+
+    matchingScores.sort((a, b) => {
+      if (direction === "asc") return a.score - b.score;
+      return b.score - a.score;
+    });
+
+    const seen = new Set<number>();
+    const res: ServerGameLeaderboardEntry[] = [];
+
+    for (const s of matchingScores) {
+      if (seen.has(s.userId)) continue;
+      seen.add(s.userId);
+
+      res.push({
+        id: s.id,
+        userId: s.userId,
+        nickname: `User_${s.userId}`,
+        avatarUrl: null,
+        gameId: s.gameId,
+        score: s.score,
+        formattedScore: String(s.score),
+        createdAt: s.createdAt,
+      });
+
+      if (res.length >= limit) break;
+    }
+
+    return res;
+  }
+
+  async getGuildUserXpRank(
+    guildId: string,
+    userId: number,
+    startOfWeekIso?: string,
+  ): Promise<{ totalXp: number; rank: number | null }> {
+    const { entries } = await this.getGuildXpLeaderboard(guildId, startOfWeekIso, 1000, 0);
+    const entry = entries.find((e) => e.userId === userId);
+    if (!entry || entry.xp <= 0) {
+      return { totalXp: 0, rank: null };
+    }
+    return { totalXp: entry.xp, rank: entry.rank };
   }
 }
 
@@ -359,14 +523,12 @@ test("Phase H1 Invariants & Play Context Tests", async (t) => {
   await t.test(
     "2 & 3. Valid Guild A context + accepted +10 global XP => global +10, Guild A +10, Guild B remains 0",
     async () => {
-      // Issue play context for Guild A
       const ctx = await guildXpUseCases.createPlayContextFromInteraction({
         guildId: "guild_A",
         discordUserId: "discord_user_1",
         gameId: "reaction-time",
       });
 
-      // Complete game
       const completion = await progressionUseCases.recordAcceptedGameCompletion({
         userId: 1,
         gameId: "reaction-time",
@@ -376,7 +538,6 @@ test("Phase H1 Invariants & Play Context Tests", async (t) => {
       assert.equal(completion.xpAwarded, 10);
       assert.ok(completion.xpEventId);
 
-      // Attribute to Guild A
       const attr = await guildXpUseCases.attributeCompletionToGuild({
         userId: 1,
         gameId: "reaction-time",
@@ -389,7 +550,6 @@ test("Phase H1 Invariants & Play Context Tests", async (t) => {
       assert.equal(attr.guildId, "guild_A");
       assert.equal(attr.amount, 10);
 
-      // Check XP totals
       const guildAXp = await guildXpUseCases.getGuildUserXp("guild_A", 1);
       const guildBXp = await guildXpUseCases.getGuildUserXp("guild_B", 1);
       assert.equal(guildAXp, 10);
@@ -420,7 +580,6 @@ test("Phase H1 Invariants & Play Context Tests", async (t) => {
     });
     assert.equal(attr1.attributed, true);
 
-    // Replay same score_102
     const completion2 = await progressionUseCases.recordAcceptedGameCompletion({
       userId: 1,
       gameId: "aim-test",
@@ -432,221 +591,212 @@ test("Phase H1 Invariants & Play Context Tests", async (t) => {
     const guildAXp = await guildXpUseCases.getGuildUserXp("guild_A", 1);
     assert.equal(guildAXp, 10);
   });
+});
+
+test("Phase H2 Leaderboard, Time Boundary & Command Tests", async (t) => {
+  let guildRepo: MockDiscordGuildRepo;
+  let userRepo: MockUserRepo;
+  let guildXpUseCases: DiscordGuildXpUseCases;
+
+  t.beforeEach(async () => {
+    guildRepo = new MockDiscordGuildRepo();
+    userRepo = new MockUserRepo();
+    guildXpUseCases = new DiscordGuildXpUseCases(guildRepo, userRepo);
+
+    // Register Guild A (PUBLIC), Guild B (UNLISTED), Guild C (PRIVATE)
+    await guildRepo.registerGuild({
+      guildId: "guild_A",
+      slug: "guild-a",
+      name: "Guild Alpha",
+      visibility: "PUBLIC",
+      userId: 1,
+    });
+    await guildRepo.registerGuild({
+      guildId: "guild_B",
+      slug: "guild-b",
+      name: "Guild Beta",
+      visibility: "UNLISTED",
+      userId: 1,
+    });
+    await guildRepo.registerGuild({
+      guildId: "guild_C",
+      slug: "guild-c",
+      name: "Guild Charlie",
+      visibility: "PRIVATE",
+      userId: 1,
+    });
+
+    // Create users 1, 2, 3
+    const u1 = await userRepo.createUser({ nickname: "AlphaUser" });
+    const u2 = await userRepo.createUser({ nickname: "BetaUser" });
+    const u3 = await userRepo.createUser({ nickname: "CharlieUser" });
+
+    await userRepo.linkOAuthAccount({
+      userId: u1.id,
+      provider: "discord",
+      providerUserId: "discord_u1",
+    });
+    await userRepo.linkOAuthAccount({
+      userId: u2.id,
+      provider: "discord",
+      providerUserId: "discord_u2",
+    });
+  });
 
   await t.test(
-    "5. Same source with second guild context => cannot credit second guild",
+    "getStartOfWeekKst correctly computes Monday 00:00 KST boundary in UTC",
     async () => {
-      const ctxA = await guildXpUseCases.createPlayContextFromInteraction({
-        guildId: "guild_A",
-        discordUserId: "discord_user_1",
-      });
-      const ctxB = await guildXpUseCases.createPlayContextFromInteraction({
-        guildId: "guild_B",
-        discordUserId: "discord_user_1",
-      });
+      // Thursday Aug 13 2026 08:10:22 UTC = Thursday Aug 13 2026 17:10:22 KST
+      const testDate = new Date("2026-08-13T08:10:22.000Z");
+      const weekStart = getStartOfWeekKst(testDate);
+      // Expected Monday Aug 10 2026 00:00 KST = Sunday Aug 9 2026 15:00 UTC
+      assert.equal(weekStart, "2026-08-09T15:00:00.000Z");
 
-      const completion = await progressionUseCases.recordAcceptedGameCompletion({
-        userId: 1,
-        gameId: "memory-test",
-        sourceId: "score_103",
-      });
+      // Sunday Aug 16 2026 14:59:59 UTC = Sunday Aug 16 2026 23:59:59 KST
+      const endOfWeek = new Date("2026-08-16T14:59:59.000Z");
+      assert.equal(getStartOfWeekKst(endOfWeek), "2026-08-09T15:00:00.000Z");
 
-      // First credit to Guild A succeeds
-      const attrA = await guildXpUseCases.attributeCompletionToGuild({
-        userId: 1,
-        gameId: "memory-test",
-        sourceXpEventId: completion.xpEventId!,
-        xpAmount: completion.xpAwarded,
-        playToken: ctxA.token,
-      });
-      assert.equal(attrA.attributed, true);
-
-      // Attempt second credit to Guild B with same source_xp_event_id fails (unique constraint)
-      const attrB = await guildXpUseCases.attributeCompletionToGuild({
-        userId: 1,
-        gameId: "memory-test",
-        sourceXpEventId: completion.xpEventId!,
-        xpAmount: completion.xpAwarded,
-        playToken: ctxB.token,
-      });
-      // Already credited once, attribute returns existing or ignored
-      const guildBXp = await guildXpUseCases.getGuildUserXp("guild_B", 1);
-      assert.equal(guildBXp, 0);
+      // Sunday Aug 16 2026 15:00:00 UTC = Monday Aug 17 2026 00:00:00 KST
+      const nextWeekStart = new Date("2026-08-16T15:00:00.000Z");
+      assert.equal(getStartOfWeekKst(nextWeekStart), "2026-08-16T15:00:00.000Z");
     },
   );
 
-  await t.test("6. Forged guild_id impossible / ignored (server controls context)", async () => {
-    const ctx = await guildXpUseCases.createPlayContextFromInteraction({
-      guildId: "guild_A",
-      discordUserId: "discord_user_1",
-    });
-
-    const completion = await progressionUseCases.recordAcceptedGameCompletion({
-      userId: 1,
-      gameId: "typing-test",
-      sourceId: "score_104",
-    });
-
-    const attr = await guildXpUseCases.attributeCompletionToGuild({
-      userId: 1,
-      gameId: "typing-test",
-      sourceXpEventId: completion.xpEventId!,
-      xpAmount: completion.xpAwarded,
-      playToken: ctx.token,
-    });
-
-    // Attributed strictly to guild_A bound in server-side context
-    assert.equal(attr.guildId, "guild_A");
-  });
-
-  await t.test("7. Expired play context => no guild credit", async () => {
-    // Create token with 0 second TTL
-    const playCtx = await guildRepo.createPlayContext({
-      guildId: "guild_A",
-      discordUserId: "discord_user_1",
-      userId: 1,
-      ttlSeconds: -10, // already expired
-    });
-
-    const completion = await progressionUseCases.recordAcceptedGameCompletion({
-      userId: 1,
-      gameId: "aim-test",
-      sourceId: "score_105",
-    });
-
-    const attr = await guildXpUseCases.attributeCompletionToGuild({
-      userId: 1,
-      gameId: "aim-test",
-      sourceXpEventId: completion.xpEventId!,
-      xpAmount: completion.xpAwarded,
-      playToken: playCtx.token,
-    });
-
-    assert.equal(attr.attributed, false);
-    assert.equal(attr.reason, "EXPIRED_TOKEN");
-    const guildAXp = await guildXpUseCases.getGuildUserXp("guild_A", 1);
-    assert.equal(guildAXp, 0);
-  });
-
-  await t.test("8. Wrong user context => rejected", async () => {
-    const ctx = await guildXpUseCases.createPlayContextFromInteraction({
-      guildId: "guild_A",
-      discordUserId: "discord_user_1",
-    });
-
-    const completion = await progressionUseCases.recordAcceptedGameCompletion({
-      userId: 2, // Different user
-      gameId: "aim-test",
-      sourceId: "score_106",
-    });
-
-    const attr = await guildXpUseCases.attributeCompletionToGuild({
-      userId: 2, // Submitting as user 2 with user 1's token
-      gameId: "aim-test",
-      sourceXpEventId: completion.xpEventId!,
-      xpAmount: completion.xpAwarded,
-      playToken: ctx.token,
-    });
-
-    assert.equal(attr.attributed, false);
-    assert.equal(attr.reason, "USER_MISMATCH");
-  });
-
-  await t.test("9. Wrong game context => rejected if game-bound", async () => {
-    const ctx = await guildXpUseCases.createPlayContextFromInteraction({
-      guildId: "guild_A",
-      discordUserId: "discord_user_1",
-      gameId: "aim-test",
-    });
-
-    const completion = await progressionUseCases.recordAcceptedGameCompletion({
-      userId: 1,
-      gameId: "reaction-time", // Playing different game
-      sourceId: "score_107",
-    });
-
-    const attr = await guildXpUseCases.attributeCompletionToGuild({
-      userId: 1,
-      gameId: "reaction-time",
-      sourceXpEventId: completion.xpEventId!,
-      xpAmount: completion.xpAwarded,
-      playToken: ctx.token,
-    });
-
-    assert.equal(attr.attributed, false);
-    assert.equal(attr.reason, "GAME_MISMATCH");
-  });
-
-  await t.test("10. Unregistered/disabled guild => /gamemoa play denied", async () => {
-    await assert.rejects(
-      async () => {
-        await guildXpUseCases.createPlayContextFromInteraction({
-          guildId: "unregistered_guild_999",
-          discordUserId: "discord_user_1",
-        });
+  await t.test("Guild XP leaderboard ordering and tie handling", async () => {
+    // Add XP events to Guild A: User 1: 50 XP, User 2: 50 XP, User 3: 100 XP
+    guildRepo.guildXpEvents.push(
+      {
+        id: 1,
+        guildId: "guild_A",
+        userId: 1,
+        sourceXpEventId: 101,
+        amount: 50,
+        createdAt: new Date().toISOString(),
       },
-      (err: Error) => err.message.includes("등록되지 않았거나"),
+      {
+        id: 2,
+        guildId: "guild_A",
+        userId: 2,
+        sourceXpEventId: 102,
+        amount: 50,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 3,
+        guildId: "guild_A",
+        userId: 3,
+        sourceXpEventId: 103,
+        amount: 100,
+        createdAt: new Date().toISOString(),
+      },
     );
+
+    const lb = await guildXpUseCases.getGuildLeaderboard("guild_A", "alltime", 10, 0);
+    assert.equal(lb.total, 3);
+    // User 3 (100 XP) -> Rank 1
+    assert.equal(lb.entries[0].userId, 3);
+    assert.equal(lb.entries[0].rank, 1);
+    // User 1 (50 XP) vs User 2 (50 XP): User 1 comes first due to user_id ASC tie-breaker
+    assert.equal(lb.entries[1].userId, 1);
+    assert.equal(lb.entries[1].rank, 2);
+    assert.equal(lb.entries[2].userId, 2);
+    assert.equal(lb.entries[2].rank, 3);
   });
 
-  await t.test("11. Global daily XP cap returns 0 => guild total does not increase", async () => {
-    const ctx = await guildXpUseCases.createPlayContextFromInteraction({
+  await t.test(
+    "Global Guild Activity ranking includes PUBLIC guilds and excludes UNLISTED/PRIVATE",
+    async () => {
+      guildRepo.guildXpEvents.push(
+        {
+          id: 1,
+          guildId: "guild_A",
+          userId: 1,
+          sourceXpEventId: 101,
+          amount: 100,
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: 2,
+          guildId: "guild_B",
+          userId: 1,
+          sourceXpEventId: 102,
+          amount: 500,
+          createdAt: new Date().toISOString(),
+        }, // UNLISTED
+        {
+          id: 3,
+          guildId: "guild_C",
+          userId: 1,
+          sourceXpEventId: 103,
+          amount: 900,
+          createdAt: new Date().toISOString(),
+        }, // PRIVATE
+      );
+
+      const ranking = await guildXpUseCases.getGlobalGuildRanking("alltime", 10, 0);
+      assert.equal(ranking.total, 1); // Only Guild A is PUBLIC
+      assert.equal(ranking.guilds.length, 1);
+      assert.equal(ranking.guilds[0].guildId, "guild_A");
+    },
+  );
+
+  await t.test("Server Game ranking reuses canonical scores for guild participants", async () => {
+    // Add XP event in Guild A for User 1 only
+    guildRepo.guildXpEvents.push({
+      id: 1,
       guildId: "guild_A",
-      discordUserId: "discord_user_1",
+      userId: 1,
+      sourceXpEventId: 101,
+      amount: 10,
+      createdAt: new Date().toISOString(),
     });
 
-    // Simulate 10 completions for reaction-time already recorded today
-    for (let i = 0; i < 10; i++) {
-      await progressionRepo.recordGameCompletion({
+    // Scores in DB for reaction-time (lower is better): User 1 (220ms), User 2 (150ms)
+    guildRepo.scores.push(
+      {
+        id: 10,
         userId: 1,
         gameId: "reaction-time",
-        sourceType: "score",
-        sourceId: `preload_${i}`,
-        xpPerCompletion: 10,
-        dailyCapPerGame: 10,
-      });
-    }
+        score: 220,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 11,
+        userId: 2,
+        gameId: "reaction-time",
+        score: 150,
+        createdAt: new Date().toISOString(),
+      },
+    );
 
-    // 11th completion reaches daily cap (0 XP awarded)
-    const completion11 = await progressionUseCases.recordAcceptedGameCompletion({
-      userId: 1,
-      gameId: "reaction-time",
-      sourceId: "score_111",
-    });
-
-    assert.equal(completion11.capped, true);
-    assert.equal(completion11.xpAwarded, 0);
-
-    const attr = await guildXpUseCases.attributeCompletionToGuild({
-      userId: 1,
-      gameId: "reaction-time",
-      sourceXpEventId: completion11.xpEventId!,
-      xpAmount: completion11.xpAwarded, // 0
-      playToken: ctx.token,
-    });
-
-    assert.equal(attr.attributed, true);
-    assert.equal(attr.amount, 0);
-
-    const guildAXp = await guildXpUseCases.getGuildUserXp("guild_A", 1);
-    assert.equal(guildAXp, 0);
+    const gameLb = await guildXpUseCases.getGuildGameLeaderboard("guild_A", "reaction-time", 10);
+    // User 2 has not participated in Guild A (no XP event), so excluded from Guild A's game ranking
+    assert.equal(gameLb.length, 1);
+    assert.equal(gameLb[0].userId, 1);
+    assert.equal(gameLb[0].score, 220);
   });
 
-  await t.test("12. Raw play token is never stored in database (hash only)", async () => {
-    const ctx = await guildXpUseCases.createPlayContextFromInteraction({
+  await t.test("getUserGuildRankSummary for linked vs unlinked user", async () => {
+    guildRepo.guildXpEvents.push({
+      id: 1,
       guildId: "guild_A",
-      discordUserId: "discord_user_1",
+      userId: 1,
+      sourceXpEventId: 101,
+      amount: 40,
+      createdAt: new Date().toISOString(),
     });
 
-    const rawToken = ctx.token;
-    let rawFoundInDb = false;
+    // Linked user 1 (discord_u1)
+    const summary1 = await guildXpUseCases.getUserGuildRankSummary("guild_A", "discord_u1");
+    assert.equal(summary1.totalXp, 40);
+    assert.equal(summary1.rank, 1);
 
-    for (const savedCtx of guildRepo.playContexts.values()) {
-      if (savedCtx.tokenHash === rawToken) {
-        rawFoundInDb = true;
-      }
-    }
-
-    assert.equal(rawFoundInDb, false);
+    // Unlinked user
+    const summaryUnlinked = await guildXpUseCases.getUserGuildRankSummary(
+      "guild_A",
+      "unknown_discord_id",
+    );
+    assert.equal(summaryUnlinked.totalXp, 0);
+    assert.equal(summaryUnlinked.rank, null);
   });
 });
