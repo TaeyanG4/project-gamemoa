@@ -83,15 +83,17 @@
 
 ## 블로커 / 외부 설정 대기
 
-- **Discord Interactions 실사용을 위한 외부 설정**: 이 저장소만으로 완결되지 않으며 사용자의 Discord
-  Developer Portal 접근이 필요합니다. 정확한 절차는 `docs/DISCORD_INTEGRATION.md` §8:
-  1. Developer Portal에서 기존 GAMEMOA Application의 **Public Key** 복사.
-  2. GitHub 저장소 Settings → Actions → **Variables**에 `DISCORD_PUBLIC_KEY` 추가(Secret 아님).
-  3. 배포 후 Developer Portal의 **Interactions Endpoint URL**을
-     `https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions`로 설정.
-  4. 로컬에서 `DISCORD_APPLICATION_ID=... DISCORD_BOT_TOKEN=... pnpm discord:commands:register` 실행.
-  - 이 단계 전까지 `POST /api/discord/interactions`는 500을 반환하는 것이 **정상**입니다(선택적 통합
-    미설정 상태이며 전체 서비스는 정상 동작).
+- **Discord Interactions 외부 설정 (부분 완료)**: 정확한 절차는 `docs/DISCORD_INTEGRATION.md` §8.
+  1. ✅ **완료**: 사용자가 Developer Portal에서 Public Key를 확인해 전달, `gh variable set
+DISCORD_PUBLIC_KEY`로 GitHub 저장소 Variable에 등록(Secret 아님) → 재배포로 Worker에 반영.
+  2. ⏳ **대기**: Developer Portal의 **Interactions Endpoint URL**을
+     `https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions`로 설정 — 사용자가 Discord
+     Developer Portal에서 직접 저장해야 합니다(외부 서비스 UI, 저장소에서 조작 불가). 저장 시점에
+     Discord가 즉시 PING을 보내 서명 검증에 성공해야 저장되므로, 반드시 `DISCORD_PUBLIC_KEY`가 이미
+     배포된 상태(위 1번)에서 진행해야 합니다 — 이 조건은 이미 충족되었습니다.
+  3. ⏳ **대기**: 로컬 터미널에서 `DISCORD_APPLICATION_ID=... DISCORD_BOT_TOKEN=...
+pnpm discord:commands:register` 실행 — Bot Token은 비밀값이므로 **채팅에 붙여넣지 말고** 로컬
+     환경에서만 실행해야 합니다.
 - **Creator 플랫폼 자격증명**: Phase D~E 착수 시 YouTube/Twitch 등 OAuth Client 등록이 필요하며, 아직
   요청/설정되지 않았습니다.
 

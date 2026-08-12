@@ -131,26 +131,26 @@ DISCORD_APPLICATION_ID=... DISCORD_BOT_TOKEN=... pnpm discord:commands:register
 
 이 저장소 안에서 완결할 수 없는 부분입니다. 아래는 사용자가 직접 진행해야 합니다.
 
-1. **Discord Developer Portal** (https://discord.com/developers/applications) 접속 → 기존 GAMEMOA
-   OAuth 로그인에 사용 중인 Application을 엽니다(새로 만들 필요 없음).
-2. **General Information** 탭에서 **Public Key** 값을 복사합니다.
-3. GitHub 저장소 → Settings → Secrets and variables → Actions → **Variables** 탭에서
-   `DISCORD_PUBLIC_KEY`를 위에서 복사한 값으로 추가합니다 (Secret이 아닌 Variable입니다 — 공개해도
-   안전한 값입니다).
-4. 저장소에 push하여 배포가 완료된 후, **Interactions Endpoint URL**을
-   `https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions`로 설정하고 저장합니다.
-   (Discord가 저장 시점에 즉시 PING을 보내 검증하므로, 반드시 `DISCORD_PUBLIC_KEY`가 먼저 배포되어
-   있어야 합니다.)
-5. **Bot** 탭에서 Bot Token을 생성/복사합니다(저장소나 채팅에 붙여넣지 마세요).
-6. 로컬 터미널에서 아래 명령을 실행해 슬래시 명령어를 등록합니다:
+1. ✅ **완료** — **Discord Developer Portal** (https://discord.com/developers/applications)에서 기존
+   GAMEMOA OAuth 로그인에 사용 중인 Application의 **General Information** 탭에서 **Public Key** 확인.
+2. ✅ **완료** — GitHub 저장소 → Settings → Secrets and variables → Actions → **Variables** 탭에
+   `DISCORD_PUBLIC_KEY` 등록(Secret이 아닌 Variable — 공개해도 안전한 값) 및 재배포로 Worker에 반영
+   완료. `GET /api/discord/status`가 `{"configured": true}`를 반환하는 것으로 확인 가능합니다.
+3. ⏳ **대기** — Developer Portal에서 **Interactions Endpoint URL**을
+   `https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions`로 설정하고 저장합니다. (Discord가
+   저장 시점에 즉시 PING을 보내 서명 검증에 성공해야 저장되며, `DISCORD_PUBLIC_KEY`가 이미 배포되어
+   있으므로 — 위 2번 완료 — 이 조건은 충족되었습니다.)
+4. ⏳ **대기** — **Bot** 탭에서 Bot Token을 생성/복사합니다 (**저장소나 채팅에 절대 붙여넣지 마세요**).
+5. ⏳ **대기** — 로컬 터미널에서 아래 명령을 실행해 슬래시 명령어를 등록합니다:
    ```bash
    DISCORD_APPLICATION_ID=<Application ID> DISCORD_BOT_TOKEN=<Bot Token> pnpm discord:commands:register
    ```
-7. 봇을 사용할 Discord 서버에 Application이 설치되어 있는지 확인합니다(기존 OAuth 설정에서 이미
-   설치되어 있을 수 있습니다).
+6. ⏳ **대기** — 봇을 사용할 Discord 서버에 Application이 설치되어 있는지 확인합니다(기존 OAuth
+   설정에서 이미 설치되어 있을 수 있습니다).
 
-이 단계들이 완료되기 전까지 `POST /api/discord/interactions`는 500(미설정)을 반환하며, 이는 정상적인
-안전 상태입니다.
+3~6번이 완료되기 전까지 명령어(`/gamemoa ...`)는 아직 서버에 나타나지 않거나 응답하지 않을 수 있으며,
+이는 정상적인 진행 중 상태입니다. `POST /api/discord/interactions` 자체는 이미 서명 검증이 가능한
+상태입니다.
 
 ---
 
