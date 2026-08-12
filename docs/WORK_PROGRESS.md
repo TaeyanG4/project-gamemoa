@@ -30,7 +30,8 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 - [x] **원격 검증**: `git push origin main` → GitHub Actions CI GREEN → Cloudflare Deploy GREEN(D1 프로덕션 마이그레이션 0005 적용 포함) → `pnpm smoke:prod` API/Web provenance 및 신규 엔드포인트 프로덕션 200/401 확인 완료.
 - [x] **버그 수정: Discord 계정 연결 `잘못된 OAuth2 redirect_uri`**: LOGIN(`/api/auth/discord`)과 LINK(`/api/auth/link/discord`)가 서로 다른 `redirect_uri`를 Discord에 전송하던 문제(Discord Developer Portal에는 LOGIN용 하나만 등록되어 있어 LINK 시도가 즉시 거부됨) — 두 흐름 모두 동일한 등록된 `redirect_uri`를 사용하도록 통합(`getDiscordRedirectUri`), LOGIN/LINK 구분은 경로가 아닌 state 쿠키로 판별. Discord Developer Portal 설정 변경 불필요. 회귀 테스트 추가, 프로덕션에서 실제 redirect_uri 값 확인 완료.
 - [x] **UI 정리: 푸터 SEO 필러 제거**: "인기 태그" 태그 클라우드 및 2단 설명 문단 제거, 로고 옆 한 줄 태그라인으로 축소.
-- [x] **My Page 진행도 노출 (Phase C 1차 증분)**: 기존 `/profile` 페이지에 레벨/XP 진행 바(전체 XP 랭킹 포함) 및 도전과제 요약(달성 배지) 카드 추가 — `GET /api/progression/me`, `GET /api/progression/achievements` 소비. `/me`·`/account` 라우트 분리는 아직 수행하지 않음(아래 남은 작업 참고).
+- [x] **My Page 진행도 노출 (Phase C 1차 증분)**: 기존 `/profile` 페이지에 레벨/XP 진행 바(전체 XP 랭킹 포함) 및 도전과제 요약(달성 배지) 카드 추가 — `GET /api/progression/me`, `GET /api/progression/achievements` 소비.
+- [x] **My Page "내 프로필" / "기록" 탭 분리 + 게임 기록 카드 UI 개선 (Phase C 2차 증분)**: `/profile`을 별도 라우트로 쪼개지 않고 탭(세그먼트 컨트롤)으로 분리 — "내 프로필"(사용자 카드, 레벨/XP, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록). 게임별 최고 기록 카드는 실제 게임 썸네일 + accent 색상 배경(GameCard와 동일한 시각 언어), 전체 카드가 `/games/:slug`로 연결되는 클릭 가능한 링크, 계정 기록(트로피 아이콘, 굵은 강조)을 1차, 기기 기록을 보조 표시로 재구성, 기록 없는 게임은 "지금 도전해보세요" 안내로 개선. 섹션 헤더에 "N/M 도전" 완료 카운트 추가. Discord/Google 연결 리다이렉트는 "내 프로필" 탭으로 랜딩.
 
 ---
 
@@ -44,7 +45,7 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 
 이번 세션 범위 밖 — 후속 세션에서 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-- **Phase C (잔여)**: 진행도 카드는 `/profile`에 이미 노출됨(위 완료 참고). 남은 것은 IA 분리 — `/me`(대시보드) / `/account`(계정 관리) / `/profile/:id`(공개 프로필)로 나누고 기존 `/profile` 링크에 redirect 전략 적용. 닉네임/국가 변경 UI(`POST /api/profile/nickname|country`는 백엔드 완료, UI 미연결), 즐겨찾기/최근 플레이 카드도 대시보드에 추가.
+- **Phase C (잔여)**: 진행도 카드 노출 + "내 프로필"/"기록" 탭 분리 + 게임 기록 카드 UI 개선은 완료(위 참고). 남은 것: (1) 닉네임/국가 변경 UI (`POST /api/profile/nickname|country` 백엔드는 완료, UI 미연결 — 쿨다운 에러 메시지 처리 필요), (2) "내 프로필" 탭에 즐겨찾기/최근 플레이 카드 추가(`GET /api/personalization`), (3) 공개 프로필(`/profile/:id`) — 현재 `/profile`은 본인 전용이며 타인에게 공개되는 프로필 개념이 아직 없음. 별도 `/me`·`/account` 라우트로의 완전한 분리는 이번 탭 방식으로 사용자 요구를 충족했다고 판단되면 보류 가능 — 필요 시에만 진행.
 - **Phase D~E**: Creator 모델(YouTube/CHZZK/SOOP/Twitch 채널 소유권 인증), Featured Creator 심사 엔진(6시간 자동 재심사 Cron), Creator 랭킹.
 - **Phase F~H**: Discord HTTP Interactions(서명 검증), 계정 연결, 서버 등록/검색/관리, 길드-로컬 XP(이번 세션의 XP 원장 패턴을 재사용하되 `source_type`을 분리한 별도 귀속 테이블 필요).
 - **Phase I**: 계정 통합 회귀 테스트 확장(Creator/Discord 식별자 포함), 최종 문서화, 프로덕션 검증.
@@ -59,12 +60,12 @@ My Page UI, Account Center, Creator, Discord는 이 파운데이션 위에 후�
 
 ## 다음 작업 (Next Action)
 
-**Phase C 마무리: My Page IA 분리 + 즐겨찾기/최근 플레이 카드 + 닉네임/국가 변경 UI** — 레벨/XP·도전과제 카드는
-이미 `/profile`에 노출되어 있음(완료 참고). 다음 세션은: (1) 기존 `/profile`을 `/me`(개인 대시보드)와
-`/account`(계정 관리: 연결된 로그인 계정 + 향후 Creator 설정)로 분리하고 구 `/profile` 경로에 redirect 적용,
-(2) 대시보드에 `GET /api/personalization`(즐겨찾기/최근 플레이) 카드 추가, (3) 이미 구현된
-`POST /api/profile/nickname`/`POST /api/profile/country`를 계정 관리 UI에 연결(쿨다운 에러 메시지 처리 포함).
-새 세션은 본 문서와 `docs/PROGRESSION.md`, `docs/ROADMAP.md`만으로 이어서 진행 가능.
+**닉네임/국가 변경 UI + 즐겨찾기·최근 플레이 카드** — "내 프로필" 탭에 (1) 닉네임 변경 폼(이미 구현된
+`POST /api/profile/nickname` 연결, `NICKNAME_COOLDOWN_ACTIVE` 에러 시 다음 가능 시각 안내), (2) 국가/지역 선택
+UI("국적 인증"이 아닌 자기 신고임을 명확히 표기, `POST /api/profile/country` 연결, `COUNTRY_COOLDOWN_ACTIVE` 처리),
+(3) `GET /api/personalization` 기반 즐겨찾기/최근 플레이 카드를 추가. 그 다음에만 `/me`·`/account`·`/profile/:id`
+완전 라우트 분리 여부를 재검토(현재 탭 방식으로 사용자 요구가 충족되는지 먼저 확인). 새 세션은 본 문서와
+`docs/PROGRESSION.md`, `docs/ROADMAP.md`만으로 이어서 진행 가능.
 
 ---
 
