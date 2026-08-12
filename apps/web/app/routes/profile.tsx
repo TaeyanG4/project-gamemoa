@@ -1,7 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../features/auth";
 import { Link, useNavigate, useSearchParams } from "react-router";
-import { User, LogOut, Trophy, Gamepad2, ArrowLeft, Link2, Unlink, Loader2 } from "lucide-react";
+import {
+  User,
+  LogOut,
+  Trophy,
+  Gamepad2,
+  ArrowLeft,
+  Link2,
+  Unlink,
+  Loader2,
+  Zap,
+  Award,
+} from "lucide-react";
 import { formatScore } from "@gamemoa/game-sdk";
 import { getLocalBestScore, fetchUserBestsApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
@@ -11,11 +22,15 @@ import {
   getDiscordLinkUrl,
   unlinkProvider,
 } from "../features/auth/authService";
+import { fetchMyProgressApi, fetchMyAchievementsApi } from "../features/progression/api";
 import type {
   ConnectedProvider,
   SocialProvider,
   CreateMergeChallengeResponse,
+  ProgressResponse,
+  AchievementSummaryResponse,
 } from "@gamemoa/contracts";
+import { ACHIEVEMENT_DEFINITIONS, type AchievementCode } from "@gamemoa/core";
 import { ApiClientError } from "../lib/api";
 import { MergeModal } from "../components/ui/MergeModal";
 
@@ -41,6 +56,8 @@ export default function ProfilePage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [busyProvider, setBusyProvider] = useState<SocialProvider | null>(null);
   const [mergeChallengeId, setMergeChallengeId] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressResponse | null>(null);
+  const [achievements, setAchievements] = useState<AchievementSummaryResponse | null>(null);
 
   const refreshConnected = useCallback(async () => {
     try {
@@ -57,6 +74,12 @@ export default function ProfilePage() {
         .then(setServerBests)
         .catch(() => setServerBests({}));
       void refreshConnected();
+      void fetchMyProgressApi()
+        .then(setProgress)
+        .catch(() => setProgress(null));
+      void fetchMyAchievementsApi()
+        .then(setAchievements)
+        .catch(() => setAchievements(null));
     }
   }, [isAuthenticated, user, refreshConnected]);
 
@@ -260,6 +283,76 @@ export default function ProfilePage() {
           >
             ×
           </button>
+        </div>
+      )}
+
+      {/* Level & XP */}
+      {progress && (
+        <div className="w-full bg-surface-raised rounded-3xl border border-border p-6 md:p-8 flex flex-col gap-4 shadow-xl">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-accent-yellow" />
+              <h2 className="text-xl font-bold text-text-primary">레벨 {progress.summary.level}</h2>
+            </div>
+            {progress.globalRank !== null && (
+              <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-brand/10 text-brand border border-brand/20">
+                전체 XP 랭킹 #{progress.globalRank}
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <div className="w-full h-3 rounded-full bg-surface border border-border overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-brand to-accent-yellow rounded-full transition-all"
+                style={{ width: `${progress.summary.progressPercent}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[11px] text-text-muted font-semibold">
+              <span>
+                {progress.summary.currentLevelProgressXp.toLocaleString()} /{" "}
+                {progress.summary.currentLevelSpanXp.toLocaleString()} XP
+              </span>
+              <span>총 {progress.summary.totalXp.toLocaleString()} XP</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Achievements */}
+      {achievements && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Award className="w-5 h-5 text-accent-yellow" />
+              <h2 className="text-xl font-bold text-text-primary">도전과제</h2>
+            </div>
+            <span className="text-xs font-bold text-text-muted">
+              {achievements.unlockedCodes.length} / {achievements.totalAchievements} 달성
+            </span>
+          </div>
+
+          {achievements.unlockedCodes.length === 0 ? (
+            <div className="p-5 rounded-2xl bg-surface-raised border border-border text-xs text-text-muted">
+              아직 달성한 도전과제가 없습니다. 게임을 플레이하고 즐겨찾기를 추가해보세요!
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {achievements.recentlyUnlocked.map((a) => {
+                const def = ACHIEVEMENT_DEFINITIONS[a.code as AchievementCode];
+                return (
+                  <span
+                    key={a.code}
+                    title={def?.descriptionKo}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-accent-yellow/10 text-accent-yellow border border-accent-yellow/30"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    {def?.titleKo ?? a.code}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
