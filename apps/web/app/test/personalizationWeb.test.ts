@@ -25,8 +25,9 @@ class MockLocalStorage {
 }
 
 test("getGuestPersonalization handles empty or missing localStorage safely", () => {
-  (globalThis as any).window = {
-    localStorage: new MockLocalStorage(),
+  const mockStorage = new MockLocalStorage();
+  (globalThis as unknown as { window?: { localStorage?: unknown } }).window = {
+    localStorage: mockStorage,
   };
 
   const state = getGuestPersonalization();
@@ -36,7 +37,7 @@ test("getGuestPersonalization handles empty or missing localStorage safely", () 
 
 test("saveGuestPersonalization persists valid published game IDs and filters invalid ones", () => {
   const mockStorage = new MockLocalStorage();
-  (globalThis as any).window = {
+  (globalThis as unknown as { window?: { localStorage?: unknown } }).window = {
     localStorage: mockStorage,
   };
 
@@ -51,13 +52,13 @@ test("saveGuestPersonalization persists valid published game IDs and filters inv
   const state = getGuestPersonalization();
   assert.deepEqual(state.favoriteGameIds, ["reaction-time"]);
   assert.equal(state.recentPlays.length, 1);
-  assert.equal(state.recentPlays[0].gameId, "aim-test");
+  assert.equal(state.recentPlays[0]?.gameId, "aim-test");
 });
 
 test("getGuestPersonalization handles corrupted JSON in localStorage without throwing", () => {
   const mockStorage = new MockLocalStorage();
   mockStorage.setItem(LOCAL_STORAGE_KEY, "{ corrupted_json: true ");
-  (globalThis as any).window = {
+  (globalThis as unknown as { window?: { localStorage?: unknown } }).window = {
     localStorage: mockStorage,
   };
 
@@ -72,7 +73,7 @@ test("clearGuestPersonalization removes local storage key", () => {
     LOCAL_STORAGE_KEY,
     JSON.stringify({ version: 1, favoriteGameIds: ["aim-test"] }),
   );
-  (globalThis as any).window = {
+  (globalThis as unknown as { window?: { localStorage?: unknown } }).window = {
     localStorage: mockStorage,
   };
 

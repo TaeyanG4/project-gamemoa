@@ -20,6 +20,11 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - 🧠 **순서 기억력 테스트 (Memory Test)**: 패턴 시퀀스 암기 및 최고 레벨 도전
   - 🎯 **에임 테스트 (Aim Test)**: 31개 무작위 타겟 정밀 타격 반응속도 측정 (반응형 아레나 지원)
   - ⌨️ **타자 속도 테스트 (Typing Test)**: 60초간 연속 문장 입력 및 WPM/CPM/정확도 실시간 측정
+- ⭐️ **사용자 맞춤화 레이어 (Personalization & Account Foundation)**:
+  - 📜 **최근 플레이 (Recent Plays)**: 실제 게임 시작 시점(`game_started`)에 타임스탬프 자동 기록 및 최근 플레이 탭 제공
+  - ⭐ **즐겨찾기 (Favorites)**: 게임 카드 1-클릭 북마크 등록, 카테고리 칩 탭 필터링 및 홈 화면 전용 섹션 제공
+  - 💾 **게스트 로컬스토리지 & 계정 D1 동기화**: 로그인 없이 브라우저 로컬스토리지로 완벽 보존되며, 로그인 시 계정 D1 데이터베이스로 안전한 1-Way 데이터 통합 (Import)
+  - 🔒 **SHA-256 세션 보안 강화**: 데이터베이스 내 세션 토큰 해싱 저장으로 보안 강화
 - 🧩 **Game Plugin Architecture**:
   - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
 - 🛡️ **Clean Monorepo & Architecture Guard**:
@@ -27,9 +32,9 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - CI 자동화 Architecture Guard (`pnpm verify`, `pnpm architecture:check`, `pnpm registry:check`)로 레이어 위반 및 생성 파일 이탈 자동 차단
 - ☁️ **Cloudflare Free Tier Production Architecture**:
   - **Hono + Cloudflare Workers**: 고성능 서버리스 API 백엔드
-  - **Cloudflare D1**: 글로벌 에지 데이터베이스 (유저, 세션, 게임 점수, 랭킹)
-  - **Google & Discord OAuth**: HttpOnly 세션 기반 보안 인증
-- 🔄 **Cloudflare Exit Strategy**: Hono business logic과 Repository Abstraction을 통해 Node.js + Docker + PostgreSQL 구조로의 용이한 전환 보장
+  - **Cloudflare D1**: 글로벌 에지 데이터베이스 (유저, 세션, 게임 점수, 랭킹, 개인화 데이터)
+  - **Google & Discord OAuth**: HttpOnly 세션 기반 보안 인증 (코드/서버 완료, 외부 프로바이더 설정 가이드 `docs/runbooks/oauth-setup.md` 제공)
+- 🔄 **Cloudflare 이탈 전략 (Exit Strategy)**: Hono 이식 가능 웹 표준 아키텍처와 Repository Abstraction을 통해 Node.js + Docker + PostgreSQL 구조로의 용이한 전환 고려
 
 ---
 

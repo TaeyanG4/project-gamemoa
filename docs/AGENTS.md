@@ -59,3 +59,16 @@
 
 - **Local Validation 성공만으로 완료라 보고하지 않습니다.**
 - **GitHub Actions CI 및 Deploy Green, 그리고 배포 커밋 SHA가 원격과 100% 일치할 때만 최종 완료 처리합니다.**
+
+---
+
+## 5. 🔄 새 세션 작업 원칙 (Fresh-Session Principles)
+
+긴 컨텍스트 저하(long-context degradation)를 방지하기 위해 각 대형 스프린트 작업은 새로운 LLM 세션에서 시작될 수 있습니다. 모든 에이전트는 다음 원칙을 엄격하게 준수합니다:
+
+1. **이전 대화 기억 미의존**: 대화 히스토리에 의존하지 않고, 항상 실제 저장소 파일 및 Git 상태를 단 하나의 진실의 출처(Source of Truth)로 사용합니다.
+2. **저장소 기반 상태 복원**: 시작 시 `git status`, `git branch`, `git fetch origin`, `git log`, `origin/main` SHA, `docs/AGENTS.md`, `docs/WORK_PROGRESS.md`, `docs/PROGRESS.md`, `docs/ROADMAP.md`를 순서대로 점검하여 시스템 현주소를 파악합니다.
+3. **WORK_PROGRESS 핸드오프 이행**: `docs/WORK_PROGRESS.md`가 간결한 핸드오프 문서 역할을 수행하도록 관리하고, 명시된 "Next Action"부터 이어서 작업을 진행합니다.
+4. **완료 작업 중복 방지**: 이미 구현되어 프로덕션 검증까지 끝난 작업을 다시 처음부터 재시작하거나 덮어쓰지 않습니다.
+5. **안정적 체크포인트 구축**: 컨텍스트 예산이 부족해지기 전 작업을 원자적 단위로 검증하고 커밋/푸시하여 다음 세션이 저장소 상태만으로 즉시 이어서 작업할 수 있도록 만듭니다.
+6. **완전 검증 후 푸시**: 로컬 검증(`pnpm verify`) -> 커밋 -> 푸시 -> 원격 SHA Provenance 검증(`pnpm smoke:prod`) 완료 후 세션을 마감합니다.

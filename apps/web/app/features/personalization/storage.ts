@@ -37,9 +37,13 @@ export function getGuestPersonalization(): PersistedPersonalizationState {
           .filter(
             (r: unknown): r is { gameId: string; lastPlayedAt: string } =>
               Boolean(r) &&
-              typeof (r as any).gameId === "string" &&
-              isValidGame((r as any).gameId) &&
-              typeof (r as any).lastPlayedAt === "string",
+              typeof r === "object" &&
+              r !== null &&
+              "gameId" in r &&
+              "lastPlayedAt" in r &&
+              typeof (r as { gameId: unknown }).gameId === "string" &&
+              isValidGame((r as { gameId: string }).gameId) &&
+              typeof (r as { lastPlayedAt: unknown }).lastPlayedAt === "string",
           )
           .slice(0, 12)
       : [];

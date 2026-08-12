@@ -1,31 +1,28 @@
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import {
   ImportGuestPersonalizationRequestSchema,
   PersonalizationStateSchema,
 } from "@gamemoa/contracts";
-import type { AppContainer } from "../container.js";
+import type { ApiEnv } from "./auth.js";
+import { createContainer } from "../container.js";
 
-type Env = {
-  Bindings: {
-    DB: any;
-  };
-  Variables: {
-    container?: AppContainer;
-  };
-};
+export const personalizationRouter = new Hono<ApiEnv>();
 
-export const personalizationRouter = new Hono<Env>();
-
-async function getAuthUser(c: any) {
-  const container = c.get("container");
-  if (!container) return null;
-
+async function getAuthUser(c: Context<ApiEnv>) {
   const sessionId = getCookie(c, "gamemoa_session");
   if (!sessionId) return null;
 
-  const result = await container.sessionRepo.findSession(sessionId);
-  return result ? result.user : null;
+  if (!c.env?.DB) return null;
+
+  try {
+    const { sessionRepo } = createContainer(c.env.DB);
+    const result = await sessionRepo.findSession(sessionId);
+    return result ? result.user : null;
+  } catch {
+    return null;
+  }
 }
 
 // GET /api/personalization
@@ -35,8 +32,12 @@ personalizationRouter.get("/", async (c) => {
     return c.json({ error: "Unauthenticated" }, 401);
   }
 
-  const container = c.get("container")!;
-  const state = await container.personalizationUseCases.getPersonalizationState(user.id);
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const { personalizationUseCases } = createContainer(c.env.DB);
+  const state = await personalizationUseCases.getPersonalizationState(user.id);
   const validated = PersonalizationStateSchema.parse(state);
   return c.json(validated, 200);
 });
@@ -48,14 +49,19 @@ personalizationRouter.post("/favorites/:gameId", async (c) => {
     return c.json({ error: "Unauthenticated" }, 401);
   }
 
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
   const gameId = c.req.param("gameId");
-  const container = c.get("container")!;
+  const { personalizationUseCases } = createContainer(c.env.DB);
 
   try {
-    await container.personalizationUseCases.addFavorite(user.id, gameId);
+    await personalizationUseCases.addFavorite(user.id, gameId);
     return c.json({ success: true }, 200);
-  } catch (err: any) {
-    return c.json({ error: err.message || "Invalid game" }, 400);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Invalid game";
+    return c.json({ error: message }, 400);
   }
 });
 
@@ -66,9 +72,13 @@ personalizationRouter.delete("/favorites/:gameId", async (c) => {
     return c.json({ error: "Unauthenticated" }, 401);
   }
 
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
   const gameId = c.req.param("gameId");
-  const container = c.get("container")!;
-  await container.personalizationUseCases.removeFavorite(user.id, gameId);
+  const { personalizationUseCases } = createContainer(c.env.DB);
+  await personalizationUseCases.removeFavorite(user.id, gameId);
   return c.json({ success: true }, 200);
 });
 
@@ -79,14 +89,19 @@ personalizationRouter.post("/recent/:gameId", async (c) => {
     return c.json({ error: "Unauthenticated" }, 401);
   }
 
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
   const gameId = c.req.param("gameId");
-  const container = c.get("container")!;
+  const { personalizationUseCases } = createContainer(c.env.DB);
 
   try {
-    await container.personalizationUseCases.recordRecentPlay(user.id, gameId);
+    await personalizationUseCases.recordRecentPlay(user.id, gameId);
     return c.json({ success: true }, 200);
-  } catch (err: any) {
-    return c.json({ error: err.message || "Invalid game" }, 400);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Invalid game";
+    return c.json({ error: message }, 400);
   }
 });
 
@@ -97,14 +112,18 @@ personalizationRouter.post("/import", async (c) => {
     return c.json({ error: "Unauthenticated" }, 401);
   }
 
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
   const body = await c.req.json().catch(() => null);
   const parsed = ImportGuestPersonalizationRequestSchema.safeParse(body);
   if (!parsed.success) {
     return c.json({ error: "Invalid import payload" }, 400);
   }
 
-  const container = c.get("container")!;
-  const updatedState = await container.personalizationUseCases.importGuestData(
+  const { personalizationUseCases } = createContainer(c.env.DB);
+  const updatedState = await personalizationUseCases.importGuestData(
     user.id,
     parsed.data.guestFavorites,
     parsed.data.guestRecentPlays,

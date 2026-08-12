@@ -119,7 +119,7 @@ export function PersonalizationProvider({ children }: { children: React.ReactNod
           } else {
             await addFavoriteApi(gameId);
           }
-        } catch (err) {
+        } catch {
           // Revert optimistic UI if server update fails
           setFavoriteGameIds(favoriteGameIds);
         }
