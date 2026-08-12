@@ -57,3 +57,27 @@ test("getRandomPassage returns deterministic passage by index", () => {
   const p0 = getRandomPassage(0);
   assert.ok(p0.startsWith("The quick brown fox"));
 });
+
+test("whitespace in target passages contains standard spaces for word boundary separation", () => {
+  const p0 = getRandomPassage(0);
+  const words = p0.split(" ");
+  assert.ok(words.length > 5, "Passage should be split into multiple readable words");
+  assert.equal(words[0], "The");
+  assert.equal(words[1], "quick");
+  assert.equal(words[2], "brown");
+  assert.equal(words[3], "fox");
+});
+
+test("computeSegmentStats after Backspace correction computes clean stats for corrected input", () => {
+  const target = "The quick brown fox";
+  // User typed wrong char 'x' then pressed Backspace and typed correct 'e'
+  const typedBefore = "Thx";
+  const statsBefore = computeSegmentStats(target, typedBefore);
+  assert.equal(statsBefore.incorrectChars, 1);
+
+  // After Backspace and typing 'e'
+  const typedAfter = "The";
+  const statsAfter = computeSegmentStats(target, typedAfter);
+  assert.equal(statsAfter.incorrectChars, 0);
+  assert.equal(statsAfter.correctChars, 3);
+});

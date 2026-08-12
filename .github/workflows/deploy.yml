@@ -49,36 +49,14 @@ jobs:
           command: deploy --var COMMIT_SHA:${{ github.event.workflow_run.head_sha }}
 
       - name: Verify API Health & Provenance
-        env:
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          node -e "
-            const expectedSha = process.env.EXPECTED_SHA;
-            async function check() {
-              for (let attempt = 1; attempt <= 20; attempt++) {
-                try {
-                  const res = await fetch('https://gamemoa-api.gamemoa.workers.dev/api/health?v=' + Date.now());
-                  if (!res.ok) throw new Error('HTTP ' + res.status);
-                  const data = await res.json();
-                  console.log('Attempt', attempt, 'API Response:', data);
-                  if (data.status === 'ok' && (!expectedSha || data.commit === expectedSha)) {
-                    console.log('✅ API Health & Provenance Verification Passed!');
-                    return;
-                  }
-                } catch (err) {
-                  console.log('Attempt', attempt, 'failed:', err.message);
-                }
-                await new Promise(r => setTimeout(r, 3000));
-              }
-              throw new Error('API Health & Provenance Verification Failed after 20 attempts');
-            }
-            check().catch(err => { console.error(err); process.exit(1); });
-          "
+        run: pnpm smoke:prod --api-only --sha ${{ github.event.workflow_run.head_sha }}
 
       - name: Build Web Frontend
         run: pnpm --filter @gamemoa/web build
         env:
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://gamemoa-api.gamemoa.workers.dev' }}
 
       - name: Deploy Web Frontend
         uses: cloudflare/wrangler-action@v3
@@ -89,39 +67,4 @@ jobs:
           command: deploy
 
       - name: Smoke Test Web Frontend & Provenance
-        env:
-          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          node -e "
-            const expectedSha = process.env.EXPECTED_SHA;
-            async function check() {
-              for (let attempt = 1; attempt <= 20; attempt++) {
-                try {
-                  const res = await fetch('https://gamemoa-web.gamemoa.workers.dev/version.json?v=' + Date.now());
-                  if (!res.ok) throw new Error('HTTP ' + res.status);
-                  const data = await res.json();
-                  console.log('Attempt', attempt, 'Web Version Response:', data);
-                  if (!expectedSha || data.commit === expectedSha) {
-                    console.log('✅ Web Provenance Verification Passed!');
-                    return;
-                  }
-                } catch (err) {
-                  console.log('Attempt', attempt, 'failed:', err.message);
-                }
-                await new Promise(r => setTimeout(r, 3000));
-              }
-              throw new Error('Web Provenance Verification Failed after 20 attempts');
-            }
-            check().then(() => {
-              const routes = ['/', '/games', '/ranking', '/profile', '/games/reaction-time', '/games/memory-test', '/games/aim-test', '/games/typing-test'];
-              return Promise.all(routes.map(r => 
-                fetch('https://gamemoa-web.gamemoa.workers.dev' + r + '?v=' + Date.now())
-                  .then(res => {
-                    console.log(r, res.status);
-                    if (!res.ok) throw new Error('Route failed: ' + r);
-                  })
-              ));
-            })
-            .then(() => console.log('✅ Web Smoke & Provenance Verification Passed!'))
-            .catch(err => { console.error(err); process.exit(1); });
-          "
+        run: pnpm smoke:prod --sha ${{ github.event.workflow_run.head_sha }}

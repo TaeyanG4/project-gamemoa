@@ -29,6 +29,18 @@ function isLocalhost(urlStr: string): boolean {
   }
 }
 
+// GET /api/auth/providers (non-secret readiness check)
+authRouter.get("/providers", (c) => {
+  return c.json({
+    google: {
+      configured: Boolean(c.env?.GOOGLE_CLIENT_ID),
+    },
+    discord: {
+      configured: Boolean(c.env?.DISCORD_CLIENT_ID && c.env?.DISCORD_CLIENT_SECRET),
+    },
+  });
+});
+
 // POST /api/auth/google
 authRouter.post("/google", async (c) => {
   try {

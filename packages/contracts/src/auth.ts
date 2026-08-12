@@ -23,3 +23,13 @@ export const GoogleLoginRequestSchema = z.object({
   credential: z.string().min(1, "Credential is required"),
 });
 export type GoogleLoginRequest = z.infer<typeof GoogleLoginRequestSchema>;
+
+export const AuthProvidersResponseSchema = z.object({
+  google: z.object({
+    configured: z.boolean(),
+  }),
+  discord: z.object({
+    configured: z.boolean(),
+  }),
+});
+export type AuthProvidersResponse = z.infer<typeof AuthProvidersResponseSchema>;

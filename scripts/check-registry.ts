@@ -68,8 +68,35 @@ async function checkRegistry() {
     process.exit(1);
   }
 
+  // Verify published game thumbnail assets exist
+  let missingAssets = false;
+  for (const entry of gameEntries) {
+    if (entry.manifest.status === "published") {
+      const thumb = entry.manifest.thumbnail;
+      if (thumb.startsWith("/")) {
+        const assetPath = path.join(rootDir, "apps", "web", "public", thumb);
+        if (!fs.existsSync(assetPath)) {
+          console.error(
+            `❌ Published game "${entry.manifest.slug}" missing thumbnail asset at ${assetPath}`,
+          );
+          missingAssets = true;
+        }
+      }
+    }
+  }
+
+  if (missingAssets) {
+    console.error(
+      "\n❌ Thumbnail check failed! Every published game manifest must have a valid thumbnail asset.\n",
+    );
+    process.exit(1);
+  }
+
   console.log(
     `✅ Verified Plugin Architecture Invariants: ${fsGameSlugs.length} games registered identically across filesystem, manifest registry, and web loaders.`,
+  );
+  console.log(
+    "✅ Verified Thumbnail Assets: All published game thumbnails exist in public directory.",
   );
   console.log("✅ Game Registries are canonical and up to date! 0 Stale Registries Found.\n");
 }

@@ -61,7 +61,7 @@ export function Game({ runtime }: GameProps) {
   return (
     <div className="flex flex-col items-center justify-center w-full select-none">
       {/* Top Info Bar */}
-      <div className="flex items-center justify-between w-full max-w-[500px] mb-4 px-2">
+      <div className="flex items-center justify-between w-full max-w-4xl mb-4 px-2">
         <span className="text-sm font-bold text-text-secondary flex items-center gap-1.5">
           <Target className="w-4 h-4 text-brand" />
           {phase === "playing" ? `${targetCount} / ${TOTAL_TARGETS}` : "에임 테스트"}
@@ -73,8 +73,8 @@ export function Game({ runtime }: GameProps) {
         )}
       </div>
 
-      {/* Responsive Arena (aspect 4/3 up to max-w 500px) */}
-      <div className="relative w-full max-w-[500px] aspect-[4/3] rounded-2xl bg-surface-sidebar border border-border overflow-hidden cursor-crosshair shadow-inner">
+      {/* Responsive Arena */}
+      <div className="relative w-full max-w-4xl aspect-[16/10] min-h-[380px] md:min-h-[480px] rounded-2xl bg-surface-sidebar border border-border overflow-hidden cursor-crosshair shadow-inner">
         {phase === "ready" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-black/60 backdrop-blur-sm z-10">
             <h3 className="text-2xl font-black text-white mb-2">에임 테스트</h3>

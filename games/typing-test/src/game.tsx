@@ -141,7 +141,7 @@ export function Game({ runtime }: GameProps) {
 
   return (
     <div
-      className="flex flex-col items-center justify-center w-full max-w-4xl mx-auto p-4 md:p-8 select-none font-sans"
+      className="flex flex-col items-center justify-center w-full max-w-5xl mx-auto p-4 md:p-8 select-none font-sans"
       onClick={() => inputRef.current?.focus()}
     >
       {/* Top Header & Live Stats Card */}
@@ -184,25 +184,42 @@ export function Game({ runtime }: GameProps) {
 
       {/* Main Interactive Passage Arena */}
       <div className="w-full bg-surface-raised border border-border/80 rounded-3xl p-6 md:p-10 shadow-2xl relative overflow-hidden mb-6">
-        {/* Visual Text Highlight Passage */}
-        <div className="text-lg md:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] flex flex-wrap content-start">
-          {targetText.split("").map((char, index) => {
+        {/* Visual Text Highlight Passage with Preserved Whitespace */}
+        <div className="text-lg md:text-2xl font-mono leading-relaxed tracking-wide min-h-[140px] whitespace-pre-wrap flex flex-wrap content-start select-none">
+          {targetText.split("").map((expectedChar, index) => {
             let colorClass = "text-text-muted/60";
             let bgClass = "";
+            let displayChar = expectedChar === " " ? "\u00A0" : expectedChar;
 
             if (index < typedText.length) {
-              const isCorrect = typedText[index] === char;
-              colorClass = isCorrect
-                ? "text-emerald-400 font-bold"
-                : "text-rose-400 bg-rose-500/20 rounded font-bold";
+              const actualChar = typedText[index];
+              const isCorrect = actualChar === expectedChar;
+
+              if (isCorrect) {
+                colorClass = "text-emerald-400 font-bold";
+                displayChar = actualChar === " " ? "\u00A0" : actualChar;
+              } else {
+                // Render the ACTUAL typed character in error style
+                colorClass =
+                  "text-rose-400 font-bold bg-rose-500/25 rounded border-b-2 border-amber-400";
+                displayChar = actualChar === " " ? "␣" : (actualChar ?? expectedChar);
+              }
             } else if (index === typedText.length && status !== "finished") {
               bgClass = "bg-brand/40 underline underline-offset-4 animate-pulse rounded";
               colorClass = "text-text-primary font-bold";
             }
 
             return (
-              <span key={index} className={`${colorClass} ${bgClass} transition-colors px-[1px]`}>
-                {char}
+              <span
+                key={index}
+                className={`${colorClass} ${bgClass} transition-colors px-[1px] relative inline-block`}
+                title={
+                  index < typedText.length && typedText[index] !== expectedChar
+                    ? `입력: '${typedText[index]}' (기대: '${expectedChar}')`
+                    : undefined
+                }
+              >
+                {displayChar}
               </span>
             );
           })}

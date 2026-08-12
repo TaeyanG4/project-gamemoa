@@ -31,6 +31,17 @@ test("GET /api/auth/me returns 401 unauthenticated and matches AuthMeResponseSch
   assert.equal(parsed.data.authenticated, false);
 });
 
+test("GET /api/auth/providers returns non-secret provider readiness status", async () => {
+  const res = await app.request("http://localhost/api/auth/providers");
+  assert.equal(res.status, 200);
+  const json = (await res.json()) as {
+    google: { configured: boolean };
+    discord: { configured: boolean };
+  };
+  assert.equal(typeof json.google.configured, "boolean");
+  assert.equal(typeof json.discord.configured, "boolean");
+});
+
 test("POST /api/scores rejects foreign origin with 403 Forbidden", async () => {
   const res = await app.request("http://localhost/api/scores", {
     method: "POST",

@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import {
   type AuthUser,
+  type ProviderStatus,
   fetchCurrentUser,
+  fetchProviderStatus,
   loginGoogle,
   getDiscordLoginUrl,
   logoutFromServer,
@@ -11,6 +13,7 @@ export interface AuthContextValue {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  providerStatus: ProviderStatus;
   error: string | null;
   isLoginModalOpen: boolean;
   openLoginModal: () => void;
@@ -52,13 +55,18 @@ declare global {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus>({
+    google: false,
+    discord: false,
+  });
   const [error, setError] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const refreshUser = useCallback(async () => {
     try {
-      const currentUser = await fetchCurrentUser();
+      const [currentUser, status] = await Promise.all([fetchCurrentUser(), fetchProviderStatus()]);
       setUser(currentUser);
+      setProviderStatus(status);
     } catch {
       setUser(null);
     } finally {
@@ -89,8 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ?.VITE_GOOGLE_CLIENT_ID ?? "")
         : "";
 
-    if (!clientId) {
-      setError("Google Client ID가 설정되지 않았습니다.");
+    if (!clientId || !providerStatus.google) {
+      setError("Google 로그인이 아직 설정되지 않았습니다.");
       return;
     }
 
@@ -139,12 +147,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => document.body.removeChild(tempDiv), 5000);
       }
     });
-  }, []);
+  }, [providerStatus.google]);
 
   const loginWithDiscord = useCallback(() => {
     setError(null);
+    if (!providerStatus.discord) {
+      setError("Discord 로그인이 아직 설정되지 않았습니다.");
+      return;
+    }
     window.location.href = getDiscordLoginUrl();
-  }, []);
+  }, [providerStatus.discord]);
 
   const logout = useCallback(async () => {
     setIsLoading(true);
@@ -159,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
+        providerStatus,
         error,
         isLoginModalOpen,
         openLoginModal,

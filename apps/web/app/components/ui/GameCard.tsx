@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router";
 import { Clock, Play, Sparkles } from "lucide-react";
 
@@ -20,6 +21,8 @@ export function GameCard({
   accent = "#6366f1",
   estimatedRoundSeconds,
 }: GameCardProps) {
+  const [imageError, setImageError] = useState(false);
+
   return (
     <Link
       to={`/games/${slug}`}
@@ -45,10 +48,11 @@ export function GameCard({
         </div>
 
         {/* Thumbnail Visual */}
-        {thumbnail.startsWith("/") || thumbnail.startsWith("http") ? (
+        {!imageError && (thumbnail.startsWith("/") || thumbnail.startsWith("http")) ? (
           <img
             src={thumbnail}
             alt={title}
+            onError={() => setImageError(true)}
             className="w-24 h-24 object-contain rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300"
           />
         ) : (

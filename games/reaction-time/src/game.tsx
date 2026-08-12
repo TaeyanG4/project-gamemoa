@@ -131,7 +131,7 @@ export function Game({ runtime }: GameProps) {
               : handleScreenClick
         }
         style={{ backgroundColor: display.bgColor }}
-        className="w-full max-w-md aspect-[4/3] rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-colors duration-150 shadow-2xl border border-white/20 active:scale-[0.99]"
+        className="w-full max-w-4xl min-h-[380px] md:min-h-[460px] rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-colors duration-150 shadow-2xl border border-white/20 active:scale-[0.99]"
         aria-label={display.text}
       >
         <span className="text-4xl font-black text-white drop-shadow-md">{display.text}</span>

@@ -13,6 +13,7 @@
     "generate:game": "tsx scripts/generate-game.ts",
     "architecture:check": "tsx scripts/verify-architecture.ts",
     "registry:check": "tsx scripts/check-registry.ts",
+    "smoke:prod": "tsx scripts/verify-production.ts",
     "verify": "pnpm install --frozen-lockfile && pnpm format:check && pnpm architecture:check && pnpm registry:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "deploy": "pnpm --filter @gamemoa/api deploy && pnpm --filter @gamemoa/web deploy",
     "d1:migrate": "pnpm exec wrangler d1 migrations apply DB --local --config apps/api/wrangler.jsonc",

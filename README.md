@@ -82,6 +82,9 @@ pnpm --filter @gamemoa/api dev
 # 단일 통합 품질 게이트 (락파일, 포맷, 아키텍처, 레지스트리, 린트, 타입, 테스트, 빌드)
 pnpm verify
 
+# 프로덕션 상태 및 SHA 검증 (시간 제한 & 무한 대기 방지 검사)
+pnpm smoke:prod
+
 # 코드 포맷 및 린트 검사
 pnpm format:check
 pnpm lint

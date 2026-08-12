@@ -1,5 +1,6 @@
 import {
   AuthMeResponseSchema,
+  AuthProvidersResponseSchema,
   type AuthMeResponse,
   type AuthUser,
   type SocialProvider,
@@ -8,6 +9,23 @@ import { API_URL, apiFetch } from "../../lib/api";
 
 export type { AuthUser, AuthMeResponse, SocialProvider };
 export type AuthProviderName = SocialProvider;
+
+export interface ProviderStatus {
+  google: boolean;
+  discord: boolean;
+}
+
+export async function fetchProviderStatus(): Promise<ProviderStatus> {
+  try {
+    const data = await apiFetch("/api/auth/providers", AuthProvidersResponseSchema);
+    return {
+      google: data.google.configured,
+      discord: data.discord.configured,
+    };
+  } catch {
+    return { google: false, discord: false };
+  }
+}
 
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
   try {

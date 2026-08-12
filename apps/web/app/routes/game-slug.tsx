@@ -223,7 +223,7 @@ export default function GamePlay() {
             </button>
           </div>
         ) : GameComponent ? (
-          <div className="w-full max-w-4xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
+          <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
             {/* Game Result & Score Submission Overlay */}
             {result ? (
               <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center">

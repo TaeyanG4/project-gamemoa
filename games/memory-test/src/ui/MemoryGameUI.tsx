@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Play, RotateCcw, Brain } from "lucide-react";
+import type { GameProps } from "@gamemoa/game-sdk";
 import {
   type MemoryColor,
   generateNextColor,
@@ -38,11 +39,16 @@ function playTone(freq: number, duration = 0.3) {
   }
 }
 
-export function MemoryGameUI() {
+export function MemoryGameUI({ runtime }: { runtime?: GameProps["runtime"] }) {
   const [gameState, setGameState] = useState(createInitialState());
   const [activeColor, setActiveColor] = useState<MemoryColor | null>(null);
 
+  const startTimeRef = useRef<number>(0);
+  const hasCompletedRef = useRef<boolean>(false);
+
   const startNewGame = () => {
+    hasCompletedRef.current = false;
+    startTimeRef.current = Date.now();
     const firstColor = generateNextColor();
     setGameState({
       status: "showing",
@@ -51,6 +57,7 @@ export function MemoryGameUI() {
       level: 1,
       bestLevel: gameState.bestLevel,
     });
+    runtime?.emit({ type: "game_started", at: Date.now() });
   };
 
   // Play sequence animation when status is "showing"
@@ -107,13 +114,33 @@ export function MemoryGameUI() {
     if (color !== expectedColor) {
       // Game Over
       playTone(150, 0.5); // Low error tone
-      const newBest = Math.max(gameState.bestLevel, gameState.level - 1);
+      const completedLevels = Math.max(0, gameState.level - 1);
+      const newBest = Math.max(gameState.bestLevel, completedLevels);
 
       setGameState((prev) => ({
         ...prev,
         status: "game-over",
         bestLevel: newBest,
       }));
+
+      if (!hasCompletedRef.current && runtime) {
+        hasCompletedRef.current = true;
+        const now = Date.now();
+        void runtime.complete({
+          gameId: "memory-test",
+          sessionId: runtime.sessionId,
+          score: completedLevels,
+          durationMs: now - startTimeRef.current,
+          metadata: {
+            level: completedLevels,
+            sequenceLength: gameState.sequence.length,
+            grade: evaluateGrade(completedLevels),
+          },
+          clientStartedAt: startTimeRef.current,
+          clientEndedAt: now,
+        });
+        runtime.emit({ type: "game_completed", at: now });
+      }
       return;
     }
 
@@ -138,7 +165,7 @@ export function MemoryGameUI() {
   const grade = evaluateGrade(gameState.level - 1);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-md mx-auto p-6 md:p-8 bg-gradient-to-b from-[#18181b] via-[#0f0f12] to-[#09090b] rounded-[2.5rem] border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] select-none">
+    <div className="flex flex-col items-center justify-center w-full max-w-3xl mx-auto p-6 md:p-8 bg-gradient-to-b from-[#18181b] via-[#0f0f12] to-[#09090b] rounded-[2.5rem] border border-white/10 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] select-none">
       {/* Header Info */}
       <div className="flex items-center justify-between w-full mb-6 pb-4 border-b border-white/10">
         <div className="flex items-center gap-2.5">
@@ -202,7 +229,7 @@ export function MemoryGameUI() {
           </div>
 
           {/* 3D Simon Arcade Pad Matrix */}
-          <div className="relative w-[270px] h-[270px] sm:w-[300px] sm:h-[300px] rounded-full bg-[#0a0a0c] border-[10px] border-[#18181b] shadow-[0_0_50px_rgba(0,0,0,0.9)] flex items-center justify-center p-3 select-none">
+          <div className="relative w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] md:w-[460px] md:h-[460px] rounded-full bg-[#0a0a0c] border-[10px] border-[#18181b] shadow-[0_0_50px_rgba(0,0,0,0.9)] flex items-center justify-center p-3 select-none">
             <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-3 bg-[#0a0a0c] rounded-full overflow-hidden">
               {/* RED PAD (Top Left) */}
               <button
@@ -226,9 +253,6 @@ export function MemoryGameUI() {
                 }`}
               >
                 <div className="absolute top-1/4 left-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute bottom-3 right-3 text-[11px] font-black text-white/40 tracking-wider">
-                  RED
-                </span>
               </button>
 
               {/* GREEN PAD (Top Right) */}
@@ -253,9 +277,6 @@ export function MemoryGameUI() {
                 }`}
               >
                 <div className="absolute top-1/4 right-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute bottom-3 left-3 text-[11px] font-black text-white/40 tracking-wider">
-                  GREEN
-                </span>
               </button>
 
               {/* BLUE PAD (Bottom Left) */}
@@ -280,9 +301,6 @@ export function MemoryGameUI() {
                 }`}
               >
                 <div className="absolute bottom-1/4 left-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute top-3 right-3 text-[11px] font-black text-white/40 tracking-wider">
-                  BLUE
-                </span>
               </button>
 
               {/* YELLOW PAD (Bottom Right) */}
@@ -307,9 +325,6 @@ export function MemoryGameUI() {
                 }`}
               >
                 <div className="absolute bottom-1/4 right-1/4 w-8 h-8 rounded-full bg-white/20 blur-[4px] pointer-events-none" />
-                <span className="absolute top-3 left-3 text-[11px] font-black text-white/40 tracking-wider">
-                  YELLOW
-                </span>
               </button>
             </div>
 
