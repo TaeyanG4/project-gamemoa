@@ -111,6 +111,18 @@ Provider 자격증명이 필요 없고 이번 세션에서 만든 `discord_link_
 
 ## 마지막 검증 상태 (Last Verified State)
 
-- **Local Quality Gate (`pnpm verify`)**: 아래 커밋 push 직전 실행 예정 — 결과는 이 문서의 다음 갱신에서 반영.
-- **최종 커밋 (Final SHA)**: push 및 CI/Deploy 확인 후 갱신 예정.
+- **Local Quality Gate (`pnpm verify`)**: PASS (format/arch/registry/lint/typecheck/test/build)
+- **Local Unit Tests**: core 74 / db 19 / api 56 / web 15 — 전원 PASS (Discord 서명 검증은 Node
+  `crypto.generateKeyPairSync("ed25519")`로 만든 실제 키쌍/서명 사용)
+- **D1 마이그레이션 (로컬 + 프로덕션)**: 0006 적용 성공 (기존 0000~0005 위에 additive)
+- **최종 커밋 (Final SHA)**: `99dc2dd3e91e3895561a57d04b2f876fdac88ed1` (origin/main과 100% 일치)
+- **GitHub Actions CI**: GREEN (run `31646841329`)
+- **Cloudflare Deploy**: GREEN (run `31646920168`) — D1 프로덕션 마이그레이션 0006 적용, API/Web Worker
+  배포, Health/Provenance 체크 전원 통과.
+- **운영 Provenance/Smoke (`pnpm smoke:prod`)**: API `/api/health` commit = Web `/version.json` commit =
+  `99dc2dd3e91e3895561a57d04b2f876fdac88ed1` (= origin/main). `/discord/link` 포함 전체 웹 라우트/자산
+  HTTP 200.
+- **프로덕션 직접 확인**: `GET /api/discord/status` → `{"configured":false}`(예상된 상태, 외부 설정
+  대기), `POST /api/discord/interactions`(미설정) → 500(안전한 성능 저하, 전체 API는 정상), `GET
+/api/discord/link/preview`(토큰 없음) → 400, `POST /api/discord/link/confirm`(미인증) → 401.
 - **시작 SHA (이번 세션)**: `18f2f3bb0df6a92969d387dbf8b4e93f5e70f507`
