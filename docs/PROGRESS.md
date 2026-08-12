@@ -18,11 +18,19 @@
 | **Phase 9**  | 제품 무결성 & 게임 세션 UX (가짜 랭킹 제거, Web API client, 시도 라이프사이클, 60초 타자)                                                                  | ✅ 완료 | 랭킹/API/시도 라이프사이클/타자 단위 테스트 전원 통과                               |
 | **Phase 10** | 크리티컬 버그 수정 & 게임 플레이 UX (타임아웃 검사기, 소셜진단/Fallback UI, 썸네일 복원, Memory/Typing 버그, 뷰포트 확대)                                  | ✅ 완료 | `pnpm smoke:prod`, `pnpm verify` 및 단위 테스트 전원 통과                           |
 | **Phase 11** | 계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 (별도 계정 기본, Primary Account Wins 통합, 게스트 즐겨찾기 제거, Google JWT/JWKS, 파비콘) | ✅ 완료 | `pnpm verify`, 단위 테스트, D1 마이그레이션 0003/0004 및 파비콘 자산 검증 통과      |
+| **Phase 12** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase B: 진행도(XP/레벨/도전과제) 파운데이션** (My Page/Creator/Discord의 하위 기반) | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0005 로컬 적용 검증, 신규 단위/통합 테스트 전원 통과 |
 
 ---
 
 ## 2. ⚙️ 현재 작업 (Current Phase)
 
+- **GAMEMOA 플레이어 플랫폼 확장 스프린트 — Phase B: 진행도 파운데이션 (Phase 12)**:
+  - **XP/레벨 시스템**: 서버 권위 XP(인증 완료 1회당 +10), 사용자×게임×UTC일 기준 최대 10회 XP 지급 상한, `xp_events` 원장 + `UNIQUE(source_type, source_id)` 멱등성, `user_progress` 집계. 순수 함수 레벨 공식(`100 × (L-1)²`) 및 파생 진행도 필드.
+  - **도전과제**: `user_achievements`(`UNIQUE(user_id, achievement_code)`), 7종 초기 도전과제(FIRST_PLAY/PLAY_10/PLAY_100/FIRST_FAVORITE/LEVEL_5/LEVEL_10/ALL_GAMES), 게임 완료·즐겨찾기 추가 시점 자동 평가.
+  - **닉네임/국가·지역 정책 중앙화**: `profilePolicy.ts` — 닉네임 Unicode 2~20자 + 7일 쿨다운, 국가/지역 ISO 3166-1 alpha-2 + 30일 쿨다운("국적 인증" 아님, IP 미추론).
+  - **신규 API**: `GET /api/progression/me`, `GET /api/progression/leaderboard`(글로벌 XP 랭킹, 공개), `GET /api/progression/achievements`, `POST /api/profile/nickname`, `POST /api/profile/country`. `POST /api/scores` 응답에 XP/도전과제 부수효과 포함(점수 자체는 불변).
+  - **계정 통합 정합성 확장**: Primary Account Wins 병합 시 Secondary의 `xp_events`/`user_progress`/`user_achievements`도 원자적으로 삭제(고스트 진행도 방지), 기존 초대 흐름 무변경.
+  - **범위 밖(후속 세션)**: My Page/Account Center UI, Creator, Discord 연동 — `docs/PROGRESSION.md` §11 참고.
 - **계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 (Phase 11)**:
   - **계정 모델 (별도 계정 기본)**: Google/Discord 로그인을 기본적으로 별도 GAMEMOA 계정으로 분리하고, 동일 이메일을 자동 병합 근거로 사용하지 않음. 정규 식별자는 `provider` + `provider_user_id`(Google `sub`, Discord 사용자 ID).
   - **즐겨찾기 접근 통제 (P0)**: 게스트 즐겨찾기를 로그인 전용으로 변경 — 게스트 즐겨찾기 클릭/카테고리 칩 선택은 로그인 모달을 호출하고 로컬 즐겨찾기 미저장. 로컬스토리지 v1→v2 마이그레이션으로 기존 게스트 즐겨찾기를 폐기하고 최근 플레이만 보존. 게스트 임포트 계약/API/유즈케이스/저장소 흐름에서 `guestFavorites` 제거.
@@ -36,10 +44,12 @@
 
 ## 3. 🎯 다음 우선순위 (Next Priorities)
 
-1. **Discord Integration Foundation Sprint** (다음 스프린트):
-   - Discord App → HTTP Interactions → Hono Worker → GAMEMOA 애플리케이션 서비스 → D1 (Gateway 없이).
-   - 명령어: `/gamemoa link`, `/gamemoa profile`, `/gamemoa ranking`, `/gamemoa server-ranking`, `/gamemoa games`.
-2. **신규 미니게임 확장**: 색각 이상 테스트(color-test), 숫자 암기 테스트(number-memory), CPS 테스트(cps-test).
+플레이어 플랫폼 확장 스프린트는 여러 세션에 걸쳐 단계적으로 진행됩니다 (`docs/WORK_PROGRESS.md`의 Next Action 참고):
+
+1. **Phase C: My Page / Account Center / Public Profile UI** — 이번 세션에서 구축한 진행도 API를 소비하는 `/me`, `/account`, `/profile/:id` 대시보드.
+2. **Phase D~E: Creator 모델** — 채널 소유권 인증(YouTube/CHZZK/SOOP/Twitch), Featured Creator 심사 엔진, Creator 랭킹.
+3. **Phase F~H: Discord 연동** — HTTP Interactions 서명 검증, `/gamemoa link|profile|rank|leaderboard|play|server|games`, 서버 등록/검색, 길드-로컬 XP.
+4. **신규 미니게임 확장**: 색각 이상 테스트(color-test), 숫자 암기 테스트(number-memory), CPS 테스트(cps-test).
 
 ---
 
@@ -54,6 +64,7 @@
 
 ## 5. 📜 주요 변경 이력 (History)
 
+- **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase B(진행도 파운데이션) 완수 — 서버 권위 XP 원장/일일 상한/멱등성, 결정론적 레벨 공식, 7종 초기 도전과제, 닉네임/국가·지역 정책 중앙화(쿨다운), `/api/progression/*` 및 `/api/profile/*` 신규 API, 계정 통합 시 Secondary 진행도 삭제 정합성 확장.
 - **2026-08-13**: 계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 완수 — Google/Discord 별도 계정 기본, 게스트 즐겨찾기 로그인 전용화 및 v1→v2 마이그레이션, OAuth 공급자 연결/연결해제, Primary Account Wins 원자 통합, Google JWT/JWKS 검증, 프로필 계정 관리 UX, GAMEMOA 파비콘 자산.
 - **2026-08-13**: 크리티컬 버그 수정 및 게임 플레이 UX 안정화 완수 (시간 제한 검증기, 소셜 진단/Fallback UI, 썸네일 자산 복원, Memory/Typing 버그 수정, 뷰포트 확대).
 - **2026-08-12**: 가짜 목 데이터 제거, `@gamemoa/contracts` 안전 Web API 클라이언트 도입, 게임 시도 라이프사이클 및 retry 재마운트, 60초 연속 타자속도 테스트 완수.

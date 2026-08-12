@@ -1,13 +1,33 @@
 # GAMEMOA 향후 로드맵 (ROADMAP)
 
 GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아키텍처 기반으로 설계된 미니게임 플랫폼입니다.  
-계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트가 완료됨에 따라, 향후 플랫폼 사용자 경험 강화 및 신규 기능(특히 Discord 연동)이 안정적으로 진행됩니다.
+계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 완료 이후, GAMEMOA는 "미니게임 모음"에서
+**경쟁형 플레이어 플랫폼**(개인 진행도/XP/레벨/도전과제, My Page, Creator 생태계, Discord 커뮤니티 경쟁)으로
+확장하는 대형 스프린트를 여러 세션에 걸쳐 진행합니다. 이 로드맵은 그 스프린트의 단계 구조를 반영합니다.
+
+> 📌 **진행 원칙**: 기존 아키텍처(pnpm/Turborepo/React 19/Hono/Cloudflare Workers/D1/Zod contracts/Modular
+> Monolith), UI 정체성, 랭킹 무결성(XP/Creator/Discord는 게임 점수에 영향 없음), OAuth 계정 정책(별도 계정 기본,
+> Primary Account Wins), 게스트 정책을 그대로 보존합니다. 상세 단계별 진행 상태는 `docs/WORK_PROGRESS.md`를
+> 참고하세요.
 
 ---
 
-## 🎯 1. 단기 로드맵 (Next Sprint)
+## 🎯 1. 진행 중인 대형 스프린트 — 플레이어 플랫폼 확장
 
-### 1) Discord Integration Foundation (HTTP Interactions)
+| Phase | 내용                                                              | 상태      |
+| ----- | ----------------------------------------------------------------- | --------- |
+| B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)             | ✅ 완료   |
+| C     | My Page / Account Center / Public Profile UI                      | 예정      |
+| D     | XP 랭킹 UI, Creator 모델 기초                                      | 예정      |
+| E     | Creator 채널 소유권 인증 + Featured 심사 엔진 (6시간 자동 재심사)  | 예정      |
+| F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어       | 예정      |
+| G     | Discord 서버 등록/검색/관리 페이지                                 | 예정      |
+| H     | Discord 길드-로컬 XP, 서버 랭킹, 다중 길드 중복 방지                | 예정      |
+| I     | 계정 통합 회귀 테스트, 최종 문서화, 프로덕션 검증                  | 예정      |
+
+세부 정책(XP 지급/상한/멱등성, 레벨 공식, 도전과제 목록)은 `docs/PROGRESSION.md`를 참고하세요.
+
+### Discord Integration Foundation (HTTP Interactions) — Phase F~H 상세
 
 - **아키텍처 (v1)**: `discord.js` 상시 Gateway / VM / Docker 데몬 없이 **HTTP Interactions** 베이스.
   - Discord App → HTTP Interactions → Hono Worker → GAMEMOA 애플리케이션 서비스 → D1
