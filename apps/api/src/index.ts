@@ -6,6 +6,8 @@ import { scoresRouter } from "./routes/scores.js";
 import { personalizationRouter } from "./routes/personalization.js";
 import { progressionRouter } from "./routes/progression.js";
 import { profileRouter } from "./routes/profile.js";
+import { discordRouter } from "./routes/discordInteractions.js";
+import { discordLinkRouter } from "./routes/discordLink.js";
 import type { ApiEnv } from "./routes/auth.js";
 
 const app = new Hono<ApiEnv>();
@@ -76,6 +78,8 @@ app.route("/api/scores", scoresRouter);
 app.route("/api/personalization", personalizationRouter);
 app.route("/api/progression", progressionRouter);
 app.route("/api/profile", profileRouter);
+app.route("/api/discord", discordRouter);
+app.route("/api/discord", discordLinkRouter);
 
 // 404 Handler
 app.notFound((c) => {

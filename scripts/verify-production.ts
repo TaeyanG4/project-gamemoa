@@ -13,6 +13,7 @@ const ROUTES_TO_CHECK = [
   "/games",
   "/ranking",
   "/profile",
+  "/discord/link",
   "/games/reaction-time",
   "/games/memory-test",
   "/games/aim-test",

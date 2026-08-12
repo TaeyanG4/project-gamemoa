@@ -6,6 +6,7 @@ import {
   D1AccountMergeRepository,
   D1ProgressionRepository,
   D1AchievementRepository,
+  D1DiscordLinkRepository,
 } from "@gamemoa/db";
 import {
   ScoreUseCases,
@@ -15,6 +16,7 @@ import {
   ProgressionUseCases,
   AchievementUseCases,
   ProfileUseCases,
+  DiscordLinkUseCases,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -22,6 +24,7 @@ import {
   type AccountMergeRepository,
   type ProgressionRepository,
   type AchievementRepository,
+  type DiscordLinkRepository,
 } from "@gamemoa/core";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -33,6 +36,7 @@ export interface AppContainer {
   accountMergeRepo: AccountMergeRepository;
   progressionRepo: ProgressionRepository;
   achievementRepo: AchievementRepository;
+  discordLinkRepo: DiscordLinkRepository;
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
   identityUseCases: IdentityUseCases;
@@ -40,6 +44,7 @@ export interface AppContainer {
   progressionUseCases: ProgressionUseCases;
   achievementUseCases: AchievementUseCases;
   profileUseCases: ProfileUseCases;
+  discordLinkUseCases: DiscordLinkUseCases;
 }
 
 export function createContainer(db: D1Database): AppContainer {
@@ -50,6 +55,7 @@ export function createContainer(db: D1Database): AppContainer {
   const accountMergeRepo = new D1AccountMergeRepository(db);
   const progressionRepo = new D1ProgressionRepository(db);
   const achievementRepo = new D1AchievementRepository(db);
+  const discordLinkRepo = new D1DiscordLinkRepository(db);
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -58,6 +64,7 @@ export function createContainer(db: D1Database): AppContainer {
   const progressionUseCases = new ProgressionUseCases(progressionRepo);
   const achievementUseCases = new AchievementUseCases(achievementRepo);
   const profileUseCases = new ProfileUseCases(userRepo);
+  const discordLinkUseCases = new DiscordLinkUseCases(discordLinkRepo);
 
   return {
     userRepo,
@@ -67,6 +74,7 @@ export function createContainer(db: D1Database): AppContainer {
     accountMergeRepo,
     progressionRepo,
     achievementRepo,
+    discordLinkRepo,
     scoreUseCases,
     personalizationUseCases,
     identityUseCases,
@@ -74,6 +82,7 @@ export function createContainer(db: D1Database): AppContainer {
     progressionUseCases,
     achievementUseCases,
     profileUseCases,
+    discordLinkUseCases,
   };
 }
 

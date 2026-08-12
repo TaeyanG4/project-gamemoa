@@ -215,3 +215,28 @@ export interface AchievementRepository {
   /** Idempotent: `unlocked` is false if the code was already unlocked for this user. */
   unlockAchievement(userId: number, code: string): Promise<{ unlocked: boolean }>;
 }
+
+// ---------------------------------------------------------------------------
+// Discord account-linking challenges (/gamemoa link)
+// ---------------------------------------------------------------------------
+
+export interface DiscordLinkChallenge {
+  discordUserId: string;
+  discordUsername: string;
+  createdAt: string;
+  expiresAt: string;
+  consumedAt: string | null;
+}
+
+export interface DiscordLinkRepository {
+  /** Generates a random single-use token internally, persists only its hash, and returns
+   * the raw token (shown to the Discord user exactly once, inside an ephemeral message). */
+  createChallenge(input: {
+    discordUserId: string;
+    discordUsername: string;
+    ttlSeconds: number;
+  }): Promise<{ token: string; expiresAt: string }>;
+  /** Looks up by the raw token; the repository hashes internally to match stored data. */
+  findChallengeByToken(token: string): Promise<DiscordLinkChallenge | null>;
+  consumeChallengeByToken(token: string): Promise<void>;
+}

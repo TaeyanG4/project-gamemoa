@@ -51,6 +51,8 @@ export type ApiEnv = {
     DISCORD_CLIENT_ID?: string;
     DISCORD_CLIENT_SECRET?: string;
     DISCORD_REDIRECT_URI?: string;
+    /** Discord application's public key (non-secret), used to verify Interaction signatures. */
+    DISCORD_PUBLIC_KEY?: string;
     FRONTEND_URL?: string;
     COMMIT_SHA?: string;
   };

@@ -6,4 +6,5 @@ export default [
   route("games/:slug", "routes/game-slug.tsx"),
   route("ranking", "routes/ranking.tsx"),
   route("profile", "routes/profile.tsx"),
+  route("discord/link", "routes/discordLink.tsx"),
 ] satisfies RouteConfig;
