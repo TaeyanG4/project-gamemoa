@@ -1,16 +1,33 @@
 import { z } from "zod";
 
-export const LeaderRecordSchema = z.object({
-  id: z.union([z.string(), z.number()]).transform((val) => String(val)),
-  playerName: z.string(),
-  gameId: z.string().optional(),
-  gameTitle: z.string().optional(),
-  score: z.number(),
-  formattedScore: z.string(),
-  grade: z.string().optional(),
-  createdAt: z.string(),
-  avatarUrl: z.string().nullable().optional(),
-});
+export const LeaderRecordSchema = z
+  .object({
+    id: z.union([z.string(), z.number()]),
+    playerName: z.string().optional(),
+    nickname: z.string().optional(),
+    gameId: z.string().optional(),
+    game_id: z.string().optional(),
+    gameTitle: z.string().optional(),
+    score: z.number(),
+    formattedScore: z.string().optional(),
+    grade: z.string().optional(),
+    createdAt: z.string().optional(),
+    created_at: z.string().optional(),
+    avatarUrl: z.string().nullable().optional(),
+    avatar_url: z.string().nullable().optional(),
+  })
+  .transform((data) => ({
+    id: String(data.id),
+    playerName: data.playerName || data.nickname || "게스트",
+    gameId: data.gameId || data.game_id || "all",
+    gameTitle: data.gameTitle,
+    score: data.score,
+    formattedScore: data.formattedScore || `${data.score}`,
+    grade: data.grade,
+    createdAt: data.createdAt || data.created_at || "",
+    avatarUrl: data.avatarUrl || data.avatar_url || null,
+  }));
+
 export type LeaderRecord = z.infer<typeof LeaderRecordSchema>;
 
 export const LeaderboardResponseSchema = z.object({
@@ -18,4 +35,5 @@ export const LeaderboardResponseSchema = z.object({
   gameId: z.string().optional(),
   leaderboard: z.array(LeaderRecordSchema),
 });
+
 export type LeaderboardResponse = z.infer<typeof LeaderboardResponseSchema>;

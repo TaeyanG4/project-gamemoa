@@ -10,7 +10,7 @@ export const manifest: GameManifest = {
     "영문 단어를 입력하며 자신의 타자 속도(WPM)와 분당 타수(CPM), 정확도를 측정해보세요. 정교한 타자 타이핑 실력에 도전하세요.",
   modes: ["single"] as const,
   status: "published",
-  categories: ["typing", "popular"],
+  categories: ["typing", "brain", "popular"],
   tags: ["타자", "WPM", "속도", "순발력", "두뇌"],
   minPlayers: 1,
   maxPlayers: 1,

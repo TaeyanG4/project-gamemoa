@@ -1,13 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
-import { Trophy, Medal } from "lucide-react";
-import { MOCK_LEADERBOARD, fetchLeaderboardApi } from "../features/scores/api";
-import type { LeaderRecord } from "@gamemoa/shared";
+import { useState, useEffect, useCallback } from "react";
+import { Trophy, Medal, AlertCircle, RefreshCw } from "lucide-react";
+import { fetchLeaderboardApi } from "../features/scores/api";
+import type { LeaderRecord } from "@gamemoa/contracts";
 import { gameManifests } from "../features/catalog/registry";
-
-function filterLeaderboard(records: LeaderRecord[], gameId?: string): LeaderRecord[] {
-  if (!gameId || gameId === "all") return records;
-  return records.filter((rec) => rec.gameId === gameId);
-}
 
 export function meta() {
   return [
@@ -16,40 +11,31 @@ export function meta() {
   ];
 }
 
+type LeaderboardState = "loading" | "success" | "error";
+
 export default function Ranking() {
   const [selectedGameId, setSelectedGameId] = useState<string>("all");
-  const [apiRecords, setApiRecords] = useState<LeaderRecord[] | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [records, setRecords] = useState<LeaderRecord[]>([]);
+  const [status, setStatus] = useState<LeaderboardState>("loading");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const loadData = useCallback(async (gameId: string) => {
+    setStatus("loading");
+    setErrorMsg(null);
+    try {
+      const data = await fetchLeaderboardApi(gameId);
+      setRecords(data);
+      setStatus("success");
+    } catch (err) {
+      console.error("Failed to load leaderboard:", err);
+      setErrorMsg("랭킹 정보를 불러오지 못했습니다.");
+      setStatus("error");
+    }
+  }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
-
-    async function loadData() {
-      const records = await fetchLeaderboardApi(selectedGameId);
-      if (isMounted) {
-        if (records.length > 0) {
-          setApiRecords(records);
-        } else {
-          setApiRecords(null);
-        }
-        setIsLoading(false);
-      }
-    }
-
-    void loadData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedGameId]);
-
-  const displayRecords = useMemo(() => {
-    if (apiRecords && apiRecords.length > 0) {
-      return apiRecords;
-    }
-    return filterLeaderboard(MOCK_LEADERBOARD, selectedGameId);
-  }, [apiRecords, selectedGameId]);
+    void loadData(selectedGameId);
+  }, [selectedGameId, loadData]);
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-7xl mx-auto flex-1 select-none">
@@ -109,14 +95,42 @@ export default function Ranking() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50 text-sm font-medium text-text-primary">
-              {isLoading ? (
+              {status === "loading" && (
                 <tr>
                   <td colSpan={5} className="py-16 text-center text-text-muted animate-pulse">
                     랭킹 정보를 불러오는 중...
                   </td>
                 </tr>
-              ) : (
-                displayRecords.map((record, index) => {
+              )}
+
+              {status === "error" && (
+                <tr>
+                  <td colSpan={5} className="py-16 text-center text-text-muted">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <AlertCircle className="w-8 h-8 text-accent-red" />
+                      <p className="font-semibold text-text-primary">{errorMsg}</p>
+                      <button
+                        onClick={() => void loadData(selectedGameId)}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-surface-raised border border-border rounded-xl text-xs font-bold hover:bg-surface-overlay transition-colors cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        다시 시도
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {status === "success" && records.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-16 text-center text-text-muted">
+                    아직 등록된 기록이 없습니다. 첫 기록의 주인공이 되어보세요.
+                  </td>
+                </tr>
+              )}
+
+              {status === "success" &&
+                records.map((record, index) => {
                   const rank = index + 1;
 
                   return (
@@ -175,16 +189,7 @@ export default function Ranking() {
                       </td>
                     </tr>
                   );
-                })
-              )}
-
-              {!isLoading && displayRecords.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="py-16 text-center text-text-muted">
-                    등록된 기록이 없습니다.
-                  </td>
-                </tr>
-              )}
+                })}
             </tbody>
           </table>
         </div>

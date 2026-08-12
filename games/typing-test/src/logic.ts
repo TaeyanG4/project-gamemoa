@@ -45,14 +45,33 @@ export function calculateAccuracy(correctChars: number, totalTypedChars: number)
 }
 
 export function calculateTypingResult(
-  targetText: string,
-  typedText: string,
+  cumulativeCorrect: number,
+  cumulativeIncorrect: number,
+  cumulativeTyped: number,
   elapsedMs: number,
 ): TypingResult {
   const safeElapsed = Math.max(1, elapsedMs);
+  const scoreWpm = calculateWpm(cumulativeCorrect, safeElapsed);
+  const cpm = calculateCpm(cumulativeTyped, safeElapsed);
+  const accuracy = calculateAccuracy(cumulativeCorrect, cumulativeTyped);
+
+  return {
+    scoreWpm,
+    cpm,
+    accuracy,
+    correctChars: cumulativeCorrect,
+    incorrectChars: cumulativeIncorrect,
+    totalTypedChars: cumulativeTyped,
+    durationMs: safeElapsed,
+  };
+}
+
+export function computeSegmentStats(
+  targetText: string,
+  typedText: string,
+): { correctChars: number; incorrectChars: number; totalTypedChars: number } {
   let correctChars = 0;
   let incorrectChars = 0;
-
   const len = typedText.length;
   for (let i = 0; i < len; i++) {
     if (typedText[i] === targetText[i]) {
@@ -61,18 +80,9 @@ export function calculateTypingResult(
       incorrectChars++;
     }
   }
-
-  const scoreWpm = calculateWpm(correctChars, safeElapsed);
-  const cpm = calculateCpm(typedText.length, safeElapsed);
-  const accuracy = calculateAccuracy(correctChars, typedText.length);
-
   return {
-    scoreWpm,
-    cpm,
-    accuracy,
     correctChars,
     incorrectChars,
-    totalTypedChars: typedText.length,
-    durationMs: safeElapsed,
+    totalTypedChars: len,
   };
 }

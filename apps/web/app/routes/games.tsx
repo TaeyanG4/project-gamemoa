@@ -28,10 +28,7 @@ export default function Games() {
         game.shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCategory =
-        selectedCategory === "all" ||
-        selectedCategory === "popular" ||
-        (selectedCategory === "reaction" && game.slug.includes("reaction")) ||
-        (selectedCategory === "brain" && game.modes.includes("single"));
+        selectedCategory === "all" || game.categories.includes(selectedCategory);
 
       return matchesSearch && matchesCategory;
     });

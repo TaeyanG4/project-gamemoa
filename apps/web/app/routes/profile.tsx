@@ -20,7 +20,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      void fetchUserBestsApi().then(setServerBests);
+      void fetchUserBestsApi()
+        .then(setServerBests)
+        .catch(() => setServerBests({}));
     }
   }, [isAuthenticated, user]);
 
@@ -116,17 +118,6 @@ export default function ProfilePage() {
             const localBest = getLocalBestScore(game.slug);
             const serverBest = serverBests[game.slug] ?? null;
 
-            const lowerIsBetter = game.scoreConfig?.direction === "asc";
-
-            let best: number | null = null;
-            if (serverBest !== null && localBest !== null) {
-              best = lowerIsBetter
-                ? Math.min(serverBest, localBest)
-                : Math.max(serverBest, localBest);
-            } else {
-              best = serverBest ?? localBest;
-            }
-
             return (
               <div
                 key={game.slug}
@@ -142,11 +133,19 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-xs text-text-muted block">최고 기록</span>
-                  <span className="font-black text-brand-light text-base">
-                    {best !== null ? formatScore(best, game.scoreConfig) : "기록 없음"}
-                  </span>
+                <div className="flex flex-col items-end gap-1 text-right">
+                  <div>
+                    <span className="text-[10px] text-text-muted font-bold mr-1.5">계정 기록:</span>
+                    <span className="font-black text-brand-light text-sm">
+                      {serverBest !== null ? formatScore(serverBest, game.scoreConfig) : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-text-muted font-bold mr-1.5">기기 기록:</span>
+                    <span className="font-bold text-text-secondary text-xs">
+                      {localBest !== null ? formatScore(localBest, game.scoreConfig) : "-"}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

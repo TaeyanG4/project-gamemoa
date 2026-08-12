@@ -5,6 +5,7 @@ import {
   calculateCpm,
   calculateAccuracy,
   calculateTypingResult,
+  computeSegmentStats,
   getRandomPassage,
 } from "../src/logic.js";
 
@@ -34,11 +35,17 @@ test("calculateAccuracy calculates percentage accurately", () => {
   assert.equal(calculateAccuracy(0, 0), 100);
 });
 
-test("calculateTypingResult calculates full result object with incorrect character detection", () => {
+test("computeSegmentStats detects correct and incorrect characters", () => {
   const target = "hello world";
-  const typed = "hello wordd"; // 10 chars, 9 correct, 1 incorrect ('d' instead of 'l')
+  const typed = "hello wordd"; // 11 chars: 10 correct ('h','e','l','l','o',' ','w','o','r','d'), 1 incorrect ('d' vs 'l')
+  const stats = computeSegmentStats(target, typed);
+  assert.equal(stats.totalTypedChars, 11);
+  assert.equal(stats.correctChars, 10);
+  assert.equal(stats.incorrectChars, 1);
+});
 
-  const result = calculateTypingResult(target, typed, 60000);
+test("calculateTypingResult calculates full result object with cumulative stats", () => {
+  const result = calculateTypingResult(10, 1, 11, 60000);
   assert.equal(result.totalTypedChars, 11);
   assert.equal(result.correctChars, 10);
   assert.equal(result.incorrectChars, 1);

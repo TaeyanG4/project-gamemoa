@@ -8,7 +8,7 @@ export const manifest: GameManifest = {
   description: "초록색 화면이 나타나는 순간 최대한 빨리 클릭하세요. 당신의 반응속도를 측정합니다.",
   modes: ["single"] as const,
   status: "published",
-  categories: ["반응", "측정"],
+  categories: ["reaction", "popular"],
   tags: ["반응속도", "클릭", "타이밍"],
   minPlayers: 1,
   maxPlayers: 1,

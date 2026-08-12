@@ -13,26 +13,20 @@ export function meta() {
   ];
 }
 
+const FEATURED_SLUG = "reaction-time";
+
 export default function Home() {
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get("category") || "all";
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
-  const featuredGame = gameManifests[0];
+  const featuredGame = useMemo(() => {
+    return gameManifests.find((g) => g.slug === FEATURED_SLUG) ?? gameManifests[0];
+  }, []);
 
   const filteredGames = useMemo(() => {
     if (selectedCategory === "all") return gameManifests;
-    if (selectedCategory === "popular") return gameManifests;
-    if (selectedCategory === "reaction") {
-      return gameManifests.filter((g) => g.modes.includes("single") || g.slug.includes("reaction"));
-    }
-    if (selectedCategory === "brain") {
-      return gameManifests.filter((g) => g.modes.includes("single"));
-    }
-    if (selectedCategory === "arcade") {
-      return gameManifests;
-    }
-    return gameManifests;
+    return gameManifests.filter((game) => game.categories.includes(selectedCategory));
   }, [selectedCategory]);
 
   return (

@@ -1,0 +1,76 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { LeaderboardResponseSchema, LeaderRecordSchema } from "@gamemoa/contracts";
+import { gameManifests } from "../features/catalog/registry.js";
+
+describe("Product Integrity & Web API Contracts", () => {
+  it("LeaderRecordSchema correctly normalizes snake_case and camelCase items", () => {
+    const rawBackendItem = {
+      id: 101,
+      nickname: "ProPlayer",
+      game_id: "reaction-time",
+      score: 180,
+      formattedScore: "180 ms",
+      created_at: "2026-08-12",
+      avatar_url: "https://example.com/avatar.png",
+    };
+
+    const parsed = LeaderRecordSchema.parse(rawBackendItem);
+    assert.equal(parsed.id, "101");
+    assert.equal(parsed.playerName, "ProPlayer");
+    assert.equal(parsed.gameId, "reaction-time");
+    assert.equal(parsed.score, 180);
+    assert.equal(parsed.formattedScore, "180 ms");
+    assert.equal(parsed.avatarUrl, "https://example.com/avatar.png");
+  });
+
+  it("LeaderboardResponseSchema validates real empty array and records without throwing", () => {
+    const emptyResponse = {
+      game_id: "all",
+      leaderboard: [],
+    };
+    const parsedEmpty = LeaderboardResponseSchema.safeParse(emptyResponse);
+    assert.equal(parsedEmpty.success, true);
+    if (parsedEmpty.success) {
+      assert.equal(parsedEmpty.data.leaderboard.length, 0);
+    }
+
+    const recordsResponse = {
+      game_id: "memory-test",
+      leaderboard: [
+        {
+          id: "201",
+          playerName: "BrainMaster",
+          gameId: "memory-test",
+          score: 15,
+          formattedScore: "Level 15",
+          createdAt: "2026-08-12",
+        },
+      ],
+    };
+    const parsedRecords = LeaderboardResponseSchema.safeParse(recordsResponse);
+    assert.equal(parsedRecords.success, true);
+    if (parsedRecords.success) {
+      assert.equal(parsedRecords.data.leaderboard.length, 1);
+      assert.equal(parsedRecords.data.leaderboard[0]?.playerName, "BrainMaster");
+    }
+  });
+
+  it("Catalog category filtering strictly uses manifest.categories", () => {
+    const reactionGames = gameManifests.filter((g) => g.categories.includes("reaction"));
+    const reactionSlugs = reactionGames.map((g) => g.slug);
+    assert.ok(reactionSlugs.includes("reaction-time"));
+    assert.ok(reactionSlugs.includes("aim-test"));
+
+    const brainGames = gameManifests.filter((g) => g.categories.includes("brain"));
+    const brainSlugs = brainGames.map((g) => g.slug);
+    assert.ok(brainSlugs.includes("memory-test"));
+    assert.ok(brainSlugs.includes("typing-test"));
+
+    const typingGames = gameManifests.filter((g) => g.categories.includes("typing"));
+    assert.deepEqual(
+      typingGames.map((g) => g.slug),
+      ["typing-test"],
+    );
+  });
+});

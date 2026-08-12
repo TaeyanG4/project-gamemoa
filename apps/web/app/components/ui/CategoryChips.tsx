@@ -1,4 +1,4 @@
-import { Flame, Sparkles, Zap, Brain, Gamepad2, Bookmark } from "lucide-react";
+import { Flame, Sparkles, Zap, Brain, Target, Keyboard, Bookmark } from "lucide-react";
 
 export interface CategoryOption {
   id: string;
@@ -11,7 +11,8 @@ export const CATEGORIES: CategoryOption[] = [
   { id: "popular", label: "인기", icon: Sparkles },
   { id: "reaction", label: "순발력", icon: Zap },
   { id: "brain", label: "두뇌", icon: Brain },
-  { id: "arcade", label: "아케이드", icon: Gamepad2 },
+  { id: "aim", label: "에임", icon: Target },
+  { id: "typing", label: "타자", icon: Keyboard },
   { id: "favorites", label: "즐겨찾기", icon: Bookmark },
 ];
 

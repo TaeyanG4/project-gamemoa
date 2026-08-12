@@ -9,7 +9,7 @@ export const manifest: GameManifest = {
     "무작위로 생성되는 31개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
   modes: ["single"] as const,
   status: "published",
-  categories: ["aim", "popular"],
+  categories: ["aim", "reaction", "popular"],
   tags: ["에임", "조준", "반응속도", "클릭"],
   minPlayers: 1,
   maxPlayers: 1,

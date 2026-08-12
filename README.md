@@ -18,12 +18,13 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
 - 🎮 **게이머 필수 테스트 미니게임 컬렉션**:
   - ⏱️ **반응속도 테스트 (Reaction Time)**: 밀리초(ms) 단위 반응속도 측정 및 S~F 등급 판정
   - 🧠 **순서 기억력 테스트 (Memory Test)**: 패턴 시퀀스 암기 및 최고 레벨 도전
-  - 🎯 **에임 테스트 (Aim Test)**: 30개 무작위 타겟 정밀 타격 반응속도 측정 (반응형 아레나 지원)
+  - 🎯 **에임 테스트 (Aim Test)**: 31개 무작위 타겟 정밀 타격 반응속도 측정 (반응형 아레나 지원)
+  - ⌨️ **타자 속도 테스트 (Typing Test)**: 60초간 연속 문장 입력 및 WPM/CPM/정확도 실시간 측정
 - 🧩 **Game Plugin Architecture**:
   - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
 - 🛡️ **Clean Monorepo & Architecture Guard**:
   - `packages/core` (Domain, Application, Ports), `packages/db` (Cloudflare D1 Persistence), `@gamemoa/contracts` (Single Source of Truth Schemas)
-  - CI 자동화 Architecture Guard (`pnpm architecture:check`, `pnpm registry:check`)로 레이어 위반 및 생성 파일 이탈 자동 차단
+  - CI 자동화 Architecture Guard (`pnpm verify`, `pnpm architecture:check`, `pnpm registry:check`)로 레이어 위반 및 생성 파일 이탈 자동 차단
 - ☁️ **Cloudflare Free Tier Production Architecture**:
   - **Hono + Cloudflare Workers**: 고성능 서버리스 API 백엔드
   - **Cloudflare D1**: 글로벌 에지 데이터베이스 (유저, 세션, 게임 점수, 랭킹)
@@ -78,6 +79,9 @@ pnpm --filter @gamemoa/api dev
 ## 🛠️ 검증 및 빌드 스크립트 (Scripts)
 
 ```bash
+# 단일 통합 품질 게이트 (락파일, 포맷, 아키텍처, 레지스트리, 린트, 타입, 테스트, 빌드)
+pnpm verify
+
 # 코드 포맷 및 린트 검사
 pnpm format:check
 pnpm lint
@@ -110,7 +114,7 @@ pnpm build
 | **Backend**           | Hono, TypeScript, Zod Validation                               |
 | **Database**          | Cloudflare D1 (SQL) & Repository Abstraction Layer             |
 | **Auth**              | Google OAuth (GIS), Discord OAuth 2.0, HttpOnly Cookie Session |
-| **Runtime / Hosting** | Cloudflare Workers & Cloudflare Pages / Static Assets          |
+| **Runtime / Hosting** | Cloudflare Workers & Cloudflare Workers Static Assets          |
 | **CI/CD**             | GitHub Actions & Wrangler CLI                                  |
 | **Monorepo**          | pnpm workspaces, Turborepo                                     |
 
@@ -126,7 +130,8 @@ gamemoa/
 ├── games/
 │   ├── reaction-time/         # 반응속도 테스트 게임 (@gamemoa/game-reaction-time)
 │   ├── memory-test/           # 순서 기억력 테스트 게임 (@gamemoa/game-memory-test)
-│   └── aim-test/              # 에임 테스트 게임 (@gamemoa/game-aim-test)
+│   ├── aim-test/              # 에임 테스트 게임 (@gamemoa/game-aim-test)
+│   └── typing-test/           # 타자 속도 테스트 게임 (@gamemoa/game-typing-test)
 ├── packages/
 │   ├── contracts/             # Zod 요청/응답 스키마 & API Single Source of Truth
 │   ├── core/                  # Pure Domain, Application Use Cases & Ports (No Infra/Browser deps)
@@ -153,7 +158,7 @@ GAMEMOA는 **GitHub Actions**와 **Wrangler CLI**를 통해 Cloudflare Workers�
 ```text
 git push origin main
   └─► GitHub Actions CI (frozen install ➔ format ➔ lint ➔ architecture ➔ registry ➔ typecheck ➔ test ➔ build)
-        └─► GitHub Actions CD (D1 Migration ➔ API Worker 배포 ➔ API Health Check ➔ Web Worker 배포 ➔ Web Smoke Check)
+        └─► GitHub Actions CD (D1 Migration ➔ API Worker 배포 ➔ API Health Check ➔ Web Worker 배포 ➔ Web Smoke Check ➔ Provenance Check)
 ```
 
 ---
