@@ -294,13 +294,25 @@ function GoogleStepUpPanel({
         <p className="flex items-center gap-2 text-xs font-semibold text-accent-red">
           <ShieldAlert className="h-4 w-4" /> Google 설정 누락 — 관리자에게 문의해주세요.
         </p>
-      ) : !scriptReady ? (
-        <p className="flex items-center gap-2 text-xs font-semibold text-text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> Google 스크립트 로딩 중...
-        </p>
       ) : (
+        // The container is always mounted (never conditionally rendered behind `scriptReady`)
+        // so `containerRef.current` is already non-null by the time the effect above runs its
+        // very first check. Gating this div's presence on `scriptReady` instead — as an earlier
+        // version of this component did — created a race: when the async GIS script (loaded by
+        // root.tsx on every page) has already finished loading before this component mounts,
+        // `tryInit` calls `setScriptReady(true)` and, in that same synchronous tick, immediately
+        // checks `containerRef.current` — which was still null because React hadn't yet
+        // committed the render that would have mounted this div. `renderButton` was silently
+        // skipped and never retried, leaving a permanently empty box with no error and no
+        // loading text (exactly what an admin visiting a second time — GIS already warm from an
+        // earlier page — would see).
         <div className="relative flex min-h-[44px] items-center justify-center">
-          <div ref={containerRef} />
+          <div ref={containerRef} className={scriptReady ? undefined : "invisible"} />
+          {!scriptReady && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 text-xs font-semibold text-text-muted">
+              <Loader2 className="h-4 w-4 animate-spin" /> Google 스크립트 로딩 중...
+            </div>
+          )}
           {verifying && (
             <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-full bg-surface-raised/90 text-xs font-bold text-text-muted">
               <Loader2 className="h-4 w-4 animate-spin" /> 확인 중...
