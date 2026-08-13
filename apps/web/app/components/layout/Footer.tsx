@@ -22,7 +22,7 @@ export function Footer() {
 
         <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-text-secondary">
           <a
-            href="https://github.com/TaeyanG4/project-gamemoa"
+            href="https://github.com/TaeyanG4/project-owogg"
             target="_blank"
             rel="noreferrer"
             className="hover:text-text-primary transition-colors"
