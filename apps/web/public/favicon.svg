@@ -6,16 +6,23 @@
     </linearGradient>
   </defs>
   <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#bg)" />
-  <!-- Gamepad mark — matches the site header/sidebar/footer's Gamepad2 badge -->
-  <g fill="#f1f5f9">
-    <rect x="108" y="200" width="296" height="122" rx="52" ry="52" />
-    <circle cx="160" cy="318" r="62" />
-    <circle cx="352" cy="318" r="62" />
-  </g>
-  <g fill="#a855f7">
-    <rect x="168" y="240" width="48" height="22" rx="6" ry="6" />
-    <rect x="181" y="227" width="22" height="48" rx="6" ry="6" />
-    <circle cx="328" cy="270" r="15" />
-    <circle cx="368" cy="230" r="15" />
+  <!-- lucide-react's actual Gamepad2 icon (24x24 viewBox), unmodified — the exact icon
+       live-rendered by Header/Sidebar/Footer, not a redrawn approximation. translate(64,64)
+       scale(16) centers and fits it into this 512 canvas at the same proportions as the
+       header badge (icon ~5/9 of its box). stroke-width stays "2" (Lucide's native value) —
+       the scale transform grows it proportionally, exactly like the live <Gamepad2> render. -->
+  <g
+    transform="translate(64,64) scale(16)"
+    fill="none"
+    stroke="#ffffff"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z" />
+    <line x1="6" x2="10" y1="11" y2="11" />
+    <line x1="8" x2="8" y1="9" y2="13" />
+    <line x1="15" x2="15.01" y1="12" y2="12" />
+    <line x1="18" x2="18.01" y1="10" y2="10" />
   </g>
 </svg>
