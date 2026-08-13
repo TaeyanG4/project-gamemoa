@@ -188,9 +188,81 @@ are not supported (requested 210000).
 
 - [x] `pnpm verify` 전체 GREEN.
 - [x] 코드 배포(CI → Deploy → provenance 일치 → `pnpm smoke:prod`) 완료.
-- [ ] **운영자가 새 임시 비밀번호로 실제 로그인 성공을 아직 확인하지 못한 상태** — 다음 세션
-      시작 시 가장 먼저 확인 필요. 만약 여전히 실패한다면 `wrangler tail`로 다시 실시간 로그를
-      확인하는 것이 정답에 가장 빨리 도달하는 방법(이번에도 그렇게 원인을 찾았음).
+- [x] **운영자가 새 임시 비밀번호로 실제 로그인 성공 확인** — `wrangler tail`에서
+      `POST /api/admin/auth/login 200`, 이어서 `POST /api/admin/settings/password 200`(강제
+      비밀번호 변경)까지 정상 흐름 확인. 관리자 계정 시스템이 이번에 최초로 실제 프로덕션에서
+      끝까지 동작함.
+
+---
+
+## 완료 (같은 세션 — Discord 봇 실사용 준비: 설치 링크/명령어 등록/Interactions Endpoint 진단, 아이콘 통일)
+
+운영자가 `/discord/setup` 가이드를 실제로 따라해보며 3가지 문제를 보고: (1) 1단계 설치 링크가
+안 보임, (2) `/gamemoa` 명령어가 전혀 동작하지 않고 서버 멤버 목록에 봇 자체가 안 보임,
+(3) 명령어를 등록한 뒤에도 "애플리케이션이 응답하지 않았어요" 에러.
+
+### 1) 설치 링크 + Bot Token 발급 → 테스트 서버에 즉시 명령어 등록
+
+- `GET /api/discord/status` 확인 결과 `DISCORD_PUBLIC_KEY`는 설정되어 있었지만
+  `installUrl: null` — `DISCORD_INSTALL_URL` 미설정이 원인.
+- 운영자가 Developer Portal에서 설치 링크(공개값, 안전하게 채팅으로 공유 가능)와 Bot Token(민감값)을
+  발급. Bot Token은 운영자가 로컬 `setx`로 직접 설정 — 채팅에는 절대 노출하지 않음.
+  - **주의**: `setx`는 레지스트리(`HKCU\Environment`)에만 기록되고 이미 떠 있는 프로세스에는
+    반영되지 않는다 — `$env:VAR`로 확인하면 안 보이는 게 정상. `[Environment]::GetEnvironmentVariable(name,"User")`로
+    레지스트리를 직접 읽어 값이 실제로 설정됐는지(내용은 노출하지 않고 길이만) 확인하는 방식을
+    사용.
+- `DISCORD_INSTALL_URL`을 GitHub Variable로 설정 → CI 재실행(`gh run rerun`)으로 재배포 →
+  `/api/discord/status`에서 반영 확인.
+- `pnpm discord:commands:register:guild`를 운영자의 테스트 길드에 실행 — 토큰은 PowerShell
+  세션 안에서만 로드했다가 사용 직후 `Remove-Item Env:\DISCORD_BOT_TOKEN`으로 즉시 제거. 길드
+  전용 등록이라 전역 전파 대기 없이 즉시 사용 가능.
+- 이후 향후 배포마다 전역 명령어가 자동 동기화되도록 `DISCORD_COMMAND_SYNC_ENABLED=true`도 설정
+  (배포 워크플로의 "Sync Discord Commands" 잡이 이 값으로 게이트됨 — `DISCORD_BOT_TOKEN`
+  시크릿은 이미 설정됨).
+
+### 2) "애플리케이션이 응답하지 않았어요" — Interactions Endpoint URL 미등록
+
+명령어 등록 후에도 실행 시 에러. `wrangler tail`로 확인한 결과 **`POST /api/discord/interactions`
+요청 자체가 로그에 단 한 번도 찍히지 않음** — 즉 Discord가 애초에 우리 서버로 요청을 보낸 적이
+없었습니다. `DISCORD_PUBLIC_KEY`가 서버에 설정된 것과, Developer Portal의 "Interactions Endpoint
+URL" 필드에 실제 주소를 입력해 저장하는 것은 별개의 단계인데 후자가 누락되어 있었습니다.
+운영자에게 `https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions`를 General
+Information → Interactions Endpoint URL에 저장하도록 안내(저장 시 Discord가 즉시 PING
+검증을 하므로, PUBLIC_KEY가 이미 올바르면 바로 통과함) — **다음 세션 시작 시 실제로 명령어가
+동작하는지 확인 필요** (이 문서 작성 시점에는 아직 운영자의 재시도 결과 확인 전).
+
+### 3) 아이콘 통일 — 파비콘/PWA/앱 아이콘을 헤더의 실제 로고와 일치시킴
+
+운영자가 홈페이지 헤더(왼쪽 위, `Header.tsx`)의 실제 로고 — `bg-gradient-to-tr from-brand
+to-accent-purple` 배지 안의 흰색 `Gamepad2`(게임패드) 아이콘 — 를 보여주며 파비콘도 이것과
+통일하고, Discord 봇 아이콘도 통일해달라고 요청.
+
+- 확인해보니 **사이트에 아이콘 정체성이 두 개 존재**했음: (a) Header/Sidebar/Footer가 실제
+  라이브로 렌더링하는 Lucide `Gamepad2` + 그라데이션 배지, (b) `favicon.svg`/PNG 세트는 이와
+  무관한 "2x2 둥근 사각형 타일" 디자인(브랜드 인디고 단색 그라데이션). 셋 다(Header/Sidebar/
+  Footer) 게임패드 디자인을 쓰고 있어 이쪽이 실제 사이트 정체성으로 판단, **파비콘 쪽을 헤더에
+  맞춰 재설계**.
+- `scripts/generate-favicon.ts`(외부 이미지 라이브러리 없이 zlib+수기 CRC32로 PNG/ICO를 직접
+  인코딩하는 결정론적 생성기, 애널리틱 rounded-rect/circle 커버리지 테스트로 픽셀 채색)의
+  도형 정의를 "4개 타일"에서 "게임패드 몸체(둥근 사각+양끝 원으로 그립 표현) + D패드 십자 +
+  버튼 2개"로 교체. 그라데이션도 헤더와 동일하게 brand(#6366f1) → accent-purple(#a855f7),
+  방향도 `to-tr`(왼쪽 아래 → 오른쪽 위)로 일치.
+- `favicon.svg`(수기 작성 원본)도 동일 도형으로 재작성, `pnpm generate:favicon`으로 전체
+  세트(16/32/48/180/192/512px PNG, ICO, site.webmanifest) 재생성 후 각 크기를 육안으로 확인
+  (16px에서도 게임패드로 인식 가능한 굵고 단순한 형태 유지).
+- 새 `favicon-512x512.png`를 Discord 앱 아이콘/봇 아바타용으로도 운영자에게 재전달 — 사이트
+  파비콘·PWA 아이콘·Discord 아이콘이 전부 동일한 이미지로 통일됨.
+- 검증: `turbo run lint typecheck test build --force` 47/47, 0 캐시 히트. 파비콘 파일을
+  참조하는 테스트 없음을 확인(존재 여부만 `pnpm smoke:prod`가 체크).
+
+### 검증
+
+- [x] `pnpm verify` 및 강제 재실행 전부 GREEN.
+- [ ] Interactions Endpoint URL 등록 후 `/gamemoa` 명령어 실제 동작 여부 — 다음 세션에서 먼저
+      확인.
+- [ ] 새 파비콘/Discord 아이콘이 실제 배포된 프로덕션과 Discord 클라이언트에 반영됐는지 육안
+      확인(배포 직후 브라우저/Discord 캐시로 인해 즉시 안 바뀌어 보일 수 있음 — 강력 새로고침
+      필요할 수 있음).
 
 ---
 
@@ -356,20 +428,25 @@ Actions 기록이 원본입니다.
 
 ## 다음 작업 (Next Action)
 
-**0순위(다음 세션 시작 시 가장 먼저 확인)**: 운영자가 재발급된 임시 비밀번호로 `/admin` 로그인에
-실제로 성공했는지 확인. 아직 확인 전 상태로 이 세션이 종료되었습니다. 만약 여전히 실패한다면
-`wrangler tail --format pretty`로 프로덕션 로그를 실시간으로 보면서 운영자에게 재시도를 요청하는
-방식이 가장 빠르게 원인에 도달합니다(이번 세션에서 두 번의 치명 버그를 모두 이 방법으로
-찾았습니다 — 추측으로 코드를 고치려 하지 말고 실제 에러 스택을 먼저 확인하세요). 로그인 성공
-후에는 강제 비밀번호 변경 화면이 뜨는지, 그 화면에서 새 비밀번호로 변경까지 정상 완료되는지도
-함께 확인.
+**0순위(다음 세션 시작 시 가장 먼저 확인)**:
 
-로그인이 확인되면: Discord 봇 기능/완성도 보완을 계속 진행(운영자에게 우선순위 확인 후 착수) →
+1. Admin 로그인 자체는 이번 세션에 실제 성공까지 확인됨(§ 위 참고) — 재확인 불필요.
+2. **Discord Interactions Endpoint URL을 운영자가 실제로 등록했는지, 등록 후 `/gamemoa`
+   명령어가 정상 동작하는지 확인.** 안 된다면 `wrangler tail --format pretty`로
+   `/api/discord/interactions`에 요청이 실제로 들어오는지부터 확인 — 요청 자체가 안 찍히면
+   Portal 설정 문제, 요청은 찍히는데 에러가 나면 코드/서명 문제. 이번 세션에서 이미 이 방법으로
+   admin 로그인 버그 2건 + Discord 미응답 원인을 전부 실제 로그로 찾았습니다 — 추측으로 코드부터
+   고치지 말고 항상 먼저 실시간 로그를 확인하세요.
+3. 새 파비콘(게임패드 디자인)이 브라우저/PWA에 정상 반영됐는지, Discord 봇 아이콘도 운영자가
+   Developer Portal에 업로드했는지 육안 확인.
+
+이 세 가지가 확인되면: Discord 봇 기능/완성도 보완을 계속 진행(운영자에게 우선순위 확인 후
+착수 — 주간 리더보드 옵션, `/gamemoa help`, 게임 선택 Autocomplete 등 후보는 위 섹션 참고) →
 i18n 번역 재개는 운영자가 명시적으로 요청할 때까지 대기 → 필요 시 Admin 흐름 UI 텍스트(표시
 문자열만, 인증/보안 로직 불변) → 필요 시 `Post-Sprint UX / SEO / Production Readiness QA`.
-Admin **로직**은 운영자가 먼저 언급하지 않는 한 건드리지 마세요 — 다만 이번 세션에서 확인했듯
-"운영자가 admin을 직접 다룬다"는 것이 "admin에 실제 버그가 있어도 못 고친다"는 뜻은 아닙니다.
-운영자가 에러를 보고하면 즉시 조사·수정하는 것이 맞습니다.
+Admin **로직**은 운영자가 먼저 언급하지 않는 한 건드리지 마세요 — 다만 "운영자가 admin을 직접
+다룬다"는 것이 "admin에 실제 버그가 있어도 못 고친다"는 뜻은 아닙니다. 운영자가 에러를 보고하면
+즉시 조사·수정하는 것이 맞습니다(이번 세션 전체가 그 실증 사례).
 
 시작 시 `git log`, `git status`, 이 문서의 "완료" 섹션으로 현재 상태를 재확인한 뒤 처음부터 다시
 설계하지 말고 이어서 진행하세요.

@@ -7,33 +7,39 @@ import { Buffer } from "node:buffer";
 // GAMEMOA favicon generator — deterministic, dependency-free.
 //
 // Canonical source: apps/web/public/favicon.svg (hand-authored).
-// This script rasterises the SAME parametric design (four mini-game tiles on a
-// brand-gradient rounded hub) into PNG / ICO fallbacks and writes a web manifest.
-// No external image-processing dependency is required: PNGs are encoded with the
-// built-in zlib + a hand-written CRC32; pixels are produced by supersampling an
-// analytic rounded-rectangle coverage test.
+// This script rasterises the SAME parametric design — a gamepad silhouette on a
+// brand-gradient rounded hub, matching the live site header/sidebar/footer's
+// Gamepad2 badge (bg-gradient-to-tr from-brand to-accent-purple) — into PNG / ICO
+// fallbacks and writes a web manifest. No external image-processing dependency is
+// required: PNGs are encoded with the built-in zlib + a hand-written CRC32; pixels
+// are produced by supersampling analytic rounded-rectangle/circle coverage tests.
 // ---------------------------------------------------------------------------
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 const OUT_DIR = resolve(REPO_ROOT, "apps/web", "public");
 const SVG_PATH = resolve(OUT_DIR, "favicon.svg");
 
-// Brand palette (must match favicon.svg)
-const BRAND = [99, 102, 241] as const; // #6366f1
-const BRAND_DARK = [79, 70, 229] as const; // #4f46e5
-const BRAND_LIGHT = [129, 140, 248] as const; // #818cf8
-const TILE_WHITE = [241, 245, 249] as const; // #f1f5f9
+// Brand palette (must match favicon.svg and apps/web/app/app.css)
+const BRAND = [99, 102, 241] as const; // --color-brand #6366f1
+const ACCENT_PURPLE = [168, 85, 247] as const; // --color-accent-purple #a855f7
+const GAMEPAD_WHITE = [241, 245, 249] as const; // #f1f5f9
 const VIEWBOX = 512;
-
-const TILES = [
-  { x: 92, y: 92, color: BRAND_LIGHT as const },
-  { x: 284, y: 92, color: TILE_WHITE as const },
-  { x: 92, y: 284, color: TILE_WHITE as const },
-  { x: 284, y: 284, color: TILE_WHITE as const },
-];
-const TILE_SIZE = 136;
-const TILE_RX = 34;
 const BG_RX = 112;
+
+// Gamepad body: a rounded-rect "plate" plus two circular grip bulges at the
+// bottom corners — the same silhouette concept as Lucide's Gamepad2 icon used
+// live across Header/Sidebar/Footer, simplified to shapes this rasteriser can
+// coverage-test analytically.
+const BODY_RECT = { x0: 108, y0: 200, x1: 404, y1: 322, r: 52 };
+const LEFT_GRIP = { cx: 160, cy: 318, r: 62 };
+const RIGHT_GRIP = { cx: 352, cy: 318, r: 62 };
+
+// D-pad (left) and two face buttons (right), drawn in accent-purple on top of
+// the white body plate.
+const DPAD_H_BAR = { x0: 168, y0: 240, x1: 216, y1: 262, r: 6 };
+const DPAD_V_BAR = { x0: 181, y0: 227, x1: 203, y1: 275, r: 6 };
+const BUTTON_A = { cx: 328, cy: 270, r: 15 };
+const BUTTON_B = { cx: 368, cy: 230, r: 15 };
 
 function insideRoundedRect(
   px: number,
@@ -55,6 +61,12 @@ function insideRoundedRect(
   return dx * dx + dy * dy <= r * r;
 }
 
+function insideCircle(px: number, py: number, cx: number, cy: number, r: number): boolean {
+  const dx = px - cx;
+  const dy = py - cy;
+  return dx * dx + dy * dy <= r * r;
+}
+
 function lerp(
   a: readonly [number, number, number],
   b: readonly [number, number, number],
@@ -68,15 +80,47 @@ function lerp(
 }
 
 function colorAt(px: number, py: number): readonly [number, number, number] {
-  const t = Math.min(1, Math.max(0, (px + py) / (VIEWBOX * 2)));
-  let color: readonly [number, number, number] = lerp(BRAND, BRAND_DARK, t);
-  for (const tile of TILES) {
-    if (
-      insideRoundedRect(px, py, tile.x, tile.y, tile.x + TILE_SIZE, tile.y + TILE_SIZE, TILE_RX)
-    ) {
-      color = tile.color;
-    }
-  }
+  // bg-gradient-to-tr: bottom-left (brand) -> top-right (accent-purple).
+  const t = Math.min(1, Math.max(0, (px + (VIEWBOX - py)) / (VIEWBOX * 2)));
+  let color: readonly [number, number, number] = lerp(BRAND, ACCENT_PURPLE, t);
+
+  const onBody =
+    insideRoundedRect(
+      px,
+      py,
+      BODY_RECT.x0,
+      BODY_RECT.y0,
+      BODY_RECT.x1,
+      BODY_RECT.y1,
+      BODY_RECT.r,
+    ) ||
+    insideCircle(px, py, LEFT_GRIP.cx, LEFT_GRIP.cy, LEFT_GRIP.r) ||
+    insideCircle(px, py, RIGHT_GRIP.cx, RIGHT_GRIP.cy, RIGHT_GRIP.r);
+  if (onBody) color = GAMEPAD_WHITE;
+
+  const onDetail =
+    insideRoundedRect(
+      px,
+      py,
+      DPAD_H_BAR.x0,
+      DPAD_H_BAR.y0,
+      DPAD_H_BAR.x1,
+      DPAD_H_BAR.y1,
+      DPAD_H_BAR.r,
+    ) ||
+    insideRoundedRect(
+      px,
+      py,
+      DPAD_V_BAR.x0,
+      DPAD_V_BAR.y0,
+      DPAD_V_BAR.x1,
+      DPAD_V_BAR.y1,
+      DPAD_V_BAR.r,
+    ) ||
+    insideCircle(px, py, BUTTON_A.cx, BUTTON_A.cy, BUTTON_A.r) ||
+    insideCircle(px, py, BUTTON_B.cx, BUTTON_B.cy, BUTTON_B.r);
+  if (onDetail) color = ACCENT_PURPLE;
+
   return color;
 }
 
