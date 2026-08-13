@@ -80,6 +80,9 @@ export type ApiEnv = {
     SOOP_CLIENT_SECRET?: string;
     SOOP_REDIRECT_URI?: string;
     USE_MOCK_CREATOR_PROVIDERS?: string;
+    /** 쉼표로 구분한, 이 배포에서 필수로 기대하는 Creator provider 목록 (예: "YOUTUBE,TWITCH").
+     * 프로덕션 readiness 게이트(scripts/verify-production.ts)가 사용하며 미설정 시 필수 provider가 없음을 의미. */
+    CREATOR_ENABLED_PROVIDERS?: string;
   };
 };
 

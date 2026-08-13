@@ -107,6 +107,54 @@
 
 ---
 
+## 5-1. 프로덕션 CI/CD 배포 설정 (GitHub Actions)
+
+Creator provider 자격 증명은 저장소 코드에 이미 완전히 배선되어 있으며(`getCreatorProviderAdapters`,
+`apps/api/src/routes/creators.ts`), 남은 것은 **운영자가 GitHub Actions에 실제 값을 등록하는 것**뿐입니다.
+`.github/workflows/deploy.yml`이 아래 이름을 Cloudflare Worker(`gamemoa-api`)로 자동 전달합니다.
+
+### GitHub Variables (`Settings` → `Secrets and variables` → `Actions` → `Variables`)
+
+공개 client ID/redirect URI는 비밀이 아니므로 Variable로 등록합니다.
+
+| 이름                        | 예시 값                                                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `YOUTUBE_CLIENT_ID`         | Google Cloud Console OAuth Client ID                                                                                  |
+| `YOUTUBE_REDIRECT_URI`      | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/youtube/callback`                                        |
+| `TWITCH_CLIENT_ID`          | Twitch Developer Console Client ID                                                                                    |
+| `TWITCH_REDIRECT_URI`       | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/twitch/callback`                                         |
+| `CHZZK_CLIENT_ID`           | Naver/Chzzk Open API Client ID                                                                                        |
+| `CHZZK_REDIRECT_URI`        | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/chzzk/callback`                                          |
+| `SOOP_CLIENT_ID`            | SOOP Developers Client ID                                                                                             |
+| `SOOP_REDIRECT_URI`         | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/soop/callback`                                           |
+| `CREATOR_ENABLED_PROVIDERS` | 이 배포에서 필수로 기대하는 provider 목록 (예: `YOUTUBE,TWITCH`). 미설정 시 모든 provider가 선택 사항으로 취급됩니다. |
+
+### GitHub Secrets (`Settings` → `Secrets and variables` → `Actions` → `Secrets`)
+
+Client secret과 API Key는 자격 증명이므로 반드시 Secret으로 등록하며, Wrangler `--var`가 아닌
+`wrangler secret put` 경로(`cloudflare/wrangler-action`의 `secrets:`)로만 전달합니다.
+
+| 이름                    | 용도                                                        |
+| ----------------------- | ----------------------------------------------------------- |
+| `YOUTUBE_CLIENT_SECRET` | YouTube OAuth token 교환                                    |
+| `YOUTUBE_API_KEY`       | YouTube 6시간 자동 재심사용 공개 지표 재조회 (OAuth와 별개) |
+| `TWITCH_CLIENT_SECRET`  | Twitch OAuth token 교환 및 App Access Token 발급            |
+| `CHZZK_CLIENT_SECRET`   | CHZZK OAuth token 교환 및 지표 재조회                       |
+| `SOOP_CLIENT_SECRET`    | SOOP OAuth token 교환                                       |
+
+### 선택적 provider 준비 상태 정책
+
+Creator provider는 선택적 통합입니다. 일부 또는 전체가 미설정이어도 GAMEMOA 핵심 배포는 계속
+진행됩니다. `CREATOR_ENABLED_PROVIDERS`를 명시적으로 설정한 provider만 프로덕션 readiness 게이트
+(`pnpm smoke:prod --api-only`, `scripts/verify-production.ts`)가 `GET /api/creators/providers`의
+`configured=false`를 배포 실패로 처리합니다. 설정하지 않은 provider는 상태만 보고하고 배포를 막지
+않습니다. `USE_MOCK_CREATOR_PROVIDERS`는 프로덕션 배포 워크플로우에서 절대 설정하지 않습니다.
+
+값을 등록하지 않은 provider의 실제 상태는 **외부 설정 대기**입니다. 저장소 코드/문서가 존재한다고
+해서 완료로 간주하지 않습니다.
+
+---
+
 ## 6. Featured Creator 심사 시스템 (Phase E2A)
 
 ### 6-1. 개념 구분

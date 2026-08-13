@@ -46,14 +46,50 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
-          command: deploy --var COMMIT_SHA:${{ github.event.workflow_run.head_sha }} GOOGLE_CLIENT_ID:${{ vars.GOOGLE_CLIENT_ID }} DISCORD_CLIENT_ID:${{ vars.DISCORD_CLIENT_ID }} DISCORD_REDIRECT_URI:${{ vars.DISCORD_REDIRECT_URI }} DISCORD_PUBLIC_KEY:${{ vars.DISCORD_PUBLIC_KEY }} DISCORD_INSTALL_URL:${{ vars.DISCORD_INSTALL_URL || '' }} FRONTEND_URL:${{ vars.FRONTEND_URL }} ADMIN_USER_IDS:${{ vars.ADMIN_USER_IDS || '' }}
+          # Creator provider client IDs/redirect URIs are non-secret and optional — GAMEMOA must
+          # still deploy when some (or all) are unconfigured (`|| ''`). Client secrets/API keys go
+          # through `secrets:` below, never `--var`.
+          command: >-
+            deploy
+            --var COMMIT_SHA:${{ github.event.workflow_run.head_sha }}
+            GOOGLE_CLIENT_ID:${{ vars.GOOGLE_CLIENT_ID }}
+            DISCORD_CLIENT_ID:${{ vars.DISCORD_CLIENT_ID }}
+            DISCORD_REDIRECT_URI:${{ vars.DISCORD_REDIRECT_URI }}
+            DISCORD_PUBLIC_KEY:${{ vars.DISCORD_PUBLIC_KEY }}
+            DISCORD_INSTALL_URL:${{ vars.DISCORD_INSTALL_URL || '' }}
+            FRONTEND_URL:${{ vars.FRONTEND_URL }}
+            ADMIN_USER_IDS:${{ vars.ADMIN_USER_IDS || '' }}
+            CREATOR_ENABLED_PROVIDERS:${{ vars.CREATOR_ENABLED_PROVIDERS || '' }}
+            YOUTUBE_CLIENT_ID:${{ vars.YOUTUBE_CLIENT_ID || '' }}
+            YOUTUBE_REDIRECT_URI:${{ vars.YOUTUBE_REDIRECT_URI || '' }}
+            TWITCH_CLIENT_ID:${{ vars.TWITCH_CLIENT_ID || '' }}
+            TWITCH_REDIRECT_URI:${{ vars.TWITCH_REDIRECT_URI || '' }}
+            CHZZK_CLIENT_ID:${{ vars.CHZZK_CLIENT_ID || '' }}
+            CHZZK_REDIRECT_URI:${{ vars.CHZZK_REDIRECT_URI || '' }}
+            SOOP_CLIENT_ID:${{ vars.SOOP_CLIENT_ID || '' }}
+            SOOP_REDIRECT_URI:${{ vars.SOOP_REDIRECT_URI || '' }}
           secrets: |
             DISCORD_CLIENT_SECRET
+            YOUTUBE_CLIENT_SECRET
+            YOUTUBE_API_KEY
+            TWITCH_CLIENT_SECRET
+            CHZZK_CLIENT_SECRET
+            SOOP_CLIENT_SECRET
         env:
           DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          # Optional Creator provider secrets. An unset GitHub secret resolves to an empty
+          # string, which keeps that provider's isConfigured() false — never
+          # USE_MOCK_CREATOR_PROVIDERS, which this workflow never sets.
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
+          CHZZK_CLIENT_SECRET: ${{ secrets.CHZZK_CLIENT_SECRET }}
+          SOOP_CLIENT_SECRET: ${{ secrets.SOOP_CLIENT_SECRET }}
 
       - name: Verify API Health & Provenance
         run: pnpm smoke:prod --api-only --sha ${{ github.event.workflow_run.head_sha }}
+        env:
+          CREATOR_ENABLED_PROVIDERS: ${{ vars.CREATOR_ENABLED_PROVIDERS || '' }}
 
       - name: Build Web Frontend
         run: pnpm --filter @gamemoa/web build
