@@ -266,6 +266,69 @@ to-accent-purple` 배지 안의 흰색 `Gamepad2`(게임패드) 아이콘 — �
 
 ---
 
+## 완료 (같은 세션 — 아이콘 재작업, 헤더/사이드바 레이아웃 버그, 진행바, ToS/Privacy)
+
+### 아이콘 v2 — 손으로 그린 근사치를 실제 Lucide 아이콘 그대로로 교체
+
+운영자 피드백: "너가 만들어준 아이콘 디자인이 마음에 안들어 다시 만들던가 현재 홈페이지 로고
+사용해줘". v1(둥근 사각형 몸체+원 그립+채워진 십자/점)은 Lucide 아이콘이 실제로는 **선(stroke)
+아이콘이지 채워진 도형이 아니라는** 점을 놓친 근사치였음 — 그래서 실제 헤더 로고와 느낌이
+달랐음.
+
+- `node_modules/lucide-react/dist/esm/icons/gamepad-2.js`에서 실제 path 데이터를 그대로
+  가져와 `favicon.svg`에 `translate(64,64) scale(16)` 그룹으로 감싸 배치(SVG는 베지어/호를
+  네이티브로 그리므로 근사 없이 완전히 동일).
+- `scripts/generate-favicon.ts`(PNG/ICO 래스터용, 여전히 이미지 라이브러리 없음)는 3차 베지어
+  평탄화 + SVG 타원호 평탄화(SVG 1.1 Appendix F.6 공식, rotation=0으로 단순화)를 새로 구현해
+  전체 아이콘을 ~130개 선분으로 분해한 뒤 "선분까지의 거리" 기준으로 픽셀을 칠하는 방식으로 교체.
+- 순수 O(N) 거리 계산이 1024px 렌더링에 2분 넘게 걸려서, 전체 아이콘 AABB + 세그먼트별 AABB
+  선검사를 추가해 5초 이내로 단축(출력은 바이트 단위로 동일 — 최적화가 결과를 안 바꿨음을 확인).
+- 512px/32px 육안 확인 완료 — 헤더와 사실상 동일하게 보임.
+
+### Header/Sidebar z-index 충돌 — 스크롤 시 로고가 가려지는 버그
+
+운영자 스크린샷 제보. `Header`(`sticky top-0`)와 데스크톱 `Sidebar`(`sticky top-16`)가 둘 다
+`z-40`으로 동일 — `top-16` 오프셋이 헤더 높이와 정확히 맞아떨어져 정상 상황에선 겹치지 않아야
+하지만, z-index가 같으면 DOM상 나중에 오는 Sidebar가(래핑 div에 z-index가 없어 같은 스태킹
+컨텍스트 취급) 어떤 순간에든 Header 위로 그려질 수 있었음. `Sidebar`를 `z-30`으로 낮춰 Header가
+항상 우선하도록 수정.
+
+### `/gamemoa profile`에 XP 진행바 추가
+
+운영자가 Arcane의 rank 카드(레벨/XP/진행바)를 참고 사례로 제시. 실제 이미지 생성(Arcane처럼
+아바타+막대를 합성한 PNG)은 Cloudflare Workers에서 가능은 하지만(`satori`+`@resvg/resvg-wasm`,
+Vercel OG와 같은 패턴) 새 의존성과 레이아웃 디자인이 필요한 별도 규모 작업이라 시작하지 않음.
+대신 블록 문자 진행바(`▰▰▰▰▰▰▱▱▱▱ 62%`)를 `handleProfileCommand`의 임베드 필드에 추가 —
+새 의존성 없이 기존 `progressionUseCases.getProgressionSummary`가 이미 계산해두는
+`currentLevelProgressXp`/`currentLevelSpanXp`/`progressPercent`를 그대로 사용.
+
+### `/terms`, `/privacy` 페이지 신설
+
+Discord 앱 "인증 자격" 체크리스트가 ToS/Privacy Policy 링크를 요구(운영자 스크린샷). 실제
+스키마(`users`, `oauth_accounts` 테이블 등)를 확인해 사실과 다르지 않은 내용으로 작성:
+
+- `/terms`: 서비스 개요, 계정/로그인, 이용자 의무(어뷰징 금지), 콘텐츠, 서비스 변경/중단,
+  면책조항, 약관 변경, 문의.
+- `/privacy`: 실제 수집 항목(OAuth 이메일/닉네임/아바타, 게임 기록/XP, 프로필 설정, Discord
+  연동 정보, Creator 채널 인증 정보)을 정확히 나열, 수집 목적, 보관 기간, 제3자 미제공 명시,
+  이용자 권리, 쿠키 사용 범위, 문의처.
+- `routes.ts`에 등록, `Footer.tsx`에 링크 추가(현재 한국어 전용 — i18n 재개 시 함께 처리).
+- Discord Team 이전은 Discord 쪽 순수 조작이라 코딩 세션이 대신할 수 없음 — 운영자 안내만 제공.
+
+### 웹사이트 UI/UX(좌우 공간 활용도) — 이번엔 기록만, 미착수
+
+운영자 피드백을 "다음 작업사항"에 기록만 하고 착수하지 않음(범위가 커서 우선순위 확인 필요).
+자세한 원인 분석과 후속 조치는 아래 "남은 작업" §2 참고.
+
+### 검증
+
+- [x] `turbo run lint typecheck test build --force`: 아이콘 v2 47/47, 진행바 47/47(discord
+      핸들러 테스트 15/15, api 전체 135/135) — 모두 0 캐시 히트로 재확인.
+- [x] 아이콘 v2, z-index 수정, 진행바 각각 커밋 후 CI/Deploy/provenance/smoke 전부 그린.
+- [ ] `/terms`, `/privacy`는 이 문서 작성 시점 기준 아직 커밋 전 — 이어서 검증·배포 필요.
+
+---
+
 ## 완료 (Phase B~E — Admin/Streamer/Discord/Wiki/i18n 기반)
 
 ### Phase B: 스트리머 랭킹 정책 & 플랫폼 아이콘
@@ -401,52 +464,78 @@ Actions 기록이 원본입니다.
 ## 남은 작업 (다음 세션에서 이어서 진행)
 
 1. **i18n 번역은 운영자 지시로 일시 보류 상태**(2026-08-13: "번역은 나중에 완성도가 높아지면
-   실행하자") — Wiki 본문 17개 상세 라우트(장문 설명·단계별 가이드·FAQ, 약 1,300줄 — 셸/내비게이션
-   은 완료), `COUNTRY_OPTIONS` 국가명 다국어화 모두 **운영자가 다시 번역을 진행하자고 명시적으로
-   말하기 전까지 착수하지 마세요.** 현재 우선순위는 아래 2번(Discord 봇 기능/완성도).
-2. **Discord 봇 기능/완성도 보완 (진행 중, 현재 우선순위)** — 운영자가 메시지 UX 고도화(Embed
-   전환)를 1순위로 선택. `/gamemoa` 전체 응답의 Embed 전환은 완료했고, 리뷰 패스에서 마크다운
-   마스킹 링크 취약점을 발견해 함께 수정했습니다(위 섹션 참고). 운영자가 물어봤던 다른 선택지
-   (신규 명령어/옵션 확장, 게임 선택 Autocomplete)는 아직 착수 전 — 다음에 이어서 진행할 후보:
+   실행하자") — Wiki 본문 17개 상세 라우트, `COUNTRY_OPTIONS` 국가명 다국어화, 그리고 방금 새로
+   추가한 `/terms`·`/privacy`(현재 한국어 전용) 모두 **운영자가 다시 번역을 진행하자고 명시적으로
+   말하기 전까지 착수하지 마세요.**
+2. **웹사이트 UI/UX 개선 — 좌우 공간 활용도 (신규, 운영자 피드백)**: 운영자가 Arcane 대시보드
+   (`docs.arcane.bot` 스크린샷 — 넓은 폭의 리더보드 테이블 + 우측 정보 패널 구조)를 참고 사례로
+   들며, GAMEMOA 현재 레이아웃이 좌우 공간을 잘 못 쓰고 있다고 지적. 실제 원인: 메인 콘텐츠가
+   `max-w-7xl`(1280px)로 중앙 정렬되어 있고, 데스크톱 사이드바(`Sidebar.tsx`)는 기본
+   `w-16`(64px, hover 시에만 `w-56`으로 확장)이라 — 와이드 모니터(1920px+)에서는 좌우로 큰 빈
+   여백이 생기고, 사이드바 자체도 네비게이션 아이콘 몇 개 외에는 세로 공간을 활용하지 않음.
+   착수 전에 범위를 먼저 정하는 게 좋습니다(랭킹/게임 목록 등 데이터 밀도 높은 페이지부터 넓히기
+   vs. 전체 레이아웃 시스템 재설계 vs. 사이드바에 상시 정보 패널 추가 등) — 운영자에게 우선순위
+   확인 후 착수.
+3. **Discord 봇 기능/완성도 보완 (진행 중)** — `/gamemoa profile`에 XP 진행바(▰▰▰▱▱ 62%) 추가
+   완료. 다음 후보:
    - `/gamemoa leaderboard`에 주간(weekly) 옵션 추가(`getGuildLeaderboard`는 이미 `period`
      파라미터를 지원하므로 커맨드 옵션만 추가하면 됨).
    - `/gamemoa help` 명령어 신설.
    - `/gamemoa achievements`(도전과제 확인) 신설.
-   - `/gamemoa play game:` 옵션을 정적 `choices`에서 Discord Autocomplete 상호작용으로 전환(게임
-     추가 시 명령어 재등록 없이 자동 반영).
-3. **Admin bootstrap 관련 작업은 운영자가 직접 진행하기로 함**(2026-08-13 지시: "admin은 추후
-   내가 테스트 해볼게") — 코딩 세션은 admin 로그인/bootstrap 플로우를 더 이상 건드리거나
-   검증하지 않습니다. `ADMIN_USER_IDS`는 이전 세션에 이미 설정 완료된 상태이며, 나머지는 운영자의
-   `/admin` 브라우저 조작이 필요합니다. admin i18n 번역(표시 문자열만이라도)도 의도적으로
-   보류했습니다 — 운영자가 admin 테스트를 완료했다고 알려주면 그때(그리고 번역 작업을 다시
-   시작하기로 한 뒤) admin UI 텍스트(표시 문자열만, 로직 불변)의 i18n 연결을 진행하세요.
-4. **외부 설정 대기**(repository만으로 완결 불가, 선택 사항): Discord 명령어 자동 동기화를 원하면
-   `DISCORD_COMMAND_SYNC_ENABLED=true` + `DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`/
-   `DISCORD_TEST_GUILD_ID`(선택) 등록. 미설정이어도 배포에는 영향 없음.
-5. **실사용자 E2E 인수 테스트**: 실제 Discord 서버 설치/등록, Creator 플랫폼 인증, 4개 언어 실환경
-   확인은 운영자의 실계정 조작이 필요해 이 세션에서 완결할 수 없었습니다.
+   - `/gamemoa play game:` 옵션을 정적 `choices`에서 Discord Autocomplete 상호작용으로 전환.
+   - **(큰 작업, 운영자 확인 필요) Arcane 스타일 생성 이미지 랭크 카드**: 아바타+레벨+XP바를
+     실제 PNG 이미지로 합성하는 기능. Cloudflare Workers에서 가능은 하지만(`satori`로 JSX→SVG,
+     `@resvg/resvg-wasm`으로 SVG→PNG — Vercel OG와 동일한 패턴) **새 의존성 추가 + 폰트 임베딩
+     - 레이아웃 디자인이 필요한 별도 규모의 기능**이라 임의로 시작하지 않았음. 운영자가 원하면
+       별도 작업으로 스코프.
+   - **(운영자 결정 필요) "온라인" 상태 표시**: 현재 봇은 HTTP Interactions 전용(상시 Gateway
+     연결 없음)이라 구조적으로 Discord 멤버 목록에 "온라인"으로 표시될 수 없음. 가능하게 하려면
+     별도의 상시 구동 프로세스(Cloudflare Workers 밖 — VPS/Fly.io/Railway 등)를 Gateway
+     presence 유지 전용으로 새로 띄워야 함 — 호스팅 비용/운영 부담이 늘어나는 인프라 결정이라
+     운영자가 명시적으로 원할 때만 진행.
+4. **Discord 앱 "인증 자격" 체크리스트 — 3개 항목 보완 (선택 사항, 급하지 않음)**: Discord가
+   요구하는 건 봇이 100개 서버를 넘거나 공개 앱 디렉토리에 올릴 때뿐 — 지금 단계에서 막는 건
+   없음.
+   - [x] ToS/Privacy Policy 페이지 — `/terms`, `/privacy` 라우트 신설(Footer에도 링크 추가).
+         **다음 세션 시작 시**: 배포 후 Discord Developer Portal → General Information에
+         `https://gamemoa-web.gamemoa.workers.dev/terms`,
+         `https://gamemoa-web.gamemoa.workers.dev/privacy`를 등록했는지 확인.
+   - [ ] "앱은 팀에 속해 있어야 해요" — Developer Portal에서 Team 생성 후 앱을 이전하는 건 순수
+         Discord 쪽 조작이라 운영자가 직접 해야 함. 코딩 세션이 할 수 있는 일 없음.
+5. **외부 설정**: Discord 설치 링크/Bot Token/Interactions Endpoint URL/명령어 등록까지 이번
+   세션에 전부 완료. **Interactions Endpoint URL 저장 후 `/gamemoa` 명령어가 실제로 동작하는지는
+   아직 운영자 확인 전** — 다음 세션 최우선 확인 사항(위 "0순위" 참고, 최신 상태로 갱신 필요).
+6. **실사용자 E2E 인수 테스트**: Creator 플랫폼 인증, 4개 언어 실환경 확인은 운영자의 실계정
+   조작이 필요해 이 세션에서 완결할 수 없었습니다. Discord 봇 명령어는 이번 세션에 상당 부분
+   실제로 확인됨(설치/연동/서버등록 단계는 성공, 명령어 실행은 Interactions Endpoint 등록 대기
+   중이었음).
 
 ## 다음 작업 (Next Action)
 
 **0순위(다음 세션 시작 시 가장 먼저 확인)**:
 
-1. Admin 로그인 자체는 이번 세션에 실제 성공까지 확인됨(§ 위 참고) — 재확인 불필요.
+1. Admin 로그인은 이번 세션에 실제 성공까지 확인됨 — 재확인 불필요.
 2. **Discord Interactions Endpoint URL을 운영자가 실제로 등록했는지, 등록 후 `/gamemoa`
    명령어가 정상 동작하는지 확인.** 안 된다면 `wrangler tail --format pretty`로
    `/api/discord/interactions`에 요청이 실제로 들어오는지부터 확인 — 요청 자체가 안 찍히면
    Portal 설정 문제, 요청은 찍히는데 에러가 나면 코드/서명 문제. 이번 세션에서 이미 이 방법으로
    admin 로그인 버그 2건 + Discord 미응답 원인을 전부 실제 로그로 찾았습니다 — 추측으로 코드부터
    고치지 말고 항상 먼저 실시간 로그를 확인하세요.
-3. 새 파비콘(게임패드 디자인)이 브라우저/PWA에 정상 반영됐는지, Discord 봇 아이콘도 운영자가
-   Developer Portal에 업로드했는지 육안 확인.
+3. 파비콘 — 처음엔 직접 그린 근사치 도형이었다가, 운영자 피드백("마음에 안 들어") 후
+   lucide-react의 실제 Gamepad2 path 데이터를 그대로 재현하는 방식으로 다시 만들었습니다
+   (`scripts/generate-favicon.ts`). 브라우저/PWA에 정상 반영됐는지, Discord 봇 앱 아이콘도
+   운영자가 Developer Portal에 업로드했는지 육안 확인.
+4. `/terms`, `/privacy` 페이지가 실제 배포되어 열리는지, Developer Portal에 URL을 등록했는지
+   확인.
 
-이 세 가지가 확인되면: Discord 봇 기능/완성도 보완을 계속 진행(운영자에게 우선순위 확인 후
-착수 — 주간 리더보드 옵션, `/gamemoa help`, 게임 선택 Autocomplete 등 후보는 위 섹션 참고) →
-i18n 번역 재개는 운영자가 명시적으로 요청할 때까지 대기 → 필요 시 Admin 흐름 UI 텍스트(표시
-문자열만, 인증/보안 로직 불변) → 필요 시 `Post-Sprint UX / SEO / Production Readiness QA`.
-Admin **로직**은 운영자가 먼저 언급하지 않는 한 건드리지 마세요 — 다만 "운영자가 admin을 직접
-다룬다"는 것이 "admin에 실제 버그가 있어도 못 고친다"는 뜻은 아닙니다. 운영자가 에러를 보고하면
-즉시 조사·수정하는 것이 맞습니다(이번 세션 전체가 그 실증 사례).
+이 항목들이 확인되면: 운영자가 지적한 **웹사이트 UI/UX(좌우 공간 활용도)** 개선 범위를 먼저
+확인 후 착수 → Discord 봇 기능/완성도 보완 계속(주간 리더보드 옵션, `/gamemoa help`, Autocomplete
+등, 큰 항목인 생성 이미지 랭크 카드·온라인 상태 표시는 운영자 확인 후에만) → i18n 번역 재개는
+운영자가 명시적으로 요청할 때까지 대기 → 필요 시 Admin 흐름 UI 텍스트(표시 문자열만, 인증/보안
+로직 불변). Admin **로직**은 운영자가 먼저 언급하지 않는 한 건드리지 마세요 — 다만 "운영자가
+admin을 직접 다룬다"는 것이 "admin에 실제 버그가 있어도 못 고친다"는 뜻은 아닙니다. 운영자가
+에러를 보고하면 즉시 조사·수정하는 것이 맞습니다(이번 세션 전체가 그 실증 사례 — 로그인 500,
+Google 버튼 미표시, Discord 미응답, 파비콘 디자인 재작업까지 전부 이 패턴으로 해결).
 
 시작 시 `git log`, `git status`, 이 문서의 "완료" 섹션으로 현재 상태를 재확인한 뒤 처음부터 다시
 설계하지 말고 이어서 진행하세요.
