@@ -7,17 +7,22 @@ import { Buffer } from "node:buffer";
 // OwOGG favicon generator — deterministic, dependency-free.
 //
 // Canonical source: apps/web/public/favicon.svg (hand-authored).
-// This script rasterises the SAME design — OwOGG's brand mark, an "OwO" face
-// (two round eyes + a "w" mouth) drawn in Lucide's line-art convention (the
-// exact shape live-rendered by Header/Footer's <OwoFaceIcon>, not an
-// approximation of it) stroked in white on a brand-gradient rounded hub
-// (bg-gradient-to-tr from-brand to-accent-purple) — into PNG / ICO fallbacks and
-// writes a web manifest. No external image-processing/SVG-rasterisation
-// dependency is required: PNGs are encoded with the built-in zlib + a
-// hand-written CRC32; pixels are produced by supersampling a distance-to-stroke
-// test against the icon's shapes — circles tested exactly (distance to center
-// vs. radius), the mouth's straight segments flattened directly (see
-// distanceToSegment/distanceToCircleOutline below).
+// This script rasterises the SAME design — OwOGG's brand mark, the literal
+// word "OwO" (two round "O"s + a "w" built from the same line-art convention
+// as Lucide icons) tilted diagonally, no background tile — into transparent
+// PNG / ICO fallbacks and writes a web manifest. No external
+// image-processing/SVG-rasterisation dependency is required: PNGs are
+// encoded with the built-in zlib + a hand-written CRC32; pixels are produced
+// by supersampling a distance-to-stroke test against the letterform's shapes
+// (circles tested exactly — distance to center vs. radius; the "w"'s
+// straight segments via distanceToSegment), with the whole letterform
+// rotated by a fixed angle before the distance test so every downstream
+// primitive (AABBs, distance functions) just works in already-rotated
+// coordinates. Stroke color is the same brand gradient the old background
+// tile used (bg-gradient-to-tr from-brand to-accent-purple), now painted
+// along the letters themselves instead of behind them; everything else is
+// fully transparent (alpha 0), composited with premultiplied-alpha
+// supersampling to avoid dark fringing at the stroke edges.
 // ---------------------------------------------------------------------------
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -27,50 +32,81 @@ const SVG_PATH = resolve(OUT_DIR, "favicon.svg");
 // Brand palette (must match favicon.svg and apps/web/app/app.css)
 const BRAND = [99, 102, 241] as const; // --color-brand #6366f1
 const ACCENT_PURPLE = [168, 85, 247] as const; // --color-accent-purple #a855f7
-const ICON_WHITE = [255, 255, 255] as const; // matches Header's text-white
 const VIEWBOX = 512;
-const BG_RX = 112;
 
 // ---------------------------------------------------------------------------
-// OwOGG's brand mark, transcribed exactly from
-// apps/web/app/components/ui/OwoFaceIcon.tsx (24x24 viewBox, stroke-width 2,
-// fill: none, round caps/joins — Lucide's own line-art convention). Two round
-// eyes (<circle cx="7" cy="10" r="4"/>, <circle cx="17" cy="10" r="4"/>) and a
-// "w" mouth (<path d="M8 16l2 3 2-3 2 3 2-3"/>, four straight segments).
+// OwOGG's brand mark — the word "OwO" as three letterforms in a row, each
+// built the same way apps/web/app/components/ui/OwoWordmarkIcon.tsx builds a
+// round "O"/"w": circles for the O's, a 4-segment zigzag for the w. Defined
+// here in unrotated "letter space"; ROTATION_DEG below tilts the whole word
+// diagonally, matching the reference OwO wordmark logo.
 // ---------------------------------------------------------------------------
 type IconPoint = readonly [number, number];
 type IconSegment = { kind: "line"; from: IconPoint; to: IconPoint };
 type IconCircle = { cx: number; cy: number; r: number };
 
-const EYE_CIRCLES: IconCircle[] = [
-  { cx: 7, cy: 10, r: 4 },
-  { cx: 17, cy: 10, r: 4 },
+const LETTER_CIRCLES: IconCircle[] = [
+  { cx: 8, cy: 8, r: 7 }, // "O"
+  { cx: 40, cy: 8, r: 7 }, // "O"
 ];
 
-// "M8 16l2 3 2-3 2 3 2-3" as four absolute line segments.
-const MOUTH_LINES: IconSegment[] = [
-  { kind: "line", from: [8, 16], to: [10, 19] },
-  { kind: "line", from: [10, 19], to: [12, 16] },
-  { kind: "line", from: [12, 16], to: [14, 19] },
-  { kind: "line", from: [14, 19], to: [16, 16] },
+// "w", as four absolute line segments between the two O's.
+const LETTER_W_LINES: IconSegment[] = [
+  { kind: "line", from: [17, 3], to: [20.5, 13] },
+  { kind: "line", from: [20.5, 13], to: [24, 5] },
+  { kind: "line", from: [24, 5], to: [27.5, 13] },
+  { kind: "line", from: [27.5, 13], to: [31, 3] },
 ];
 
-const ICON_STROKE_WIDTH = 2; // OwoFaceIcon's stroke-width, in 24x24 icon units
+const ICON_STROKE_WIDTH = 3; // in letter-space units — bold, matching the reference wordmark
+const ROTATION_DEG = -25; // tilts the word so it rises left-to-right, like the reference logo
 
-/** Every straight segment of the icon (currently just the mouth — the eyes are perfect
- * circles, tested exactly by distanceToCircle instead of being flattened into a polygon)
- * in the icon's native 24x24 coordinate space. */
-function flattenIconToLines(): { a: IconPoint; b: IconPoint }[] {
-  return MOUTH_LINES.map((seg) => ({ a: seg.from, b: seg.to }));
+// Pivot for the rotation: center of the unrotated letterform's bounding box
+// (x: 1-47, y: 1-15 — O radius 7 from cx 8/40, w peaks/valleys at y 3/13).
+const LETTER_PIVOT: IconPoint = [24, 8];
+
+function rotatePoint([x, y]: IconPoint, degrees: number, [px, py]: IconPoint): IconPoint {
+  const rad = (degrees * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = x - px;
+  const dy = y - py;
+  return [px + dx * cos - dy * sin, py + dx * sin + dy * cos];
 }
 
-const ICON_LINES = flattenIconToLines();
+const ROTATED_CIRCLES: IconCircle[] = LETTER_CIRCLES.map(({ cx, cy, r }) => {
+  const [rx, ry] = rotatePoint([cx, cy], ROTATION_DEG, LETTER_PIVOT);
+  return { cx: rx, cy: ry, r };
+});
+const ROTATED_W_LINES: { a: IconPoint; b: IconPoint }[] = LETTER_W_LINES.map((seg) => ({
+  a: rotatePoint(seg.from, ROTATION_DEG, LETTER_PIVOT),
+  b: rotatePoint(seg.to, ROTATION_DEG, LETTER_PIVOT),
+}));
 
-// Fit the icon's 24x24 (bbox ~18x13: eyes span x 3-21/y 6-14, mouth spans x 8-16/y 16-19)
-// coordinate space into the 512 canvas, centered, with margins matching the header badge's
-// visual proportions (icon ~5/9 of its box).
-const ICON_BBOX = { x0: 3, y0: 6, x1: 21, y1: 19 };
-const ICON_SCALE = 320 / (ICON_BBOX.x1 - ICON_BBOX.x0);
+// Bounding box of the ROTATED letterform: a circle's bbox is always
+// [cx-r,cx+r]x[cy-r,cy+r] regardless of rotation (rotating a circle around any
+// pivot only moves its center), so this is exact, not an overestimate.
+const ICON_BBOX = {
+  x0: Math.min(
+    ...ROTATED_CIRCLES.map((c) => c.cx - c.r),
+    ...ROTATED_W_LINES.flatMap((l) => [l.a[0], l.b[0]]),
+  ),
+  x1: Math.max(
+    ...ROTATED_CIRCLES.map((c) => c.cx + c.r),
+    ...ROTATED_W_LINES.flatMap((l) => [l.a[0], l.b[0]]),
+  ),
+  y0: Math.min(
+    ...ROTATED_CIRCLES.map((c) => c.cy - c.r),
+    ...ROTATED_W_LINES.flatMap((l) => [l.a[1], l.b[1]]),
+  ),
+  y1: Math.max(
+    ...ROTATED_CIRCLES.map((c) => c.cy + c.r),
+    ...ROTATED_W_LINES.flatMap((l) => [l.a[1], l.b[1]]),
+  ),
+};
+// Fit the rotated letterform into the 512 canvas, centered, filling most of
+// the frame now that there's no background tile framing it.
+const ICON_SCALE = 460 / (ICON_BBOX.x1 - ICON_BBOX.x0);
 const ICON_CENTER: IconPoint = [
   (ICON_BBOX.x0 + ICON_BBOX.x1) / 2,
   (ICON_BBOX.y0 + ICON_BBOX.y1) / 2,
@@ -89,7 +125,7 @@ function toCanvas([x, y]: IconPoint): IconPoint {
 // per supersample, i.e. millions of times for the larger raster sizes — can reject most
 // shapes with four comparisons instead of a sqrt. Combined with the whole-icon AABB reject
 // below, this keeps even the 1024px render well under a second.
-const CANVAS_LINES = ICON_LINES.map(({ a, b }) => {
+const CANVAS_LINES = ROTATED_W_LINES.map(({ a, b }) => {
   const ca = toCanvas(a);
   const cb = toCanvas(b);
   return {
@@ -101,7 +137,7 @@ const CANVAS_LINES = ICON_LINES.map(({ a, b }) => {
     maxY: Math.max(ca[1], cb[1]) + STROKE_HALF_WIDTH,
   };
 });
-const CANVAS_CIRCLES = EYE_CIRCLES.map(({ cx, cy, r }) => {
+const CANVAS_CIRCLES = ROTATED_CIRCLES.map(({ cx, cy, r }) => {
   const [ccx, ccy] = toCanvas([cx, cy]);
   const cr = r * ICON_SCALE;
   return {
@@ -136,7 +172,7 @@ function distanceToSegment(px: number, py: number, a: IconPoint, b: IconPoint): 
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-/** Exact distance from a point to a circle's *outline* (not its filled disc) — the eyes are
+/** Exact distance from a point to a circle's *outline* (not its filled disc) — the O's are
  * stroked circles (fill="none"), so a point is "on the stroke" when its distance to the
  * center is within STROKE_HALF_WIDTH of the radius, not merely inside the disc. */
 function distanceToCircleOutline(px: number, py: number, cx: number, cy: number, r: number) {
@@ -157,47 +193,53 @@ function lerp(
   ] as const;
 }
 
-function colorAt(px: number, py: number): readonly [number, number, number] {
-  // bg-gradient-to-tr: bottom-left (brand) -> top-right (accent-purple).
-  const t = Math.min(1, Math.max(0, (px + (VIEWBOX - py)) / (VIEWBOX * 2)));
-  const bg = lerp(BRAND, ACCENT_PURPLE, t);
-
-  // Whole-icon AABB reject — skips the segment loop entirely for the majority of pixels
-  // (pure background), which is the bulk of the win.
+/** RGBA at a canvas pixel: opaque brand-gradient color on the stroke, fully transparent
+ * everywhere else (no background tile). The gradient is keyed to canvas position — the same
+ * bg-gradient-to-tr direction the old background tile used — so the stroke itself carries the
+ * brand gradient now that nothing sits behind it. */
+function colorAt(px: number, py: number): readonly [number, number, number, number] {
   if (px < ICON_AABB.minX || px > ICON_AABB.maxX || py < ICON_AABB.minY || py > ICON_AABB.maxY) {
-    return bg;
+    return [0, 0, 0, 0];
   }
+
+  const t = Math.min(1, Math.max(0, (px + (VIEWBOX - py)) / (VIEWBOX * 2)));
+  const strokeColor = lerp(BRAND, ACCENT_PURPLE, t);
 
   for (const circle of CANVAS_CIRCLES) {
     if (px < circle.minX || px > circle.maxX || py < circle.minY || py > circle.maxY) continue;
     if (distanceToCircleOutline(px, py, circle.cx, circle.cy, circle.r) <= STROKE_HALF_WIDTH) {
-      return ICON_WHITE;
+      return [...strokeColor, 255];
     }
   }
 
   for (const seg of CANVAS_LINES) {
     if (px < seg.minX || px > seg.maxX || py < seg.minY || py > seg.maxY) continue;
     if (distanceToSegment(px, py, seg.a, seg.b) <= STROKE_HALF_WIDTH) {
-      return ICON_WHITE;
+      return [...strokeColor, 255];
     }
   }
-  return bg;
+  return [0, 0, 0, 0];
 }
 
 function rasterize(size: number, ss = 4): Buffer {
   const pixels = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      let r = 0;
-      let g = 0;
-      let b = 0;
+      // Premultiplied-alpha accumulation: color is weighted by its own sample's alpha before
+      // summing, so fully-transparent samples don't drag opaque-edge pixels toward black —
+      // avoiding a dark halo around the stroke where supersamples straddle the edge.
+      let ra = 0;
+      let ga = 0;
+      let ba = 0;
+      let aSum = 0;
       const sample = (yy: number, xx: number) => {
         const px = (xx / size) * VIEWBOX;
         const py = (yy / size) * VIEWBOX;
-        const c = colorAt(px, py);
-        r += c[0];
-        g += c[1];
-        b += c[2];
+        const [r, g, b, a] = colorAt(px, py);
+        ra += r * a;
+        ga += g * a;
+        ba += b * a;
+        aSum += a;
       };
       let count = 0;
       for (let sy = 0; sy < ss; sy++) {
@@ -207,10 +249,12 @@ function rasterize(size: number, ss = 4): Buffer {
         }
       }
       const idx = (y * size + x) * 4;
-      pixels[idx] = Math.round(r / count);
-      pixels[idx + 1] = Math.round(g / count);
-      pixels[idx + 2] = Math.round(b / count);
-      pixels[idx + 3] = 255;
+      if (aSum > 0) {
+        pixels[idx] = Math.round(ra / aSum);
+        pixels[idx + 1] = Math.round(ga / aSum);
+        pixels[idx + 2] = Math.round(ba / aSum);
+      }
+      pixels[idx + 3] = Math.round(aSum / count); // average alpha (each sample is 0 or 255)
     }
   }
   return encodePng(size, size, pixels);

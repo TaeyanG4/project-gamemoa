@@ -1,27 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="OwOGG">
   <defs>
-    <linearGradient id="bg" x1="0" y1="1" x2="1" y2="0">
+    <!-- userSpaceOnUse (not the default objectBoundingBox) so the gradient stays one
+         continuous diagonal across the whole wordmark instead of restarting per letter. -->
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="0" y1="512" x2="512" y2="0">
       <stop offset="0" stop-color="#6366f1" />
       <stop offset="1" stop-color="#a855f7" />
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#bg)" />
-  <!-- OwOGG's brand mark — the exact shape live-rendered by Header/Footer's
-       <OwoFaceIcon> (apps/web/app/components/ui/OwoFaceIcon.tsx, 24x24 viewBox), not a
-       redrawn approximation. translate(64,64) scale(16) centers and fits it into this 512
-       canvas at the same proportions as the header badge. stroke-width stays "2" (the
-       component's native value) — the scale transform grows it proportionally, exactly
-       like the live <OwoFaceIcon> render. -->
+  <!-- OwOGG's brand mark — the word "OwO" (two round "O"s + a "w"), tilted diagonally, no
+       background tile. The exact shape live-rendered by Header/Footer's <OwoWordmarkIcon>
+       (apps/web/app/components/ui/OwoWordmarkIcon.tsx), not a redrawn approximation. The
+       transform composes: rotate(-25, 24, 8) tilts the unrotated letterform around its own
+       center, translate(-24,-8) + scale(...) + translate(256,256) then fits that rotated
+       letterform into this 512 canvas — same order scripts/generate-favicon.ts computes in
+       code (rotate first in letter-space, then center/scale the rotated bounding box). -->
   <g
-    transform="translate(64,64) scale(16)"
+    transform="translate(256,256) scale(10.697214392319895) translate(-24,-8) rotate(-25,24,8)"
     fill="none"
-    stroke="#ffffff"
-    stroke-width="2"
+    stroke="url(#bg)"
+    stroke-width="3"
     stroke-linecap="round"
     stroke-linejoin="round"
   >
-    <circle cx="7" cy="10" r="4" />
-    <circle cx="17" cy="10" r="4" />
-    <path d="M8 16l2 3 2-3 2 3 2-3" />
+    <circle cx="8" cy="8" r="7" />
+    <circle cx="40" cy="8" r="7" />
+    <path d="M17 3l3.5 10 3.5-8 3.5 8 3.5-10" />
   </g>
 </svg>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { LanguageSelector } from "../ui/LanguageSelector";
-import { OwoFaceIcon } from "../ui/OwoFaceIcon";
+import { OwoWordmarkIcon } from "../ui/OwoWordmarkIcon";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -37,16 +37,9 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
             <Menu className="w-6 h-6" />
           </button>
 
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="p-2 rounded-xl bg-gradient-to-tr from-brand to-accent-purple shadow-md shadow-brand/20 group-hover:scale-105 transition-transform duration-200">
-              <OwoFaceIcon className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-extrabold text-xl tracking-tight text-text-primary">
-              OwO
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-accent-purple">
-                GG
-              </span>
-            </span>
+          <Link to="/" className="flex items-center gap-2 group">
+            <OwoWordmarkIcon className="h-8 w-12 group-hover:scale-105 transition-transform duration-200" />
+            <span className="font-extrabold text-xl tracking-tight text-text-primary">GG</span>
           </Link>
         </div>
 
