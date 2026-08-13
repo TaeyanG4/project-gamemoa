@@ -15,10 +15,12 @@ import { GAME_MANIFESTS } from "@gamemoa/core";
 
 import { ApiClientError } from "../lib/api/errors";
 import { Trophy, Zap, Calendar, Users, Gamepad2, Lock } from "lucide-react";
+import { useI18n } from "../features/i18n/I18nContext";
 
 type ServerTab = "alltime" | "weekly" | "games";
 
 export default function DiscordServerSlugRoute() {
+  const { dict } = useI18n();
   const { slug } = useParams<{ slug: string }>();
   const [guild, setGuild] = useState<DiscordGuildDto | null>(null);
   const [isManager, setIsManager] = useState(false);
@@ -61,12 +63,12 @@ export default function DiscordServerSlugRoute() {
           setError(errObj);
         } else {
           setError({
-            message: err instanceof Error ? err.message : "서버 정보를 불러올 수 없습니다.",
+            message: err instanceof Error ? err.message : dict.discordServerSlug.loadFailedGeneric,
           });
         }
       })
       .finally(() => setLoading(false));
-  }, [slug]);
+  }, [slug, dict.discordServerSlug.loadFailedGeneric]);
 
   // Fetch Game Scores when game tab or selected game changes
   useEffect(() => {
@@ -86,7 +88,7 @@ export default function DiscordServerSlugRoute() {
   if (loading) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center text-sm text-slate-400">
-        서버 정보를 불러오는 중...
+        {dict.discordServerSlug.loadingServer}
       </div>
     );
   }
@@ -99,19 +101,19 @@ export default function DiscordServerSlugRoute() {
             <Lock className="mx-auto h-12 w-12 text-rose-400" />
           </div>
           <h1 className="text-xl font-bold text-white">
-            {error.status === 403 ? "비공개(PRIVATE) 서버" : "서버를 찾을 수 없습니다"}
+            {error.status === 403
+              ? dict.discordServerSlug.privateServerTitle
+              : dict.discordServerSlug.notFoundTitle}
           </h1>
           <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
-            {error.status === 403
-              ? "이 서버는 PRIVATE 가시성으로 설정되어 있으며, 권한을 가진 관리자만 접근할 수 있습니다."
-              : error.message}
+            {error.status === 403 ? dict.discordServerSlug.privateServerMessage : error.message}
           </p>
           <div className="pt-4">
             <Link
               to="/discord/servers"
               className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors"
             >
-              ← 디렉토리로 돌아가기
+              {dict.discordServerSlug.backToDirectory}
             </Link>
           </div>
         </div>
@@ -166,7 +168,7 @@ export default function DiscordServerSlugRoute() {
               id="manage-server-button"
               className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/20 px-5 py-2.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/30 hover:text-white transition-all"
             >
-              ⚙️ 서버 관리
+              {dict.discordServerSlug.manageServerCta}
             </Link>
           )}
         </div>
@@ -183,34 +185,37 @@ export default function DiscordServerSlugRoute() {
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 backdrop-blur-sm space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
             <Users className="h-4 w-4 text-indigo-400" />
-            <span>GAMEMOA 참여 멤버</span>
+            <span>{dict.discordServerSlug.participantsLabel}</span>
           </div>
           <div className="text-2xl font-extrabold text-white">
-            {(summary?.participantCount ?? 0).toLocaleString()}명
+            {(summary?.participantCount ?? 0).toLocaleString()}
+            {dict.discordServerSlug.participantsUnit}
           </div>
-          <div className="text-[11px] text-slate-500">기여한 실적 유저 수</div>
+          <div className="text-[11px] text-slate-500">
+            {dict.discordServerSlug.participantsHint}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 backdrop-blur-sm space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
             <Zap className="h-4 w-4 text-amber-400" />
-            <span>서버 총 누적 XP</span>
+            <span>{dict.discordServerSlug.totalXpLabel}</span>
           </div>
           <div className="text-2xl font-extrabold text-amber-300">
             {(summary?.totalXp ?? 0).toLocaleString()} XP
           </div>
-          <div className="text-[11px] text-slate-500">모든 게임 활동 합산</div>
+          <div className="text-[11px] text-slate-500">{dict.discordServerSlug.totalXpHint}</div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 backdrop-blur-sm space-y-2">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
             <Calendar className="h-4 w-4 text-purple-400" />
-            <span>이번 주 서버 XP</span>
+            <span>{dict.discordServerSlug.weeklyXpLabel}</span>
           </div>
           <div className="text-2xl font-extrabold text-purple-300">
             {(summary?.weeklyXp ?? 0).toLocaleString()} XP
           </div>
-          <div className="text-[11px] text-slate-500">월요일 00:00 KST 기준</div>
+          <div className="text-[11px] text-slate-500">{dict.discordServerSlug.weeklyXpHint}</div>
         </div>
       </div>
 
@@ -219,7 +224,9 @@ export default function DiscordServerSlugRoute() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-indigo-400" />
-            <h2 className="text-lg font-extrabold text-white">서버 리더보드</h2>
+            <h2 className="text-lg font-extrabold text-white">
+              {dict.discordServerSlug.leaderboardTitle}
+            </h2>
           </div>
 
           <div className="flex items-center gap-1.5 rounded-xl bg-slate-950 p-1 border border-white/10">
@@ -231,7 +238,7 @@ export default function DiscordServerSlugRoute() {
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              ⚡ 서버 XP
+              {dict.discordServerSlug.tabAlltime}
             </button>
             <button
               onClick={() => setActiveTab("weekly")}
@@ -241,7 +248,7 @@ export default function DiscordServerSlugRoute() {
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              📅 주간 XP
+              {dict.discordServerSlug.tabWeekly}
             </button>
             <button
               onClick={() => setActiveTab("games")}
@@ -251,7 +258,7 @@ export default function DiscordServerSlugRoute() {
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              🎮 게임별 기록
+              {dict.discordServerSlug.tabGames}
             </button>
           </div>
         </div>
@@ -263,11 +270,12 @@ export default function DiscordServerSlugRoute() {
               <div className="p-12 text-center space-y-3">
                 <div className="text-3xl">🎮</div>
                 <p className="text-sm font-semibold text-slate-300">
-                  아직 이 서버에 누적된 XP가 없습니다
+                  {dict.discordServerSlug.emptyAlltimeTitle}
                 </p>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  Discord 채널에서 <code className="text-indigo-300 font-mono">/gamemoa play</code>{" "}
-                  명령어를 실행하여 게임에 기여해보세요!
+                  {dict.discordServerSlug.emptyAlltimeHintPrefix}{" "}
+                  <code className="text-indigo-300 font-mono">/gamemoa play</code>{" "}
+                  {dict.discordServerSlug.emptyAlltimeHintSuffix}
                 </p>
               </div>
             ) : (
@@ -324,10 +332,10 @@ export default function DiscordServerSlugRoute() {
               <div className="p-12 text-center space-y-3">
                 <div className="text-3xl">📅</div>
                 <p className="text-sm font-semibold text-slate-300">
-                  이번 주 이 서버에 누적된 XP가 없습니다
+                  {dict.discordServerSlug.emptyWeeklyTitle}
                 </p>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  월요일 00:00 KST 이후 첫 플레이를 시작하여 주간 랭크를 차지해보세요!
+                  {dict.discordServerSlug.emptyWeeklyHint}
                 </p>
               </div>
             ) : (
@@ -400,19 +408,21 @@ export default function DiscordServerSlugRoute() {
 
             <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
               {loadingGameScores ? (
-                <div className="p-12 text-center text-xs text-slate-400">게임을 불러오는 중...</div>
+                <div className="p-12 text-center text-xs text-slate-400">
+                  {dict.discordServerSlug.loadingGame}
+                </div>
               ) : gameLeaderboard.length === 0 ? (
                 <div className="p-12 text-center space-y-3">
                   <div className="text-3xl">🎯</div>
                   <p className="text-sm font-semibold text-slate-300">
-                    **{currentManifest?.title}** 에 기록된 서버 멤버 스코어가 없습니다
+                    <b>{currentManifest?.title}</b> {dict.discordServerSlug.emptyGameScoreSuffix}
                   </p>
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    Discord 채널에서{" "}
+                    {dict.discordServerSlug.emptyGameHintPrefix}{" "}
                     <code className="text-indigo-300 font-mono">
                       /gamemoa play game:{selectedGameId}
                     </code>{" "}
-                    명령어로 도전해보세요!
+                    {dict.discordServerSlug.emptyGameHintSuffix}
                   </p>
                 </div>
               ) : (
@@ -466,22 +476,22 @@ export default function DiscordServerSlugRoute() {
 
       {/* Metadata Info Card */}
       <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 backdrop-blur-sm space-y-3">
-        <h3 className="text-sm font-bold text-white">GAMEMOA 서버 정보</h3>
+        <h3 className="text-sm font-bold text-white">{dict.discordServerSlug.infoCardTitle}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
           <div>
             <div className="text-slate-400">Discord Guild ID</div>
             <div className="font-mono text-slate-200 mt-1 truncate">{guild.guildId}</div>
           </div>
           <div>
-            <div className="text-slate-400">등록일</div>
+            <div className="text-slate-400">{dict.discord.registeredLabel}</div>
             <div className="text-slate-200 mt-1">{guild.registeredAt.slice(0, 10)}</div>
           </div>
           <div>
-            <div className="text-slate-400">상태</div>
+            <div className="text-slate-400">{dict.discordServerSlug.statusLabel}</div>
             <div className="text-emerald-400 font-semibold mt-1">{guild.registrationStatus}</div>
           </div>
           <div>
-            <div className="text-slate-400">가시성</div>
+            <div className="text-slate-400">{dict.discordServerSlug.visibilityLabel}</div>
             <div className="text-indigo-300 font-semibold mt-1">{guild.visibility}</div>
           </div>
         </div>

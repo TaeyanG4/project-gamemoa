@@ -46,8 +46,15 @@ F. Full Regression / Production Verification           ← 매 세션 수행
       전체 연결.
 - [x] `dict.games`(eyebrow/제목/게임 수 문구/검색창 placeholder/빈 상태 2종) — `/games` 전체 연결.
 - [x] `dict.ranking`(3개 메인 탭, 전체 종목/전체 플랫폼 필터, 점수/XP 모드 전환, 테이블 헤더 전체,
-      로딩/에러/재시도, 3개 탭 각각의 빈 상태) — `/ranking` 대부분 연결(1/2/3위 배지 텍스트는
-      아직 미번역, `docs/I18N.md` §6에 기록).
+      로딩/에러/재시도, 3개 탭 각각의 빈 상태, 1/2/3위 배지 텍스트) — `/ranking` 전체 연결.
+- [x] `dict.profile`(탭 전환, 가입일, 로그아웃, 즐겨찾기/최근 플레이/도전과제 섹션 제목·빈 상태)
+      — `/profile` 구조적 텍스트 연결(닉네임/국가 편집 폼, 연동 계정 표시, Creator 채널 인증 등
+      세부 마이크로카피는 스코프 밖으로 유보).
+- [x] `dict.discord` / `dict.discordSetup` / `dict.discordGuide` / `dict.discordServers` /
+      `dict.discordServerSlug` / `dict.discordServerManage` / `dict.discordLink` — Discord 6개
+      라우트(Hub/설치 가이드/이용 가이드/서버 디렉토리/서버 공개 페이지/서버 관리/계정 연동) 전체
+      화면 텍스트 연결 완료. 각 라우트 `meta()`는 기존 관례대로(정적 함수, 훅 접근 불가) 로케일화
+      제외.
 - [x] `docs/I18N.md` §6 커버리지 목록 갱신.
 
 ### 검증
@@ -190,25 +197,27 @@ Actions 기록이 원본입니다.
 
 ## 남은 작업 (다음 세션에서 이어서 진행)
 
-1. **i18n 화면 번역 확장 (계속)**: 프로필/내 정보, 계정 관리, Discord Hub/설정/가이드/서버, Wiki
-   본문, Admin 흐름, 순위 배지("1위" 등 서수 표기)를 `dict`에 연결. `common` 사전 섹션은 이미
-   준비되어 있음. 라우트 `meta()` 로케일화 방식 검토.
-2. **외부 설정 대기**(repository만으로 완결 불가):
-   - Admin 최초 bootstrap: `ADMIN_USER_IDS`는 이번 세션에 설정 완료. **운영자가 `/admin`에서
-     Google 본인 확인 + "초기 관리자 설정" 폼을 직접 완료해야** 실제로 로그인 가능해집니다(다음
-     세션 시작 시 프로덕션 `admin_accounts` 테이블에 행이 있는지로 완료 여부 확인 가능).
-   - Discord 명령어 자동 동기화를 원하면 `DISCORD_COMMAND_SYNC_ENABLED=true` +
-     `DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`/`DISCORD_TEST_GUILD_ID`(선택) 등록. 미설정이어도
-     배포에는 영향 없음.
-3. **실사용자 E2E 인수 테스트**: 실제 Discord 서버 설치/등록, Creator 플랫폼 인증, 4개 언어 실환경
+1. **i18n 화면 번역 확장 (계속)**: 프로필의 닉네임/국가 편집 폼·연동 계정 표시·Creator 채널 인증
+   등 세부 마이크로카피, Wiki 본문(18개 서브 라우트), Admin 로그인 흐름/센터를 `dict`에 연결.
+   `common` 사전 섹션은 이미 준비되어 있음. 라우트 `meta()` 로케일화 방식 검토(현재 스코프 밖).
+   Discord 6개 라우트(Hub/설치 가이드/이용 가이드/서버 디렉토리/서버 공개 페이지/서버 관리/계정
+   연동)는 이번 세션에 전체 완료.
+2. **Admin bootstrap 관련 작업은 운영자가 직접 진행하기로 함**(2026-08-13 지시: "admin은 추후
+   내가 테스트 해볼게") — 코딩 세션은 admin 로그인/bootstrap 플로우를 더 이상 건드리거나
+   검증하지 않습니다. `ADMIN_USER_IDS`는 이전 세션에 이미 설정 완료된 상태이며, 나머지는 운영자의
+   `/admin` 브라우저 조작이 필요합니다.
+3. **외부 설정 대기**(repository만으로 완결 불가, 선택 사항): Discord 명령어 자동 동기화를 원하면
+   `DISCORD_COMMAND_SYNC_ENABLED=true` + `DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`/
+   `DISCORD_TEST_GUILD_ID`(선택) 등록. 미설정이어도 배포에는 영향 없음.
+4. **실사용자 E2E 인수 테스트**: 실제 Discord 서버 설치/등록, Creator 플랫폼 인증, 4개 언어 실환경
    확인은 운영자의 실계정 조작이 필요해 이 세션에서 완결할 수 없었습니다.
 
 ## 다음 작업 (Next Action)
 
-Admin bootstrap 완료 여부(운영자 조작 필요)를 먼저 확인한 뒤:
-
-`i18n 화면 번역 확장 마무리`(프로필/Discord/Wiki/Admin/순위 배지) → `Discord 자동 동기화
-자격 증명 등록 여부 확인` → 필요 시 `Post-Sprint UX / SEO / Production Readiness QA`.
+`i18n 화면 번역 확장 마무리`(프로필 세부 마이크로카피 → Wiki 본문 → Admin 흐름 UI 텍스트, 단
+Admin 인증/보안 로직은 절대 건드리지 않고 표시 문자열만) → 필요 시 `Post-Sprint UX / SEO /
+Production Readiness QA`. Admin bootstrap/로그인 자체는 운영자가 직접 진행하므로 다음 세션에서
+먼저 확인하거나 손댈 필요 없음.
 
 시작 시 `git log`, `git status`, 이 문서의 "완료" 섹션으로 현재 상태를 재확인한 뒤 처음부터 다시
 설계하지 말고 이어서 진행하세요.

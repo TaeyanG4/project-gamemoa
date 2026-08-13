@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useAuth } from "../features/auth";
+import { useI18n } from "../features/i18n/I18nContext";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   User,
@@ -166,6 +167,7 @@ function GameActivityCard({ game, lastPlayedAt }: { game: GameManifest; lastPlay
 
 export default function ProfilePage() {
   const { user, isAuthenticated, logout, openLoginModal, refreshUser, providerStatus } = useAuth();
+  const { dict } = useI18n();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { favoriteGameIds, recentPlays } = usePersonalization();
@@ -515,7 +517,7 @@ export default function ProfilePage() {
               : "text-text-secondary hover:text-text-primary"
           }`}
         >
-          내 프로필
+          {dict.profile.myProfileTab}
         </button>
         <button
           type="button"
@@ -526,7 +528,7 @@ export default function ProfilePage() {
               : "text-text-secondary hover:text-text-primary"
           }`}
         >
-          기록
+          {dict.profile.recordsTab}
         </button>
       </div>
 
@@ -561,7 +563,7 @@ export default function ProfilePage() {
                 </div>
                 <p className="text-xs text-text-secondary">{user.email}</p>
                 <p className="text-[11px] text-text-muted mt-1">
-                  가입일: {user.created_at?.split("T")[0]}
+                  {dict.profile.joinedLabel}: {user.created_at?.split("T")[0]}
                 </p>
               </div>
             </div>
@@ -571,7 +573,7 @@ export default function ProfilePage() {
               className="flex items-center gap-2 px-6 py-2.5 bg-accent-red/10 text-accent-red border border-accent-red/30 rounded-2xl font-bold text-xs hover:bg-accent-red/20 transition-all cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
-              <span>로그아웃</span>
+              <span>{dict.profile.logout}</span>
             </button>
           </div>
 
@@ -700,16 +702,18 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Bookmark className="w-5 h-5 text-amber-400 fill-amber-400" />
-                <h2 className="text-xl font-bold text-text-primary">즐겨찾기</h2>
+                <h2 className="text-xl font-bold text-text-primary">
+                  {dict.profile.favoritesTitle}
+                </h2>
               </div>
               <span className="text-xs font-bold text-text-muted">{favoriteGames.length}개</span>
             </div>
 
             {favoriteGames.length === 0 ? (
               <div className="p-5 rounded-2xl bg-surface-raised border border-border text-xs text-text-muted">
-                아직 즐겨찾기한 게임이 없습니다. 게임 카드의 북마크 아이콘을 눌러 추가해보세요.{" "}
+                {dict.profile.emptyFavorites}{" "}
                 <Link to="/games" className="text-brand-light font-bold hover:underline">
-                  게임 둘러보기 →
+                  {dict.home.browseGames} →
                 </Link>
               </div>
             ) : (
@@ -726,7 +730,9 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-brand" />
-                <h2 className="text-xl font-bold text-text-primary">최근 플레이</h2>
+                <h2 className="text-xl font-bold text-text-primary">
+                  {dict.profile.recentPlaysTitle}
+                </h2>
               </div>
               <span className="text-xs font-bold text-text-muted">{recentGames.length}개</span>
             </div>
@@ -931,7 +937,9 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Award className="w-5 h-5 text-accent-yellow" />
-                <h2 className="text-xl font-bold text-text-primary">도전과제</h2>
+                <h2 className="text-xl font-bold text-text-primary">
+                  {dict.profile.achievementsTitle}
+                </h2>
               </div>
               {achievements && (
                 <span className="text-xs font-bold text-text-muted">
@@ -942,7 +950,7 @@ export default function ProfilePage() {
 
             {!achievements || achievements.unlockedCodes.length === 0 ? (
               <div className="p-5 rounded-2xl bg-surface-raised border border-border text-xs text-text-muted">
-                아직 달성한 도전과제가 없습니다. 게임을 플레이하고 즐겨찾기를 추가해보세요!
+                {dict.profile.emptyAchievements}
               </div>
             ) : (
               <div className="flex flex-wrap gap-2">

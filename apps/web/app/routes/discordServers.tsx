@@ -7,8 +7,10 @@ import {
   getDiscordRegisterAuthUrl,
 } from "../features/discord/discordGuildApi";
 import type { DiscordGuildDto, DiscordCandidateGuildDto } from "@gamemoa/contracts";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export default function DiscordServersRoute() {
+  const { dict } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isPending, startTransition] = useTransition();
@@ -57,16 +59,14 @@ export default function DiscordServersRoute() {
             setCandidates(res.candidates);
             setSelectedCandidate(res.candidates[0] ?? null);
           } else {
-            setRegError(
-              "등록 가능한 서버 목록을 불러올 수 없습니다. 만료되었거나 이미 사용된 토큰입니다.",
-            );
+            setRegError(dict.discordServers.candidateLoadError);
           }
         })
         .catch((err) => {
-          setRegError(err instanceof Error ? err.message : "서버 목록 조회 실패");
+          setRegError(err instanceof Error ? err.message : dict.discordServers.guildListFetchError);
         });
     }
-  }, [tokenParam]);
+  }, [tokenParam, dict.discordServers.candidateLoadError, dict.discordServers.guildListFetchError]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +97,7 @@ export default function DiscordServersRoute() {
 
       setRegSuccessGuild(res.guild);
     } catch (err) {
-      setRegError(err instanceof Error ? err.message : "서버 등록 실패");
+      setRegError(err instanceof Error ? err.message : dict.discordServers.registerFailError);
     } finally {
       setRegSubmitting(false);
     }
@@ -121,11 +121,9 @@ export default function DiscordServersRoute() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-2xl md:text-3xl font-extrabold text-white">
-              🔍 Discord 서버 디렉토리
+              {dict.discordServers.pageTitle}
             </h1>
-            <p className="text-xs md:text-sm text-slate-400">
-              GAMEMOA에 등록된 Discord 커뮤니티 서버를 탐색하거나 내 서버를 새로 등록하세요.
-            </p>
+            <p className="text-xs md:text-sm text-slate-400">{dict.discordServers.pageSubtitle}</p>
           </div>
 
           <a
@@ -133,7 +131,7 @@ export default function DiscordServersRoute() {
             id="register-server-button"
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 active:scale-95 transition-all"
           >
-            <span>🏰 내 서버 등록하기</span>
+            <span>{dict.discordServers.registerCta}</span>
           </a>
         </div>
 
@@ -145,7 +143,7 @@ export default function DiscordServersRoute() {
               id="server-search-input"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="서버 이름 또는 vanity slug 검색..."
+              placeholder={dict.discordServers.searchPlaceholder}
               className="w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
@@ -153,7 +151,7 @@ export default function DiscordServersRoute() {
             type="submit"
             className="rounded-xl bg-slate-800 px-6 py-3 text-sm font-medium text-white hover:bg-slate-700 transition-colors"
           >
-            검색
+            {dict.discordServers.searchButton}
           </button>
         </form>
       </div>
@@ -163,10 +161,10 @@ export default function DiscordServersRoute() {
         <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-200 flex items-center justify-between">
           <span>
             {registerStatusParam === "no_guilds"
-              ? "관리자(MANAGE_GUILD) 권한을 가진 Discord 서버를 찾을 수 없습니다."
+              ? dict.discordServers.statusNoGuilds
               : registerStatusParam === "unauthorized"
-                ? "서버 등록을 위해 로그인이 필요합니다."
-                : "Discord 인증 중 오류가 발생했습니다. 다시 시도해 주세요."}
+                ? dict.discordServers.statusUnauthorized
+                : dict.discordServers.statusError}
           </span>
           <button
             onClick={() => {
@@ -187,7 +185,7 @@ export default function DiscordServersRoute() {
           <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-slate-900 p-6 md:p-8 space-y-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <span>🏰 Discord 서버 등록</span>
+                <span>{dict.discordServers.modalTitle}</span>
               </h2>
               <button
                 onClick={closeRegistrationModal}
@@ -200,7 +198,7 @@ export default function DiscordServersRoute() {
             {regSuccessGuild ? (
               <div className="space-y-4 text-center py-4">
                 <div className="text-4xl">🎉</div>
-                <h3 className="text-lg font-bold text-white">서버가 성공적으로 등록되었습니다!</h3>
+                <h3 className="text-lg font-bold text-white">{dict.discordServers.successTitle}</h3>
                 <p className="text-xs text-slate-300">
                   <span className="font-semibold text-indigo-300">{regSuccessGuild.name}</span>{" "}
                   (/discord/servers/{regSuccessGuild.slug})
@@ -211,14 +209,14 @@ export default function DiscordServersRoute() {
                     onClick={closeRegistrationModal}
                     className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-500"
                   >
-                    공개 페이지 보기
+                    {dict.discordServers.viewPublicPage}
                   </Link>
                   <Link
                     to={`/discord/servers/${regSuccessGuild.slug}/manage`}
                     onClick={closeRegistrationModal}
                     className="flex-1 rounded-xl border border-white/20 bg-white/10 py-2.5 text-xs font-semibold text-white hover:bg-white/20"
                   >
-                    서버 관리하기
+                    {dict.discordServers.manageServer}
                   </Link>
                 </div>
               </div>
@@ -232,7 +230,7 @@ export default function DiscordServersRoute() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-300">
-                    1. 등록할 서버 선택 (관리 중인 길드)
+                    {dict.discordServers.step1Label}
                   </label>
                   <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                     {candidates.map((c) => (
@@ -264,7 +262,7 @@ export default function DiscordServersRoute() {
 
                 <div className="space-y-2">
                   <label className="text-xs font-semibold text-slate-300">
-                    2. Vanity Slug 주소 설정 (옵션)
+                    {dict.discordServers.step2Label}
                   </label>
                   <div className="flex items-center rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2 text-xs text-slate-400">
                     <span>/discord/servers/</span>
@@ -272,14 +270,16 @@ export default function DiscordServersRoute() {
                       type="text"
                       value={customSlug}
                       onChange={(e) => setCustomSlug(e.target.value)}
-                      placeholder="자동 생성 (영문 소문자, 숫자, -)"
+                      placeholder={dict.discordServers.slugPlaceholder}
                       className="ml-1 flex-1 bg-transparent text-white placeholder-slate-600 focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300">3. 가시성 선택</label>
+                  <label className="text-xs font-semibold text-slate-300">
+                    {dict.discordServers.step3Label}
+                  </label>
                   <div className="grid grid-cols-3 gap-2">
                     {(["PUBLIC", "UNLISTED", "PRIVATE"] as const).map((v) => (
                       <button
@@ -304,14 +304,16 @@ export default function DiscordServersRoute() {
                     onClick={closeRegistrationModal}
                     className="flex-1 rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
                   >
-                    취소
+                    {dict.discordServers.cancelButton}
                   </button>
                   <button
                     type="submit"
                     disabled={regSubmitting || !selectedCandidate}
                     className="flex-1 rounded-xl bg-indigo-600 py-2.5 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
                   >
-                    {regSubmitting ? "등록 중..." : "서버 등록 완료"}
+                    {regSubmitting
+                      ? dict.discordServers.submittingButton
+                      : dict.discordServers.submitButton}
                   </button>
                 </div>
               </form>
@@ -323,23 +325,29 @@ export default function DiscordServersRoute() {
       {/* Directory Grid */}
       <div className="space-y-4">
         <div className="flex items-center justify-between text-xs text-slate-400">
-          <span>총 {total}개의 공개 서버가 등록되어 있습니다.</span>
-          {queryParam && <span>검색어: "{queryParam}"</span>}
+          <span>
+            {dict.discordServers.totalCountPrefix}
+            {total}
+            {dict.discordServers.totalCountSuffix}
+          </span>
+          {queryParam && (
+            <span>
+              {dict.discordServers.searchTermLabel} "{queryParam}"
+            </span>
+          )}
         </div>
 
         {loading ? (
           <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-12 text-center text-sm text-slate-400">
-            서버 목록을 불러오는 중...
+            {dict.discordServers.loadingList}
           </div>
         ) : guilds.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-white/10 bg-slate-900/30 p-12 text-center space-y-3">
             <div className="text-3xl">🔍</div>
             <p className="text-sm font-semibold text-slate-300">
-              검색 조건에 맞는 공개 서버가 없습니다.
+              {dict.discordServers.emptyResultsTitle}
             </p>
-            <p className="text-xs text-slate-400">
-              다른 검색어로 찾아보거나 새로운 서버를 등록해보세요.
-            </p>
+            <p className="text-xs text-slate-400">{dict.discordServers.emptyResultsHint}</p>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
@@ -380,9 +388,9 @@ export default function DiscordServersRoute() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5 text-[11px] text-slate-400">
-                  <span>GAMEMOA 서버</span>
+                  <span>{dict.discordServers.gamemoaServerLabel}</span>
                   <span className="text-indigo-400 font-medium group-hover:translate-x-0.5 transition-transform">
-                    페이지 보기 →
+                    {dict.discordServers.viewPageArrow}
                   </span>
                 </div>
               </Link>

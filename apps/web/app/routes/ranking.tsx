@@ -330,17 +330,17 @@ export default function Ranking() {
                           <td className="py-4 px-6 whitespace-nowrap">
                             {rank === 1 && (
                               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40 shadow-md">
-                                <Medal className="w-4 h-4" /> 1위
+                                <Medal className="w-4 h-4" /> {dict.ranking.rank1}
                               </span>
                             )}
                             {rank === 2 && (
                               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
-                                <Medal className="w-4 h-4" /> 2위
+                                <Medal className="w-4 h-4" /> {dict.ranking.rank2}
                               </span>
                             )}
                             {rank === 3 && (
                               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
-                                <Medal className="w-4 h-4" /> 3위
+                                <Medal className="w-4 h-4" /> {dict.ranking.rank3}
                               </span>
                             )}
                             {rank > 3 && (
@@ -402,15 +402,15 @@ export default function Ranking() {
                           <td className="py-4 px-6 whitespace-nowrap font-bold">
                             {record.rank === 1 ? (
                               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40">
-                                <Medal className="w-4 h-4" /> 1위
+                                <Medal className="w-4 h-4" /> {dict.ranking.rank1}
                               </span>
                             ) : record.rank === 2 ? (
                               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
-                                <Medal className="w-4 h-4" /> 2위
+                                <Medal className="w-4 h-4" /> {dict.ranking.rank2}
                               </span>
                             ) : record.rank === 3 ? (
                               <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
-                                <Medal className="w-4 h-4" /> 3위
+                                <Medal className="w-4 h-4" /> {dict.ranking.rank3}
                               </span>
                             ) : (
                               <span className="text-text-muted px-3">#{record.rank}</span>

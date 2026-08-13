@@ -8,8 +8,10 @@ import {
 import { fetchDiscordBotStatusApi } from "../features/discord/api";
 import type { DiscordGuildDto, GlobalGuildRankEntryDto } from "@gamemoa/contracts";
 import { ExternalLink, Trophy } from "lucide-react";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export default function DiscordHubRoute() {
+  const { dict } = useI18n();
   const [managedGuilds, setManagedGuilds] = useState<DiscordGuildDto[]>([]);
   const [weeklyRanking, setWeeklyRanking] = useState<GlobalGuildRankEntryDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,15 +56,14 @@ export default function DiscordHubRoute() {
           </div>
 
           <h1 className="text-3xl font-extrabold tracking-tight text-white md:text-5xl">
-            친구들과 게임 기록을 <br className="hidden sm:inline" />
+            {dict.discord.heroTitle1} <br className="hidden sm:inline" />
             <span className="bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 bg-clip-text text-transparent">
-              경쟁하고 소통하세요
+              {dict.discord.heroTitle2}
             </span>
           </h1>
 
           <p className="text-sm leading-relaxed text-indigo-100/80 md:text-base">
-            GAMEMOA Discord Bot을 내 서버에 등록하고 커뮤니티 전용 리더보드와 서버 전용 페이지를
-            구축하세요.
+            {dict.discord.heroSubtitle}
           </p>
 
           <div className="flex flex-wrap gap-4 pt-2">
@@ -74,7 +75,7 @@ export default function DiscordHubRoute() {
                 id="discord-hub-install-cta"
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500 hover:shadow-indigo-500/40 active:scale-95"
               >
-                Discord에 GAMEMOA 추가 <ExternalLink className="h-4 w-4" />
+                {dict.discord.installCta} <ExternalLink className="h-4 w-4" />
               </a>
             )}
             <Link
@@ -82,28 +83,28 @@ export default function DiscordHubRoute() {
               id="discord-hub-setup-cta"
               className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/20 active:scale-95"
             >
-              🧭 설치 가이드 (5단계)
+              {dict.discord.setupCta}
             </Link>
             <Link
               to="/discord/servers"
               id="discord-hub-search-cta"
               className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/20 active:scale-95"
             >
-              🔍 서버 검색
+              {dict.discord.searchCta}
             </Link>
             <a
               href={getDiscordRegisterAuthUrl()}
               id="discord-hub-register-cta"
               className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/20 active:scale-95"
             >
-              ⚡ 내 서버 등록 (관리자 권한)
+              {dict.discord.registerCta}
             </a>
             <Link
               to="/discord/guide"
               id="discord-hub-guide-cta"
               className="inline-flex items-center justify-center rounded-xl border border-indigo-300/20 bg-indigo-300/10 px-6 py-3 text-sm font-semibold text-indigo-100 transition-all hover:bg-indigo-300/20 active:scale-95"
             >
-              📖 Discord 이용 가이드
+              {dict.discord.guideCta}
             </Link>
           </div>
         </div>
@@ -115,7 +116,7 @@ export default function DiscordHubRoute() {
         <div className="md:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <span>🛡️ 내가 관리하는 등록 서버</span>
+              <span>{dict.discord.managedServersTitle}</span>
               {managedGuilds.length > 0 && (
                 <span className="rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs text-indigo-300 font-semibold">
                   {managedGuilds.length}
@@ -126,31 +127,29 @@ export default function DiscordHubRoute() {
               to="/discord/servers"
               className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors"
             >
-              전체 탐색 →
+              {dict.discord.exploreAll}
             </Link>
           </div>
 
           {loading ? (
             <div className="rounded-2xl border border-white/5 bg-slate-900/50 p-8 text-center text-sm text-slate-400">
-              서버 목록 불러오는 중...
+              {dict.discord.loadingServers}
             </div>
           ) : managedGuilds.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-white/10 bg-slate-900/30 p-8 text-center space-y-4">
               <div className="text-3xl">🏰</div>
               <div className="space-y-1">
                 <p className="text-sm font-semibold text-slate-200">
-                  {isLoggedIn ? "관리 중인 등록 서버가 없습니다" : "로그인이 필요합니다"}
+                  {isLoggedIn ? dict.discord.noManagedServers : dict.discord.loginRequired}
                 </p>
-                <p className="text-xs text-slate-400">
-                  Discord 관리자 권한이 있는 서버를 GAMEMOA에 등록하여 커뮤니티를 시작해보세요.
-                </p>
+                <p className="text-xs text-slate-400">{dict.discord.registerPrompt}</p>
               </div>
               <div>
                 <a
                   href={getDiscordRegisterAuthUrl()}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600/80 px-4 py-2 text-xs font-medium text-white hover:bg-indigo-500 transition-all"
                 >
-                  서버 등록 시작하기
+                  {dict.discord.registerStart}
                 </a>
               </div>
             </div>
@@ -197,7 +196,7 @@ export default function DiscordHubRoute() {
                         {guild.visibility}
                       </span>
                       <span className="text-[11px] text-slate-500">
-                        등록일: {guild.registeredAt.slice(0, 10)}
+                        {dict.discord.registeredLabel}: {guild.registeredAt.slice(0, 10)}
                       </span>
                     </div>
                   </div>
@@ -207,13 +206,13 @@ export default function DiscordHubRoute() {
                       to={`/discord/servers/${guild.slug}`}
                       className="flex-1 rounded-lg bg-white/5 px-3 py-1.5 text-center text-xs font-medium text-slate-300 hover:bg-white/10 hover:text-white transition-all"
                     >
-                      공개 페이지
+                      {dict.discord.publicPage}
                     </Link>
                     <Link
                       to={`/discord/servers/${guild.slug}/manage`}
                       className="flex-1 rounded-lg bg-indigo-600/30 px-3 py-1.5 text-center text-xs font-medium text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/50 hover:text-white transition-all"
                     >
-                      서버 관리
+                      {dict.discord.manageServer}
                     </Link>
                   </div>
                 </div>
@@ -229,16 +228,18 @@ export default function DiscordHubRoute() {
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Trophy className="h-4 w-4 text-purple-400" />
-                <span>이번 주 서버 활동 랭킹</span>
+                <span>{dict.discord.weeklyRankingTitle}</span>
               </h3>
               <span className="text-[10px] text-slate-500 font-mono">PUBLIC</span>
             </div>
 
             {loadingRanking ? (
-              <div className="text-xs text-slate-400 text-center py-4">랭킹 불러오는 중...</div>
+              <div className="text-xs text-slate-400 text-center py-4">
+                {dict.discord.loadingRanking}
+              </div>
             ) : weeklyRanking.length === 0 ? (
               <div className="text-xs text-slate-400 text-center py-4">
-                이번 주 등록된 서버 활동이 없습니다
+                {dict.discord.emptyWeeklyRanking}
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -279,22 +280,20 @@ export default function DiscordHubRoute() {
           {/* Quick Guide Card */}
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 backdrop-blur-sm space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <span>📌 이용 안내</span>
+              <span>{dict.discord.guideTitle}</span>
             </h3>
             <ul className="space-y-3 text-xs leading-relaxed text-slate-300">
               <li className="flex gap-2">
                 <span className="text-indigo-400 font-bold">1.</span>
-                <span>서버 등록은 Discord 관리자(MANAGE_GUILD) 권한을 가진 유저만 가능합니다.</span>
+                <span>{dict.discord.guideStep1}</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-indigo-400 font-bold">2.</span>
-                <span>공개(PUBLIC) 등록 시 GAMEMOA 디렉토리 및 검색에 노출됩니다.</span>
+                <span>{dict.discord.guideStep2}</span>
               </li>
               <li className="flex gap-2">
                 <span className="text-indigo-400 font-bold">3.</span>
-                <span>
-                  /gamemoa play로 게임을 플레이하면 이 서버에 XP가 기여되며 주간 랭킹에 집계됩니다.
-                </span>
+                <span>{dict.discord.guideStep3}</span>
               </li>
             </ul>
           </div>
@@ -302,23 +301,20 @@ export default function DiscordHubRoute() {
           {/* Account Link Card */}
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 backdrop-blur-sm space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <span>🔗 Discord 계정 연동</span>
+              <span>{dict.discord.accountLinkTitle}</span>
             </h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              GAMEMOA 계정과 Discord 계정을 연동하면 봇 커맨드(/gamemoa profile)에서 본인 정보를
-              확인할 수 있습니다.
-            </p>
+            <p className="text-xs text-slate-400 leading-relaxed">{dict.discord.accountLinkBody}</p>
             <Link
               to="/discord/link"
               className="block w-full rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2.5 text-center text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 hover:text-white transition-all"
             >
-              계정 연동 페이지 이동
+              {dict.discord.accountLinkCta}
             </Link>
             <Link
               to="/discord/guide"
               className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-center text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-all"
             >
-              Discord 사용 방법 보기
+              {dict.discord.usageGuideCta}
             </Link>
           </div>
         </div>

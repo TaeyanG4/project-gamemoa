@@ -6,8 +6,10 @@ import {
   unregisterDiscordGuild,
 } from "../features/discord/discordGuildApi";
 import type { DiscordGuildDto, DiscordGuildVisibility } from "@gamemoa/contracts";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export default function DiscordServerManageRoute() {
+  const { dict } = useI18n();
   const { slug: currentSlug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
 
@@ -34,9 +36,7 @@ export default function DiscordServerManageRoute() {
     fetchDiscordGuildBySlug(currentSlug)
       .then((res) => {
         if (!res.isManager) {
-          setError(
-            "이 서버를 관리할 권한이 없습니다. Discord 관리자 계정으로 로그인되어 있는지 확인하세요.",
-          );
+          setError(dict.discordServerManage.noPermissionError);
           return;
         }
         setGuild(res.guild);
@@ -45,10 +45,14 @@ export default function DiscordServerManageRoute() {
         setVisibilityInput(res.guild.visibility);
       })
       .catch((err) => {
-        setError(err instanceof Error ? err.message : "서버 정보를 불러올 수 없습니다.");
+        setError(err instanceof Error ? err.message : dict.discordServerSlug.loadFailedGeneric);
       })
       .finally(() => setLoading(false));
-  }, [currentSlug]);
+  }, [
+    currentSlug,
+    dict.discordServerManage.noPermissionError,
+    dict.discordServerSlug.loadFailedGeneric,
+  ]);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,7 +75,7 @@ export default function DiscordServerManageRoute() {
         navigate(`/discord/servers/${res.guild.slug}/manage`, { replace: true });
       }
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "설정 저장 실패");
+      setSaveError(err instanceof Error ? err.message : dict.discordServerManage.saveFailedError);
     } finally {
       setSaving(false);
     }
@@ -85,7 +89,9 @@ export default function DiscordServerManageRoute() {
       await unregisterDiscordGuild(currentSlug);
       navigate("/discord/servers", { replace: true });
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "서버 해제 실패");
+      setSaveError(
+        err instanceof Error ? err.message : dict.discordServerManage.unregisterFailedError,
+      );
       setShowUnregisterModal(false);
     } finally {
       setUnregistering(false);
@@ -95,7 +101,7 @@ export default function DiscordServerManageRoute() {
   if (loading) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16 text-center text-sm text-slate-400">
-        서버 관리 정보를 불러오는 중...
+        {dict.discordServerManage.loadingManageInfo}
       </div>
     );
   }
@@ -105,14 +111,16 @@ export default function DiscordServerManageRoute() {
       <div className="mx-auto max-w-md px-4 py-16 text-center space-y-4">
         <div className="rounded-3xl border border-rose-500/20 bg-slate-900/80 p-8 backdrop-blur-md space-y-4">
           <div className="text-3xl">🚫</div>
-          <h1 className="text-lg font-bold text-white">접근 권한 없음</h1>
+          <h1 className="text-lg font-bold text-white">
+            {dict.discordServerManage.accessDeniedTitle}
+          </h1>
           <p className="text-xs text-slate-300 leading-relaxed">{error}</p>
           <div className="pt-2">
             <Link
               to="/discord/servers"
               className="inline-flex items-center gap-1 rounded-xl bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700"
             >
-              ← 디렉토리로 이동
+              {dict.discordServerManage.backToDirectory}
             </Link>
           </div>
         </div>
@@ -126,17 +134,17 @@ export default function DiscordServerManageRoute() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <span>⚙️ {guild.name} 서버 관리</span>
+            <span>
+              ⚙️ {guild.name} {dict.discordServerManage.manageTitleSuffix}
+            </span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
-            공개/비공개 가시성, 커스텀 Vanity Slug 주소 및 설명 문구를 설정할 수 있습니다.
-          </p>
+          <p className="text-xs text-slate-400 mt-1">{dict.discordServerManage.manageSubtitle}</p>
         </div>
         <Link
           to={`/discord/servers/${guild.slug}`}
           className="rounded-xl border border-white/10 bg-slate-900 px-3.5 py-2 text-xs font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-all"
         >
-          공개 페이지 →
+          {dict.discordServerManage.publicPageArrow}
         </Link>
       </div>
 
@@ -153,14 +161,14 @@ export default function DiscordServerManageRoute() {
 
         {saveSuccess && (
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300">
-            설정이 성공적으로 저장되었습니다.
+            {dict.discordServerManage.saveSuccessMessage}
           </div>
         )}
 
         {/* Vanity Slug */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-slate-200">
-            Vanity Slug 주소 (영문 소문자, 숫자, -)
+            {dict.discordServerManage.slugLabel}
           </label>
           <div className="flex items-center rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2.5 text-xs text-slate-400">
             <span>/discord/servers/</span>
@@ -173,23 +181,35 @@ export default function DiscordServerManageRoute() {
             />
           </div>
           <p className="text-[11px] text-slate-500">
-            변경하더라도 Discord Guild ID({guild.guildId}) 자체는 변경되지 않습니다.
+            {dict.discordServerManage.slugHintPrefix}
+            {guild.guildId}
+            {dict.discordServerManage.slugHintSuffix}
           </p>
         </div>
 
         {/* Visibility */}
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-slate-200">서버 가시성 (Visibility)</label>
+          <label className="text-xs font-semibold text-slate-200">
+            {dict.discordServerManage.visibilityLabel}
+          </label>
           <div className="grid grid-cols-3 gap-3">
             {(
               [
-                { key: "PUBLIC", title: "PUBLIC", desc: "검색 노출 및 공개 페이지 접속 가능" },
+                {
+                  key: "PUBLIC",
+                  title: "PUBLIC",
+                  desc: dict.discordServerManage.visibilityPublicDesc,
+                },
                 {
                   key: "UNLISTED",
                   title: "UNLISTED",
-                  desc: "검색 미노출, 직링크 페이지 접속 가능",
+                  desc: dict.discordServerManage.visibilityUnlistedDesc,
                 },
-                { key: "PRIVATE", title: "PRIVATE", desc: "검색 미노출, 관리자만 접근 가능" },
+                {
+                  key: "PRIVATE",
+                  title: "PRIVATE",
+                  desc: dict.discordServerManage.visibilityPrivateDesc,
+                },
               ] as const
             ).map((v) => (
               <button
@@ -211,12 +231,14 @@ export default function DiscordServerManageRoute() {
 
         {/* Description */}
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-slate-200">서버 설명 문구</label>
+          <label className="text-xs font-semibold text-slate-200">
+            {dict.discordServerManage.descriptionLabel}
+          </label>
           <textarea
             rows={3}
             value={descriptionInput}
             onChange={(e) => setDescriptionInput(e.target.value)}
-            placeholder="서버의 특징이나 커뮤니티 소개글을 입력하세요..."
+            placeholder={dict.discordServerManage.descriptionPlaceholder}
             className="w-full rounded-xl border border-white/10 bg-slate-950/60 p-3 text-xs text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none"
           />
         </div>
@@ -228,17 +250,18 @@ export default function DiscordServerManageRoute() {
             disabled={saving}
             className="w-full rounded-xl bg-indigo-600 py-3 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 transition-all shadow-lg shadow-indigo-600/20"
           >
-            {saving ? "저장 중..." : "설정 저장"}
+            {saving ? dict.discordServerManage.savingButton : dict.discordServerManage.saveButton}
           </button>
         </div>
       </form>
 
       {/* Danger Zone */}
       <div className="rounded-3xl border border-rose-500/20 bg-rose-950/20 p-6 md:p-8 backdrop-blur-md space-y-4">
-        <h2 className="text-sm font-bold text-rose-300">위험 구역 (Danger Zone)</h2>
+        <h2 className="text-sm font-bold text-rose-300">
+          {dict.discordServerManage.dangerZoneTitle}
+        </h2>
         <p className="text-xs text-slate-400 leading-relaxed">
-          서버 등록을 해제하면 GAMEMOA 디렉토리에서 제외되고 `DISABLED` 상태로 변경됩니다. (Discord
-          서버 자체에는 영향이 없습니다)
+          {dict.discordServerManage.dangerZoneText}
         </p>
         <div>
           <button
@@ -246,7 +269,7 @@ export default function DiscordServerManageRoute() {
             onClick={() => setShowUnregisterModal(true)}
             className="rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500 hover:text-white transition-all"
           >
-            서버 등록 해제
+            {dict.discordServerManage.unregisterButton}
           </button>
         </div>
       </div>
@@ -257,10 +280,12 @@ export default function DiscordServerManageRoute() {
           <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900 p-6 space-y-6 shadow-2xl">
             <div className="space-y-2 text-center">
               <div className="text-3xl">⚠️</div>
-              <h3 className="text-base font-bold text-white">서버 등록을 해제하시겠습니까?</h3>
+              <h3 className="text-base font-bold text-white">
+                {dict.discordServerManage.unregisterConfirmTitle}
+              </h3>
               <p className="text-xs text-slate-400">
-                <span className="font-semibold text-white">{guild.name}</span> 서버가 GAMEMOA
-                디렉토리 및 검색에서 제외됩니다.
+                <span className="font-semibold text-white">{guild.name}</span>{" "}
+                {dict.discordServerManage.unregisterConfirmBodySuffix}
               </p>
             </div>
 
@@ -270,7 +295,7 @@ export default function DiscordServerManageRoute() {
                 onClick={() => setShowUnregisterModal(false)}
                 className="flex-1 rounded-xl bg-slate-800 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-700"
               >
-                취소
+                {dict.discordServerManage.cancelButton}
               </button>
               <button
                 type="button"
@@ -278,7 +303,9 @@ export default function DiscordServerManageRoute() {
                 disabled={unregistering}
                 className="flex-1 rounded-xl bg-rose-600 py-2.5 text-xs font-semibold text-white hover:bg-rose-500 disabled:opacity-50"
               >
-                {unregistering ? "해제 중..." : "확인 (해제)"}
+                {unregistering
+                  ? dict.discordServerManage.unregisteringButton
+                  : dict.discordServerManage.confirmUnregisterButton}
               </button>
             </div>
           </div>
