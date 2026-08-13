@@ -12,13 +12,54 @@ export function isAdminUserId(userId: number, configuredIds?: string): boolean {
 
 const DEFAULT_FRONTEND_URL = "https://gamemoa-web.gamemoa.workers.dev";
 
+/** Returns the normalized `scheme://host:port` origin, or null if `value` is not a valid URL. */
+function safeOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function isLocalhostOrigin(value: string): boolean {
+  const origin = safeOrigin(value);
+  if (!origin) return false;
+  try {
+    const hostname = new URL(origin).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Admin mutations require an explicit browser Origin. This is stricter than the general
- * API guard because an authenticated session cookie alone must never authorize a write.
+ * Admin mutations require an explicit, exactly-matching browser Origin. This is stricter than
+ * the general API guard because an authenticated session cookie alone must never authorize a
+ * write.
+ *
+ * Comparison is always an exact origin match (`new URL(origin).origin === new URL(FRONTEND_URL).origin`)
+ * — never `startsWith`/prefix matching, which a lookalike host (e.g.
+ * `https://gamemoa-web.gamemoa.workers.dev.evil.example`) could otherwise satisfy.
+ *
+ * localhost/127.0.0.1 origins are only ever trusted when the configured `FRONTEND_URL` itself
+ * is a localhost/127.0.0.1 development origin — production configuration never grants a
+ * blanket localhost bypass.
  */
 export function isTrustedAdminOrigin(origin: string | undefined, frontendUrl?: string): boolean {
   if (!origin) return false;
-  const allowed = frontendUrl || DEFAULT_FRONTEND_URL;
-  if (origin === allowed || origin === DEFAULT_FRONTEND_URL) return true;
-  return origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+  const originValue = safeOrigin(origin);
+  if (!originValue) return false;
+
+  const configuredFrontendUrl = frontendUrl || DEFAULT_FRONTEND_URL;
+
+  const allowedOrigins = new Set(
+    [safeOrigin(configuredFrontendUrl), safeOrigin(DEFAULT_FRONTEND_URL)].filter(
+      (value): value is string => value !== null,
+    ),
+  );
+  if (allowedOrigins.has(originValue)) return true;
+
+  // Development-only exception: the request origin and the *configured* frontend URL must
+  // both be localhost/127.0.0.1 — a production FRONTEND_URL never enables this branch.
+  return isLocalhostOrigin(configuredFrontendUrl) && isLocalhostOrigin(originValue);
 }
