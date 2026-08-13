@@ -4,20 +4,54 @@ import { DISCORD_SUBCOMMANDS } from "./commands.js";
 import {
   DISCORD_MESSAGE_FLAG_EPHEMERAL,
   DISCORD_RESPONSE_TYPE,
+  type DiscordEmbed,
+  type DiscordEmbedFooter,
   type DiscordInteraction,
   type DiscordInteractionResponse,
   type DiscordInteractionUser,
 } from "./types.js";
 
-function ephemeral(content: string): DiscordInteractionResponse {
+// GAMEMOA brand palette (apps/web/app/app.css) used consistently across every embed so the
+// bot's messages read as a matched extension of the site, not a bare-bones text bot.
+const COLOR_BRAND = 0x6366f1; // --color-brand — default/neutral
+const COLOR_XP = 0xf59e0b; // --color-accent-yellow — level/XP/leaderboard
+const COLOR_SERVER = 0xa855f7; // --color-accent-purple — server-wide info
+const COLOR_SUCCESS = 0x10b981; // --color-accent-green
+const COLOR_ERROR = 0xf43f5e; // --color-accent-red
+
+function gamemoaFooter(frontendUrl: string): DiscordEmbedFooter {
+  return { text: "GAMEMOA", icon_url: `${frontendUrl}/favicon-192x192.png` };
+}
+
+/** Discord's default (no custom avatar set) avatar, computed the same way Discord's own
+ * clients do for the modern username system (no legacy discriminator). */
+function discordAvatarUrl(user: DiscordInteractionUser): string {
+  if (user.avatar) {
+    return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`;
+  }
+  const index = Number((BigInt(user.id) >> 22n) % 6n);
+  return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
+}
+
+function ephemeralEmbed(embed: DiscordEmbed): DiscordInteractionResponse {
   return {
     type: DISCORD_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
-    data: { content, flags: DISCORD_MESSAGE_FLAG_EPHEMERAL },
+    data: { embeds: [embed], flags: DISCORD_MESSAGE_FLAG_EPHEMERAL },
   };
 }
 
-function publicMessage(content: string): DiscordInteractionResponse {
-  return { type: DISCORD_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE, data: { content } };
+function publicEmbed(embed: DiscordEmbed): DiscordInteractionResponse {
+  return { type: DISCORD_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE, data: { embeds: [embed] } };
+}
+
+/** Errors are always ephemeral (only the invoking user needs to see why something failed). */
+function errorEmbed(description: string, frontendUrl: string): DiscordInteractionResponse {
+  return ephemeralEmbed({
+    title: "⚠️ 오류",
+    description,
+    color: COLOR_ERROR,
+    footer: gamemoaFooter(frontendUrl),
+  });
 }
 
 /** Dispatches a verified `/gamemoa <subcommand>` interaction to its handler. */
@@ -32,7 +66,7 @@ export async function handleGamemoaCommand(
   const discordUser = interaction.member?.user ?? interaction.user;
 
   if (!discordUser) {
-    return ephemeral("Discord 사용자 정보를 확인할 수 없습니다.");
+    return errorEmbed("Discord 사용자 정보를 확인할 수 없습니다.", frontendUrl);
   }
 
   switch (subcommand) {
@@ -41,27 +75,40 @@ export async function handleGamemoaCommand(
     case DISCORD_SUBCOMMANDS.LINK:
       return handleLinkCommand(container, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.PROFILE:
-      return handleProfileCommand(container, discordUser);
+      return handleProfileCommand(container, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.PLAY:
       return handlePlayCommand(container, interaction, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.RANK:
-      return handleRankCommand(container, interaction, discordUser);
+      return handleRankCommand(container, interaction, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.LEADERBOARD:
       return handleLeaderboardCommand(container, interaction, frontendUrl);
     case DISCORD_SUBCOMMANDS.SERVER:
       return handleServerCommand(container, interaction, frontendUrl);
     default:
-      return ephemeral("알 수 없는 명령어입니다.");
+      return errorEmbed("알 수 없는 명령어입니다.", frontendUrl);
   }
 }
 
 function handleGamesCommand(frontendUrl: string): DiscordInteractionResponse {
   const published = Object.values(GAME_MANIFEST_MAP).filter((m) => m.status === "published");
+  const footer = gamemoaFooter(frontendUrl);
+
   if (published.length === 0) {
-    return publicMessage("현재 플레이 가능한 게임이 없습니다.");
+    return publicEmbed({
+      title: "🎮 GAMEMOA 게임 목록",
+      description: "현재 플레이 가능한 게임이 없습니다.",
+      color: COLOR_BRAND,
+      footer,
+    });
   }
-  const lines = published.map((g) => `• **${g.title}** — ${frontendUrl}/games/${g.slug}`);
-  return publicMessage(`🎮 GAMEMOA 게임 목록\n${lines.join("\n")}`);
+
+  const lines = published.map((g) => `• [${g.title}](${frontendUrl}/games/${g.slug})`);
+  return publicEmbed({
+    title: "🎮 GAMEMOA 게임 목록",
+    description: lines.join("\n"),
+    color: COLOR_BRAND,
+    footer,
+  });
 }
 
 async function handleLinkCommand(
@@ -69,9 +116,15 @@ async function handleLinkCommand(
   discordUser: DiscordInteractionUser,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
+  const footer = gamemoaFooter(frontendUrl);
   const existing = await container.userRepo.findOAuthAccount("discord", discordUser.id);
   if (existing) {
-    return ephemeral("이 Discord 계정은 이미 GAMEMOA 계정과 연동되어 있습니다.");
+    return ephemeralEmbed({
+      title: "🔗 Discord 계정 연동",
+      description: "✅ 이 Discord 계정은 이미 GAMEMOA 계정과 연동되어 있습니다.",
+      color: COLOR_SUCCESS,
+      footer,
+    });
   }
 
   const displayName = discordUser.global_name || discordUser.username;
@@ -86,27 +139,43 @@ async function handleLinkCommand(
   );
   const linkUrl = `${frontendUrl}/discord/link?token=${encodeURIComponent(token)}`;
 
-  return ephemeral(
-    `GAMEMOA 계정과 연동하려면 아래 링크를 열고 로그인해주세요.\n${linkUrl}\n\n` +
-      `이 링크는 ${expiresInMinutes}분 후 만료되며, 1회만 사용할 수 있습니다.`,
-  );
+  return ephemeralEmbed({
+    title: "🔗 Discord 계정 연동",
+    description:
+      `GAMEMOA 계정과 연동하려면 아래 링크를 열고 로그인해주세요.\n\n` +
+      `🔗 [연동 링크 열기](${linkUrl})\n\n` +
+      `⏱️ 이 링크는 ${expiresInMinutes}분 후 만료되며, 1회만 사용할 수 있습니다.`,
+    color: COLOR_BRAND,
+    footer,
+  });
 }
 
 async function handleProfileCommand(
   container: AppContainer,
   discordUser: DiscordInteractionUser,
+  frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
+  const footer = gamemoaFooter(frontendUrl);
   const user = await container.userRepo.findByOAuth("discord", discordUser.id);
   if (!user) {
-    return ephemeral(
+    return errorEmbed(
       "이 Discord 계정은 아직 GAMEMOA 계정과 연동되지 않았습니다. `/gamemoa link`로 먼저 연동해주세요.",
+      frontendUrl,
     );
   }
 
   const { summary } = await container.progressionUseCases.getProgressionSummary(user.id);
-  return ephemeral(
-    `**${user.nickname}**\n레벨 ${summary.level} · 총 ${summary.totalXp.toLocaleString()} XP`,
-  );
+  return ephemeralEmbed({
+    title: `👤 ${user.nickname}`,
+    url: `${frontendUrl}/profile`,
+    color: COLOR_XP,
+    thumbnail: { url: discordAvatarUrl(discordUser) },
+    fields: [
+      { name: "레벨", value: `${summary.level}`, inline: true },
+      { name: "총 XP", value: `${summary.totalXp.toLocaleString()} XP`, inline: true },
+    ],
+    footer,
+  });
 }
 
 async function handlePlayCommand(
@@ -117,7 +186,7 @@ async function handlePlayCommand(
 ): Promise<DiscordInteractionResponse> {
   const guildId = interaction.guild_id;
   if (!guildId) {
-    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+    return errorEmbed("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.", frontendUrl);
   }
 
   const subCommandOptions = interaction.data?.options?.[0]?.options;
@@ -140,19 +209,18 @@ async function handlePlayCommand(
     const gameTitle =
       selectedGameId && GAME_MANIFEST_MAP[selectedGameId]
         ? GAME_MANIFEST_MAP[selectedGameId].title
-        : null;
+        : "게임 선택";
 
-    const gameText = gameTitle ? ` **${gameTitle}**` : "";
-
-    return ephemeral(
-      `🎮 **${playCtx.guildName}** 기여 플레이 링크가 발급되었습니다!${gameText}\n` +
-        `아래 링크를 통해 게임을 플레이하면 이 서버에 XP가 기여됩니다:\n` +
-        `${playUrl}\n\n` +
-        `⏱️ 이 링크는 15분간 유효하며 1회만 사용할 수 있습니다.`,
-    );
+    return ephemeralEmbed({
+      title: `🎮 ${playCtx.guildName} 플레이 링크 발급`,
+      description: "아래 링크를 통해 게임을 플레이하면 이 서버에 XP가 기여됩니다.",
+      color: COLOR_BRAND,
+      fields: [{ name: gameTitle, value: `[플레이하기](${playUrl})` }],
+      footer: { text: `⏱️ 이 링크는 15분간 유효하며 1회만 사용할 수 있습니다.` },
+    });
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "플레이 링크 생성에 실패했습니다.";
-    return ephemeral(errorMsg);
+    return errorEmbed(errorMsg, frontendUrl);
   }
 }
 
@@ -160,23 +228,27 @@ async function handleRankCommand(
   container: AppContainer,
   interaction: DiscordInteraction,
   discordUser: DiscordInteractionUser,
+  frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
+  const footer = gamemoaFooter(frontendUrl);
   const guildId = interaction.guild_id;
   if (!guildId) {
-    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+    return errorEmbed("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.", frontendUrl);
   }
 
   const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
   if (!guild || guild.registration_status !== "ACTIVE") {
-    return ephemeral(
+    return errorEmbed(
       "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+      frontendUrl,
     );
   }
 
   const oauthAccount = await container.userRepo.findOAuthAccount("discord", discordUser.id);
   if (!oauthAccount) {
-    return ephemeral(
+    return errorEmbed(
       "GAMEMOA 계정이 Discord와 연결되어 있지 않습니다. `/gamemoa link` 명령어로 계정을 먼저 연결해 주세요.",
+      frontendUrl,
     );
   }
 
@@ -186,18 +258,31 @@ async function handleRankCommand(
     "alltime",
   );
 
+  const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
+
   if (!rankSummary.rank || rankSummary.totalXp <= 0) {
-    return ephemeral(
-      `🏆 **${guild.name}**\n아직 이 서버에 기여한 XP가 없습니다. \`/gamemoa play\` 명령어로 게임을 플레이해보세요!`,
-    );
+    return ephemeralEmbed({
+      title: `🏆 ${guild.name}`,
+      description:
+        "아직 이 서버에 기여한 XP가 없습니다. `/gamemoa play` 명령어로 게임을 플레이해보세요!",
+      color: COLOR_BRAND,
+      ...(thumbnail ? { thumbnail } : {}),
+      footer,
+    });
   }
 
   const nickname = rankSummary.nickname || discordUser.global_name || discordUser.username;
-  return ephemeral(
-    `🏆 **${guild.name}** 내 **${nickname}** 님의 활동 현황\n` +
-      `• 서버 기여 XP: **${rankSummary.totalXp.toLocaleString()} XP**\n` +
-      `• 서버 순위: **#${rankSummary.rank}**`,
-  );
+  return ephemeralEmbed({
+    title: `🏆 ${guild.name} 활동 현황`,
+    color: COLOR_XP,
+    ...(thumbnail ? { thumbnail } : {}),
+    fields: [
+      { name: "닉네임", value: nickname, inline: true },
+      { name: "서버 기여 XP", value: `${rankSummary.totalXp.toLocaleString()} XP`, inline: true },
+      { name: "서버 순위", value: `#${rankSummary.rank}`, inline: true },
+    ],
+    footer,
+  });
 }
 
 async function handleLeaderboardCommand(
@@ -205,15 +290,17 @@ async function handleLeaderboardCommand(
   interaction: DiscordInteraction,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
+  const footer = gamemoaFooter(frontendUrl);
   const guildId = interaction.guild_id;
   if (!guildId) {
-    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+    return errorEmbed("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.", frontendUrl);
   }
 
   const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
   if (!guild || guild.registration_status !== "ACTIVE") {
-    return ephemeral(
+    return errorEmbed(
       "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+      frontendUrl,
     );
   }
 
@@ -225,23 +312,31 @@ async function handleLeaderboardCommand(
   );
 
   const serverUrl = `${frontendUrl}/discord/servers/${guild.slug}`;
+  const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
 
   if (leaderboard.entries.length === 0) {
-    return publicMessage(
-      `📊 **${guild.name}** 서버 XP 리더보드\n` +
-        `아직 등록된 활동 XP가 없습니다. \`/gamemoa play\`로 첫 기여를 시작해보세요!\n\n` +
-        `👉 전체 랭킹 보기: ${serverUrl}`,
-    );
+    return publicEmbed({
+      title: `📊 ${guild.name} 서버 XP 리더보드`,
+      description: "아직 등록된 활동 XP가 없습니다. `/gamemoa play`로 첫 기여를 시작해보세요!",
+      color: COLOR_BRAND,
+      ...(thumbnail ? { thumbnail } : {}),
+      fields: [{ name: "전체 랭킹", value: `[웹에서 보기](${serverUrl})` }],
+      footer,
+    });
   }
 
   const lines = leaderboard.entries.map(
     (e) => `${e.rank}. **${e.nickname}** — ${e.xp.toLocaleString()} XP`,
   );
 
-  return publicMessage(
-    `📊 **${guild.name}** 서버 XP 리더보드 (Top 10)\n${lines.join("\n")}\n\n` +
-      `👉 전체 랭킹 보기: ${serverUrl}`,
-  );
+  return publicEmbed({
+    title: `📊 ${guild.name} 서버 XP 리더보드 (Top 10)`,
+    description: lines.join("\n"),
+    color: COLOR_XP,
+    ...(thumbnail ? { thumbnail } : {}),
+    fields: [{ name: "전체 랭킹", value: `[웹에서 전체 보기](${serverUrl})` }],
+    footer,
+  });
 }
 
 async function handleServerCommand(
@@ -249,26 +344,34 @@ async function handleServerCommand(
   interaction: DiscordInteraction,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
+  const footer = gamemoaFooter(frontendUrl);
   const guildId = interaction.guild_id;
   if (!guildId) {
-    return ephemeral("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.");
+    return errorEmbed("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.", frontendUrl);
   }
 
   const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
   if (!guild || guild.registration_status !== "ACTIVE") {
-    return ephemeral(
+    return errorEmbed(
       "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+      frontendUrl,
     );
   }
 
   const summary = await container.discordGuildXpUseCases.getGuildSummary(guildId);
   const serverUrl = `${frontendUrl}/discord/servers/${guild.slug}`;
+  const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
 
-  return publicMessage(
-    `🏰 **${guild.name}** 서버 정보 요약\n` +
-      `• 전체 활동 XP: **${summary.totalXp.toLocaleString()} XP**\n` +
-      `• 이번 주 활동 XP: **${summary.weeklyXp.toLocaleString()} XP**\n` +
-      `• GAMEMOA 참여자: **${summary.participantCount}명**\n\n` +
-      `🌐 웹 커뮤니티 페이지: ${serverUrl}`,
-  );
+  return publicEmbed({
+    title: `🏰 ${guild.name}`,
+    url: serverUrl,
+    color: COLOR_SERVER,
+    ...(thumbnail ? { thumbnail } : {}),
+    fields: [
+      { name: "전체 활동 XP", value: `${summary.totalXp.toLocaleString()} XP`, inline: true },
+      { name: "이번 주 활동 XP", value: `${summary.weeklyXp.toLocaleString()} XP`, inline: true },
+      { name: "GAMEMOA 참여자", value: `${summary.participantCount}명`, inline: true },
+    ],
+    footer,
+  });
 }

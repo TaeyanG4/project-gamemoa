@@ -32,8 +32,37 @@ export interface DiscordInteraction {
   guild_id?: string;
 }
 
+// Minimal subset of Discord's Embed object — https://discord.com/developers/docs/resources/message#embed-object
+export interface DiscordEmbedField {
+  name: string;
+  value: string;
+  inline?: boolean;
+}
+
+export interface DiscordEmbedFooter {
+  text: string;
+  icon_url?: string;
+}
+
+export interface DiscordEmbedThumbnail {
+  url: string;
+}
+
+export interface DiscordEmbed {
+  title?: string;
+  description?: string;
+  /** Makes the embed title a clickable link when set. */
+  url?: string;
+  /** Decimal RGB color, e.g. 0x6366f1. */
+  color?: number;
+  fields?: DiscordEmbedField[];
+  footer?: DiscordEmbedFooter;
+  thumbnail?: DiscordEmbedThumbnail;
+}
+
 export interface DiscordInteractionResponseData {
   content?: string;
+  embeds?: DiscordEmbed[];
   /** Bitfield; 64 = EPHEMERAL (only the invoking user sees the response). */
   flags?: number;
 }
