@@ -14,18 +14,19 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 
 ## 🎯 1. 진행 중인 대형 스프린트 — 플레이어 플랫폼 확장
 
-| Phase | 내용                                                                              | 상태                                                                           |
-| ----- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)                            | ✅ 완료                                                                        |
-| C     | My Page(내 프로필/기록 탭) / 닉네임·국가 변경 UI / 즐겨찾기·최근 플레이           | ✅ 완료 (공개 프로필 `/profile/:id`, `/me`·`/account` 완전 라우트 분리는 보류) |
-| D     | XP 랭킹 UI, Creator 모델 기초                                                     | ✅ 완료                                                                        |
-| E1    | Creator 채널 소유권 검증 (YouTube, CHZZK, SOOP, Twitch 공식 OAuth/API)            | ✅ 완료                                                                        |
-| E2A   | Creator Featured 심사 엔진 (자격 정책, 6시간 자동 재심사 스케줄러, 잡 모델)       | ✅ 완료                                                                        |
-| E2B   | Featured 수동 심사(운영진 리뷰), 14일 재검증/하이스테리시스, 관리 도구            | ✅ 완료                                                                        |
-| F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어                      | ✅ 완료                                                                        |
-| H1    | Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`                                 | ✅ 완료                                                                        |
-| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`)        | ✅ 완료                                                                        |
-| I     | 계정 통합 회귀 테스트, 플랫폼 무결성, Admin Center, Discord 안내 및 프로덕션 검증 | ✅ 완료                                                                        |
+| Phase | 내용                                                                                                        | 상태                                                                           |
+| ----- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)                                                      | ✅ 완료                                                                        |
+| C     | My Page(내 프로필/기록 탭) / 닉네임·국가 변경 UI / 즐겨찾기·최근 플레이                                     | ✅ 완료 (공개 프로필 `/profile/:id`, `/me`·`/account` 완전 라우트 분리는 보류) |
+| D     | XP 랭킹 UI, Creator 모델 기초                                                                               | ✅ 완료                                                                        |
+| E1    | Creator 채널 소유권 검증 (YouTube, CHZZK, SOOP, Twitch 공식 OAuth/API)                                      | ✅ 완료                                                                        |
+| E2A   | Creator Featured 심사 엔진 (자격 정책, 6시간 자동 재심사 스케줄러, 잡 모델)                                 | ✅ 완료                                                                        |
+| E2B   | Featured 수동 심사(운영진 리뷰), 14일 재검증/하이스테리시스, 관리 도구                                      | ✅ 완료                                                                        |
+| F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어                                                | ✅ 완료                                                                        |
+| H1    | Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`                                                           | ✅ 완료                                                                        |
+| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`)                                  | ✅ 완료                                                                        |
+| I     | 계정 통합 회귀 테스트, 플랫폼 무결성, Admin Center, Discord 안내 및 프로덕션 검증                           | ✅ 완료                                                                        |
+| J     | 프로덕션 하드닝: 리더보드 SQL 무결성, Creator UNKNOWN 지표, Admin Origin, Creator CI/CD, Admin Step-Up 인증 | ✅ 완료 (Discord 자동화/Wiki는 다음 세션)                                      |
 
 세부 정책(XP 지급/상한/멱등성, 레벨 공식, 도전과제 목록)은 `docs/PROGRESSION.md`를 참고하세요.
 

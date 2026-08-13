@@ -1,36 +1,12 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
-import { getCookie } from "hono/cookie";
-import { AdminMeResponseSchema, AdminOverviewResponseSchema } from "@gamemoa/contracts";
+import { AdminOverviewResponseSchema } from "@gamemoa/contracts";
 import { createContainer } from "../container.js";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
-import { isAdminUserId, isTrustedAdminOrigin } from "../auth/admin.js";
+import { isTrustedAdminOrigin } from "../auth/admin.js";
+import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminRouter = new Hono<ApiEnv>();
-
-async function getSessionUser(c: Context<ApiEnv>): Promise<{ id: number } | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
-  if (!sessionId) return null;
-  const { sessionRepo } = createContainer(c.env.DB);
-  const result = await sessionRepo.findSession(sessionId);
-  return result ? { id: result.user.id } : null;
-}
-
-function isResponse(value: Response | { id: number }): value is Response {
-  return value instanceof Response;
-}
-
-async function requireAdmin(c: Context<ApiEnv>): Promise<Response | { id: number }> {
-  const user = await getSessionUser(c);
-  if (!user) {
-    return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
-  }
-  if (!isAdminUserId(user.id, c.env.ADMIN_USER_IDS)) {
-    return c.json({ error: { code: "FORBIDDEN", message: "관리자 권한이 필요합니다." } }, 403);
-  }
-  return user;
-}
 
 adminRouter.use("*", async (c, next) => {
   c.header("Cache-Control", "no-store");
@@ -45,20 +21,14 @@ adminRouter.use("*", async (c, next) => {
   await next();
 });
 
-// GET /api/admin/me — frontend discoverability only; ADMIN_USER_IDS is never returned.
-adminRouter.get("/me", async (c) => {
-  const user = await getSessionUser(c);
-  const response = AdminMeResponseSchema.parse({
-    authenticated: Boolean(user),
-    admin: Boolean(user && isAdminUserId(user.id, c.env.ADMIN_USER_IDS)),
-  });
-  return c.json(response);
-});
+// GET /api/admin/me lives in adminAuth.ts (mounted at the same /api/admin base path) — it
+// reports step-up/login state and is intentionally reachable before an elevated session exists.
 
-// GET /api/admin/overview — bounded, non-secret information for the Admin Home.
+// GET /api/admin/overview — sensitive review/audit summary; requires a full elevated admin
+// session (ADMIN_USER_IDS alone is no longer sufficient, GET included).
 adminRouter.get("/overview", async (c) => {
-  const admin = await requireAdmin(c);
-  if (isResponse(admin)) return admin;
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
 
   const container = createContainer(c.env.DB);
   const [reviewData, activeGuildCount] = await Promise.all([

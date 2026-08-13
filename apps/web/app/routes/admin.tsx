@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router";
 import {
   Activity,
@@ -6,13 +6,22 @@ import {
   CheckCircle2,
   Clock3,
   ExternalLink,
+  Loader2,
+  LogOut,
   Server,
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { fetchAdminMe, fetchAdminOverview } from "../features/adminApi";
-import type { AdminOverviewResponse } from "@gamemoa/contracts";
+import {
+  fetchAdminMe,
+  fetchAdminOverview,
+  postAdminGoogleStepUp,
+  postAdminLogin,
+  postAdminLogout,
+} from "../features/adminApi";
+import type { AdminMeResponse, AdminOverviewResponse } from "@gamemoa/contracts";
 import { ApiClientError } from "../lib/api/errors";
+import { useAuth } from "../features/auth";
 
 export function meta() {
   return [
@@ -22,46 +31,68 @@ export function meta() {
   ];
 }
 
+type Stage = "loading" | "need-gamemoa-login" | "not-eligible" | "step-up" | "dashboard";
+
 export default function AdminRoute() {
-  const [loading, setLoading] = useState(true);
-  const [allowed, setAllowed] = useState(false);
+  const { isAuthenticated, isLoading: authLoading, providerStatus, openLoginModal } = useAuth();
+  const [me, setMe] = useState<AdminMeResponse | null>(null);
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMe, setLoadingMe] = useState(true);
+  // Local, client-only progress within the two-step elevation flow — the server has no
+  // concept of "Google done, password pending" outside the short-lived step-up cookie.
+  const [googleStepDone, setGoogleStepDone] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const me = await fetchAdminMe();
-        if (!active) return;
-        if (!me.admin) {
-          setAllowed(false);
-          setLoading(false);
-          return;
-        }
-        setAllowed(true);
+  const refreshMe = useCallback(async () => {
+    try {
+      const next = await fetchAdminMe();
+      setMe(next);
+      setError(null);
+      if (next.adminAuthenticated) {
         const nextOverview = await fetchAdminOverview();
-        if (active) setOverview(nextOverview);
-      } catch (err) {
-        if (!active) return;
-        setError(
-          err instanceof ApiClientError && (err.status === 401 || err.status === 403)
-            ? "이 페이지는 지정된 GAMEMOA 관리자만 사용할 수 있습니다."
-            : err instanceof Error
-              ? err.message
-              : "관리자 상태를 확인할 수 없습니다.",
-        );
-      } finally {
-        if (active) setLoading(false);
+        setOverview(nextOverview);
       }
-    })();
-    return () => {
-      active = false;
-    };
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "관리자 상태를 확인할 수 없습니다.");
+    } finally {
+      setLoadingMe(false);
+    }
   }, []);
 
-  if (loading) return <PageMessage>관리자 권한을 확인하는 중...</PageMessage>;
-  if (!allowed || error) {
+  useEffect(() => {
+    if (authLoading) return;
+    void refreshMe();
+  }, [authLoading, refreshMe]);
+
+  let stage: Stage = "loading";
+  if (!authLoading && !loadingMe && me) {
+    if (!isAuthenticated || !me.authenticated) stage = "need-gamemoa-login";
+    else if (!me.eligible) stage = "not-eligible";
+    else if (!me.adminAuthenticated) stage = "step-up";
+    else stage = "dashboard";
+  }
+
+  if (stage === "loading") return <PageMessage>관리자 권한을 확인하는 중...</PageMessage>;
+
+  if (stage === "need-gamemoa-login") {
+    return (
+      <PageMessage>
+        <ShieldCheck className="mx-auto mb-4 h-10 w-10 text-text-muted" />
+        <h1 className="text-lg font-black text-text-primary">GAMEMOA 로그인이 필요합니다</h1>
+        <p className="mt-2 text-sm text-text-muted">
+          관리자 센터는 GAMEMOA 로그인 이후 추가 본인 확인을 거쳐 접근할 수 있습니다.
+        </p>
+        <button
+          onClick={openLoginModal}
+          className="mt-6 inline-flex items-center rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer"
+        >
+          GAMEMOA 로그인
+        </button>
+      </PageMessage>
+    );
+  }
+
+  if (stage === "not-eligible") {
     return (
       <PageMessage>
         <ShieldCheck className="mx-auto mb-4 h-10 w-10 text-text-muted" />
@@ -79,7 +110,250 @@ export default function AdminRoute() {
     );
   }
 
+  if (stage === "step-up") {
+    return (
+      <StepUpFlow
+        googleClientId={providerStatus.google.clientId}
+        googleConfigured={providerStatus.google.configured}
+        googleStepDone={googleStepDone}
+        onGoogleStepDone={() => setGoogleStepDone(true)}
+        onLoggedIn={() => void refreshMe()}
+      />
+    );
+  }
+
   if (!overview) return <PageMessage>관리자 요약을 불러올 수 없습니다.</PageMessage>;
+
+  return <AdminDashboard overview={overview} onLoggedOut={() => void refreshMe()} />;
+}
+
+// ---------------------------------------------------------------------------
+// Step 1 — Google 계정으로 관리자 본인 확인 / Step 2 — 관리자 계정 로그인
+// ---------------------------------------------------------------------------
+
+function StepUpFlow({
+  googleClientId,
+  googleConfigured,
+  googleStepDone,
+  onGoogleStepDone,
+  onLoggedIn,
+}: {
+  googleClientId?: string | undefined;
+  googleConfigured: boolean;
+  googleStepDone: boolean;
+  onGoogleStepDone: () => void;
+  onLoggedIn: () => void;
+}) {
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+
+  const handleGoogleStepUp = () => {
+    if (googleLoading) return;
+    if (!googleClientId || !googleConfigured) {
+      setGoogleError("Google 로그인이 아직 설정되지 않았습니다.");
+      return;
+    }
+    if (!window.google?.accounts?.id) {
+      setGoogleError("Google 로그인 스크립트가 로드되지 않았습니다. 페이지를 새로고침해주세요.");
+      return;
+    }
+
+    setGoogleError(null);
+    setGoogleLoading(true);
+    const googleAuth = window.google.accounts.id;
+
+    googleAuth.initialize({
+      client_id: googleClientId,
+      callback: async (response: { credential: string }) => {
+        try {
+          await postAdminGoogleStepUp(response.credential);
+          onGoogleStepDone();
+        } catch (err) {
+          setGoogleError(
+            err instanceof ApiClientError
+              ? err.detail || "Google 본인 확인에 실패했습니다."
+              : "Google 본인 확인에 실패했습니다.",
+          );
+        } finally {
+          setGoogleLoading(false);
+        }
+      },
+      auto_select: false,
+      cancel_on_tap_outside: true,
+    });
+
+    googleAuth.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        const tempDiv = document.createElement("div");
+        tempDiv.style.position = "fixed";
+        tempDiv.style.top = "-9999px";
+        document.body.appendChild(tempDiv);
+        googleAuth.renderButton(tempDiv, { type: "icon", size: "large" });
+        const btn = tempDiv.querySelector("div[role=button]") as HTMLElement | null;
+        if (btn) btn.click();
+        setTimeout(() => {
+          document.body.removeChild(tempDiv);
+          setGoogleLoading(false);
+        }, 5000);
+      }
+    });
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginLoading) return;
+    setLoginError(null);
+    setLoginLoading(true);
+    try {
+      await postAdminLogin(username, password);
+      onLoggedIn();
+    } catch (err) {
+      setLoginError(
+        err instanceof ApiClientError
+          ? err.detail || "로그인에 실패했습니다."
+          : "로그인에 실패했습니다.",
+      );
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
+      <div className="text-center">
+        <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-accent-yellow" />
+        <h1 className="text-xl font-black text-text-primary">관리자 본인 확인</h1>
+        <p className="mt-2 text-xs leading-relaxed text-text-muted">
+          관리자 센터는 두 단계 확인을 모두 통과해야 열립니다.
+        </p>
+      </div>
+
+      <ol className="flex items-center justify-center gap-2 text-[11px] font-bold text-text-muted">
+        <StepBadge
+          index={1}
+          label="Google 본인 확인"
+          active={!googleStepDone}
+          done={googleStepDone}
+        />
+        <span className="text-text-muted">→</span>
+        <StepBadge index={2} label="관리자 로그인" active={googleStepDone} done={false} />
+      </ol>
+
+      {!googleStepDone ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-5">
+          <p className="text-xs text-text-muted">
+            평소 로그인 세션과는 별개로, 지금 이 자리에서 Google 계정으로 새로 본인 확인을
+            진행합니다.
+          </p>
+          <button
+            onClick={handleGoogleStepUp}
+            disabled={googleLoading}
+            className="flex items-center justify-center gap-3 rounded-2xl bg-white py-3.5 font-extrabold text-slate-900 shadow-lg transition-all hover:scale-[1.02] hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 cursor-pointer"
+          >
+            {googleLoading ? (
+              <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+            ) : (
+              <ShieldCheck className="h-5 w-5 text-brand" />
+            )}
+            <span>{googleLoading ? "확인 중..." : "Google 계정으로 관리자 본인 확인"}</span>
+          </button>
+          {googleError && <p className="text-xs font-semibold text-accent-red">{googleError}</p>}
+        </div>
+      ) : (
+        <form
+          onSubmit={handleLogin}
+          className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-5"
+        >
+          <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+            관리자 아이디
+            <input
+              type="text"
+              autoComplete="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+              required
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+            관리자 비밀번호
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={loginLoading}
+            className="mt-1 rounded-xl bg-brand py-3 text-xs font-bold text-white hover:bg-brand-light disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+          >
+            {loginLoading ? "로그인 중..." : "관리자 로그인"}
+          </button>
+          {loginError && <p className="text-xs font-semibold text-accent-red">{loginError}</p>}
+        </form>
+      )}
+    </div>
+  );
+}
+
+function StepBadge({
+  index,
+  label,
+  active,
+  done,
+}: {
+  index: number;
+  label: string;
+  active: boolean;
+  done: boolean;
+}) {
+  return (
+    <li
+      className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 ${
+        done
+          ? "border-accent-green/30 bg-accent-green/10 text-accent-green"
+          : active
+            ? "border-brand/40 bg-brand/10 text-brand-light"
+            : "border-border bg-surface text-text-muted"
+      }`}
+    >
+      {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <span>{index}</span>}
+      {label}
+    </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard (post-elevation)
+// ---------------------------------------------------------------------------
+
+function AdminDashboard({
+  overview,
+  onLoggedOut,
+}: {
+  overview: AdminOverviewResponse;
+  onLoggedOut: () => void;
+}) {
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await postAdminLogout();
+    } finally {
+      setLoggingOut(false);
+      onLoggedOut();
+    }
+  };
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-7 px-4 py-8 md:px-8">
@@ -94,9 +368,18 @@ export default function AdminRoute() {
             운영에 필요한 안전한 상태 요약과 Creator 심사 도구를 한곳에서 확인합니다.
           </p>
         </div>
-        <span className="inline-flex items-center gap-2 rounded-full border border-accent-green/30 bg-accent-green/10 px-3 py-2 text-xs font-bold text-accent-green">
-          <CheckCircle2 className="h-4 w-4" /> 관리자 인증됨
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-accent-green/30 bg-accent-green/10 px-3 py-2 text-xs font-bold text-accent-green">
+            <CheckCircle2 className="h-4 w-4" /> 관리자 인증됨
+          </span>
+          <button
+            onClick={handleLogout}
+            disabled={loggingOut}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-2 text-xs font-bold text-text-muted hover:text-text-primary disabled:opacity-50 cursor-pointer"
+          >
+            <LogOut className="h-3.5 w-3.5" /> 관리자 로그아웃
+          </button>
+        </div>
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="핵심 운영 상태">

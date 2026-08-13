@@ -47,6 +47,24 @@
 
 ---
 
+## 3-1. 구독자/팔로워 지표: 미지(UNKNOWN) vs 공식 0 (Migration 0014)
+
+`audience_count`는 **"공식 API가 0명을 확정 응답했음"**과 **"공식 지표를 아직 얻지 못했음"**을 절대
+혼동하지 않습니다. `creator_platform_accounts.audience_count_known`이 이 둘을 구분합니다.
+
+- `audience_count_known = 0` (UNKNOWN): API/도메인 `audienceCount`는 `null`. UI는 "확인 불가"로 표시하며
+  절대 "0명"으로 표시하지 않습니다.
+- `audience_count_known = 1` (KNOWN): `audience_count`가 실제 공식 값(0 포함)이며, UI는 "0명"처럼 실제
+  숫자를 표시합니다.
+
+각 플랫폼 어댑터(`verifyOwnershipCode`, `fetchChannelMetrics`)는 공식 API가 구독자/팔로워 필드를 아예
+제공하지 않으면(예: YouTube가 구독자 수를 비공개로 설정한 채널) `audienceCount`를 아예 설정하지 않으며,
+이는 UNKNOWN으로 영속화됩니다. 기존(마이그레이션 이전) 데이터의 `audience_count = 0`은 과거 코드가 미지
+값을 0으로 취급했을 가능성이 있어 안전하게 UNKNOWN으로 백필되며, 기존 양수 값만 KNOWN으로 백필됩니다.
+UNKNOWN 지표는 Featured 자격 심사에서 항상 `MANUAL_REVIEW`로 안전하게 라우팅됩니다(§6-2, §6-6).
+
+---
+
 ## 4. 인증 보안 및 상태 복원성 (OAuth Security)
 
 1. **CSRF 방지 (State Cookie)**:

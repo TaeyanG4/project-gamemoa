@@ -4,6 +4,9 @@ export interface GoogleUserProfile {
   emailVerified: boolean;
   name: string;
   picture: string | null;
+  /** Token issued-at (epoch seconds). Used by admin step-up to reject a stale/cached token even
+   * though it remains cryptographically valid until `exp`. */
+  iat: number;
 }
 
 export interface GoogleTokenVerifyResult {
@@ -212,6 +215,7 @@ export async function verifyGoogleToken(
       emailVerified,
       name: typeof payload.name === "string" ? payload.name : "Google User",
       picture: typeof payload.picture === "string" ? payload.picture : null,
+      iat: typeof payload.iat === "number" ? payload.iat : 0,
     },
   };
 }

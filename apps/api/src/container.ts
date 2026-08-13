@@ -10,6 +10,7 @@ import {
   D1DiscordGuildRepository,
   D1CreatorRepository,
   D1CreatorReviewRepository,
+  D1AdminAuthRepository,
 } from "@gamemoa/db";
 import {
   ScoreUseCases,
@@ -25,6 +26,7 @@ import {
   DiscordGuildManagementUseCases,
   DiscordGuildXpUseCases,
   CreatorUseCases,
+  AdminAuthUseCases,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -36,6 +38,7 @@ import {
   type DiscordGuildRepository,
   type CreatorRepository,
   type CreatorReviewRepository,
+  type AdminAuthRepository,
 } from "@gamemoa/core";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -51,6 +54,7 @@ export interface AppContainer {
   discordGuildRepo: DiscordGuildRepository;
   creatorRepo: CreatorRepository;
   creatorReviewRepo: CreatorReviewRepository;
+  adminAuthRepo: AdminAuthRepository;
 
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
@@ -65,6 +69,7 @@ export interface AppContainer {
   discordGuildManagementUseCases: DiscordGuildManagementUseCases;
   discordGuildXpUseCases: DiscordGuildXpUseCases;
   creatorUseCases: CreatorUseCases;
+  adminAuthUseCases: AdminAuthUseCases;
 }
 
 export function createContainer(db: D1Database): AppContainer {
@@ -79,6 +84,7 @@ export function createContainer(db: D1Database): AppContainer {
   const discordGuildRepo = new D1DiscordGuildRepository(db);
   const creatorRepo = new D1CreatorRepository(db);
   const creatorReviewRepo = new D1CreatorReviewRepository(db);
+  const adminAuthRepo = new D1AdminAuthRepository(db);
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -93,6 +99,7 @@ export function createContainer(db: D1Database): AppContainer {
   const discordGuildManagementUseCases = new DiscordGuildManagementUseCases(discordGuildRepo);
   const discordGuildXpUseCases = new DiscordGuildXpUseCases(discordGuildRepo, userRepo);
   const creatorUseCases = new CreatorUseCases(creatorRepo, creatorReviewRepo);
+  const adminAuthUseCases = new AdminAuthUseCases(adminAuthRepo);
 
   return {
     userRepo,
@@ -106,6 +113,7 @@ export function createContainer(db: D1Database): AppContainer {
     discordGuildRepo,
     creatorRepo,
     creatorReviewRepo,
+    adminAuthRepo,
 
     scoreUseCases,
     personalizationUseCases,
@@ -120,6 +128,7 @@ export function createContainer(db: D1Database): AppContainer {
     discordGuildManagementUseCases,
     discordGuildXpUseCases,
     creatorUseCases,
+    adminAuthUseCases,
   };
 }
 

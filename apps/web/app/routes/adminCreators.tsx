@@ -37,7 +37,11 @@ export default function AdminCreatorsRoute() {
     } catch (err) {
       if (err instanceof ApiClientError && (err.status === 401 || err.status === 403)) {
         setAccessDenied(true);
-        setError("이 페이지는 지정된 GAMEMOA 관리자만 사용할 수 있습니다.");
+        setError(
+          err.code === "ADMIN_SESSION_REQUIRED"
+            ? "관리자 로그인이 필요합니다. /admin 에서 본인 확인을 먼저 완료해주세요."
+            : "이 페이지는 지정된 GAMEMOA 관리자만 사용할 수 있습니다.",
+        );
       } else {
         setError(err instanceof Error ? err.message : "수동 심사 큐를 불러올 수 없습니다.");
       }

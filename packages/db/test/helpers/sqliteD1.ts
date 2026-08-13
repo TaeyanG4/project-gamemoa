@@ -111,3 +111,34 @@ CREATE TABLE user_progress (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `;
+
+/** Schema for admin step-up authentication repository tests (migration 0015). */
+export const ADMIN_AUTH_TEST_SCHEMA = `
+CREATE TABLE admin_step_up_challenges (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_hash TEXT NOT NULL UNIQUE,
+  user_id INTEGER NOT NULL,
+  google_sub TEXT NOT NULL,
+  session_token_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  consumed_at TEXT
+);
+
+CREATE TABLE admin_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_hash TEXT NOT NULL UNIQUE,
+  user_id INTEGER NOT NULL,
+  session_token_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+
+CREATE TABLE admin_login_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  success INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+`;

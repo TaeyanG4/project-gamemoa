@@ -59,6 +59,7 @@ jobs:
             DISCORD_INSTALL_URL:${{ vars.DISCORD_INSTALL_URL || '' }}
             FRONTEND_URL:${{ vars.FRONTEND_URL }}
             ADMIN_USER_IDS:${{ vars.ADMIN_USER_IDS || '' }}
+            ADMIN_LOGIN_USERNAME:${{ vars.ADMIN_LOGIN_USERNAME || '' }}
             CREATOR_ENABLED_PROVIDERS:${{ vars.CREATOR_ENABLED_PROVIDERS || '' }}
             YOUTUBE_CLIENT_ID:${{ vars.YOUTUBE_CLIENT_ID || '' }}
             YOUTUBE_REDIRECT_URI:${{ vars.YOUTUBE_REDIRECT_URI || '' }}
@@ -75,6 +76,8 @@ jobs:
             TWITCH_CLIENT_SECRET
             CHZZK_CLIENT_SECRET
             SOOP_CLIENT_SECRET
+            ADMIN_GOOGLE_SUBS
+            ADMIN_PASSWORD_PBKDF2
         env:
           DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
           # Optional Creator provider secrets. An unset GitHub secret resolves to an empty
@@ -85,6 +88,10 @@ jobs:
           TWITCH_CLIENT_SECRET: ${{ secrets.TWITCH_CLIENT_SECRET }}
           CHZZK_CLIENT_SECRET: ${{ secrets.CHZZK_CLIENT_SECRET }}
           SOOP_CLIENT_SECRET: ${{ secrets.SOOP_CLIENT_SECRET }}
+          # Admin step-up identity data — sensitive operational config, never a Variable.
+          ADMIN_GOOGLE_SUBS: ${{ secrets.ADMIN_GOOGLE_SUBS }}
+          # PBKDF2-derived record only (see `pnpm admin:password:hash`) — never the plaintext password.
+          ADMIN_PASSWORD_PBKDF2: ${{ secrets.ADMIN_PASSWORD_PBKDF2 }}
 
       - name: Verify API Health & Provenance
         run: pnpm smoke:prod --api-only --sha ${{ github.event.workflow_run.head_sha }}

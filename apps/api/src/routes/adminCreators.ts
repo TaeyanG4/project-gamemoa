@@ -1,6 +1,4 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
-import { getCookie } from "hono/cookie";
 import {
   CreatorManualReviewActionRequestSchema,
   AdminPaginationQuerySchema,
@@ -8,7 +6,8 @@ import {
 } from "@gamemoa/contracts";
 import type { CreatorManualReviewItem, CreatorReviewAuditLog } from "@gamemoa/core";
 import { createContainer } from "../container.js";
-import { isAdminUserId, isTrustedAdminOrigin } from "../auth/admin.js";
+import { isTrustedAdminOrigin } from "../auth/admin.js";
+import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminCreatorsRouter = new Hono<ApiEnv>();
@@ -25,14 +24,6 @@ adminCreatorsRouter.use("*", async (c, next) => {
   }
   await next();
 });
-
-async function getSessionUser(c: Context<ApiEnv>): Promise<{ id: number } | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
-  if (!sessionId) return null;
-  const { sessionRepo } = createContainer(c.env.DB);
-  const result = await sessionRepo.findSession(sessionId);
-  return result ? { id: result.user.id } : null;
-}
 
 function mapReviewItem(item: CreatorManualReviewItem) {
   return {
@@ -67,24 +58,9 @@ function mapAudit(audit: CreatorReviewAuditLog) {
   };
 }
 
-async function requireAdmin(c: Context<ApiEnv>): Promise<Response | { id: number }> {
-  const user = await getSessionUser(c);
-  if (!user) {
-    return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
-  }
-  if (!isAdminUserId(user.id, c.env.ADMIN_USER_IDS)) {
-    return c.json({ error: { code: "FORBIDDEN", message: "관리자 권한이 필요합니다." } }, 403);
-  }
-  return user;
-}
-
-function isResponse(value: Response | { id: number }): value is Response {
-  return value instanceof Response;
-}
-
 adminCreatorsRouter.get("/reviews", async (c) => {
-  const admin = await requireAdmin(c);
-  if (isResponse(admin)) return admin;
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
 
   const pagination = AdminPaginationQuerySchema.safeParse({
     limit: c.req.query("limit"),
@@ -111,8 +87,8 @@ adminCreatorsRouter.get("/reviews", async (c) => {
 });
 
 adminCreatorsRouter.post("/reviews/:jobId/action", async (c) => {
-  const admin = await requireAdmin(c);
-  if (isResponse(admin)) return admin;
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
 
   const jobId = Number(c.req.param("jobId"));
   if (!Number.isSafeInteger(jobId) || jobId <= 0) {
@@ -142,7 +118,7 @@ adminCreatorsRouter.post("/reviews/:jobId/action", async (c) => {
   const { creatorUseCases } = createContainer(c.env.DB);
   const result = await creatorUseCases.applyManualCreatorReview({
     jobId,
-    reviewerUserId: admin.id,
+    reviewerUserId: admin.userId,
     action: parsed.data.action as CreatorManualReviewAction,
     reason: parsed.data.reason,
   });

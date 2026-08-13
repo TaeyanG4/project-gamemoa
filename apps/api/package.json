@@ -9,7 +9,7 @@
     "deploy": "wrangler deploy --minify src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/",
-    "test": "tsx --test test/**/*.test.ts"
+    "test": "node --experimental-sqlite --import tsx --test test/**/*.test.ts"
   },
   "dependencies": {
     "@gamemoa/contracts": "workspace:*",

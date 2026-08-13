@@ -35,7 +35,7 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/gamemoa games|link|profile|play|rank|leaderboard|server`).
   - **Discord 서버 시스템 & Hub 페이지**: OAuth `guilds` 1회용 인증으로 `MANAGE_GUILD`/`ADMINISTRATOR` 권한 검증 후 서버 등록, 1회용 해시 챌린지 기반 access_token 미저장 보안, 공개 디렉토리 검색(`/discord/servers`), 공개 서버 페이지(`/discord/servers/:slug`), 가시성(`PUBLIC`/`UNLISTED`/`PRIVATE`), 서버 관리 페이지. 일반 GAMEMOA 게임 랭킹과 Discord 서버 공간은 명확히 분리되어 동작합니다. 자세한 내용은 `docs/DISCORD_INTEGRATION.md` 참고.
   - **Discord 사용 안내**: `/discord/guide` 공개 사용 가이드와 `docs/DISCORD_BOT_GUIDE.md` 운영 가이드 제공. 앱 설치와 GAMEMOA 서버 등록은 별도 단계이며 기존 글로벌 XP는 새 Guild로 복사되지 않습니다.
-- 🛡️ **보안 Admin Center**: `/admin`은 HttpOnly 세션과 서버의 `ADMIN_USER_IDS`만으로 권한을 판단하며, Creator 수동 심사(`/admin/creators`)와 감사 요약을 통합합니다. 관리자 페이지는 검색 색인에서 제외됩니다. 설정 절차는 `docs/ADMIN_GUIDE.md` 참고.
+- 🛡️ **다층 방어 Admin Center**: `/admin`은 `ADMIN_USER_IDS`(근본 자격) + 신선한 Google Step-Up 본인 확인(canonical `sub` 허용 목록, 5분 이내 발급) + 관리자 전용 아이디/PBKDF2 비밀번호 로그인을 모두 통과해야 30분 수명의 별도 관리자 세션이 발급되는 다층 인증 구조입니다. 관리자 로그인 실패는 15분 rate limit으로 보호되며, Creator 수동 심사(`/admin/creators`)와 감사 요약은 GET을 포함해 관리자 세션을 요구합니다. 관리자 페이지는 검색 색인에서 제외됩니다. 설정 절차는 `docs/ADMIN_GUIDE.md`, 외부 설정 체크리스트는 `docs/PRODUCTION_INTEGRATIONS.md` 참고.
 
 - 🧩 **Game Plugin Architecture**:
   - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
@@ -122,6 +122,9 @@ pnpm generate:favicon
 # 새 게임 스캐폴딩 생성
 pnpm generate:game <game-slug>
 
+# 관리자 비밀번호 PBKDF2 레코드 생성 (평문은 stdin으로만 입력, 절대 인자로 전달하지 않음)
+pnpm admin:password:hash
+
 # TypeScript 타입 검사 & 단위 테스트
 pnpm typecheck
 pnpm test
@@ -175,7 +178,8 @@ gamemoa/
     ├── PROGRESSION.md         # XP/레벨/도전과제 진행도 시스템 설계
     ├── DISCORD_INTEGRATION.md # Discord HTTP Interactions 아키텍처 및 설정 가이드
     ├── DISCORD_BOT_GUIDE.md   # Discord 서버 관리자/사용자/운영자 실무 가이드
-    ├── ADMIN_GUIDE.md         # Admin Center 권한 및 운영 가이드
+    ├── ADMIN_GUIDE.md         # Admin Center 다층 인증(Google Step-Up/비밀번호) 및 운영 가이드
+    ├── PRODUCTION_INTEGRATIONS.md # 외부 연동(Google/Discord/Creator/Admin) 운영 설정 체크리스트
     ├── AGENTS.md              # AI Agent 개발 규칙 명세서
     └── runbooks/
         ├── oauth-setup.md        # 소셜 로그인 설정 런북

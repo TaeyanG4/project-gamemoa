@@ -63,8 +63,14 @@ export type ApiEnv = {
     DISCORD_INSTALL_URL?: string;
     FRONTEND_URL?: string;
     COMMIT_SHA?: string;
-    /** 쉼표로 구분한 명시적 GAMEMOA 사용자 ID. 미설정 시 관리자 권한 없음. */
+    /** 쉼표로 구분한 명시적 GAMEMOA 사용자 ID. 미설정 시 관리자 권한 없음 (ROOT eligibility). */
     ADMIN_USER_IDS?: string;
+    /** 쉼표로 구분한, 관리자 Google 계정 step-up에 허용된 Google canonical OIDC subject(sub) 목록. */
+    ADMIN_GOOGLE_SUBS?: string;
+    /** 관리자 2차 로그인 사용자명 (평문 저장 금지 대상은 비밀번호만 — 이 값 자체는 식별자). */
+    ADMIN_LOGIN_USERNAME?: string;
+    /** PBKDF2-HMAC-SHA256 파생 레코드 (`pbkdf2_sha256$iterations$salt$hash`). 평문 비밀번호는 어디에도 저장하지 않음. */
+    ADMIN_PASSWORD_PBKDF2?: string;
     YOUTUBE_CLIENT_ID?: string;
     YOUTUBE_CLIENT_SECRET?: string;
     /** YouTube Data API key (public data) — 6시간 자동 재심사용 공식 지표 조회. */
@@ -89,7 +95,7 @@ export type ApiEnv = {
 export const authRouter = new Hono<ApiEnv>();
 
 // Helper to check if request is localhost
-function isLocalhost(urlStr: string): boolean {
+export function isLocalhost(urlStr: string): boolean {
   try {
     const url = new URL(urlStr);
     return url.hostname === "localhost" || url.hostname === "127.0.0.1";
@@ -452,14 +458,18 @@ authRouter.post("/logout", async (c) => {
   const sessionId = getCookie(c, "gamemoa_session");
   if (sessionId) {
     try {
-      const { sessionRepo } = createContainer(c.env.DB);
+      const { sessionRepo, adminAuthUseCases } = createContainer(c.env.DB);
       await sessionRepo.deleteSession(sessionId);
+      // A normal GAMEMOA logout must never leave an elevated admin session alive on top of a
+      // now-dead underlying session.
+      await adminAuthUseCases.logoutAllForSession(sessionId);
     } catch {
       // Ignore DB error during logout
     }
   }
 
   deleteCookie(c, "gamemoa_session", { path: "/" });
+  deleteCookie(c, "gamemoa_admin_session", { path: "/" });
   return c.json({ success: true });
 });
 

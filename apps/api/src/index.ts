@@ -11,6 +11,7 @@ import { discordLinkRouter } from "./routes/discordLink.js";
 import { discordGuildsRouter } from "./routes/discordGuilds.js";
 import { creatorsRouter } from "./routes/creators.js";
 import { adminRouter } from "./routes/admin.js";
+import { adminAuthRouter } from "./routes/adminAuth.js";
 import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { createContainer } from "./container.js";
 import { getCreatorProviderAdapters } from "./infrastructure/creators/index.js";
@@ -100,6 +101,7 @@ app.route("/api/discord", discordLinkRouter);
 app.route("/api/discord/guilds", discordGuildsRouter);
 app.route("/api/creators", creatorsRouter);
 app.route("/api/admin", adminRouter);
+app.route("/api/admin", adminAuthRouter);
 app.route("/api/admin/creators", adminCreatorsRouter);
 
 // 404 Handler
@@ -125,7 +127,7 @@ async function scheduledHandler(
   ctx: ExecutionContext,
 ): Promise<void> {
   const adapters = getCreatorProviderAdapters(env);
-  const { creatorUseCases } = createContainer(env.DB);
+  const { creatorUseCases, adminAuthUseCases } = createContainer(env.DB);
 
   const task = (async () => {
     const now = new Date();
@@ -149,7 +151,14 @@ async function scheduledHandler(
   })().catch((err) => {
     console.error("[creator-review] scheduled run crashed:", err);
   });
-  ctx.waitUntil(task);
+
+  // Bounded, opportunistic cleanup of expired admin step-up challenges/sessions/login-attempt
+  // rows — reuses this existing 6-hour Cron instead of a new background service.
+  const adminCleanupTask = adminAuthUseCases
+    .cleanupExpired(new Date())
+    .catch((err) => console.error("[admin-auth] cleanup crashed:", err));
+
+  ctx.waitUntil(Promise.all([task, adminCleanupTask]));
 }
 
 export { app };
