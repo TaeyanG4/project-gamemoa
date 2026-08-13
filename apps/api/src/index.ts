@@ -35,16 +35,11 @@ app.use(
 );
 
 const DEFAULT_FRONTEND_URL = "https://owogg.com";
-// Kept temporarily so anyone still holding the pre-cutover workers.dev URL open in a tab
-// isn't immediately locked out. Safe to remove once traffic has fully moved to owogg.com.
-const LEGACY_FRONTEND_URL = "https://gamemoa-web.gamemoa.workers.dev";
 
 function isAllowedOrigin(origin: string | undefined, frontendUrl?: string): boolean {
   if (!origin) return true;
   const allowed = frontendUrl || DEFAULT_FRONTEND_URL;
-  if (origin === allowed || origin === DEFAULT_FRONTEND_URL || origin === LEGACY_FRONTEND_URL) {
-    return true;
-  }
+  if (origin === allowed || origin === DEFAULT_FRONTEND_URL) return true;
   if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) return true;
   return false;
 }
