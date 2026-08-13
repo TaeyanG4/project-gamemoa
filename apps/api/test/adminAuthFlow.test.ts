@@ -135,6 +135,28 @@ CREATE TABLE admin_login_attempts (
   success INTEGER NOT NULL,
   created_at TEXT NOT NULL
 );
+CREATE TABLE admin_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL UNIQUE,
+  google_sub TEXT NOT NULL UNIQUE,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'ADMIN',
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  must_change_password INTEGER NOT NULL DEFAULT 0,
+  created_by_admin_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  password_changed_at TEXT NOT NULL
+);
+CREATE TABLE admin_account_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_admin_id INTEGER,
+  target_admin_id INTEGER,
+  action TEXT NOT NULL,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL
+);
 CREATE TABLE discord_guilds (
   guild_id TEXT PRIMARY KEY,
   slug TEXT UNIQUE NOT NULL,
@@ -272,6 +294,9 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       eligible: true,
       adminAuthenticated: false,
       stepUpRequired: true,
+      bootstrapAvailable: true, // no managed admin account exists yet in this fixture
+      mustChangePassword: false,
+      role: null,
     });
 
     // Step 1: Google step-up.
@@ -309,7 +334,10 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       env as any,
     );
     assert.equal(loginRes.status, 200);
-    assert.deepEqual(await loginRes.json(), { adminAuthenticated: true });
+    assert.deepEqual(await loginRes.json(), {
+      adminAuthenticated: true,
+      mustChangePassword: false,
+    });
     const adminSessionCookie = extractCookie(loginRes, "gamemoa_admin_session");
     assert.ok(adminSessionCookie, "admin session cookie must be set");
 
@@ -324,6 +352,9 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       eligible: true,
       adminAuthenticated: true,
       stepUpRequired: false,
+      bootstrapAvailable: false,
+      mustChangePassword: false,
+      role: null, // legacy env-credential admin — no managed admin_accounts row
     });
 
     // Protected admin endpoint now succeeds.
@@ -581,6 +612,229 @@ test("ADMIN_USER_IDS removed after an admin session was already issued is immedi
       envWithoutAdmin as any,
     );
     assert.equal(res.status, 403);
+  } finally {
+    jwks.restore();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Managed administrator accounts (migration 0016) — bootstrap, forced password change,
+// self password change, and optional ADMIN_GOOGLE_SUBS.
+// ---------------------------------------------------------------------------
+
+async function googleStepUp(
+  env: Record<string, unknown>,
+  privateKey: KeyObject,
+  sessionCookie: string,
+) {
+  const idToken = buildJwt(privateKey, freshGooglePayload());
+  const res = await app.request(
+    "/api/admin/auth/google",
+    {
+      method: "POST",
+      headers: {
+        Cookie: sessionCookie,
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ credential: idToken }),
+    },
+    env as any,
+  );
+  return { res, stepUpCookie: extractCookie(res, "gamemoa_admin_stepup") };
+}
+
+test("Google step-up: unset ADMIN_GOOGLE_SUBS (optional allowlist) never blocks an otherwise-linked eligible user", async () => {
+  clearGoogleJwksCache();
+  const { privateKey, publicJwk } = createRsaKeySet();
+  const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
+  jwks.install();
+  try {
+    const { env } = await setup();
+    const envWithoutAllowlist: Record<string, unknown> = { ...(env as Record<string, unknown>) };
+    delete envWithoutAllowlist.ADMIN_GOOGLE_SUBS;
+    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const { res } = await googleStepUp(envWithoutAllowlist, privateKey, sessionCookie);
+    assert.equal(res.status, 200);
+  } finally {
+    jwks.restore();
+  }
+});
+
+test("bootstrap: first SUPERADMIN can be created once; forced password change gates sensitive routes; duplicate bootstrap is rejected", async () => {
+  clearGoogleJwksCache();
+  const { privateKey, publicJwk } = createRsaKeySet();
+  const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
+  jwks.install();
+  try {
+    const { env } = await setup();
+    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+
+    // Root-eligible + no admin account exists anywhere yet -> bootstrapAvailable.
+    const meBeforeBootstrap = await app.request(
+      "/api/admin/me",
+      { headers: { Cookie: sessionCookie } },
+      env as any,
+    );
+    const meBeforeBootstrapBody = (await meBeforeBootstrap.json()) as any;
+    assert.equal(meBeforeBootstrapBody.bootstrapAvailable, true);
+
+    const { stepUpCookie } = await googleStepUp(env, privateKey, sessionCookie);
+
+    const bootstrapRes = await app.request(
+      "/api/admin/bootstrap",
+      {
+        method: "POST",
+        headers: {
+          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          username: "bootstrap-admin",
+          password: "temporary-bootstrap-pw",
+          passwordConfirm: "temporary-bootstrap-pw",
+        }),
+      },
+      env as any,
+    );
+    assert.equal(bootstrapRes.status, 200);
+    assert.deepEqual(await bootstrapRes.json(), {
+      adminAuthenticated: true,
+      mustChangePassword: true,
+    });
+    const adminSessionCookie = extractCookie(bootstrapRes, "gamemoa_admin_session");
+    assert.ok(adminSessionCookie);
+    const authedCookie = `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}`;
+
+    // /me now reports SUPERADMIN + mustChangePassword, and bootstrap is no longer available.
+    const meAfter = await app.request(
+      "/api/admin/me",
+      { headers: { Cookie: authedCookie } },
+      env as any,
+    );
+    assert.deepEqual(await meAfter.json(), {
+      authenticated: true,
+      eligible: true,
+      adminAuthenticated: true,
+      stepUpRequired: false,
+      bootstrapAvailable: false,
+      mustChangePassword: true,
+      role: "SUPERADMIN",
+    });
+
+    // Sensitive route is blocked while a password change is still pending.
+    const blockedOverview = await app.request(
+      "/api/admin/overview",
+      { headers: { Cookie: authedCookie } },
+      env as any,
+    );
+    assert.equal(blockedOverview.status, 403);
+    assert.equal((await blockedOverview.json()).error.code, "PASSWORD_CHANGE_REQUIRED");
+
+    // Self password change (wrong current password is rejected first).
+    const wrongCurrent = await app.request(
+      "/api/admin/settings/password",
+      {
+        method: "POST",
+        headers: {
+          Cookie: authedCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          currentPassword: "not-the-right-password",
+          newPassword: "brand-new-long-password",
+          newPasswordConfirm: "brand-new-long-password",
+        }),
+      },
+      env as any,
+    );
+    assert.equal(wrongCurrent.status, 401);
+
+    // Reusing the temporary bootstrap password as the "new" password is rejected — this is the
+    // structural mechanism that blocks keeping a known-weak temporary password, without this
+    // codebase ever embedding that literal value.
+    const reusedPassword = await app.request(
+      "/api/admin/settings/password",
+      {
+        method: "POST",
+        headers: {
+          Cookie: authedCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          currentPassword: "temporary-bootstrap-pw",
+          newPassword: "temporary-bootstrap-pw",
+          newPasswordConfirm: "temporary-bootstrap-pw",
+        }),
+      },
+      env as any,
+    );
+    assert.equal(reusedPassword.status, 400);
+
+    const changeRes = await app.request(
+      "/api/admin/settings/password",
+      {
+        method: "POST",
+        headers: {
+          Cookie: authedCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          currentPassword: "temporary-bootstrap-pw",
+          newPassword: "brand-new-long-password",
+          newPasswordConfirm: "brand-new-long-password",
+        }),
+      },
+      env as any,
+    );
+    assert.equal(changeRes.status, 200);
+    assert.deepEqual(await changeRes.json(), { success: true });
+    // Password change rotates the admin session cleanly — a fresh cookie is issued so the caller
+    // is never logged out by their own password change.
+    const rotatedAdminSessionCookie = extractCookie(changeRes, "gamemoa_admin_session");
+    assert.ok(rotatedAdminSessionCookie);
+    const rotatedCookie = `${sessionCookie}; gamemoa_admin_session=${rotatedAdminSessionCookie}`;
+
+    const meFinal = await app.request(
+      "/api/admin/me",
+      { headers: { Cookie: rotatedCookie } },
+      env as any,
+    );
+    const meFinalBody = (await meFinal.json()) as any;
+    assert.equal(meFinalBody.mustChangePassword, false);
+
+    const overviewNow = await app.request(
+      "/api/admin/overview",
+      { headers: { Cookie: rotatedCookie } },
+      env as any,
+    );
+    assert.equal(overviewNow.status, 200);
+
+    // Duplicate bootstrap: even with a fresh step-up, /bootstrap now rejects because an active
+    // administrator account already exists.
+    const { stepUpCookie: secondStepUpCookie } = await googleStepUp(env, privateKey, sessionCookie);
+    const secondBootstrap = await app.request(
+      "/api/admin/bootstrap",
+      {
+        method: "POST",
+        headers: {
+          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${secondStepUpCookie}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          username: "another-admin",
+          password: "another-long-password",
+          passwordConfirm: "another-long-password",
+        }),
+      },
+      env as any,
+    );
+    assert.equal(secondBootstrap.status, 409);
   } finally {
     jwks.restore();
   }

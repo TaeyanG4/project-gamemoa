@@ -26,7 +26,12 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 | H1    | Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`                                                           | ✅ 완료                                                                        |
 | H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`)                                  | ✅ 완료                                                                        |
 | I     | 계정 통합 회귀 테스트, 플랫폼 무결성, Admin Center, Discord 안내 및 프로덕션 검증                           | ✅ 완료                                                                        |
-| J     | 프로덕션 하드닝: 리더보드 SQL 무결성, Creator UNKNOWN 지표, Admin Origin, Creator CI/CD, Admin Step-Up 인증 | ✅ 완료 (Discord 자동화/Wiki는 다음 세션)                                      |
+| J     | 프로덕션 하드닝: 리더보드 SQL 무결성, Creator UNKNOWN 지표, Admin Origin, Creator CI/CD, Admin Step-Up 인증 | ✅ 완료                                                                        |
+| K-A   | Admin Login 복구 & 관리형 관리자 계정(D1 bootstrap, 비밀번호 변경, 계정 관리, 감사 로그)                    | ✅ 완료                                                                        |
+| K-B   | 스트리머 랭킹 정책(단일 플랫폼 인증으로 자격) & 플랫폼 아이콘                                               | ⏳ 다음 세션                                                                   |
+| K-C   | Discord 온보딩/명령어 자동화                                                                                | ⏳ 다음 세션                                                                   |
+| K-D   | 공개 Wiki                                                                                                   | ⏳ 다음 세션                                                                   |
+| K-E   | 4개 언어(ko-KR/en-US/ja-JP/zh-CN) i18n                                                                      | ⏳ 다음 세션                                                                   |
 
 세부 정책(XP 지급/상한/멱등성, 레벨 공식, 도전과제 목록)은 `docs/PROGRESSION.md`를 참고하세요.
 

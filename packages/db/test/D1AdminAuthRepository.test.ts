@@ -165,6 +165,56 @@ test("revokeAdminSessionsForSessionToken revokes every admin session bound to th
   );
 });
 
+test("revokeAllAdminSessionsForUserId revokes every session for that user, leaves other users' sessions intact", async () => {
+  const { db } = createSqliteD1(ADMIN_AUTH_TEST_SCHEMA);
+  const repo = new D1AdminAuthRepository(db);
+
+  const mine1 = await repo.createAdminSession({
+    userId: 7,
+    rawSessionToken: "session-A",
+    nowIso: iso(),
+    expiresAtIso: iso(30 * 60 * 1000),
+  });
+  const mine2 = await repo.createAdminSession({
+    userId: 7,
+    rawSessionToken: "session-B",
+    nowIso: iso(),
+    expiresAtIso: iso(30 * 60 * 1000),
+  });
+  const other = await repo.createAdminSession({
+    userId: 8,
+    rawSessionToken: "session-C",
+    nowIso: iso(),
+    expiresAtIso: iso(30 * 60 * 1000),
+  });
+
+  await repo.revokeAllAdminSessionsForUserId(7);
+
+  assert.equal(
+    await repo.findValidAdminSession({
+      rawToken: mine1.rawToken,
+      rawSessionToken: "session-A",
+      nowIso: iso(),
+    }),
+    null,
+  );
+  assert.equal(
+    await repo.findValidAdminSession({
+      rawToken: mine2.rawToken,
+      rawSessionToken: "session-B",
+      nowIso: iso(),
+    }),
+    null,
+  );
+  assert.ok(
+    await repo.findValidAdminSession({
+      rawToken: other.rawToken,
+      rawSessionToken: "session-C",
+      nowIso: iso(),
+    }),
+  );
+});
+
 test("login attempts: only failed attempts inside the window are returned", async () => {
   const { db } = createSqliteD1(ADMIN_AUTH_TEST_SCHEMA);
   const repo = new D1AdminAuthRepository(db);

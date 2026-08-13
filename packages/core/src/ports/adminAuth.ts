@@ -64,6 +64,10 @@ export interface AdminAuthRepository {
    * normal GAMEMOA session itself is logged out, so no admin session can outlive it. */
   revokeAdminSessionsForSessionToken(rawSessionToken: string): Promise<void>;
 
+  /** Revokes every admin session for a given GAMEMOA user — used by managed admin account
+   * password change/reset/disable so no stale elevated session survives those actions. */
+  revokeAllAdminSessionsForUserId(userId: number): Promise<void>;
+
   recordLoginAttempt(input: { userId: number; success: boolean; nowIso: string }): Promise<void>;
 
   /** Epoch-ms timestamps (oldest first) of failed attempts still inside the rate-limit period. */

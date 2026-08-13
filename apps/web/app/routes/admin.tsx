@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Link } from "react-router";
 import {
   Activity,
@@ -9,7 +9,10 @@ import {
   Loader2,
   LogOut,
   Server,
+  Settings,
+  ShieldAlert,
   ShieldCheck,
+  UserCog,
   Users,
 } from "lucide-react";
 import {
@@ -18,6 +21,8 @@ import {
   postAdminGoogleStepUp,
   postAdminLogin,
   postAdminLogout,
+  postAdminBootstrap,
+  postAdminPasswordChange,
 } from "../features/adminApi";
 import type { AdminMeResponse, AdminOverviewResponse } from "@gamemoa/contracts";
 import { ApiClientError } from "../lib/api/errors";
@@ -31,7 +36,13 @@ export function meta() {
   ];
 }
 
-type Stage = "loading" | "need-gamemoa-login" | "not-eligible" | "step-up" | "dashboard";
+type Stage =
+  | "loading"
+  | "need-gamemoa-login"
+  | "not-eligible"
+  | "step-up"
+  | "must-change-password"
+  | "dashboard";
 
 export default function AdminRoute() {
   const { isAuthenticated, isLoading: authLoading, providerStatus, openLoginModal } = useAuth();
@@ -48,7 +59,7 @@ export default function AdminRoute() {
       const next = await fetchAdminMe();
       setMe(next);
       setError(null);
-      if (next.adminAuthenticated) {
+      if (next.adminAuthenticated && !next.mustChangePassword) {
         const nextOverview = await fetchAdminOverview();
         setOverview(nextOverview);
       }
@@ -69,6 +80,7 @@ export default function AdminRoute() {
     if (!isAuthenticated || !me.authenticated) stage = "need-gamemoa-login";
     else if (!me.eligible) stage = "not-eligible";
     else if (!me.adminAuthenticated) stage = "step-up";
+    else if (me.mustChangePassword) stage = "must-change-password";
     else stage = "dashboard";
   }
 
@@ -116,92 +128,198 @@ export default function AdminRoute() {
         googleClientId={providerStatus.google.clientId}
         googleConfigured={providerStatus.google.configured}
         googleStepDone={googleStepDone}
+        bootstrapAvailable={Boolean(me?.bootstrapAvailable)}
         onGoogleStepDone={() => setGoogleStepDone(true)}
         onLoggedIn={() => void refreshMe()}
       />
     );
   }
 
+  if (stage === "must-change-password") {
+    return <ForcedPasswordChange onChanged={() => void refreshMe()} />;
+  }
+
   if (!overview) return <PageMessage>관리자 요약을 불러올 수 없습니다.</PageMessage>;
 
-  return <AdminDashboard overview={overview} onLoggedOut={() => void refreshMe()} />;
+  return (
+    <AdminDashboard
+      overview={overview}
+      role={me?.role ?? null}
+      onLoggedOut={() => void refreshMe()}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Step 1 — Google 계정으로 관리자 본인 확인 / Step 2 — 관리자 계정 로그인
+// Step 1 — Google 계정으로 관리자 본인 확인 / Step 2 — 관리자 로그인 또는 초기 설정
 // ---------------------------------------------------------------------------
 
 function StepUpFlow({
   googleClientId,
   googleConfigured,
   googleStepDone,
+  bootstrapAvailable,
   onGoogleStepDone,
   onLoggedIn,
 }: {
   googleClientId?: string | undefined;
   googleConfigured: boolean;
   googleStepDone: boolean;
+  bootstrapAvailable: boolean;
   onGoogleStepDone: () => void;
   onLoggedIn: () => void;
 }) {
-  const [googleLoading, setGoogleLoading] = useState(false);
+  return (
+    <div className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
+      <div className="text-center">
+        <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-accent-yellow" />
+        <h1 className="text-xl font-black text-text-primary">관리자 본인 확인</h1>
+        <p className="mt-2 text-xs leading-relaxed text-text-muted">
+          관리자 센터는 두 단계 확인을 모두 통과해야 열립니다.
+        </p>
+      </div>
+
+      <ol className="flex items-center justify-center gap-2 text-[11px] font-bold text-text-muted">
+        <StepBadge
+          index={1}
+          label="Google 본인 확인"
+          active={!googleStepDone}
+          done={googleStepDone}
+        />
+        <span className="text-text-muted">→</span>
+        <StepBadge
+          index={2}
+          label={bootstrapAvailable ? "초기 관리자 설정" : "관리자 로그인"}
+          active={googleStepDone}
+          done={false}
+        />
+      </ol>
+
+      {!googleStepDone ? (
+        <GoogleStepUpPanel
+          googleClientId={googleClientId}
+          googleConfigured={googleConfigured}
+          onGoogleStepDone={onGoogleStepDone}
+        />
+      ) : bootstrapAvailable ? (
+        <BootstrapForm onLoggedIn={onLoggedIn} />
+      ) : (
+        <AdminLoginForm onLoggedIn={onLoggedIn} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Renders a real, visible Google Identity Services button (`google.accounts.id.renderButton`)
+ * into an actual DOM container — the administrator must physically click it. This intentionally
+ * does NOT use One Tap + a hidden off-screen button + a synthetic click: that pattern isn't
+ * guaranteed to represent a fresh, explicit user action and isn't a supported UI surface.
+ */
+function GoogleStepUpPanel({
+  googleClientId,
+  googleConfigured,
+  onGoogleStepDone,
+}: {
+  googleClientId?: string | undefined;
+  googleConfigured: boolean;
+  onGoogleStepDone: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
+  const [scriptReady, setScriptReady] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [googleError, setGoogleError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!googleClientId || !googleConfigured) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const tryInit = (attemptsLeft: number) => {
+      if (cancelled) return;
+      if (!window.google?.accounts?.id) {
+        if (attemptsLeft <= 0) return;
+        timer = setTimeout(() => tryInit(attemptsLeft - 1), 150);
+        return;
+      }
+      setScriptReady(true);
+      if (initializedRef.current || !containerRef.current) return;
+      initializedRef.current = true;
+
+      const googleAuth = window.google.accounts.id;
+      googleAuth.initialize({
+        client_id: googleClientId,
+        callback: async (response: { credential: string }) => {
+          setVerifying(true);
+          setGoogleError(null);
+          try {
+            await postAdminGoogleStepUp(response.credential);
+            onGoogleStepDone();
+          } catch {
+            setGoogleError(
+              "Google 본인 확인에 실패했습니다. 허용된 Google 계정이 현재 GAMEMOA 계정에 연결되어 있는지 확인해주세요.",
+            );
+          } finally {
+            setVerifying(false);
+          }
+        },
+        // Always a fresh, explicit user action — never auto-selects a previously chosen account.
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      });
+      googleAuth.renderButton(containerRef.current, {
+        type: "standard",
+        theme: "filled_black",
+        size: "large",
+        text: "signin_with",
+        shape: "pill",
+      });
+    };
+
+    tryInit(60); // ~9s of polling for the async GIS script tag in root.tsx to finish loading
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [googleClientId, googleConfigured, onGoogleStepDone]);
+
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface-raised p-5">
+      <p className="text-center text-xs text-text-muted">
+        평소 로그인 세션과는 별개로, 지금 이 자리에서 Google 계정으로 새로 본인 확인을 진행합니다.
+      </p>
+
+      {!googleClientId || !googleConfigured ? (
+        <p className="flex items-center gap-2 text-xs font-semibold text-accent-red">
+          <ShieldAlert className="h-4 w-4" /> Google 설정 누락 — 관리자에게 문의해주세요.
+        </p>
+      ) : !scriptReady ? (
+        <p className="flex items-center gap-2 text-xs font-semibold text-text-muted">
+          <Loader2 className="h-4 w-4 animate-spin" /> Google 스크립트 로딩 중...
+        </p>
+      ) : (
+        <div className="relative flex min-h-[44px] items-center justify-center">
+          <div ref={containerRef} />
+          {verifying && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-full bg-surface-raised/90 text-xs font-bold text-text-muted">
+              <Loader2 className="h-4 w-4 animate-spin" /> 확인 중...
+            </div>
+          )}
+        </div>
+      )}
+      {googleError && (
+        <p className="text-center text-xs font-semibold text-accent-red">{googleError}</p>
+      )}
+    </div>
+  );
+}
+
+function AdminLoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-
-  const handleGoogleStepUp = () => {
-    if (googleLoading) return;
-    if (!googleClientId || !googleConfigured) {
-      setGoogleError("Google 로그인이 아직 설정되지 않았습니다.");
-      return;
-    }
-    if (!window.google?.accounts?.id) {
-      setGoogleError("Google 로그인 스크립트가 로드되지 않았습니다. 페이지를 새로고침해주세요.");
-      return;
-    }
-
-    setGoogleError(null);
-    setGoogleLoading(true);
-    const googleAuth = window.google.accounts.id;
-
-    googleAuth.initialize({
-      client_id: googleClientId,
-      callback: async (response: { credential: string }) => {
-        try {
-          await postAdminGoogleStepUp(response.credential);
-          onGoogleStepDone();
-        } catch (err) {
-          setGoogleError(
-            err instanceof ApiClientError
-              ? err.detail || "Google 본인 확인에 실패했습니다."
-              : "Google 본인 확인에 실패했습니다.",
-          );
-        } finally {
-          setGoogleLoading(false);
-        }
-      },
-      auto_select: false,
-      cancel_on_tap_outside: true,
-    });
-
-    googleAuth.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        const tempDiv = document.createElement("div");
-        tempDiv.style.position = "fixed";
-        tempDiv.style.top = "-9999px";
-        document.body.appendChild(tempDiv);
-        googleAuth.renderButton(tempDiv, { type: "icon", size: "large" });
-        const btn = tempDiv.querySelector("div[role=button]") as HTMLElement | null;
-        if (btn) btn.click();
-        setTimeout(() => {
-          document.body.removeChild(tempDiv);
-          setGoogleLoading(false);
-        }, 5000);
-      }
-    });
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,84 +341,263 @@ function StepUpFlow({
   };
 
   return (
+    <form
+      onSubmit={handleLogin}
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-5"
+    >
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        관리자 아이디
+        <input
+          type="text"
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        관리자 비밀번호
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={loginLoading}
+        className="mt-1 rounded-xl bg-brand py-3 text-xs font-bold text-white hover:bg-brand-light disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      >
+        {loginLoading ? "로그인 중..." : "관리자 로그인"}
+      </button>
+      {loginError && <p className="text-xs font-semibold text-accent-red">{loginError}</p>}
+    </form>
+  );
+}
+
+/** One-time first-administrator setup — only ever shown while no administrator account exists
+ * anywhere, after root eligibility + a fresh Google step-up for this exact GAMEMOA account. */
+function BootstrapForm({ onLoggedIn }: { onLoggedIn: () => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+    setFormError(null);
+    if (password !== passwordConfirm) {
+      setFormError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await postAdminBootstrap({ username, password, passwordConfirm });
+      onLoggedIn();
+    } catch (err) {
+      setFormError(
+        err instanceof ApiClientError
+          ? err.detail || "초기 설정에 실패했습니다."
+          : "초기 설정에 실패했습니다.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-3 rounded-2xl border border-accent-yellow/40 bg-surface-raised p-5"
+    >
+      <p className="text-xs leading-relaxed text-text-muted">
+        아직 관리자 계정이 없습니다. 최초 SUPERADMIN 계정의 아이디/비밀번호를 설정해주세요. 이후
+        로그인마다 비밀번호 변경이 강제됩니다.
+      </p>
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        관리자 아이디
+        <input
+          type="text"
+          autoComplete="username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          minLength={3}
+          maxLength={64}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        비밀번호 (12자 이상)
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          minLength={12}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        비밀번호 확인
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={passwordConfirm}
+          onChange={(e) => setPasswordConfirm(e.target.value)}
+          minLength={12}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={loading}
+        className="mt-1 rounded-xl bg-accent-yellow py-3 text-xs font-bold text-black hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      >
+        {loading ? "생성 중..." : "초기 관리자 계정 생성"}
+      </button>
+      {formError && <p className="text-xs font-semibold text-accent-red">{formError}</p>}
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Forced password change gate (must_change_password)
+// ---------------------------------------------------------------------------
+
+function ForcedPasswordChange({ onChanged }: { onChanged: () => void }) {
+  return (
     <div className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
       <div className="text-center">
-        <ShieldCheck className="mx-auto mb-3 h-10 w-10 text-accent-yellow" />
-        <h1 className="text-xl font-black text-text-primary">관리자 본인 확인</h1>
+        <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-accent-yellow" />
+        <h1 className="text-xl font-black text-text-primary">관리자 비밀번호를 변경해주세요</h1>
         <p className="mt-2 text-xs leading-relaxed text-text-muted">
-          관리자 센터는 두 단계 확인을 모두 통과해야 열립니다.
+          임시 비밀번호로 로그인했습니다. 비밀번호를 변경해야 관리자 기능을 사용할 수 있습니다.
         </p>
       </div>
-
-      <ol className="flex items-center justify-center gap-2 text-[11px] font-bold text-text-muted">
-        <StepBadge
-          index={1}
-          label="Google 본인 확인"
-          active={!googleStepDone}
-          done={googleStepDone}
-        />
-        <span className="text-text-muted">→</span>
-        <StepBadge index={2} label="관리자 로그인" active={googleStepDone} done={false} />
-      </ol>
-
-      {!googleStepDone ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-5">
-          <p className="text-xs text-text-muted">
-            평소 로그인 세션과는 별개로, 지금 이 자리에서 Google 계정으로 새로 본인 확인을
-            진행합니다.
-          </p>
-          <button
-            onClick={handleGoogleStepUp}
-            disabled={googleLoading}
-            className="flex items-center justify-center gap-3 rounded-2xl bg-white py-3.5 font-extrabold text-slate-900 shadow-lg transition-all hover:scale-[1.02] hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 cursor-pointer"
-          >
-            {googleLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
-            ) : (
-              <ShieldCheck className="h-5 w-5 text-brand" />
-            )}
-            <span>{googleLoading ? "확인 중..." : "Google 계정으로 관리자 본인 확인"}</span>
-          </button>
-          {googleError && <p className="text-xs font-semibold text-accent-red">{googleError}</p>}
-        </div>
-      ) : (
-        <form
-          onSubmit={handleLogin}
-          className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-5"
-        >
-          <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
-            관리자 아이디
-            <input
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
-            관리자 비밀번호
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
-              required
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={loginLoading}
-            className="mt-1 rounded-xl bg-brand py-3 text-xs font-bold text-white hover:bg-brand-light disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
-          >
-            {loginLoading ? "로그인 중..." : "관리자 로그인"}
-          </button>
-          {loginError && <p className="text-xs font-semibold text-accent-red">{loginError}</p>}
-        </form>
-      )}
+      <PasswordChangeForm onChanged={onChanged} />
+      <LogoutLink />
     </div>
+  );
+}
+
+export function PasswordChangeForm({ onChanged }: { onChanged: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+    setFormError(null);
+    if (newPassword !== newPasswordConfirm) {
+      setFormError("새 비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await postAdminPasswordChange({ currentPassword, newPassword, newPasswordConfirm });
+      setSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setNewPasswordConfirm("");
+      onChanged();
+    } catch (err) {
+      setFormError(
+        err instanceof ApiClientError
+          ? err.detail || "비밀번호 변경에 실패했습니다."
+          : "비밀번호 변경에 실패했습니다.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-5"
+    >
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        현재 비밀번호
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        새 비밀번호 (12자 이상)
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          minLength={12}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
+        새 비밀번호 확인
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={newPasswordConfirm}
+          onChange={(e) => setNewPasswordConfirm(e.target.value)}
+          minLength={12}
+          className="rounded-xl border border-border bg-surface px-3 py-2.5 text-sm font-medium text-text-primary outline-none focus:ring-2 focus:ring-brand"
+          required
+        />
+      </label>
+      <button
+        type="submit"
+        disabled={loading}
+        className="mt-1 rounded-xl bg-brand py-3 text-xs font-bold text-white hover:bg-brand-light disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+      >
+        {loading ? "변경 중..." : "비밀번호 변경"}
+      </button>
+      {formError && <p className="text-xs font-semibold text-accent-red">{formError}</p>}
+      {success && (
+        <p className="flex items-center gap-1.5 text-xs font-semibold text-accent-green">
+          <CheckCircle2 className="h-3.5 w-3.5" /> 비밀번호가 변경되었습니다.
+        </p>
+      )}
+    </form>
+  );
+}
+
+function LogoutLink() {
+  const [loggingOut, setLoggingOut] = useState(false);
+  return (
+    <button
+      onClick={async () => {
+        setLoggingOut(true);
+        try {
+          await postAdminLogout();
+        } finally {
+          window.location.reload();
+        }
+      }}
+      disabled={loggingOut}
+      className="mx-auto inline-flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-text-primary disabled:opacity-50 cursor-pointer"
+    >
+      <LogOut className="h-3.5 w-3.5" /> 관리자 로그아웃
+    </button>
   );
 }
 
@@ -337,9 +634,11 @@ function StepBadge({
 
 function AdminDashboard({
   overview,
+  role,
   onLoggedOut,
 }: {
   overview: AdminOverviewResponse;
+  role: "SUPERADMIN" | "ADMIN" | null;
   onLoggedOut: () => void;
 }) {
   const [loggingOut, setLoggingOut] = useState(false);
@@ -381,6 +680,29 @@ function AdminDashboard({
           </button>
         </div>
       </header>
+
+      <nav className="flex flex-wrap gap-2" aria-label="관리자 메뉴">
+        <Link
+          to="/admin/creators"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+        >
+          <Users className="h-3.5 w-3.5" /> Creator 심사
+        </Link>
+        {role === "SUPERADMIN" && (
+          <Link
+            to="/admin/accounts"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            <UserCog className="h-3.5 w-3.5" /> 관리자 계정
+          </Link>
+        )}
+        <Link
+          to="/admin/settings/security"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+        >
+          <Settings className="h-3.5 w-3.5" /> 보안 설정
+        </Link>
+      </nav>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="핵심 운영 상태">
         <MetricCard

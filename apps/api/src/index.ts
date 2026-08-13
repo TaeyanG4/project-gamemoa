@@ -12,6 +12,7 @@ import { discordGuildsRouter } from "./routes/discordGuilds.js";
 import { creatorsRouter } from "./routes/creators.js";
 import { adminRouter } from "./routes/admin.js";
 import { adminAuthRouter } from "./routes/adminAuth.js";
+import { adminAccountsRouter } from "./routes/adminAccounts.js";
 import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { createContainer } from "./container.js";
 import { getCreatorProviderAdapters } from "./infrastructure/creators/index.js";
@@ -102,6 +103,7 @@ app.route("/api/discord/guilds", discordGuildsRouter);
 app.route("/api/creators", creatorsRouter);
 app.route("/api/admin", adminRouter);
 app.route("/api/admin", adminAuthRouter);
+app.route("/api/admin", adminAccountsRouter);
 app.route("/api/admin/creators", adminCreatorsRouter);
 
 // 404 Handler

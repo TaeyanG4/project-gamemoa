@@ -8,6 +8,8 @@ export default [
   route("profile", "routes/profile.tsx"),
   route("admin", "routes/admin.tsx"),
   route("admin/creators", "routes/adminCreators.tsx"),
+  route("admin/accounts", "routes/adminAccounts.tsx"),
+  route("admin/settings/security", "routes/adminSettingsSecurity.tsx"),
   route("discord", "routes/discordHub.tsx"),
   route("discord/guide", "routes/discordGuide.tsx"),
   route("discord/link", "routes/discordLink.tsx"),

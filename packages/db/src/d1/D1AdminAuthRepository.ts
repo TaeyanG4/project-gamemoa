@@ -158,6 +158,13 @@ export class D1AdminAuthRepository implements AdminAuthRepository {
       .run();
   }
 
+  async revokeAllAdminSessionsForUserId(userId: number): Promise<void> {
+    await this.db
+      .prepare(`UPDATE admin_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`)
+      .bind(new Date().toISOString(), userId)
+      .run();
+  }
+
   async recordLoginAttempt(input: {
     userId: number;
     success: boolean;

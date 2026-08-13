@@ -142,3 +142,39 @@ CREATE TABLE admin_login_attempts (
   created_at TEXT NOT NULL
 );
 `;
+
+/** Schema for managed administrator account repository tests (migration 0016). */
+export const ADMIN_ACCOUNTS_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  avatar_url TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE admin_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL UNIQUE,
+  google_sub TEXT NOT NULL UNIQUE,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'ADMIN',
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  must_change_password INTEGER NOT NULL DEFAULT 0,
+  created_by_admin_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  password_changed_at TEXT NOT NULL
+);
+
+CREATE TABLE admin_account_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_admin_id INTEGER,
+  target_admin_id INTEGER,
+  action TEXT NOT NULL,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL
+);
+`;

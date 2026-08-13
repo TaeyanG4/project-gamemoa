@@ -335,6 +335,9 @@ test("admin me defaults to no access and never reveals ADMIN_USER_IDS", async ()
     eligible: false,
     adminAuthenticated: false,
     stepUpRequired: false,
+    bootstrapAvailable: false,
+    mustChangePassword: false,
+    role: null,
   });
 
   const mock = createAdminDb({ userId: 1 });
@@ -354,10 +357,14 @@ test("admin me defaults to no access and never reveals ADMIN_USER_IDS", async ()
     eligible: true,
     adminAuthenticated: true,
     stepUpRequired: false,
+    bootstrapAvailable: false,
+    mustChangePassword: false,
+    role: null,
   });
   assert.equal(JSON.stringify(body).includes("999"), false);
 
   // Eligible but without a valid admin session — stepUpRequired flips true, never adminAuthenticated.
+  // No managed admin account exists in this mock DB, so bootstrap is still available.
   const notElevated = await app.request(
     "/api/admin/me",
     { headers: { Cookie: "gamemoa_session=valid_session" } },
@@ -368,6 +375,9 @@ test("admin me defaults to no access and never reveals ADMIN_USER_IDS", async ()
     eligible: true,
     adminAuthenticated: false,
     stepUpRequired: true,
+    bootstrapAvailable: true,
+    mustChangePassword: false,
+    role: null,
   });
 });
 

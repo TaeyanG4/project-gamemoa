@@ -12,29 +12,37 @@
 
 ## 1. Google 로그인 & 관리자 Google Step-Up
 
-| 이름                    | 종류     | GitHub 위치 | 용도                                                            |
-| ----------------------- | -------- | ----------- | --------------------------------------------------------------- |
-| `GOOGLE_CLIENT_ID`      | Variable | Variables   | Google Identity Services 로그인 및 관리자 step-up 공통 audience |
-| `VITE_GOOGLE_CLIENT_ID` | Variable | Variables   | 웹 빌드에 주입되는 client ID (동일 값)                          |
-| `ADMIN_GOOGLE_SUBS`     | Secret   | Secrets     | 관리자 step-up에 허용된 Google canonical `sub` 목록 (쉼표 구분) |
+| 이름                    | 종류     | GitHub 위치 | 용도                                                                                                                                                                                      |
+| ----------------------- | -------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`      | Variable | Variables   | Google Identity Services 로그인 및 관리자 step-up 공통 audience                                                                                                                           |
+| `VITE_GOOGLE_CLIENT_ID` | Variable | Variables   | 웹 빌드에 주입되는 client ID (동일 값)                                                                                                                                                    |
+| `ADMIN_GOOGLE_SUBS`     | Secret   | Secrets     | **(선택)** 관리자 step-up 추가 제한용 Google canonical `sub` 허용 목록(쉼표 구분). 미설정 시 "현재 GAMEMOA 계정에 연결된 Google 계정"이라는 1차 바인딩만으로 정상 동작합니다 — 필수 아님. |
 
 검증: `GET /api/auth/providers`의 `google.configured`. `ADMIN_GOOGLE_SUBS`는 안전상 이유로 API가 노출하지
 않으므로, `/admin`에서 실제 Google 계정으로 step-up을 시도해 성공 여부로만 확인합니다.
 
-상태: 저장소 코드는 완전히 배선되어 있습니다. 실제 값 존재 여부는 **외부 설정 대기**로 별도 확인.
+상태: 저장소 코드는 완전히 배선되어 있습니다. `GOOGLE_CLIENT_ID`/`VITE_GOOGLE_CLIENT_ID`는 프로덕션에
+설정되어 있음을 확인했습니다(`gh variable list`). `ADMIN_GOOGLE_SUBS`는 선택 사항이며 미확인.
 
-## 2. 관리자 2차 로그인 (Admin Login)
+## 2. 관리자 인증 — 관리형 계정(D1) + root/break-glass
 
-| 이름                    | 종류     | GitHub 위치 | 용도                                              |
-| ----------------------- | -------- | ----------- | ------------------------------------------------- |
-| `ADMIN_USER_IDS`        | Variable | Variables   | 근본 관리자 자격 (GAMEMOA 사용자 ID, 쉼표 구분)   |
-| `ADMIN_LOGIN_USERNAME`  | Variable | Variables   | 관리자 2차 로그인 아이디                          |
-| `ADMIN_PASSWORD_PBKDF2` | Secret   | Secrets     | `pnpm admin:password:hash`로 생성한 PBKDF2 레코드 |
+관리자 로그인은 이제 D1 `admin_accounts`(관리형 계정)가 주 경로이며, GitHub Secret 값은
+"최초 관리자 bootstrap 자격"만 필요합니다. 자세한 모델은 `docs/ADMIN_GUIDE.md`를 참고하세요.
 
-검증: `/admin`에서 전체 5단계 로그인 흐름을 실제로 통과해 대시보드가 열리는지 확인합니다. 자세한 절차는
+| 이름                    | 종류     | GitHub 위치 | 용도                                                                                                      |
+| ----------------------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| `ADMIN_USER_IDS`        | Variable | Variables   | root/break-glass 자격(GAMEMOA 사용자 ID, 쉼표 구분). 최초 bootstrap에 필요, 이후 상시 유지되는 비상 경로. |
+| `ADMIN_LOGIN_USERNAME`  | Variable | Variables   | **(Deprecated)** 레거시 관리자 아이디 — 관리형 계정이 하나도 없을 때만 폴백으로 사용됨.                   |
+| `ADMIN_PASSWORD_PBKDF2` | Secret   | Secrets     | **(Deprecated)** 레거시 PBKDF2 레코드 — 위와 동일 조건에서만 폴백으로 사용됨.                             |
+
+검증: `/admin`에서 실제 로그인 흐름을 통과해 대시보드가 열리는지 확인합니다. 자세한 절차는
 `docs/ADMIN_GUIDE.md`를 참고하세요.
 
-상태: 저장소 코드는 완전히 배선되어 있습니다. 실제 값 존재 여부는 **외부 설정 대기**로 별도 확인.
+상태(2026-08-13 확인): `gh variable list`/`gh secret list`로 프로덕션을 직접 확인한 결과
+`ADMIN_USER_IDS`가 **설정되어 있지 않아 관리자 bootstrap 자격이 아무에게도 없는 상태**였습니다 —
+이것이 `/admin` 접근 불가의 근본 원인이었습니다. 운영자가 `ADMIN_USER_IDS`에 본인 사용자 ID를
+등록하고 `/admin`에서 직접 bootstrap을 완료해야 합니다(**외부 설정 대기**). `ADMIN_LOGIN_USERNAME`/
+`ADMIN_PASSWORD_PBKDF2`는 신규 배포에서 설정할 필요가 없습니다.
 
 ## 3. Creator Provider (YouTube / Twitch / CHZZK / SOOP)
 

@@ -6,9 +6,11 @@ export * from "./domain/profilePolicy.js";
 export * from "./domain/discordGuildPolicy.js";
 export * from "./domain/featuredPolicy.js";
 export * from "./domain/adminAuth.js";
+export * from "./domain/adminAccounts.js";
 export * from "./ports/repositories.js";
 export * from "./ports/creatorProvider.js";
 export * from "./ports/adminAuth.js";
+export * from "./ports/adminAccounts.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";
@@ -24,4 +26,5 @@ export * from "./application/discordGuildUseCases.js";
 export * from "./application/discordGuildXpUseCases.js";
 export * from "./application/creatorUseCases.js";
 export * from "./application/adminAuthUseCases.js";
+export * from "./application/adminAccountUseCases.js";
 export * from "./registry/gameRegistry.generated.js";
