@@ -352,12 +352,22 @@ export class D1CreatorRepository implements CreatorRepository {
 
     // EXISTS avoids joining creator_platform_accounts directly onto the ranked row set, which
     // would duplicate a creator's PB row once per matching platform account.
+    //
+    // Streamer ranking rule: a creator qualifies once they have AT LEAST ONE ownership-VERIFIED
+    // account on any supported platform (not all four). `cp.status = 'VERIFIED'` alone is never
+    // trusted as the sole source of truth here — it can only ever legitimately be VERIFIED
+    // because some platform account was verified, but this EXISTS check is what actually
+    // guarantees it, defending against any future drift between the two.
     const platformFilterClause = options.platform
       ? `AND EXISTS (
            SELECT 1 FROM creator_platform_accounts cpa
            WHERE cpa.creator_id = cp.id AND cpa.platform = ? AND cpa.verification_status = 'VERIFIED'
          )`
-      : "";
+      : `AND EXISTS (
+           SELECT 1 FROM creator_platform_accounts cpa
+           WHERE cpa.creator_id = cp.id AND cpa.verification_status = 'VERIFIED'
+             AND cpa.platform IN ('YOUTUBE', 'CHZZK', 'SOOP', 'TWITCH')
+         )`;
 
     if (options.mode === "score") {
       const selectedGameId = options.gameId && options.gameId !== "all" ? options.gameId : null;

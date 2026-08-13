@@ -73,8 +73,17 @@
 ## 4. Discord
 
 Discord 연동(OAuth, HTTP Interactions, 명령어 등록, 설치 링크)의 설정값과 검증 방법은
-`docs/DISCORD_INTEGRATION.md` §6, `docs/DISCORD_BOT_GUIDE.md` §6을 참고하세요. 명령어 자동 동기화/테스트
-길드 도구가 추가되면 이 문서에도 반영합니다.
+`docs/DISCORD_INTEGRATION.md` §6, `docs/DISCORD_BOT_GUIDE.md` §6을 참고하세요.
+
+명령어 자동 동기화(선택)는 `docs/DISCORD_INTEGRATION.md` §9-4를 참고하세요. `DISCORD_COMMAND_SYNC_ENABLED`
+(GitHub Actions Variable, `"true"`/미설정)가 `"true"`일 때만 `.github/workflows/deploy.yml`이 배포
+provenance 검증 이후 마지막 단계로 `pnpm discord:commands:register`(전역)를 실행합니다. 이때
+`DISCORD_APPLICATION_ID`(Variable, 없으면 `DISCORD_CLIENT_ID`로 대체)와 `DISCORD_BOT_TOKEN`(Secret,
+Worker 런타임에는 절대 전달하지 않음)이 필요합니다. 미설정 시 안전하게 건너뜁니다.
+
+상태: 저장소 코드/CI 배선은 완전합니다. `DISCORD_COMMAND_SYNC_ENABLED`/`DISCORD_BOT_TOKEN`/
+`DISCORD_TEST_GUILD_ID` 실제 값 존재 여부는 **외부 설정 대기**이며, 자동 동기화는 선택 사항입니다
+(미설정이어도 프로덕션 배포 자체는 계속 진행됩니다).
 
 ## 5. 공통 배포 검증
 

@@ -113,11 +113,13 @@ Discord 서버 기능은 다음 웹 전용 라우트에 위치합니다:
 
 ## 6. 필요한 설정값 & 명령어 등록
 
-| 변수                     | 종류 | 용도                                                              |
-| ------------------------ | ---- | ----------------------------------------------------------------- |
-| `DISCORD_APPLICATION_ID` | 공개 | CLI 명령어 등록 스크립트                                          |
-| `DISCORD_PUBLIC_KEY`     | 공개 | Worker Interaction Ed25519 서명 검증                              |
-| `DISCORD_BOT_TOKEN`      | 비밀 | 로컬 명령어 등록 스크립트 전용 (`pnpm discord:commands:register`) |
+| 변수                           | 종류      | 용도                                                                                       |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------------ |
+| `DISCORD_APPLICATION_ID`       | 공개      | CLI 명령어 등록/점검 스크립트, CI/CD 자동 동기화                                           |
+| `DISCORD_PUBLIC_KEY`           | 공개      | Worker Interaction Ed25519 서명 검증                                                       |
+| `DISCORD_BOT_TOKEN`            | 비밀      | 명령어 등록/점검 스크립트 및 CI/CD 자동 동기화 전용 — Worker 런타임에는 절대 전달하지 않음 |
+| `DISCORD_TEST_GUILD_ID`        | 선택 공개 | `pnpm discord:commands:register:guild`(개발/테스트 길드 즉시 반영용)                       |
+| `DISCORD_COMMAND_SYNC_ENABLED` | 선택 공개 | `"true"`일 때만 배포 CI/CD가 배포 후 전역 명령어를 자동 동기화(§9)                         |
 
 추가 OAuth 및 운영 설정은 다음과 같습니다.
 
@@ -150,6 +152,57 @@ Developer Portal의 Interactions Endpoint URL은 다음 API 경로를 사용합�
 ```text
 https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions
 ```
+
+## 9. 온보딩 & 명령어 자동화 (Phase C)
+
+### 9-1. 일반 사용자 온보딩
+
+`/discord/setup`(웹)이 5단계 안내를 제공합니다: 앱 설치 → Discord 계정 연결 → 서버 등록 →
+`/gamemoa games` 테스트 → `/gamemoa play`로 시작. 실제로 확인 가능한 상태(계정 연결 여부, 관리
+중인 서버 수)만 "완료"로 표시하며, Discord API로 확인할 수 없는 "설치 완료 여부"는 절대 임의로
+단정하지 않습니다. `/discord` Hub에도 설치 CTA(`DISCORD_INSTALL_URL` 설정 시에만 노출)와
+`/discord/setup` 링크를 추가했습니다.
+
+### 9-2. 명령어 드리프트 점검 (`pnpm discord:commands:check`)
+
+`apps/api/src/infrastructure/discord/commandDrift.ts`의 순수 비교 함수(`diffDiscordCommands`)가
+로컬 SSoT(`DISCORD_COMMANDS`)와 실제 Discord 등록 상태를 비교합니다. Discord가 붙이는
+`id`/`application_id`/`version`/`guild_id` 등은 무시하고 `name`/`description`/`options`(하위
+서브커맨드/choices 포함)만 의미 있게 비교하며, 순서 차이는 드리프트로 취급하지 않습니다.
+
+```bash
+pnpm discord:commands:check                    # 전역(글로벌) 명령어 점검
+DISCORD_TEST_GUILD_ID=... pnpm discord:commands:check --guild <guildId>  # 특정 길드 점검
+```
+
+`DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`이 필요하며 Bot Token은 절대 로그에 출력하지
+않습니다. 드리프트가 있으면 어떤 명령어가 누락/추가/불일치인지 진단 메시지와 함께 종료 코드 1로
+실패합니다.
+
+### 9-3. 테스트 길드 즉시 등록 (`pnpm discord:commands:register:guild`)
+
+개발/테스트 전용입니다. `DISCORD_TEST_GUILD_ID`로 지정한 길드에만 즉시 반영되는 명령어를
+등록합니다(전역 등록의 ~1시간 전파 지연 없음). 프로덕션 명령어 가용성은 항상
+`pnpm discord:commands:register`(전역)가 담당합니다.
+
+### 9-4. CI/CD 자동 동기화 (`DISCORD_COMMAND_SYNC_ENABLED`)
+
+`.github/workflows/deploy.yml`의 마지막 단계로 실행되며, 배포 provenance(정확한 SHA 검증)가 이미
+끝난 뒤에만 실행되므로 명령어 동기화가 배포 검증 결과에 영향을 주지 않습니다.
+
+- `DISCORD_COMMAND_SYNC_ENABLED`가 `"true"`가 아니면 안전하게 건너뜁니다.
+- `"true"`인데 `DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`이 없으면 명확히 실패합니다(조용히
+  넘어가지 않음).
+- Bot Token은 GitHub Actions Secret으로만 전달되며 Cloudflare Worker 런타임에는 절대 배선하지
+  않습니다.
+
+### 9-5. Admin Center Discord 진단
+
+`/admin`의 "Discord 통합 상태" 카드가 안전한 값만 표시합니다: OAuth 설정 여부, HTTP Interactions
+설정 여부, 설치 링크 설정 여부, 명령어 자동 동기화 활성화 여부, 등록된 활성 서버 수, 기대되는
+Interactions Endpoint URL, 로컬 `/gamemoa` 서브커맨드 목록. Bot Token/Client Secret/Public Key
+원문은 절대 노출하지 않으며, 실제 Discord 등록 상태와의 드리프트 여부는 "운영 CI 검증 대상"으로만
+안내합니다(Bot Token이 필요하므로 Worker가 직접 확인할 수 없음).
 
 Redirect URI는 LOGIN과 LINK에 공통으로 다음 하나를 사용합니다.
 

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { Trophy, Medal, AlertCircle, RefreshCw, Zap, Video, Gamepad2 } from "lucide-react";
+import { Trophy, Medal, AlertCircle, RefreshCw, Zap, Video, Gamepad2, Globe } from "lucide-react";
 import { fetchLeaderboardApi } from "../features/scores/api";
 import { fetchXpLeaderboardApi } from "../features/progression/api";
 import { fetchCreatorRankingsApi } from "../features/creators/creatorApi";
+import { PlatformIconRow, PlatformIcon } from "../components/ui/PlatformIcon";
 import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@gamemoa/contracts";
 
 import { levelForTotalXp } from "@gamemoa/core";
@@ -159,22 +160,29 @@ export default function Ranking() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Platform Filter Pills */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-              {[
-                { id: "ALL", label: "🌐 전체 플랫폼" },
-                { id: "YOUTUBE", label: "▶️ YouTube" },
-                { id: "CHZZK", label: "🟢 치지직 (CHZZK)" },
-                { id: "SOOP", label: "🔵 SOOP (아프리카)" },
-                { id: "TWITCH", label: "💜 Twitch" },
-              ].map((p) => (
+              {(
+                [
+                  { id: "ALL", label: "전체 플랫폼" },
+                  { id: "YOUTUBE", label: "YouTube" },
+                  { id: "CHZZK", label: "치지직 (CHZZK)" },
+                  { id: "SOOP", label: "SOOP (아프리카)" },
+                  { id: "TWITCH", label: "Twitch" },
+                ] as const
+              ).map((p) => (
                 <button
                   key={p.id}
                   onClick={() => setSelectedPlatform(p.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer border ${
                     selectedPlatform === p.id
                       ? "bg-purple-600 text-white border-purple-500 shadow-md"
                       : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary"
                   }`}
                 >
+                  {p.id === "ALL" ? (
+                    <Globe className="h-3.5 w-3.5" />
+                  ) : (
+                    <PlatformIcon platform={p.id} size={16} />
+                  )}
                   {p.label}
                 </button>
               ))}
@@ -259,11 +267,11 @@ export default function Ranking() {
                 )}
                 {mainTab === "creator" && (
                   <>
-                    <th className="py-4 px-6">연동 채널</th>
                     <th className="py-4 px-6">
                       {creatorMode === "score" ? "기록 / 종목" : "활동 레벨 (XP)"}
                     </th>
                     <th className="py-4 px-6">뱃지</th>
+                    <th className="py-4 px-6 text-right">플랫폼</th>
                   </>
                 )}
               </tr>
@@ -484,29 +492,6 @@ export default function Ranking() {
                           </div>
                         </td>
 
-                        <td className="py-4 px-6 text-xs whitespace-nowrap space-x-1.5">
-                          {record.platformAccounts.map((acc, idx) => (
-                            <a
-                              key={idx}
-                              href={acc.channelUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-sidebar border border-border/80 text-xs font-semibold hover:border-purple-500/40 hover:text-purple-300 transition-colors"
-                            >
-                              <span>
-                                {acc.platform === "YOUTUBE"
-                                  ? "▶️"
-                                  : acc.platform === "CHZZK"
-                                    ? "🟢"
-                                    : acc.platform === "SOOP"
-                                      ? "🔵"
-                                      : "💜"}
-                              </span>
-                              <span>{acc.channelName}</span>
-                            </a>
-                          ))}
-                        </td>
-
                         <td className="py-4 px-6 whitespace-nowrap font-black text-purple-200">
                           {creatorMode === "score" ? (
                             <div>
@@ -545,6 +530,12 @@ export default function Ranking() {
                                 ? "FEATURED CREATOR"
                                 : "VERIFIED CREATOR"}
                           </span>
+                        </td>
+
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div className="flex justify-end">
+                            <PlatformIconRow accounts={record.platformAccounts} size={24} />
+                          </div>
                         </td>
                       </tr>
                     ))

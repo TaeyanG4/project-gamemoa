@@ -95,7 +95,11 @@ export function createContainer(db: D1Database): AppContainer {
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
   const identityUseCases = new IdentityUseCases(userRepo);
-  const accountMergeUseCases = new AccountMergeUseCases(accountMergeRepo, userRepo);
+  const accountMergeUseCases = new AccountMergeUseCases(
+    accountMergeRepo,
+    userRepo,
+    adminAccountRepo,
+  );
   const progressionUseCases = new ProgressionUseCases(progressionRepo);
   const achievementUseCases = new AchievementUseCases(achievementRepo);
   const profileUseCases = new ProfileUseCases(userRepo);

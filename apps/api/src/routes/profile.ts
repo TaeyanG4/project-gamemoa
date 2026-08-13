@@ -1,7 +1,11 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { UpdateNicknameRequestSchema, UpdateCountryRequestSchema } from "@gamemoa/contracts";
+import {
+  UpdateNicknameRequestSchema,
+  UpdateCountryRequestSchema,
+  UpdateLocaleRequestSchema,
+} from "@gamemoa/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer } from "../container.js";
 
@@ -120,4 +124,34 @@ profileRouter.post("/country", async (c) => {
     },
     200,
   );
+});
+
+// POST /api/profile/locale — update saved UI language preference. No cooldown (unlike
+// nickname/country) — language switching is meant to apply immediately.
+profileRouter.post("/locale", async (c) => {
+  const userId = await getAuthUserId(c);
+  if (!userId) {
+    return profileError(c, "UNAUTHORIZED", "Unauthenticated", 401);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = UpdateLocaleRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return profileError(c, "INVALID_LOCALE", "지원하지 않는 언어입니다.", 400);
+  }
+
+  const { profileUseCases } = createContainer(c.env.DB);
+  const result = await profileUseCases.updateLocale(userId, parsed.data.locale);
+
+  if (!result.ok) {
+    if (result.code === "USER_NOT_FOUND") {
+      return profileError(c, result.code, "계정을 찾을 수 없습니다.", 404);
+    }
+    return profileError(c, result.code, "지원하지 않는 언어입니다.", 400);
+  }
+
+  return c.json({ success: true, locale: result.user.locale ?? parsed.data.locale }, 200);
 });

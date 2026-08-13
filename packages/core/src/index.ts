@@ -7,6 +7,7 @@ export * from "./domain/discordGuildPolicy.js";
 export * from "./domain/featuredPolicy.js";
 export * from "./domain/adminAuth.js";
 export * from "./domain/adminAccounts.js";
+export * from "./domain/i18nPolicy.js";
 export * from "./ports/repositories.js";
 export * from "./ports/creatorProvider.js";
 export * from "./ports/adminAuth.js";

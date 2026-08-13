@@ -15,6 +15,9 @@ export const AuthUserSchema = z.object({
   country: z.string().nullable().optional(),
   nickname_updated_at: z.string().nullable().optional(),
   country_updated_at: z.string().nullable().optional(),
+  // Loose string (not the strict enum) so a stale/legacy value never fails to parse — the
+  // client-side i18n resolver treats anything unsupported as "no saved preference".
+  locale: z.string().nullable().optional(),
 });
 export type AuthUser = z.infer<typeof AuthUserSchema>;
 

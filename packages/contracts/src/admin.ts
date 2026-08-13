@@ -176,6 +176,11 @@ export const AdminOverviewResponseSchema = z.object({
   discord: z.object({
     interactionsConfigured: z.boolean(),
     activeGuildCount: z.number().int().nonnegative(),
+    oauthConfigured: z.boolean(),
+    installUrlConfigured: z.boolean(),
+    commandSyncEnabled: z.boolean(),
+    expectedInteractionsEndpoint: z.string(),
+    localSubcommands: z.array(z.string()),
   }),
   creatorProviders: z.record(z.boolean()),
 });

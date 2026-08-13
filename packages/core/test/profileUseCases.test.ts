@@ -43,6 +43,14 @@ class FakeUserRepository implements UserRepository {
     this.users.set(userId, updated);
     return updated;
   }
+
+  async updateLocale(userId: number, locale: string, updatedAt: string): Promise<User> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("user not found");
+    const updated: User = { ...user, locale, updated_at: updatedAt };
+    this.users.set(userId, updated);
+    return updated;
+  }
 }
 
 function baseUser(overrides: Partial<User> = {}): User {
@@ -56,6 +64,7 @@ function baseUser(overrides: Partial<User> = {}): User {
     nickname_updated_at: null,
     country: null,
     country_updated_at: null,
+    locale: null,
     ...overrides,
   };
 }
@@ -149,4 +158,57 @@ test("updateCountry accepts unsetting the country back to null", async () => {
   const result = await useCases.updateCountry(1, null);
   assert.equal(result.ok, true);
   if (result.ok) assert.equal(result.user.country, null);
+});
+
+test("updateLocale succeeds for each of the four supported locales, no cooldown involved", async () => {
+  for (const locale of ["ko-KR", "en-US", "ja-JP", "zh-CN"]) {
+    const repo = new FakeUserRepository();
+    repo.seed(baseUser());
+    const useCases = new ProfileUseCases(repo);
+
+    const result = await useCases.updateLocale(1, locale);
+    assert.equal(result.ok, true);
+    if (result.ok) assert.equal(result.user.locale, locale);
+  }
+});
+
+test("updateLocale rejects an unsupported locale (e.g. zh-TW, out of scope this sprint)", async () => {
+  const repo = new FakeUserRepository();
+  repo.seed(baseUser());
+  const useCases = new ProfileUseCases(repo);
+
+  const result = await useCases.updateLocale(1, "zh-TW");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "INVALID_LOCALE");
+});
+
+test("updateLocale rejects a garbage value without touching the stored locale", async () => {
+  const repo = new FakeUserRepository();
+  repo.seed(baseUser({ locale: "ko-KR" }));
+  const useCases = new ProfileUseCases(repo);
+
+  const result = await useCases.updateLocale(1, "not-a-locale");
+  assert.equal(result.ok, false);
+  assert.equal(repo.users.get(1)?.locale, "ko-KR");
+});
+
+test("updateLocale allows switching immediately right after a previous change (no cooldown)", async () => {
+  const repo = new FakeUserRepository();
+  repo.seed(baseUser({ locale: "ko-KR" }));
+  const useCases = new ProfileUseCases(repo);
+
+  const first = await useCases.updateLocale(1, "en-US");
+  assert.equal(first.ok, true);
+  const second = await useCases.updateLocale(1, "ja-JP");
+  assert.equal(second.ok, true);
+  if (second.ok) assert.equal(second.user.locale, "ja-JP");
+});
+
+test("updateLocale reports USER_NOT_FOUND for a missing user", async () => {
+  const repo = new FakeUserRepository();
+  const useCases = new ProfileUseCases(repo);
+
+  const result = await useCases.updateLocale(999, "en-US");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "USER_NOT_FOUND");
 });

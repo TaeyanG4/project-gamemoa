@@ -61,6 +61,10 @@ export type ApiEnv = {
     DISCORD_PUBLIC_KEY?: string;
     /** Developer Portal에서 명시적으로 구성한 공개 Discord 설치 링크(선택). */
     DISCORD_INSTALL_URL?: string;
+    /** "true"일 때만 배포 CI/CD가 배포 후 전역 Discord 명령어를 자동 동기화합니다(선택). Admin
+     * Center 진단 표시 전용 — 실제 동기화는 GitHub Actions에서 Bot Token으로 수행되며 이 값
+     * 자체는 Worker 런타임에 Bot Token을 노출하지 않습니다. */
+    DISCORD_COMMAND_SYNC_ENABLED?: string;
     FRONTEND_URL?: string;
     COMMIT_SHA?: string;
     /** 쉼표로 구분한 명시적 GAMEMOA 사용자 ID. 미설정 시 관리자 권한 없음 (ROOT eligibility). */
@@ -764,6 +768,7 @@ authRouter.post("/merge/confirm", async (c) => {
       USER_NOT_FOUND: 404,
       MERGE_PROVIDER_CONFLICT: 409,
       MERGE_CREATOR_CONFLICT: 409,
+      MERGE_ADMIN_CONFLICT: 409,
     };
     const messageMap: Record<string, string> = {
       MERGE_CHALLENGE_EXPIRED: "계정 통합 세션이 만료되었습니다. 다시 시도해주세요.",
@@ -773,6 +778,8 @@ authRouter.post("/merge/confirm", async (c) => {
       MERGE_PROVIDER_CONFLICT: "두 계정 모두 동일 로그인 수단을 사용 중이라 병합할 수 없습니다.",
       MERGE_CREATOR_CONFLICT:
         "두 계정이 같은 플랫폼의 서로 다른 Creator 채널을 소유하고 있어 안전하게 병합할 수 없습니다. 먼저 Creator 채널 충돌을 정리해주세요.",
+      MERGE_ADMIN_CONFLICT:
+        "통합 대상(Secondary) 계정이 관리자 계정이라 안전하게 병합할 수 없습니다. 관리자에게 문의해 먼저 정리해주세요.",
     };
     const code = result.code;
     return accountError(

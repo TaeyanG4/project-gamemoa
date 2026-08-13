@@ -777,6 +777,52 @@ function AdminDashboard({
       </section>
 
       <section className="rounded-2xl border border-border bg-surface-raised p-5 shadow-lg shadow-black/10">
+        <h2 className="text-sm font-black text-text-primary">Discord 통합 상태</h2>
+        <p className="mt-1 text-xs text-text-muted">
+          안전한 값만 표시합니다. Bot Token/Client Secret/Public Key 원문은 절대 노출하지 않습니다.
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <DiscordStatusRow label="Discord OAuth" ok={overview.discord.oauthConfigured} />
+          <DiscordStatusRow
+            label="HTTP Interactions"
+            ok={overview.discord.interactionsConfigured}
+          />
+          <DiscordStatusRow
+            label="설치 링크(Install URL)"
+            ok={overview.discord.installUrlConfigured}
+          />
+          <DiscordStatusRow
+            label="명령어 자동 동기화"
+            ok={overview.discord.commandSyncEnabled}
+            okLabel="활성화됨"
+            offLabel="비활성화(수동 등록 필요)"
+          />
+          <div className="rounded-xl bg-surface px-3 py-2.5">
+            <p className="text-xs font-bold text-text-primary">등록된 활성 서버</p>
+            <p className="mt-1 text-xs text-text-muted">{overview.discord.activeGuildCount}개</p>
+          </div>
+          <div className="rounded-xl bg-surface px-3 py-2.5 sm:col-span-2 lg:col-span-1">
+            <p className="text-xs font-bold text-text-primary">Interactions Endpoint</p>
+            <p className="mt-1 truncate text-[10px] font-mono text-text-muted">
+              {overview.discord.expectedInteractionsEndpoint}
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-xl bg-surface px-3 py-2.5">
+          <p className="text-xs font-bold text-text-primary">
+            로컬 /gamemoa 서브커맨드 ({overview.discord.localSubcommands.length}개)
+          </p>
+          <p className="mt-1 text-[11px] text-text-muted">
+            {overview.discord.localSubcommands.map((s) => `/gamemoa ${s}`).join(" · ")}
+          </p>
+        </div>
+        <p className="mt-3 text-[11px] text-text-muted">
+          실제 Discord에 등록된 명령어와의 드리프트(불일치) 여부는 Bot Token이 필요한 운영 CI 검증
+          대상입니다 (<code className="font-mono">pnpm discord:commands:check</code>).
+        </p>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface-raised p-5 shadow-lg shadow-black/10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-sm font-black text-text-primary">최근 심사·감사 내역</h2>
@@ -834,6 +880,27 @@ function MetricCard({
       <p className="text-[11px] font-bold text-text-muted">{label}</p>
       <p className="mt-1 text-xl font-black text-text-primary">{value}</p>
     </article>
+  );
+}
+
+function DiscordStatusRow({
+  label,
+  ok,
+  okLabel = "설정됨",
+  offLabel = "미설정",
+}: {
+  label: string;
+  ok: boolean;
+  okLabel?: string;
+  offLabel?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-xl bg-surface px-3 py-2.5">
+      <span className="text-xs font-bold text-text-primary">{label}</span>
+      <span className={`text-[10px] font-bold ${ok ? "text-accent-green" : "text-text-muted"}`}>
+        {ok ? okLabel : offLabel}
+      </span>
+    </div>
   );
 }
 

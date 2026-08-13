@@ -17,6 +17,8 @@
     "smoke:prod": "tsx scripts/verify-production.ts",
     "auth:prod:check": "tsx scripts/check-auth-readiness.ts",
     "discord:commands:register": "tsx scripts/register-discord-commands.ts",
+    "discord:commands:register:guild": "tsx scripts/register-discord-commands-guild.ts",
+    "discord:commands:check": "tsx scripts/discord-commands-check.ts",
     "admin:password:hash": "tsx scripts/admin-password-hash.ts",
     "verify": "pnpm install --frozen-lockfile && pnpm format:check && pnpm architecture:check && pnpm registry:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "deploy": "pnpm --filter @gamemoa/api deploy && pnpm --filter @gamemoa/web deploy",

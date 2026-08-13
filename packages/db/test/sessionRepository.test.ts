@@ -19,6 +19,7 @@ function createMockD1Database(): {
       country?: string | null;
       nickname_updated_at?: string | null;
       country_updated_at?: string | null;
+      locale?: string | null;
     }
   >;
   oauthTable: Map<string, { user_id: number; provider: string }>;
@@ -37,6 +38,7 @@ function createMockD1Database(): {
       country?: string | null;
       nickname_updated_at?: string | null;
       country_updated_at?: string | null;
+      locale?: string | null;
     }
   >();
   const oauthTable = new Map<string, { user_id: number; provider: string }>();
@@ -50,6 +52,7 @@ function createMockD1Database(): {
     country: "KR",
     nickname_updated_at: "2026-01-01T00:00:00.000Z",
     country_updated_at: null,
+    locale: "en-US",
   });
 
   const db: D1Database = {
@@ -102,6 +105,7 @@ function createMockD1Database(): {
               country: user.country ?? null,
               nickname_updated_at: user.nickname_updated_at ?? null,
               country_updated_at: user.country_updated_at ?? null,
+              locale: user.locale ?? null,
             } as unknown as T;
           }
           return null;
@@ -162,6 +166,17 @@ test("D1SessionRepository surfaces country/nickname_updated_at/country_updated_a
   assert.equal(found.user.country, "KR");
   assert.equal(found.user.nickname_updated_at, "2026-01-01T00:00:00.000Z");
   assert.equal(found.user.country_updated_at, null);
+});
+
+test("D1SessionRepository surfaces the saved locale preference on the returned user", async () => {
+  const { db } = createMockD1Database();
+  const repo = new D1SessionRepository(db);
+
+  const session = await repo.createSession(1, 30);
+  const found = await repo.findSession(session.id);
+
+  assert.ok(found);
+  assert.equal(found.user.locale, "en-US");
 });
 
 test("D1SessionRepository supports legacy raw token and migrates it to hashed token", async () => {

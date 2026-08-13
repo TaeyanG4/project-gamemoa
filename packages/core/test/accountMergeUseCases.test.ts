@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   AccountMergeUseCases,
   type AccountMergeRepository,
+  type AdminAccountRepository,
+  type AdminAccountRecord,
   type MergeChallenge,
   type MergePreview,
   type OAuthAccount,
@@ -37,6 +39,31 @@ class FixtureState {
   challenges = new Map<string, MergeChallenge>();
   nextId = 1;
   failMerge = false;
+  /** userId -> admin account status, for the merge-blocks-when-Secondary-is-admin invariant. */
+  adminAccounts = new Map<number, "ACTIVE" | "DISABLED">();
+}
+
+/** Minimal fixture — only `findByUserId` is needed by AccountMergeUseCases. */
+class FixtureAdminAccountRepo implements Pick<AdminAccountRepository, "findByUserId"> {
+  constructor(private s: FixtureState) {}
+  async findByUserId(userId: number): Promise<AdminAccountRecord | null> {
+    const status = this.s.adminAccounts.get(userId);
+    if (!status) return null;
+    return {
+      id: userId,
+      userId,
+      googleSub: `sub-${userId}`,
+      username: `admin-${userId}`,
+      passwordHash: "hash",
+      role: "ADMIN",
+      status,
+      mustChangePassword: false,
+      createdByAdminId: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      passwordChangedAt: new Date().toISOString(),
+    };
+  }
 }
 
 class FixtureUserRepo implements UserRepository {
@@ -220,7 +247,8 @@ async function setupTwoAccounts(): Promise<{
   const state = new FixtureState();
   const userRepo = new FixtureUserRepo(state);
   const mergeRepo = new FixtureMergeRepo(state);
-  const useCases = new AccountMergeUseCases(mergeRepo, userRepo);
+  const adminAccountRepo = new FixtureAdminAccountRepo(state);
+  const useCases = new AccountMergeUseCases(mergeRepo, userRepo, adminAccountRepo);
 
   const userA = await userRepo.findOrCreateUser({
     provider: "google",
@@ -390,6 +418,39 @@ test("conflicting Creator platform ownership blocks merge before destructive wor
   assert.equal(state.challenges.get(challengeId)?.consumedAt, null);
 });
 
+test("merge is blocked when the Secondary (to-be-deleted) account is an ACTIVE administrator — privilege must never silently vanish or move", async () => {
+  const { state, useCases, userA, userB, challengeId } = await setupTwoAccounts();
+  // Keeping A means B (Secondary) would be deleted. B is an active admin.
+  state.adminAccounts.set(userB.id, "ACTIVE");
+
+  const result = await useCases.confirmMerge(challengeId, userA.id, userA.id);
+
+  assert.deepEqual(result, { ok: false, code: "MERGE_ADMIN_CONFLICT" });
+  // Nothing destructive happened.
+  assert.ok(state.users.has(userA.id));
+  assert.ok(state.users.has(userB.id));
+  assert.equal(state.challenges.get(challengeId)?.consumedAt, null);
+});
+
+test("merge is allowed when the Secondary account's admin status is DISABLED (not ACTIVE)", async () => {
+  const { state, useCases, userA, userB, challengeId } = await setupTwoAccounts();
+  state.adminAccounts.set(userB.id, "DISABLED");
+
+  const result = await useCases.confirmMerge(challengeId, userA.id, userA.id);
+
+  assert.equal(result.ok, true);
+});
+
+test("merge is allowed when the PRIMARY (kept) account is the administrator — only Secondary's admin status blocks the merge", async () => {
+  const { state, useCases, userA, userB, challengeId } = await setupTwoAccounts();
+  // Keeping A means B is Secondary; A being an admin is irrelevant to the Secondary-side check.
+  state.adminAccounts.set(userA.id, "ACTIVE");
+
+  const result = await useCases.confirmMerge(challengeId, userA.id, userA.id);
+
+  assert.equal(result.ok, true);
+});
+
 test("conflict-free Creator ownership transfers with review and audit identity intact", async () => {
   const { state, useCases, userA, userB, challengeId } = await setupTwoAccounts();
   state.creatorProfileOwner = userB.id;
@@ -461,7 +522,8 @@ test("confirmMerge blocks same-provider conflict (both accounts have the same pr
   const state = new FixtureState();
   const userRepo = new FixtureUserRepo(state);
   const mergeRepo = new FixtureMergeRepo(state);
-  const useCases = new AccountMergeUseCases(mergeRepo, userRepo);
+  const adminAccountRepo = new FixtureAdminAccountRepo(state);
+  const useCases = new AccountMergeUseCases(mergeRepo, userRepo, adminAccountRepo);
 
   const userA = await userRepo.findOrCreateUser({
     provider: "google",

@@ -1,0 +1,121 @@
+import type { CreatorPlatform } from "@gamemoa/contracts";
+
+/**
+ * Lightweight local SVG badges for the four supported Creator platforms — deliberately not
+ * emoji (▶️/🟢/🔵/💜) and not a hotlinked third-party image. Each badge is a brand-colored
+ * circle with a simple glyph; it is not a pixel-accurate trademark reproduction, just a
+ * compact, distinguishable, accessible indicator.
+ */
+const PLATFORM_META: Record<CreatorPlatform, { label: string; bg: string; fg: string }> = {
+  YOUTUBE: { label: "YouTube", bg: "#FF0000", fg: "#ffffff" },
+  CHZZK: { label: "CHZZK (치지직)", bg: "#1ECB4F", fg: "#0b1b0f" },
+  SOOP: { label: "SOOP (아프리카)", bg: "#1B78FF", fg: "#ffffff" },
+  TWITCH: { label: "Twitch", bg: "#9146FF", fg: "#ffffff" },
+};
+
+function PlatformGlyph({ platform }: { platform: CreatorPlatform }) {
+  if (platform === "YOUTUBE") {
+    // Universal "play" triangle — not the trademarked YouTube wordmark/icon, just the shape.
+    return (
+      <svg viewBox="0 0 24 24" width="55%" height="55%" fill="currentColor" aria-hidden="true">
+        <polygon points="8,6 8,18 18,12" />
+      </svg>
+    );
+  }
+  const letter = platform === "CHZZK" ? "Z" : platform === "SOOP" ? "S" : "T";
+  return (
+    <svg viewBox="0 0 24 24" width="70%" height="70%" aria-hidden="true">
+      <text
+        x="12"
+        y="17"
+        textAnchor="middle"
+        fontSize="15"
+        fontWeight="800"
+        fontFamily="system-ui, sans-serif"
+        fill="currentColor"
+      >
+        {letter}
+      </text>
+    </svg>
+  );
+}
+
+/**
+ * A single verified-platform badge. Never render this for an unverified platform account —
+ * callers are expected to already filter to `verificationStatus === "VERIFIED"` accounts
+ * (the ranking API only ever returns verified platformAccounts in the first place).
+ */
+export function PlatformIcon({
+  platform,
+  size = 22,
+  href,
+  className = "",
+}: {
+  platform: CreatorPlatform;
+  size?: number;
+  /** Verified channel URL — when provided, the badge becomes a link that opens the channel. */
+  href?: string;
+  className?: string;
+}) {
+  const meta = PLATFORM_META[platform];
+  const label = `${meta.label} 채널`;
+
+  const badge = (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={`inline-flex shrink-0 items-center justify-center rounded-full ${className}`}
+      style={{ width: size, height: size, backgroundColor: meta.bg, color: meta.fg }}
+    >
+      <PlatformGlyph platform={platform} />
+    </span>
+  );
+
+  if (!href) return badge;
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={label}
+      title={label}
+      className="inline-flex shrink-0 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      {badge}
+    </a>
+  );
+}
+
+/** Compact row of verified-platform badges, ordered YouTube → CHZZK → SOOP → Twitch regardless
+ * of input order, deduplicated by platform. */
+export function PlatformIconRow({
+  accounts,
+  size = 22,
+}: {
+  accounts: Array<{ platform: CreatorPlatform; channelUrl: string }>;
+  size?: number;
+}) {
+  const order: CreatorPlatform[] = ["YOUTUBE", "CHZZK", "SOOP", "TWITCH"];
+  const byPlatform = new Map(accounts.map((a) => [a.platform, a] as const));
+
+  const verified = order
+    .map((platform) => byPlatform.get(platform))
+    .filter((account): account is { platform: CreatorPlatform; channelUrl: string } =>
+      Boolean(account),
+    );
+
+  return (
+    <div className="flex items-center gap-1.5" aria-label="검증된 플랫폼">
+      {verified.map((account) => (
+        <PlatformIcon
+          key={account.platform}
+          platform={account.platform}
+          size={size}
+          href={account.channelUrl}
+        />
+      ))}
+    </div>
+  );
+}

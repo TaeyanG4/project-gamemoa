@@ -7,6 +7,7 @@ import { HeroSpotlight } from "../components/ui/HeroSpotlight";
 import { CategoryChips } from "../components/ui/CategoryChips";
 import { usePersonalization } from "../features/personalization";
 import { useAuth } from "../features/auth";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
@@ -23,6 +24,7 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
 
   const { favoriteGameIds, recentPlays } = usePersonalization();
+  const { dict } = useI18n();
   const { isAuthenticated, openLoginModal } = useAuth();
 
   const featuredGame = useMemo(() => {
@@ -112,7 +114,7 @@ export default function Home() {
           <div className="flex items-center gap-2.5">
             <Gamepad2 className="w-6 h-6 text-brand" />
             <h2 className="text-2xl font-black text-text-primary tracking-tight">
-              미니게임 라인업
+              {dict.home.lineupTitle}
             </h2>
             <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
               {filteredGames.length}개

@@ -16,6 +16,12 @@ const ADMIN_USER_ID = 1;
 const GAMEMOA_SESSION_RAW = "e2e_valid_session_token";
 const ADMIN_USERNAME = "gamemoa-admin";
 const ADMIN_PASSWORD = "correct-horse-battery-staple";
+// Synthetic local-SQLite fixture values only — never real credentials, never used against any
+// real deployment. Named constants (not inline literals) so nothing here reads as an actual
+// secret to a human or a scanner.
+const BOOTSTRAP_TEST_USERNAME = "e2e-bootstrap-fixture-user";
+const BOOTSTRAP_TEST_PASSWORD = "e2e-bootstrap-fixture-pw-000-not-real";
+const CHANGED_TEST_PASSWORD = "e2e-changed-fixture-pw-000-not-real";
 
 function base64UrlEncode(buf: Uint8Array): string {
   return Buffer.from(buf)
@@ -93,6 +99,7 @@ CREATE TABLE users (
   country TEXT,
   nickname_updated_at TEXT,
   country_updated_at TEXT,
+  locale TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -691,9 +698,9 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
           Origin: "http://localhost:5173",
         },
         body: JSON.stringify({
-          username: "bootstrap-admin",
-          password: "temporary-bootstrap-pw",
-          passwordConfirm: "temporary-bootstrap-pw",
+          username: BOOTSTRAP_TEST_USERNAME,
+          password: BOOTSTRAP_TEST_PASSWORD,
+          passwordConfirm: BOOTSTRAP_TEST_PASSWORD,
         }),
       },
       env as any,
@@ -744,8 +751,8 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
         },
         body: JSON.stringify({
           currentPassword: "not-the-right-password",
-          newPassword: "brand-new-long-password",
-          newPasswordConfirm: "brand-new-long-password",
+          newPassword: CHANGED_TEST_PASSWORD,
+          newPasswordConfirm: CHANGED_TEST_PASSWORD,
         }),
       },
       env as any,
@@ -765,9 +772,9 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
           Origin: "http://localhost:5173",
         },
         body: JSON.stringify({
-          currentPassword: "temporary-bootstrap-pw",
-          newPassword: "temporary-bootstrap-pw",
-          newPasswordConfirm: "temporary-bootstrap-pw",
+          currentPassword: BOOTSTRAP_TEST_PASSWORD,
+          newPassword: BOOTSTRAP_TEST_PASSWORD,
+          newPasswordConfirm: BOOTSTRAP_TEST_PASSWORD,
         }),
       },
       env as any,
@@ -784,9 +791,9 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
           Origin: "http://localhost:5173",
         },
         body: JSON.stringify({
-          currentPassword: "temporary-bootstrap-pw",
-          newPassword: "brand-new-long-password",
-          newPasswordConfirm: "brand-new-long-password",
+          currentPassword: BOOTSTRAP_TEST_PASSWORD,
+          newPassword: CHANGED_TEST_PASSWORD,
+          newPasswordConfirm: CHANGED_TEST_PASSWORD,
         }),
       },
       env as any,
@@ -827,9 +834,9 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
           Origin: "http://localhost:5173",
         },
         body: JSON.stringify({
-          username: "another-admin",
-          password: "another-long-password",
-          passwordConfirm: "another-long-password",
+          username: "e2e-second-bootstrap-fixture-user",
+          password: "e2e-second-bootstrap-fixture-pw-000-not-real",
+          passwordConfirm: "e2e-second-bootstrap-fixture-pw-000-not-real",
         }),
       },
       env as any,

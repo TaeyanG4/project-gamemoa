@@ -5,8 +5,9 @@ import {
   fetchGlobalGuildRanking,
   getDiscordRegisterAuthUrl,
 } from "../features/discord/discordGuildApi";
+import { fetchDiscordBotStatusApi } from "../features/discord/api";
 import type { DiscordGuildDto, GlobalGuildRankEntryDto } from "@gamemoa/contracts";
-import { Trophy } from "lucide-react";
+import { ExternalLink, Trophy } from "lucide-react";
 
 export default function DiscordHubRoute() {
   const [managedGuilds, setManagedGuilds] = useState<DiscordGuildDto[]>([]);
@@ -14,6 +15,7 @@ export default function DiscordHubRoute() {
   const [loading, setLoading] = useState(true);
   const [loadingRanking, setLoadingRanking] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [installUrl, setInstallUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMyManagedGuilds()
@@ -31,6 +33,10 @@ export default function DiscordHubRoute() {
       .then((res) => setWeeklyRanking(res.guilds))
       .catch(() => setWeeklyRanking([]))
       .finally(() => setLoadingRanking(false));
+
+    fetchDiscordBotStatusApi()
+      .then((status) => setInstallUrl(status.installUrl ?? null))
+      .catch(() => setInstallUrl(null));
   }, []);
 
   return (
@@ -60,10 +66,28 @@ export default function DiscordHubRoute() {
           </p>
 
           <div className="flex flex-wrap gap-4 pt-2">
+            {installUrl && (
+              <a
+                href={installUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                id="discord-hub-install-cta"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500 hover:shadow-indigo-500/40 active:scale-95"
+              >
+                Discord에 GAMEMOA 추가 <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+            <Link
+              to="/discord/setup"
+              id="discord-hub-setup-cta"
+              className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/20 active:scale-95"
+            >
+              🧭 설치 가이드 (5단계)
+            </Link>
             <Link
               to="/discord/servers"
               id="discord-hub-search-cta"
-              className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500 hover:shadow-indigo-500/40 active:scale-95"
+              className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white backdrop-blur-md transition-all hover:bg-white/20 active:scale-95"
             >
               🔍 서버 검색
             </Link>

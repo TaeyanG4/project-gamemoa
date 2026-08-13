@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router";
 import { Search, Menu, Gamepad2, Bookmark, User, Command, LogOut, Trophy } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../features/auth";
+import { useI18n } from "../../features/i18n/I18nContext";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -12,6 +13,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const navigate = useNavigate();
   const { user, isAuthenticated, openLoginModal, logout } = useAuth();
+  const { dict } = useI18n();
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +58,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="게임명, 태그 또는 카테고리 검색..."
+            placeholder={dict.nav.searchPlaceholder}
             className="w-full bg-surface-raised text-text-primary placeholder:text-text-muted text-sm rounded-full pl-10 pr-12 py-2 border border-border/80 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all shadow-inner"
           />
           <div className="absolute right-3 flex items-center gap-1 text-[10px] font-bold text-text-muted px-1.5 py-0.5 rounded bg-surface border border-border pointer-events-none">
@@ -70,7 +72,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           <Link
             to="/games?category=favorites"
             className="p-2.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors relative cursor-pointer"
-            title="즐겨찾기"
+            title={dict.nav.favorites}
           >
             <Bookmark className="w-5 h-5" />
           </Link>
@@ -124,7 +126,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                     className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
                   >
                     <User className="w-4 h-4 text-brand-light" />
-                    <span>내 프로필 & 기록</span>
+                    <span>{dict.nav.myProfile}</span>
                   </Link>
 
                   <Link
@@ -133,7 +135,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                     className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
                   >
                     <Trophy className="w-4 h-4 text-accent-yellow" />
-                    <span>명예의 전당</span>
+                    <span>{dict.nav.ranking}</span>
                   </Link>
 
                   <button
@@ -144,7 +146,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                     className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-accent-red hover:bg-accent-red/10 transition-colors w-full text-left border-t border-border/40 mt-1 cursor-pointer"
                   >
                     <LogOut className="w-4 h-4" />
-                    <span>로그아웃</span>
+                    <span>{dict.nav.logout}</span>
                   </button>
                 </div>
               )}
@@ -155,7 +157,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
               className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-brand to-brand-dark rounded-full hover:shadow-lg hover:shadow-brand/30 hover:scale-105 transition-all cursor-pointer"
             >
               <User className="w-4 h-4" />
-              <span>로그인</span>
+              <span>{dict.nav.login}</span>
             </button>
           )}
         </div>

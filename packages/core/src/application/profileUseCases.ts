@@ -6,6 +6,7 @@ import {
   validateCountry,
   checkCooldown,
 } from "../domain/profilePolicy.js";
+import { isSupportedLocale } from "../domain/i18nPolicy.js";
 
 export type UpdateNicknameResult =
   | { ok: true; user: User }
@@ -17,6 +18,11 @@ export type UpdateCountryResult =
   | { ok: true; user: User }
   | { ok: false; code: "INVALID_COUNTRY" }
   | { ok: false; code: "COUNTRY_COOLDOWN_ACTIVE"; nextAllowedAt: string }
+  | { ok: false; code: "USER_NOT_FOUND" };
+
+export type UpdateLocaleResult =
+  | { ok: true; user: User }
+  | { ok: false; code: "INVALID_LOCALE" }
   | { ok: false; code: "USER_NOT_FOUND" };
 
 export class ProfileUseCases {
@@ -63,6 +69,19 @@ export class ProfileUseCases {
       validation.country,
       new Date().toISOString(),
     );
+    return { ok: true, user: updated };
+  }
+
+  /** No cooldown — language switching is meant to apply immediately, unlike nickname/country. */
+  async updateLocale(userId: number, rawLocale: string): Promise<UpdateLocaleResult> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) return { ok: false, code: "USER_NOT_FOUND" };
+
+    if (!isSupportedLocale(rawLocale)) {
+      return { ok: false, code: "INVALID_LOCALE" };
+    }
+
+    const updated = await this.userRepo.updateLocale(userId, rawLocale, new Date().toISOString());
     return { ok: true, user: updated };
   }
 }

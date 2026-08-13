@@ -1,7 +1,11 @@
 import { Link } from "react-router";
 import { Gamepad2 } from "lucide-react";
+import { useI18n } from "../../features/i18n/I18nContext";
+import { LanguageSelector } from "../ui/LanguageSelector";
 
 export function Footer() {
+  const { dict } = useI18n();
+
   return (
     <footer className="w-full border-t border-border bg-surface-sidebar mt-auto select-none">
       {/* Main Footer Info */}
@@ -13,27 +17,31 @@ export function Footer() {
               game<span className="text-brand">moa</span>
             </span>
           </Link>
-          <p className="text-xs text-text-muted">설치 없이, 1초 만에 즐기는 미니게임</p>
+          <p className="text-xs text-text-muted">{dict.footer.tagline}</p>
           <p className="text-xs text-text-muted">
-            &copy; {new Date().getFullYear()} gamemoa. All rights reserved.
+            &copy; {new Date().getFullYear()} gamemoa. {dict.footer.rightsReserved}
           </p>
         </div>
 
-        <div className="flex items-center gap-6 text-xs text-text-secondary">
+        <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-text-secondary">
           <a
             href="https://github.com/TaeyanG4/project-gamemoa"
             target="_blank"
             rel="noreferrer"
             className="hover:text-text-primary transition-colors"
           >
-            GitHub Repo
+            {dict.footer.githubRepo}
           </a>
           <Link to="/games" className="hover:text-text-primary transition-colors">
-            전체 게임 목록
+            {dict.footer.allGames}
           </Link>
           <Link to="/ranking" className="hover:text-text-primary transition-colors">
-            명예의 전당
+            {dict.footer.ranking}
           </Link>
+          <Link to="/wiki" className="hover:text-text-primary transition-colors">
+            {dict.footer.wiki}
+          </Link>
+          <LanguageSelector />
         </div>
       </div>
     </footer>

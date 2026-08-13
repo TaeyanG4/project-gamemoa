@@ -14,6 +14,22 @@
   - 통합 랭킹 UI (`/ranking`)의 `[🎥 스트리머 랭킹]` 탭 노출
   - 내 프로필 페이지 (`/profile`)의 공식 크리에이터 채널 링크 및 검증 배지 표시
 
+### 1-1. 스트리머 랭킹 자격 (단일 플랫폼 인증으로 충분)
+
+YouTube / CHZZK / SOOP / Twitch **중 하나 이상**의 플랫폼에서 소유권 인증(`verification_status =
+'VERIFIED'`)이 완료되면 스트리머 랭킹에 노출됩니다. 네 플랫폼을 모두 인증할 필요는 없습니다.
+
+`D1CreatorRepository.getCreatorRankings`는 `creator_profiles.status = 'VERIFIED'`만으로 자격을
+판단하지 않고, 항상 `EXISTS (creator_platform_accounts 중 verification_status='VERIFIED'인 행)`을
+추가로 요구합니다 — 프로필 상태가 실제 플랫폼별 인증 상태와 어긋날 가능성에 대한 방어입니다. 플랫폼
+필터가 없을 때는 4개 플랫폼 중 하나라도 VERIFIED이면 충분하고, 특정 플랫폼 필터가 있을 때는 그
+플랫폼이 VERIFIED여야 합니다.
+
+여러 플랫폼을 인증한 크리에이터도 랭킹에는 1행만 노출되며, 순위 값(게임 최고 기록/XP)은 플랫폼 개수나
+Featured 상태와 무관합니다 — 플랫폼은 필터링·표시 전용 메타데이터입니다. 각 랭킹 행 오른쪽 끝에
+검증된 플랫폼 아이콘(`apps/web/app/components/ui/PlatformIcon.tsx`)이 표시되며, 클릭 시 해당
+`channelUrl`(항상 VERIFIED 계정에서만 로드됨)로 새 탭이 열립니다.
+
 ---
 
 ## 2. 핵심 검증 원칙 (Core Verification Invariants)

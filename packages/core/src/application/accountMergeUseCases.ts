@@ -5,6 +5,7 @@ import type {
   OAuthAccount,
   UserRepository,
 } from "../ports/repositories.js";
+import type { AdminAccountRepository } from "../ports/adminAccounts.js";
 
 export type MergeConfirmResult =
   | { ok: true; primaryId: number; secondaryId: number }
@@ -16,6 +17,7 @@ export type MergeConfirmResult =
         | "MERGE_CHALLENGE_MISMATCH"
         | "MERGE_PROVIDER_CONFLICT"
         | "MERGE_CREATOR_CONFLICT"
+        | "MERGE_ADMIN_CONFLICT"
         | "USER_NOT_FOUND";
     };
 
@@ -28,6 +30,9 @@ export class AccountMergeUseCases {
   constructor(
     private mergeRepo: AccountMergeRepository,
     private userRepo: UserRepository,
+    /** Only `findByUserId` is needed here — accepting the full port keeps this class from having
+     * to know about admin_accounts' other operations. */
+    private adminAccountRepo: Pick<AdminAccountRepository, "findByUserId">,
   ) {}
 
   static readonly CHALLENGE_TTL_SECONDS = 600;
@@ -110,6 +115,15 @@ export class AccountMergeUseCases {
     ]);
     if (!primaryUser || !secondaryUser) {
       return { ok: false, code: "USER_NOT_FOUND" };
+    }
+
+    // Administrator privilege must never silently move from Secondary to Primary, or simply
+    // vanish, as a side effect of an account merge — admin_accounts.user_id is a real identity
+    // binding (§ managed admin accounts), not data that "Primary Wins" is safe to discard.
+    // Block the merge outright and require explicit administrator resolution first.
+    const secondaryAdminAccount = await this.adminAccountRepo.findByUserId(secondaryId);
+    if (secondaryAdminAccount && secondaryAdminAccount.status === "ACTIVE") {
+      return { ok: false, code: "MERGE_ADMIN_CONFLICT" };
     }
 
     // Verify the second provider proof identity still belongs to one of the two candidates.

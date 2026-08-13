@@ -37,6 +37,15 @@ test("POST /api/profile/country returns 401 Unauthenticated without a session", 
   assert.equal(res.status, 401);
 });
 
+test("POST /api/profile/locale returns 401 Unauthenticated without a session", async () => {
+  const res = await app.request("http://localhost/api/profile/locale", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "http://localhost:5173" },
+    body: JSON.stringify({ locale: "en-US" }),
+  });
+  assert.equal(res.status, 401);
+});
+
 test("POST /api/scores response schema optionally carries progression side-effects", async () => {
   // Unauthenticated submission is still rejected before any progression logic runs.
   const res = await app.request("http://localhost/api/scores", {

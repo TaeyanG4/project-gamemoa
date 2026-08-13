@@ -4,11 +4,12 @@ import "./app.css";
 import { Layout } from "./components/layout/Layout";
 import { AuthProvider } from "./features/auth";
 import { PersonalizationProvider } from "./features/personalization";
+import { I18nProvider } from "./features/i18n/I18nContext";
 import { LoginModal } from "./components/ui/LoginModal";
 
 export default function App() {
   return (
-    <html lang="ko" className="dark">
+    <html lang="ko-KR" className="dark">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -32,12 +33,14 @@ export default function App() {
       </head>
       <body className="bg-surface text-text-primary antialiased">
         <AuthProvider>
-          <PersonalizationProvider>
-            <Layout>
-              <Outlet />
-            </Layout>
-            <LoginModal />
-          </PersonalizationProvider>
+          <I18nProvider>
+            <PersonalizationProvider>
+              <Layout>
+                <Outlet />
+              </Layout>
+              <LoginModal />
+            </PersonalizationProvider>
+          </I18nProvider>
         </AuthProvider>
         <ScrollRestoration />
         <Scripts />

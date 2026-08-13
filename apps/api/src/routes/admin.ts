@@ -4,6 +4,7 @@ import { createContainer } from "../container.js";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
 import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
+import { DISCORD_SUBCOMMANDS } from "../infrastructure/discord/commands.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminRouter = new Hono<ApiEnv>();
@@ -47,6 +48,11 @@ adminRouter.get("/overview", async (c) => {
     discord: {
       interactionsConfigured: Boolean(c.env.DISCORD_PUBLIC_KEY),
       activeGuildCount,
+      oauthConfigured: Boolean(c.env.DISCORD_CLIENT_ID && c.env.DISCORD_CLIENT_SECRET),
+      installUrlConfigured: Boolean(c.env.DISCORD_INSTALL_URL),
+      commandSyncEnabled: c.env.DISCORD_COMMAND_SYNC_ENABLED === "true",
+      expectedInteractionsEndpoint: `${new URL(c.req.url).origin}/api/discord/interactions`,
+      localSubcommands: Object.values(DISCORD_SUBCOMMANDS),
     },
     creatorProviders: {
       YOUTUBE: adapters.YOUTUBE.isConfigured(),

@@ -12,6 +12,8 @@ export interface User {
   nickname_updated_at?: string | null;
   /** Timestamp of the last explicit country/region change; null before the first change. */
   country_updated_at?: string | null;
+  /** Saved UI locale preference (one of SUPPORTED_LOCALES), or null if never set. */
+  locale?: string | null;
 }
 
 export interface OAuthAccount {
@@ -67,6 +69,7 @@ export interface UserRepository {
   unlinkOAuthAccount(userId: number, provider: string): Promise<void>;
   updateNickname(userId: number, nickname: string, updatedAt: string): Promise<User>;
   updateCountry(userId: number, country: string | null, updatedAt: string): Promise<User>;
+  updateLocale(userId: number, locale: string, updatedAt: string): Promise<User>;
 }
 
 export interface SessionRepository {

@@ -17,7 +17,7 @@ export class D1SessionRepository implements SessionRepository {
       .prepare(
         `SELECT s.id as session_id, s.user_id, s.created_at as session_created_at, s.expires_at,
                 u.id as user_id, u.nickname, u.email, u.avatar_url, u.created_at as user_created_at, u.updated_at,
-                u.country, u.nickname_updated_at, u.country_updated_at
+                u.country, u.nickname_updated_at, u.country_updated_at, u.locale
          FROM sessions s
          JOIN users u ON s.user_id = u.id
          WHERE s.id = ?`,
@@ -110,6 +110,7 @@ export class D1SessionRepository implements SessionRepository {
         country: row.country ? String(row.country) : null,
         nickname_updated_at: row.nickname_updated_at ? String(row.nickname_updated_at) : null,
         country_updated_at: row.country_updated_at ? String(row.country_updated_at) : null,
+        locale: row.locale ? String(row.locale) : null,
       },
     };
   }

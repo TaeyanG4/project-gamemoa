@@ -19,6 +19,14 @@ const OTHER_USER_ID = 2;
 const OTHER_GOOGLE_SUB = "other-user-google-sub";
 const OTHER_SESSION_RAW = "other_user_session_token";
 
+// Synthetic local-SQLite fixture values only — never real credentials, never used against any
+// real deployment. Named constants (not inline literals) so nothing here reads as an actual
+// secret to a human or a scanner.
+const SUPERADMIN_TEST_USERNAME = "e2e-superadmin-fixture-user";
+const SUPERADMIN_TEST_PASSWORD = "e2e-superadmin-fixture-pw-000-not-real";
+const ROTATED_TEST_PASSWORD = "e2e-rotated-fixture-pw-000-not-real";
+const SECOND_ADMIN_TEST_PASSWORD = "e2e-second-admin-fixture-pw-000-not-real";
+
 function base64UrlEncode(buf: Uint8Array): string {
   return Buffer.from(buf)
     .toString("base64")
@@ -91,6 +99,7 @@ CREATE TABLE users (
   country TEXT,
   nickname_updated_at TEXT,
   country_updated_at TEXT,
+  locale TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -229,9 +238,9 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
         Origin: "http://localhost:5173",
       },
       body: JSON.stringify({
-        username: "root-admin",
-        password: "super-secret-bootstrap-password",
-        passwordConfirm: "super-secret-bootstrap-password",
+        username: SUPERADMIN_TEST_USERNAME,
+        password: SUPERADMIN_TEST_PASSWORD,
+        passwordConfirm: SUPERADMIN_TEST_PASSWORD,
       }),
     },
     env as any,
@@ -251,9 +260,9 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
         Origin: "http://localhost:5173",
       },
       body: JSON.stringify({
-        currentPassword: "super-secret-bootstrap-password",
-        newPassword: "post-bootstrap-permanent-password",
-        newPasswordConfirm: "post-bootstrap-permanent-password",
+        currentPassword: SUPERADMIN_TEST_PASSWORD,
+        newPassword: ROTATED_TEST_PASSWORD,
+        newPasswordConfirm: ROTATED_TEST_PASSWORD,
       }),
     },
     env as any,
@@ -283,7 +292,7 @@ test("SUPERADMIN can create an ADMIN for another linked GAMEMOA user; response n
         body: JSON.stringify({
           userId: OTHER_USER_ID,
           username: "second-admin",
-          password: "another-long-enough-password",
+          password: SECOND_ADMIN_TEST_PASSWORD,
           role: "ADMIN",
         }),
       },
@@ -294,7 +303,7 @@ test("SUPERADMIN can create an ADMIN for another linked GAMEMOA user; response n
     assert.equal(created.role, "ADMIN");
     assert.equal("passwordHash" in created, false);
     assert.equal("googleSub" in created, false);
-    assert.equal(JSON.stringify(created).includes("another-long-enough-password"), false);
+    assert.equal(JSON.stringify(created).includes(SECOND_ADMIN_TEST_PASSWORD), false);
 
     // The new admin (NOT in ADMIN_USER_IDS) independently completes step-up + login using only
     // their managed admin_accounts row — this is the whole point of the migration: no GitHub
@@ -328,7 +337,7 @@ test("SUPERADMIN can create an ADMIN for another linked GAMEMOA user; response n
         },
         body: JSON.stringify({
           username: "second-admin",
-          password: "another-long-enough-password",
+          password: SECOND_ADMIN_TEST_PASSWORD,
         }),
       },
       env as any,
@@ -382,7 +391,7 @@ test("creating an admin for a user with no linked Google account is rejected", a
         body: JSON.stringify({
           userId: 3,
           username: "no-google-admin",
-          password: "another-long-enough-password",
+          password: SECOND_ADMIN_TEST_PASSWORD,
           role: "ADMIN",
         }),
       },
@@ -469,7 +478,7 @@ test("audit log records ADMIN_CREATED for both bootstrap and SUPERADMIN-created 
         body: JSON.stringify({
           userId: OTHER_USER_ID,
           username: "second-admin",
-          password: "another-long-enough-password",
+          password: SECOND_ADMIN_TEST_PASSWORD,
           role: "ADMIN",
         }),
       },
@@ -485,7 +494,7 @@ test("audit log records ADMIN_CREATED for both bootstrap and SUPERADMIN-created 
     const entries = ((await auditRes.json()) as { entries: Array<{ action: string }> }).entries;
     const createdCount = entries.filter((e) => e.action === "ADMIN_CREATED").length;
     assert.equal(createdCount, 2); // bootstrap + this create
-    assert.equal(JSON.stringify(entries).includes("another-long-enough-password"), false);
+    assert.equal(JSON.stringify(entries).includes(SECOND_ADMIN_TEST_PASSWORD), false);
   } finally {
     jwks.restore();
   }

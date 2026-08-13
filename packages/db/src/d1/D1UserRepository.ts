@@ -37,6 +37,7 @@ export class D1UserRepository implements UserRepository {
       country: row.country ? String(row.country) : null,
       nickname_updated_at: row.nickname_updated_at ? String(row.nickname_updated_at) : null,
       country_updated_at: row.country_updated_at ? String(row.country_updated_at) : null,
+      locale: row.locale ? String(row.locale) : null,
     };
   }
 
@@ -68,6 +69,7 @@ export class D1UserRepository implements UserRepository {
         ? String(oauthRow.nickname_updated_at)
         : null,
       country_updated_at: oauthRow.country_updated_at ? String(oauthRow.country_updated_at) : null,
+      locale: oauthRow.locale ? String(oauthRow.locale) : null,
     };
   }
 
@@ -141,6 +143,7 @@ export class D1UserRepository implements UserRepository {
       country: null,
       nickname_updated_at: null,
       country_updated_at: null,
+      locale: null,
     };
   }
 
@@ -240,6 +243,19 @@ export class D1UserRepository implements UserRepository {
     const updated = await this.findById(userId);
     if (!updated) {
       throw new Error(`User ${userId} not found after country update`);
+    }
+    return updated;
+  }
+
+  async updateLocale(userId: number, locale: string, updatedAt: string): Promise<User> {
+    await this.db
+      .prepare(`UPDATE users SET locale = ?, updated_at = ? WHERE id = ?`)
+      .bind(locale, updatedAt, userId)
+      .run();
+
+    const updated = await this.findById(userId);
+    if (!updated) {
+      throw new Error(`User ${userId} not found after locale update`);
     }
     return updated;
   }
