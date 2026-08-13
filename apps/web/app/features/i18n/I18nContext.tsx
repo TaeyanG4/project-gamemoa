@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { resolveLocale, matchBrowserLocale, DEFAULT_LOCALE } from "@gamemoa/core";
-import type { SupportedLocale } from "@gamemoa/contracts";
+import { resolveLocale, matchBrowserLocale, DEFAULT_LOCALE } from "@owogg/core";
+import type { SupportedLocale } from "@owogg/contracts";
 import { DICTIONARIES, type Dictionary } from "./dictionary";
 import { useAuth } from "../auth";
 import { apiFetch } from "../../lib/api/client";
-import { UpdateLocaleResponseSchema } from "@gamemoa/contracts";
+import { UpdateLocaleResponseSchema } from "@owogg/contracts";
 
-const STORAGE_KEY = "gamemoa_locale";
+const STORAGE_KEY = "owogg_locale";
 
 function readStoredLocale(): SupportedLocale | null {
   if (typeof window === "undefined") return null;

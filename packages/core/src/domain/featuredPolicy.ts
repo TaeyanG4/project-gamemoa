@@ -3,9 +3,9 @@
  * Pure domain logic: no D1, Hono, HTTP, or browser dependencies.
  *
  * 개념 구분:
- * - Creator        = GAMEMOA 공식 API로 검증된 채널 소유권 (creator_profiles.status)
- * - Featured       = GAMEMOA 기준(공개 채널 지표) 기반 자격 심사 결과 (presentation/filtering only)
- * - GAMEMOA Partner = 향후 직접 파트너십 (이번 단계 범위 밖)
+ * - Creator        = OwOGG 공식 API로 검증된 채널 소유권 (creator_profiles.status)
+ * - Featured       = OwOGG 기준(공개 채널 지표) 기반 자격 심사 결과 (presentation/filtering only)
+ * - OwOGG Partner = 향후 직접 파트너십 (이번 단계 범위 밖)
  *
  * Featured 상태는 절대 게임 점수(Score)/XP/랭킹 순위를 변경하지 않습니다.
  */

@@ -1,4 +1,4 @@
-import type { Score, ScoreRepository, UserPersonalBestAggregate } from "@gamemoa/core";
+import type { Score, ScoreRepository, UserPersonalBestAggregate } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 function mapScoreRow(row: Record<string, unknown>): Score {

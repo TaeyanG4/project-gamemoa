@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Check, Languages } from "lucide-react";
-import { SUPPORTED_LOCALES } from "@gamemoa/core";
-import type { SupportedLocale } from "@gamemoa/contracts";
+import { SUPPORTED_LOCALES } from "@owogg/core";
+import type { SupportedLocale } from "@owogg/contracts";
 import { useI18n } from "../../features/i18n/I18nContext";
 
 const NATIVE_LABELS: Record<SupportedLocale, string> = {

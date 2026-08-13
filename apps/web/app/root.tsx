@@ -13,7 +13,7 @@ export default function App() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>gamemoa — 심심할 틈 없이, 게임을 한곳에</title>
+        <title>OwOGG — 심심할 틈 없이, 게임을 한곳에</title>
         <meta name="description" content="설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼" />
         <meta name="theme-color" content="#6366f1" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

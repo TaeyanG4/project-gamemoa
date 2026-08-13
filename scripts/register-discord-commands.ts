@@ -1,6 +1,6 @@
 // pnpm discord:commands:register
 //
-// Registers the GAMEMOA Discord Application Commands (global scope) via Discord's REST API.
+// Registers the OwOGG Discord Application Commands (global scope) via Discord's REST API.
 // Safe to rerun: PUT replaces the entire global command set deterministically from
 // apps/api/src/infrastructure/discord/commands.ts (the single source of truth also used by
 // the Interactions route handler, so registered commands and handled commands never drift).
@@ -26,7 +26,7 @@ async function registerDiscordCommands() {
     process.exit(1);
   }
 
-  console.log(`🔍 Registering ${DISCORD_COMMANDS.length} GAMEMOA Discord command(s)...`);
+  console.log(`🔍 Registering ${DISCORD_COMMANDS.length} OwOGG Discord command(s)...`);
   console.log(`   Application ID: ${applicationId}`);
   console.log(`   Commands: ${DISCORD_COMMANDS.map((c) => `/${c.name}`).join(", ")}`);
 

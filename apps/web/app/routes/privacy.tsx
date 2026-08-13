@@ -2,8 +2,8 @@ import { WikiLayout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "개인정보 처리방침 | GAMEMOA" },
-    { name: "description", content: "GAMEMOA 개인정보 처리방침" },
+    { title: "개인정보 처리방침 | OwOGG" },
+    { name: "description", content: "OwOGG 개인정보 처리방침" },
     { name: "robots", content: "noindex" },
   ];
 }
@@ -22,7 +22,7 @@ export default function PrivacyRoute() {
     <WikiLayout eyebrow="정책" title="개인정보 처리방침" description="시행일: 2026년 8월 14일">
       <div className="space-y-8 rounded-2xl border border-border bg-surface-raised p-5 md:p-8">
         <Section title="1. 수집하는 개인정보 항목">
-          <p>GAMEMOA는 서비스 제공을 위해 아래 정보만 수집합니다.</p>
+          <p>OwOGG는 서비스 제공을 위해 아래 정보만 수집합니다.</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
               <strong className="text-text-primary">로그인 정보</strong> — Google 또는 Discord
@@ -72,7 +72,7 @@ export default function PrivacyRoute() {
 
         <Section title="4. 제3자 제공">
           <p>
-            GAMEMOA는 이용자의 개인정보를 광고, 마케팅 등 목적으로 제3자에게 제공하거나 판매하지
+            OwOGG는 이용자의 개인정보를 광고, 마케팅 등 목적으로 제3자에게 제공하거나 판매하지
             않습니다. 서비스 운영에 필요한 인프라(Cloudflare — 서버/데이터베이스 호스팅)만 이용하며,
             이는 제3자 마케팅 제공에 해당하지 않습니다.
           </p>

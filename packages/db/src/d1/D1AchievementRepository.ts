@@ -1,4 +1,4 @@
-import type { AchievementRepository, UnlockedAchievement } from "@gamemoa/core";
+import type { AchievementRepository, UnlockedAchievement } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export class D1AchievementRepository implements AchievementRepository {

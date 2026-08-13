@@ -1,5 +1,5 @@
 {
-  "name": "@gamemoa/game-reaction-time",
+  "name": "@owogg/game-reaction-time",
   "version": "0.0.1",
   "type": "module",
   "exports": {
@@ -9,9 +9,9 @@
     }
   },
   "dependencies": {
-    "@gamemoa/game-sdk": "workspace:*",
-    "@gamemoa/shared": "workspace:*",
-    "@gamemoa/ui": "workspace:*",
+    "@owogg/game-sdk": "workspace:*",
+    "@owogg/shared": "workspace:*",
+    "@owogg/ui": "workspace:*",
     "react": "^19.1.0"
   },
   "devDependencies": {

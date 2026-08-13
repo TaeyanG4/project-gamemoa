@@ -229,7 +229,7 @@ export interface AchievementRepository {
 }
 
 // ---------------------------------------------------------------------------
-// Discord account-linking challenges (/gamemoa link)
+// Discord account-linking challenges (/owogg link)
 // ---------------------------------------------------------------------------
 
 export interface DiscordLinkChallenge {

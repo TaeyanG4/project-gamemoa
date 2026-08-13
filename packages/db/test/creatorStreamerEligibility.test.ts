@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { D1CreatorRepository } from "../src/d1/D1CreatorRepository.js";
 import { createSqliteD1, LEADERBOARD_TEST_SCHEMA } from "./helpers/sqliteD1.js";
 
-// Streamer ranking eligibility rule (WORK_PROGRESS Phase B): a GAMEMOA user qualifies for the
+// Streamer ranking eligibility rule (WORK_PROGRESS Phase B): a OwOGG user qualifies for the
 // streamer/Creator ranking once they have AT LEAST ONE ownership-VERIFIED account on ANY
 // supported platform (YOUTUBE, CHZZK, SOOP, TWITCH) — not all four, and never on
 // creator_profiles.status alone (which could in principle drift from the real per-platform

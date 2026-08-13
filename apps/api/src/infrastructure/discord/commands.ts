@@ -1,10 +1,10 @@
-// Discord Application Command definitions for `/gamemoa`. This is the single source of
+// Discord Application Command definitions for `/owogg`. This is the single source of
 // truth for both command registration (scripts/register-discord-commands.ts) and the
 // interaction router (routes/discordInteractions.ts), so they can never drift apart.
 
-import { GAME_MANIFEST_MAP } from "@gamemoa/core";
+import { GAME_MANIFEST_MAP } from "@owogg/core";
 
-export const GAMEMOA_COMMAND_NAME = "gamemoa";
+export const OWOGG_COMMAND_NAME = "owogg";
 
 export const DISCORD_SUBCOMMANDS = {
   LINK: "link",
@@ -27,24 +27,24 @@ const gameChoices = Object.values(GAME_MANIFEST_MAP).map((m) => ({
   value: m.id,
 }));
 
-export const GAMEMOA_DISCORD_COMMAND = {
-  name: GAMEMOA_COMMAND_NAME,
-  description: "GAMEMOA 계정 연동 및 정보 확인",
+export const OWOGG_DISCORD_COMMAND = {
+  name: OWOGG_COMMAND_NAME,
+  description: "OwOGG 계정 연동 및 정보 확인",
   options: [
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.LINK,
-      description: "이 Discord 계정을 GAMEMOA 계정과 연동합니다",
+      description: "이 Discord 계정을 OwOGG 계정과 연동합니다",
     },
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.PROFILE,
-      description: "연동된 GAMEMOA 프로필 요약을 확인합니다",
+      description: "연동된 OwOGG 프로필 요약을 확인합니다",
     },
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.GAMES,
-      description: "현재 GAMEMOA에서 즐길 수 있는 게임 목록을 확인합니다",
+      description: "현재 OwOGG에서 즐길 수 있는 게임 목록을 확인합니다",
     },
     {
       type: OPTION_TYPE_SUB_COMMAND,
@@ -63,19 +63,19 @@ export const GAMEMOA_DISCORD_COMMAND = {
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.RANK,
-      description: "이 Discord 서버 내 나의 GAMEMOA 순위와 기여 XP를 확인합니다",
+      description: "이 Discord 서버 내 나의 OwOGG 순위와 기여 XP를 확인합니다",
     },
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.LEADERBOARD,
-      description: "이 Discord 서버의 GAMEMOA XP 리더보드를 확인합니다",
+      description: "이 Discord 서버의 OwOGG XP 리더보드를 확인합니다",
     },
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.SERVER,
-      description: "이 Discord 서버의 GAMEMOA 활동 정보 요약을 확인합니다",
+      description: "이 Discord 서버의 OwOGG 활동 정보 요약을 확인합니다",
     },
   ],
 } as const;
 
-export const DISCORD_COMMANDS = [GAMEMOA_DISCORD_COMMAND];
+export const DISCORD_COMMANDS = [OWOGG_DISCORD_COMMAND];

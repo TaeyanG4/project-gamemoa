@@ -1,5 +1,5 @@
 // AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
-import type { GameManifest } from "@gamemoa/game-sdk";
+import type { GameManifest } from "@owogg/game-sdk";
 
 export const GAME_MANIFESTS: GameManifest[] = [
   {

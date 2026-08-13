@@ -1,4 +1,4 @@
-import type { OAuthAccount, User, UserRepository } from "@gamemoa/core";
+import type { OAuthAccount, User, UserRepository } from "@owogg/core";
 
 export interface D1Database {
   prepare(query: string): D1PreparedStatement;

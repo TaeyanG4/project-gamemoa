@@ -1,4 +1,4 @@
-import type { ScoreStrategy } from "@gamemoa/game-sdk";
+import type { ScoreStrategy } from "@owogg/game-sdk";
 
 export const reactionTimeScoring: ScoreStrategy = {
   order: "lower-is-better",

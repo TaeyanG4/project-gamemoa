@@ -1,6 +1,6 @@
 // pnpm discord:commands:register:guild
 //
-// Registers the GAMEMOA Discord Application Commands to a SINGLE guild via Discord's REST API
+// Registers the OwOGG Discord Application Commands to a SINGLE guild via Discord's REST API
 // (instant propagation, unlike the ~1 hour global rollout) — development/test guild use only.
 // Production command availability is always driven by the global registration
 // (`pnpm discord:commands:register`); this script exists so operators can iterate on command
@@ -38,7 +38,7 @@ async function registerGuildDiscordCommands() {
   }
 
   console.log(
-    `🔍 Registering ${DISCORD_COMMANDS.length} GAMEMOA Discord command(s) to guild ${guildId}...`,
+    `🔍 Registering ${DISCORD_COMMANDS.length} OwOGG Discord command(s) to guild ${guildId}...`,
   );
   console.log(`   Application ID: ${applicationId}`);
   console.log(`   Commands: ${DISCORD_COMMANDS.map((c) => `/${c.name}`).join(", ")}`);

@@ -1,4 +1,4 @@
-/** The four locales GAMEMOA supports this sprint. Traditional Chinese (zh-TW) is intentionally
+/** The four locales OwOGG supports this sprint. Traditional Chinese (zh-TW) is intentionally
  * out of scope. Order here is display order (language selector, etc). */
 export const SUPPORTED_LOCALES = ["ko-KR", "en-US", "ja-JP", "zh-CN"] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];

@@ -3,7 +3,7 @@ import type {
   CreatorChannelInfo,
   CreatorChannelMetrics,
   CreatorPlatformType,
-} from "@gamemoa/core";
+} from "@owogg/core";
 
 export class MockCreatorProvider implements CreatorProviderAdapter {
   constructor(
@@ -30,7 +30,7 @@ export class MockCreatorProvider implements CreatorProviderAdapter {
     params.set("state", state);
     params.set("redirect_uri", redirectUri);
     params.set("platform", this.platform);
-    return `https://mock.gamemoa.dev/auth/${this.platform}?${params.toString()}`;
+    return `https://mock.owogg.dev/auth/${this.platform}?${params.toString()}`;
   }
 
   async verifyOwnershipCode(code: string, _redirectUri: string): Promise<CreatorChannelInfo> {
@@ -50,7 +50,7 @@ export class MockCreatorProvider implements CreatorProviderAdapter {
       channelName: `Mock ${this.platform} Channel (${code})`,
       channelHandle: `@mock_${code}`,
       channelUrl: `https://${this.platform.toLowerCase()}.com/mock_${code}`,
-      avatarUrl: `https://mock.gamemoa.dev/avatars/${code}.png`,
+      avatarUrl: `https://mock.owogg.dev/avatars/${code}.png`,
       audienceCount: 15000,
       channelCreatedAt: "2023-01-01T00:00:00Z",
     };

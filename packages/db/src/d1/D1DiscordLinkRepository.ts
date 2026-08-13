@@ -1,4 +1,4 @@
-import type { DiscordLinkChallenge, DiscordLinkRepository } from "@gamemoa/core";
+import type { DiscordLinkChallenge, DiscordLinkRepository } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 async function hashToken(token: string): Promise<string> {

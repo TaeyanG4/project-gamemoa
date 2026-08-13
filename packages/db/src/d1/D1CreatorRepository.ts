@@ -6,7 +6,7 @@ import type {
   CreatorPlatformType,
   CreatorStatusType,
   FeaturedStatusType,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 function mapPlatformAccountRow(r: Record<string, unknown>): CreatorPlatformAccount {

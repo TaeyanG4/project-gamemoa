@@ -1,6 +1,6 @@
-# GAMEMOA 프로덕션 외부 연동 운영 체크리스트 (PRODUCTION_INTEGRATIONS)
+# OwOGG 프로덕션 외부 연동 운영 체크리스트 (PRODUCTION_INTEGRATIONS)
 
-이 문서는 GAMEMOA 프로덕션 배포에 필요한 **외부 서비스 연동 설정값**을 한곳에 모은 운영자용 체크리스트입니다.
+이 문서는 OwOGG 프로덕션 배포에 필요한 **외부 서비스 연동 설정값**을 한곳에 모은 운영자용 체크리스트입니다.
 실제 값은 절대 기록하지 않으며, 각 항목은 GitHub Actions 위치·Cloudflare 반영 방법·검증 방법·현재 상태로만
 구성됩니다. 상세 아키텍처/보안 정책은 각 도메인 문서(`docs/ADMIN_GUIDE.md`, `docs/CREATOR_SYSTEM.md`,
 `docs/DISCORD_INTEGRATION.md`, `docs/DISCORD_BOT_GUIDE.md`)를 참고하세요.
@@ -12,11 +12,11 @@
 
 ## 1. Google 로그인 & 관리자 Google Step-Up
 
-| 이름                    | 종류     | GitHub 위치 | 용도                                                                                                                                                                                      |
-| ----------------------- | -------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GOOGLE_CLIENT_ID`      | Variable | Variables   | Google Identity Services 로그인 및 관리자 step-up 공통 audience                                                                                                                           |
-| `VITE_GOOGLE_CLIENT_ID` | Variable | Variables   | 웹 빌드에 주입되는 client ID (동일 값)                                                                                                                                                    |
-| `ADMIN_GOOGLE_SUBS`     | Secret   | Secrets     | **(선택)** 관리자 step-up 추가 제한용 Google canonical `sub` 허용 목록(쉼표 구분). 미설정 시 "현재 GAMEMOA 계정에 연결된 Google 계정"이라는 1차 바인딩만으로 정상 동작합니다 — 필수 아님. |
+| 이름                    | 종류     | GitHub 위치 | 용도                                                                                                                                                                                    |
+| ----------------------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GOOGLE_CLIENT_ID`      | Variable | Variables   | Google Identity Services 로그인 및 관리자 step-up 공통 audience                                                                                                                         |
+| `VITE_GOOGLE_CLIENT_ID` | Variable | Variables   | 웹 빌드에 주입되는 client ID (동일 값)                                                                                                                                                  |
+| `ADMIN_GOOGLE_SUBS`     | Secret   | Secrets     | **(선택)** 관리자 step-up 추가 제한용 Google canonical `sub` 허용 목록(쉼표 구분). 미설정 시 "현재 OwOGG 계정에 연결된 Google 계정"이라는 1차 바인딩만으로 정상 동작합니다 — 필수 아님. |
 
 검증: `GET /api/auth/providers`의 `google.configured`. `ADMIN_GOOGLE_SUBS`는 안전상 이유로 API가 노출하지
 않으므로, `/admin`에서 실제 Google 계정으로 step-up을 시도해 성공 여부로만 확인합니다.
@@ -29,11 +29,11 @@
 관리자 로그인은 이제 D1 `admin_accounts`(관리형 계정)가 주 경로이며, GitHub Secret 값은
 "최초 관리자 bootstrap 자격"만 필요합니다. 자세한 모델은 `docs/ADMIN_GUIDE.md`를 참고하세요.
 
-| 이름                    | 종류     | GitHub 위치 | 용도                                                                                                      |
-| ----------------------- | -------- | ----------- | --------------------------------------------------------------------------------------------------------- |
-| `ADMIN_USER_IDS`        | Variable | Variables   | root/break-glass 자격(GAMEMOA 사용자 ID, 쉼표 구분). 최초 bootstrap에 필요, 이후 상시 유지되는 비상 경로. |
-| `ADMIN_LOGIN_USERNAME`  | Variable | Variables   | **(Deprecated)** 레거시 관리자 아이디 — 관리형 계정이 하나도 없을 때만 폴백으로 사용됨.                   |
-| `ADMIN_PASSWORD_PBKDF2` | Secret   | Secrets     | **(Deprecated)** 레거시 PBKDF2 레코드 — 위와 동일 조건에서만 폴백으로 사용됨.                             |
+| 이름                    | 종류     | GitHub 위치 | 용도                                                                                                    |
+| ----------------------- | -------- | ----------- | ------------------------------------------------------------------------------------------------------- |
+| `ADMIN_USER_IDS`        | Variable | Variables   | root/break-glass 자격(OwOGG 사용자 ID, 쉼표 구분). 최초 bootstrap에 필요, 이후 상시 유지되는 비상 경로. |
+| `ADMIN_LOGIN_USERNAME`  | Variable | Variables   | **(Deprecated)** 레거시 관리자 아이디 — 관리형 계정이 하나도 없을 때만 폴백으로 사용됨.                 |
+| `ADMIN_PASSWORD_PBKDF2` | Secret   | Secrets     | **(Deprecated)** 레거시 PBKDF2 레코드 — 위와 동일 조건에서만 폴백으로 사용됨.                           |
 
 검증: `/admin`에서 실제 로그인 흐름을 통과해 대시보드가 열리는지 확인합니다. 자세한 절차는
 `docs/ADMIN_GUIDE.md`를 참고하세요.

@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createContainer, evaluateAchievementsForUser } from "../container.js";
-import { scoreSubmissionSchema } from "@gamemoa/contracts";
-import { GAME_MANIFEST_MAP } from "@gamemoa/core";
+import { scoreSubmissionSchema } from "@owogg/contracts";
+import { GAME_MANIFEST_MAP } from "@owogg/core";
 import type { ApiEnv } from "./auth.js";
 
 export const scoresRouter = new Hono<ApiEnv>();
@@ -10,7 +10,7 @@ export const scoresRouter = new Hono<ApiEnv>();
 // POST /api/scores
 scoresRouter.post("/", async (c) => {
   try {
-    const sessionId = getCookie(c, "gamemoa_session");
+    const sessionId = getCookie(c, "owogg_session");
     if (!sessionId) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -115,7 +115,7 @@ scoresRouter.post("/", async (c) => {
 
 // GET /api/scores/user/me
 scoresRouter.get("/user/me", async (c) => {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId) {
     return c.json({ authenticated: false, bests: {} });
   }

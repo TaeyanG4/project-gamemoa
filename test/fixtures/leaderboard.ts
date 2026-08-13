@@ -1,4 +1,4 @@
-import type { LeaderRecord } from "@gamemoa/shared";
+import type { LeaderRecord } from "@owogg/shared";
 
 export const MOCK_LEADERBOARD_FIXTURE: LeaderRecord[] = [
   {

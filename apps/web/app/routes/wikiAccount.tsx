@@ -3,8 +3,8 @@ import { WikiLayout, WikiCallout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "계정 | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA 계정, 로그인, 프로필 설정 안내" },
+    { title: "계정 | OwOGG Wiki" },
+    { name: "description", content: "OwOGG 계정, 로그인, 프로필 설정 안내" },
   ];
 }
 
@@ -13,14 +13,13 @@ export default function WikiAccountRoute() {
     <WikiLayout
       eyebrow="ACCOUNT"
       title="계정 개요"
-      description="GAMEMOA는 Google과 Discord 로그인을 지원하며, 두 방식은 기본적으로 별도 계정입니다."
+      description="OwOGG는 Google과 Discord 로그인을 지원하며, 두 방식은 기본적으로 별도 계정입니다."
     >
       <section>
         <h2 className="text-lg font-black text-text-primary">로그인 방식</h2>
         <p className="mt-2 text-sm text-text-secondary">
           Google 또는 Discord로 로그인할 수 있습니다. 같은 사람이더라도 Google로 만든 계정과
-          Discord로 만든 계정은 기본적으로 서로 다른 GAMEMOA 계정입니다 — 자동으로 합쳐지지
-          않습니다.
+          Discord로 만든 계정은 기본적으로 서로 다른 OwOGG 계정입니다 — 자동으로 합쳐지지 않습니다.
         </p>
       </section>
 

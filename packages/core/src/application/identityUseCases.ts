@@ -38,7 +38,7 @@ export class IdentityUseCases {
       if (existing.user_id === userId) {
         return { ok: true, provider, alreadyLinked: true };
       }
-      // Belongs to a different GAMEMOA account — explicit conflict.
+      // Belongs to a different OwOGG account — explicit conflict.
       return { ok: false, code: "ACCOUNT_ALREADY_LINKED", conflictUserId: existing.user_id };
     }
 

@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { handleGamemoaCommand } from "../src/infrastructure/discord/interactionHandlers.js";
+import { handleOwoggCommand } from "../src/infrastructure/discord/interactionHandlers.js";
 import type { AppContainer } from "../src/container.js";
 import { DISCORD_INTERACTION_TYPE } from "../src/infrastructure/discord/types.js";
 import type { DiscordInteraction } from "../src/infrastructure/discord/types.js";
-import type { OAuthAccount, User } from "@gamemoa/core";
+import type { OAuthAccount, User } from "@owogg/core";
 
 const FRONTEND_URL = "https://gamemoa-web.gamemoa.workers.dev";
 
@@ -108,7 +108,7 @@ function fakeContainer(overrides: {
 function gamesInteraction(): DiscordInteraction {
   return {
     type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
-    data: { name: "gamemoa", options: [{ name: "games", type: 1 }] },
+    data: { name: "owogg", options: [{ name: "games", type: 1 }] },
     member: { user: { id: "111", username: "tester" } },
   };
 }
@@ -116,7 +116,7 @@ function gamesInteraction(): DiscordInteraction {
 function linkInteraction(discordId = "999", username = "newbie"): DiscordInteraction {
   return {
     type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
-    data: { name: "gamemoa", options: [{ name: "link", type: 1 }] },
+    data: { name: "owogg", options: [{ name: "link", type: 1 }] },
     member: { user: { id: discordId, username } },
   };
 }
@@ -124,7 +124,7 @@ function linkInteraction(discordId = "999", username = "newbie"): DiscordInterac
 function profileInteraction(discordId = "222"): DiscordInteraction {
   return {
     type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
-    data: { name: "gamemoa", options: [{ name: "profile", type: 1 }] },
+    data: { name: "owogg", options: [{ name: "profile", type: 1 }] },
     member: { user: { id: discordId, username: "someone" } },
   };
 }
@@ -135,14 +135,14 @@ function guildInteraction(
 ): DiscordInteraction {
   return {
     type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
-    data: { name: "gamemoa", options: [{ name: subcommand, type: 1 }] },
+    data: { name: "owogg", options: [{ name: subcommand, type: 1 }] },
     member: { user: { id: "333", username: "player" } },
     ...(guildId ? { guild_id: guildId } : {}),
   };
 }
 
-test("/gamemoa games lists published games with website links as an embed, publicly visible", async () => {
-  const response = await handleGamemoaCommand(fakeContainer({}), gamesInteraction(), FRONTEND_URL);
+test("/owogg games lists published games with website links as an embed, publicly visible", async () => {
+  const response = await handleOwoggCommand(fakeContainer({}), gamesInteraction(), FRONTEND_URL);
   assert.equal(response.type, 4);
   assert.equal(response.data?.flags, undefined); // not ephemeral — fine to share in-channel
   const embed = response.data?.embeds?.[0];
@@ -150,14 +150,14 @@ test("/gamemoa games lists published games with website links as an embed, publi
   assert.match(embed?.description ?? "", new RegExp(`${FRONTEND_URL}/games/`));
 });
 
-test("/gamemoa link returns an ephemeral embed with a link URL for a not-yet-linked Discord user", async () => {
-  const response = await handleGamemoaCommand(fakeContainer({}), linkInteraction(), FRONTEND_URL);
+test("/owogg link returns an ephemeral embed with a link URL for a not-yet-linked Discord user", async () => {
+  const response = await handleOwoggCommand(fakeContainer({}), linkInteraction(), FRONTEND_URL);
   assert.equal(response.data?.flags, 64);
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.description ?? "", /\/discord\/link\?token=raw-token-123/);
 });
 
-test("/gamemoa link tells an already-linked Discord user it's already linked, without issuing a new token", async () => {
+test("/owogg link tells an already-linked Discord user it's already linked, without issuing a new token", async () => {
   let challengeCalls = 0;
   const container = fakeContainer({
     findOAuthAccount: async () => ({
@@ -174,23 +174,19 @@ test("/gamemoa link tells an already-linked Discord user it's already linked, wi
     },
   });
 
-  const response = await handleGamemoaCommand(container, linkInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(container, linkInteraction(), FRONTEND_URL);
   assert.equal(challengeCalls, 0, "must not mint a link token for an already-linked account");
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.description ?? "", /이미.*연동/);
 });
 
-test("/gamemoa profile prompts an unlinked Discord user to link first", async () => {
-  const response = await handleGamemoaCommand(
-    fakeContainer({}),
-    profileInteraction(),
-    FRONTEND_URL,
-  );
+test("/owogg profile prompts an unlinked Discord user to link first", async () => {
+  const response = await handleOwoggCommand(fakeContainer({}), profileInteraction(), FRONTEND_URL);
   const embed = response.data?.embeds?.[0];
-  assert.match(embed?.description ?? "", /gamemoa link/);
+  assert.match(embed?.description ?? "", /owogg link/);
 });
 
-test("/gamemoa profile shows nickname/level/XP for a linked Discord user", async () => {
+test("/owogg profile shows nickname/level/XP for a linked Discord user", async () => {
   const container = fakeContainer({
     findByOAuth: async () => ({
       id: 7,
@@ -213,7 +209,7 @@ test("/gamemoa profile shows nickname/level/XP for a linked Discord user", async
     }),
   });
 
-  const response = await handleGamemoaCommand(container, profileInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(container, profileInteraction(), FRONTEND_URL);
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.title ?? "", /Taeyang/);
   const fieldsText = (embed?.fields ?? []).map((f) => `${f.name}:${f.value}`).join(" ");
@@ -225,16 +221,16 @@ test("/gamemoa profile shows nickname/level/XP for a linked Discord user", async
 test("unknown subcommand returns a safe ephemeral embed fallback", async () => {
   const interaction: DiscordInteraction = {
     type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
-    data: { name: "gamemoa", options: [{ name: "totally-made-up", type: 1 }] },
+    data: { name: "owogg", options: [{ name: "totally-made-up", type: 1 }] },
     member: { user: { id: "1", username: "x" } },
   };
-  const response = await handleGamemoaCommand(fakeContainer({}), interaction, FRONTEND_URL);
+  const response = await handleOwoggCommand(fakeContainer({}), interaction, FRONTEND_URL);
   assert.equal(response.data?.flags, 64);
   assert.ok(response.data?.embeds?.[0], "expected an embed response");
 });
 
-test("/gamemoa play requires a guild channel", async () => {
-  const response = await handleGamemoaCommand(
+test("/owogg play requires a guild channel", async () => {
+  const response = await handleOwoggCommand(
     fakeContainer({}),
     guildInteraction("play", null),
     FRONTEND_URL,
@@ -243,8 +239,8 @@ test("/gamemoa play requires a guild channel", async () => {
   assert.match(response.data?.embeds?.[0]?.description ?? "", /길드\) 채널/);
 });
 
-test("/gamemoa play returns an ephemeral embed with the play link on success", async () => {
-  const response = await handleGamemoaCommand(
+test("/owogg play returns an ephemeral embed with the play link on success", async () => {
+  const response = await handleOwoggCommand(
     fakeContainer({}),
     guildInteraction("play"),
     FRONTEND_URL,
@@ -265,8 +261,8 @@ const linkedOAuthAccount: OAuthAccount = {
   created_at: "2026-01-01T00:00:00.000Z",
 };
 
-test("/gamemoa rank shows an encouragement embed when the user has no server XP yet", async () => {
-  const response = await handleGamemoaCommand(
+test("/owogg rank shows an encouragement embed when the user has no server XP yet", async () => {
+  const response = await handleOwoggCommand(
     fakeContainer({ findOAuthAccount: async () => linkedOAuthAccount }),
     guildInteraction("rank"),
     FRONTEND_URL,
@@ -275,12 +271,12 @@ test("/gamemoa rank shows an encouragement embed when the user has no server XP 
   assert.match(embed?.description ?? "", /아직 이 서버에 기여한 XP/);
 });
 
-test("/gamemoa rank shows nickname/XP/rank fields with the guild icon as thumbnail", async () => {
+test("/owogg rank shows nickname/XP/rank fields with the guild icon as thumbnail", async () => {
   const container = fakeContainer({
     findOAuthAccount: async () => linkedOAuthAccount,
     getUserGuildRankSummary: async () => ({ totalXp: 250, rank: 3, nickname: "RankedPlayer" }),
   });
-  const response = await handleGamemoaCommand(container, guildInteraction("rank"), FRONTEND_URL);
+  const response = await handleOwoggCommand(container, guildInteraction("rank"), FRONTEND_URL);
   const embed = response.data?.embeds?.[0];
   assert.equal(embed?.thumbnail?.url, "https://cdn.discordapp.com/icons/g1/abc.png");
   const fieldsText = (embed?.fields ?? []).map((f) => `${f.name}:${f.value}`).join(" ");
@@ -289,7 +285,7 @@ test("/gamemoa rank shows nickname/XP/rank fields with the guild icon as thumbna
   assert.match(fieldsText, /#3/);
 });
 
-test("/gamemoa leaderboard is a public (non-ephemeral) embed listing ranked entries", async () => {
+test("/owogg leaderboard is a public (non-ephemeral) embed listing ranked entries", async () => {
   const container = fakeContainer({
     getGuildLeaderboard: async () => ({
       entries: [
@@ -299,7 +295,7 @@ test("/gamemoa leaderboard is a public (non-ephemeral) embed listing ranked entr
       total: 2,
     }),
   });
-  const response = await handleGamemoaCommand(
+  const response = await handleOwoggCommand(
     container,
     guildInteraction("leaderboard"),
     FRONTEND_URL,
@@ -310,11 +306,11 @@ test("/gamemoa leaderboard is a public (non-ephemeral) embed listing ranked entr
   assert.match(embed?.description ?? "", /Second/);
 });
 
-test("/gamemoa server shows a public embed with XP/participant fields", async () => {
+test("/owogg server shows a public embed with XP/participant fields", async () => {
   const container = fakeContainer({
     getGuildSummary: async () => ({ totalXp: 1200, weeklyXp: 80, participantCount: 15 }),
   });
-  const response = await handleGamemoaCommand(container, guildInteraction("server"), FRONTEND_URL);
+  const response = await handleOwoggCommand(container, guildInteraction("server"), FRONTEND_URL);
   assert.equal(response.data?.flags, undefined);
   const embed = response.data?.embeds?.[0];
   assert.equal(embed?.url, `${FRONTEND_URL}/discord/servers/test-guild`);
@@ -324,14 +320,14 @@ test("/gamemoa server shows a public embed with XP/participant fields", async ()
   assert.match(fieldsText, /15명/);
 });
 
-test("/gamemoa leaderboard escapes markdown in nicknames so a crafted nickname can't render a masked phishing link in the public embed", async () => {
+test("/owogg leaderboard escapes markdown in nicknames so a crafted nickname can't render a masked phishing link in the public embed", async () => {
   const container = fakeContainer({
     getGuildLeaderboard: async () => ({
       entries: [{ rank: 1, nickname: "[Free Nitro](https://evil.example)", xp: 100 }],
       total: 1,
     }),
   });
-  const response = await handleGamemoaCommand(
+  const response = await handleOwoggCommand(
     container,
     guildInteraction("leaderboard"),
     FRONTEND_URL,
@@ -342,7 +338,7 @@ test("/gamemoa leaderboard escapes markdown in nicknames so a crafted nickname c
   assert.match(description, /\\\[Free Nitro\\\]\(https:\/\/evil\.example\)/);
 });
 
-test("/gamemoa server and /gamemoa rank escape markdown in the Discord guild name", async () => {
+test("/owogg server and /owogg rank escape markdown in the Discord guild name", async () => {
   const container = fakeContainer({
     getGuildByGuildId: async () => ({
       guild_id: "g1",
@@ -352,14 +348,14 @@ test("/gamemoa server and /gamemoa rank escape markdown in the Discord guild nam
       registration_status: "ACTIVE",
     }),
   });
-  const response = await handleGamemoaCommand(container, guildInteraction("server"), FRONTEND_URL);
+  const response = await handleOwoggCommand(container, guildInteraction("server"), FRONTEND_URL);
   const title = response.data?.embeds?.[0]?.title ?? "";
   assert.match(title, /\\\[Click me\\\]\(https:\/\/evil\.example\)/);
 });
 
 test("guild-scoped commands reject an unregistered/inactive server", async () => {
   const container = fakeContainer({ getGuildByGuildId: async () => null });
-  const response = await handleGamemoaCommand(container, guildInteraction("server"), FRONTEND_URL);
+  const response = await handleOwoggCommand(container, guildInteraction("server"), FRONTEND_URL);
   assert.equal(response.data?.flags, 64);
   assert.match(response.data?.embeds?.[0]?.description ?? "", /등록되지 않았거나/);
 });

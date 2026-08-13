@@ -12,7 +12,7 @@ import {
   D1CreatorReviewRepository,
   D1AdminAuthRepository,
   D1AdminAccountRepository,
-} from "@gamemoa/db";
+} from "@owogg/db";
 import {
   ScoreUseCases,
   PersonalizationUseCases,
@@ -42,7 +42,7 @@ import {
   type CreatorReviewRepository,
   type AdminAuthRepository,
   type AdminAccountRepository,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 
 export interface AppContainer {

@@ -5,8 +5,8 @@ import type { Dictionary } from "../features/i18n/dictionary";
 
 export function meta() {
   return [
-    { title: "GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA 설치, 계정, 게임/랭킹, Discord, Creator 이용 안내" },
+    { title: "OwOGG Wiki" },
+    { name: "description", content: "OwOGG 설치, 계정, 게임/랭킹, Discord, Creator 이용 안내" },
   ];
 }
 
@@ -63,9 +63,7 @@ export default function WikiHomeRoute() {
   return (
     <div className="mx-auto w-full max-w-5xl space-y-10 px-4 py-10 md:px-8">
       <header className="text-center">
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-light">
-          GAMEMOA Wiki
-        </p>
+        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-light">OwOGG Wiki</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-text-primary md:text-4xl">
           {dict.wiki.homeTitle}
         </h1>

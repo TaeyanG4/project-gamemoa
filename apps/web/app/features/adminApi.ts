@@ -13,7 +13,7 @@ import {
   AdminAccountAuditListResponseSchema,
   type AdminAccountRoleValue,
   type AdminAccountStatusValue,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import { apiFetch } from "../lib/api/client";
 
 const AdminLogoutResponseSchema = z.object({ success: z.boolean() });

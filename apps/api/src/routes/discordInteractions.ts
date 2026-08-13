@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import type { ApiEnv } from "./auth.js";
 import { createContainer } from "../container.js";
 import { verifyDiscordSignature } from "../infrastructure/discord/signature.js";
-import { GAMEMOA_COMMAND_NAME } from "../infrastructure/discord/commands.js";
-import { handleGamemoaCommand } from "../infrastructure/discord/interactionHandlers.js";
+import { OWOGG_COMMAND_NAME } from "../infrastructure/discord/commands.js";
+import { handleOwoggCommand } from "../infrastructure/discord/interactionHandlers.js";
 import {
   DISCORD_INTERACTION_TYPE,
   DISCORD_RESPONSE_TYPE,
@@ -78,7 +78,7 @@ discordRouter.post("/interactions", async (c) => {
 
   if (
     interaction.type === DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND &&
-    interaction.data?.name === GAMEMOA_COMMAND_NAME
+    interaction.data?.name === OWOGG_COMMAND_NAME
   ) {
     if (!c.env?.DB) {
       return c.json({
@@ -89,7 +89,7 @@ discordRouter.post("/interactions", async (c) => {
 
     const container = createContainer(c.env.DB);
     const frontendUrl = c.env.FRONTEND_URL || "https://gamemoa-web.gamemoa.workers.dev";
-    const response = await handleGamemoaCommand(container, interaction, frontendUrl);
+    const response = await handleOwoggCommand(container, interaction, frontendUrl);
     return c.json(response);
   }
 

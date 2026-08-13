@@ -10,7 +10,7 @@ import {
   GuildSummarySchema,
   type RegisterGuildRequest,
   type UpdateGuildRequest,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 
 export const CandidateResponseSchema = z.object({
   valid: z.boolean(),

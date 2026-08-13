@@ -8,12 +8,12 @@ import {
   AdminAccountRoleChangeRequestSchema,
   AdminAccountPasswordResetRequestSchema,
   AdminAccountAuditListResponseSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import {
   evaluateAdminPasswordPolicy,
   AdminAccountUseCaseFailure,
   type AdminAccountRecord,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
 import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
@@ -51,7 +51,7 @@ function failureMessage(code: AdminAccountUseCaseFailure["code"]): string {
     case "USERNAME_TAKEN":
       return "이미 사용 중인 아이디입니다.";
     case "USER_ALREADY_ADMIN":
-      return "해당 GAMEMOA 사용자는 이미 관리자 계정을 가지고 있습니다.";
+      return "해당 OwOGG 사용자는 이미 관리자 계정을 가지고 있습니다.";
     case "GOOGLE_SUB_ALREADY_ADMIN":
       return "해당 Google 계정은 이미 다른 관리자 계정에 연결되어 있습니다.";
     case "NOT_FOUND":
@@ -190,7 +190,7 @@ adminAccountsRouter.get("/accounts/audit", async (c) => {
 });
 
 // POST /api/admin/accounts — SUPERADMIN only. Creates an administrator bound to an EXISTING
-// GAMEMOA user whose Google identity is derived from that user's already-linked oauth_accounts
+// OwOGG user whose Google identity is derived from that user's already-linked oauth_accounts
 // row — a Google sub is never accepted as free-text client input.
 adminAccountsRouter.post("/accounts", async (c) => {
   const admin = await requireElevatedAdmin(c);

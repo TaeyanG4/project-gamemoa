@@ -11,4 +11,4 @@ export {
   type LeaderboardQuery,
   LeaderRecordSchema,
   type LeaderRecord,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";

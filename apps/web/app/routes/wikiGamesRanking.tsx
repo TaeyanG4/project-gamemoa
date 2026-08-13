@@ -3,8 +3,8 @@ import { WikiLayout, WikiCallout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "랭킹 | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA 게임/XP/스트리머 랭킹 계산 방식" },
+    { title: "랭킹 | OwOGG Wiki" },
+    { name: "description", content: "OwOGG 게임/XP/스트리머 랭킹 계산 방식" },
   ];
 }
 

@@ -212,7 +212,7 @@ async function setupWithSuperadmin() {
 }
 
 async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: KeyObject) {
-  const sessionCookie = `gamemoa_session=${SUPERADMIN_SESSION_RAW}`;
+  const sessionCookie = `owogg_session=${SUPERADMIN_SESSION_RAW}`;
   const idToken = buildJwt(privateKey, freshGooglePayload(SUPERADMIN_GOOGLE_SUB));
   const stepUpRes = await app.request(
     "/api/admin/auth/google",
@@ -227,13 +227,13 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
     },
     env as any,
   );
-  const stepUpCookie = extractCookie(stepUpRes, "gamemoa_admin_stepup");
+  const stepUpCookie = extractCookie(stepUpRes, "owogg_admin_stepup");
   const bootstrapRes = await app.request(
     "/api/admin/bootstrap",
     {
       method: "POST",
       headers: {
-        Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+        Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
         "Content-Type": "application/json",
         Origin: "http://localhost:5173",
       },
@@ -245,8 +245,8 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
     },
     env as any,
   );
-  const adminSessionCookie = extractCookie(bootstrapRes, "gamemoa_admin_session");
-  const authedCookie = `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}`;
+  const adminSessionCookie = extractCookie(bootstrapRes, "owogg_admin_session");
+  const authedCookie = `${sessionCookie}; owogg_admin_session=${adminSessionCookie}`;
 
   // Bootstrap always forces a password change (must_change_password=true) — clear it so the
   // returned cookie can exercise sensitive SUPERADMIN-only routes, exactly like the real flow.
@@ -267,11 +267,11 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
     },
     env as any,
   );
-  const rotatedAdminSessionCookie = extractCookie(changeRes, "gamemoa_admin_session");
-  return `${sessionCookie}; gamemoa_admin_session=${rotatedAdminSessionCookie}`;
+  const rotatedAdminSessionCookie = extractCookie(changeRes, "owogg_admin_session");
+  return `${sessionCookie}; owogg_admin_session=${rotatedAdminSessionCookie}`;
 }
 
-test("SUPERADMIN can create an ADMIN for another linked GAMEMOA user; response never leaks passwordHash/googleSub; the new admin can independently authenticate with no ADMIN_USER_IDS membership", async () => {
+test("SUPERADMIN can create an ADMIN for another linked OwOGG user; response never leaks passwordHash/googleSub; the new admin can independently authenticate with no ADMIN_USER_IDS membership", async () => {
   clearGoogleJwksCache();
   const { privateKey, publicJwk } = createRsaKeySet();
   const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
@@ -308,7 +308,7 @@ test("SUPERADMIN can create an ADMIN for another linked GAMEMOA user; response n
     // The new admin (NOT in ADMIN_USER_IDS) independently completes step-up + login using only
     // their managed admin_accounts row — this is the whole point of the migration: no GitHub
     // Secret/Variable edit was needed for this second administrator.
-    const otherSessionCookie = `gamemoa_session=${OTHER_SESSION_RAW}`;
+    const otherSessionCookie = `owogg_session=${OTHER_SESSION_RAW}`;
     const otherIdToken = buildJwt(privateKey, freshGooglePayload(OTHER_GOOGLE_SUB));
     const otherStepUp = await app.request(
       "/api/admin/auth/google",
@@ -324,14 +324,14 @@ test("SUPERADMIN can create an ADMIN for another linked GAMEMOA user; response n
       env as any,
     );
     assert.equal(otherStepUp.status, 200);
-    const otherStepUpCookie = extractCookie(otherStepUp, "gamemoa_admin_stepup");
+    const otherStepUpCookie = extractCookie(otherStepUp, "owogg_admin_stepup");
 
     const otherLogin = await app.request(
       "/api/admin/auth/login",
       {
         method: "POST",
         headers: {
-          Cookie: `${otherSessionCookie}; gamemoa_admin_stepup=${otherStepUpCookie}`,
+          Cookie: `${otherSessionCookie}; owogg_admin_stepup=${otherStepUpCookie}`,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -349,12 +349,12 @@ test("SUPERADMIN can create an ADMIN for another linked GAMEMOA user; response n
     });
 
     // But this new ADMIN (not SUPERADMIN) cannot manage other admin accounts.
-    const otherAdminSessionCookie = extractCookie(otherLogin, "gamemoa_admin_session");
+    const otherAdminSessionCookie = extractCookie(otherLogin, "owogg_admin_session");
     const deniedList = await app.request(
       "/api/admin/accounts",
       {
         headers: {
-          Cookie: `${otherSessionCookie}; gamemoa_admin_session=${otherAdminSessionCookie}`,
+          Cookie: `${otherSessionCookie}; owogg_admin_session=${otherAdminSessionCookie}`,
         },
       },
       env as any,

@@ -20,8 +20,8 @@ import {
   Video,
   CheckCircle2,
 } from "lucide-react";
-import { formatScore } from "@gamemoa/game-sdk";
-import type { GameManifest } from "@gamemoa/game-sdk";
+import { formatScore } from "@owogg/game-sdk";
+import type { GameManifest } from "@owogg/game-sdk";
 import { getLocalBestScore, fetchUserBestsApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
 import { usePersonalization } from "../features/personalization";
@@ -45,15 +45,15 @@ import type {
   ProgressResponse,
   AchievementSummaryResponse,
   CreatorProfileDto,
-} from "@gamemoa/contracts";
-import type { CreatorPlatformType } from "@gamemoa/core";
-import { ACHIEVEMENT_DEFINITIONS, type AchievementCode } from "@gamemoa/core";
+} from "@owogg/contracts";
+import type { CreatorPlatformType } from "@owogg/core";
+import { ACHIEVEMENT_DEFINITIONS, type AchievementCode } from "@owogg/core";
 import { ApiClientError } from "../lib/api";
 import { MergeModal } from "../components/ui/MergeModal";
 
 export function meta() {
   return [
-    { title: "내 프로필 & 기록 | gamemoa" },
+    { title: "내 프로필 & 기록 | OwOGG" },
     {
       name: "description",
       content: "내 계정 정보, 레벨/경험치, 도전과제, 게임별 최고 기록을 확인하세요.",

@@ -9,7 +9,7 @@
 //   pnpm admin:password:hash
 //
 // Usage (piped, e.g. from a local password manager CLI):
-//   my-password-manager-cli show gamemoa-admin | pnpm admin:password:hash
+//   my-password-manager-cli show owogg-admin | pnpm admin:password:hash
 
 import { hashAdminPassword } from "../apps/api/src/auth/adminPassword.js";
 

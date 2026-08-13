@@ -5,14 +5,14 @@ import {
   AuthMeResponseSchema,
   PersonalBestResponseSchema,
   LeaderboardResponseSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 
 test("GET / returns 200 OK with service info", async () => {
   const res = await app.request("http://localhost/");
   assert.equal(res.status, 200);
   const data = (await res.json()) as { status: string; service: string };
   assert.equal(data.status, "ok");
-  assert.equal(data.service, "gamemoa-hono-api");
+  assert.equal(data.service, "owogg-hono-api");
 });
 
 test("GET /api/health returns 200 OK with status ok", async () => {

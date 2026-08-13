@@ -2,7 +2,7 @@ import type {
   CreatorProviderAdapter,
   CreatorChannelInfo,
   CreatorChannelMetrics,
-} from "@gamemoa/core";
+} from "@owogg/core";
 
 export class SoopCreatorProvider implements CreatorProviderAdapter {
   public platform = "SOOP" as const;

@@ -3,7 +3,7 @@ import { WikiLayout, WikiCallout, WikiSteps } from "../components/wiki/WikiLayou
 
 export function meta() {
   return [
-    { title: "계정 통합 | GAMEMOA Wiki" },
+    { title: "계정 통합 | OwOGG Wiki" },
     { name: "description", content: "Google과 Discord로 따로 만든 계정을 하나로 합치는 방법" },
   ];
 }
@@ -49,7 +49,7 @@ export default function WikiAccountMergeRoute() {
       <WikiCallout tone="warning">
         <b className="text-text-primary">Secondary 계정이 관리자 계정이면 통합이 차단됩니다.</b>{" "}
         관리자 권한이 있는 계정을 Secondary로 통합하면 그 권한이 어디로도 옮겨지지 않고 사라질 수
-        있어, GAMEMOA는 안전을 위해 이 경우 통합 자체를 막고 운영진의 별도 처리를 요구합니다.
+        있어, OwOGG는 안전을 위해 이 경우 통합 자체를 막고 운영진의 별도 처리를 요구합니다.
       </WikiCallout>
 
       <p className="text-xs text-text-secondary">

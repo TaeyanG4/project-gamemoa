@@ -10,8 +10,8 @@ import type {
   GuildSummaryDto,
   GuildXpLeaderboardEntryDto,
   ServerGameLeaderboardEntryDto,
-} from "@gamemoa/contracts";
-import { GAME_MANIFESTS } from "@gamemoa/core";
+} from "@owogg/contracts";
+import { GAME_MANIFESTS } from "@owogg/core";
 
 import { ApiClientError } from "../lib/api/errors";
 import { Trophy, Zap, Calendar, Users, Gamepad2, Lock } from "lucide-react";
@@ -274,7 +274,7 @@ export default function DiscordServerSlugRoute() {
                 </p>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
                   {dict.discordServerSlug.emptyAlltimeHintPrefix}{" "}
-                  <code className="text-indigo-300 font-mono">/gamemoa play</code>{" "}
+                  <code className="text-indigo-300 font-mono">/owogg play</code>{" "}
                   {dict.discordServerSlug.emptyAlltimeHintSuffix}
                 </p>
               </div>
@@ -420,7 +420,7 @@ export default function DiscordServerSlugRoute() {
                   <p className="text-xs text-slate-400 max-w-sm mx-auto">
                     {dict.discordServerSlug.emptyGameHintPrefix}{" "}
                     <code className="text-indigo-300 font-mono">
-                      /gamemoa play game:{selectedGameId}
+                      /owogg play game:{selectedGameId}
                     </code>{" "}
                     {dict.discordServerSlug.emptyGameHintSuffix}
                   </p>

@@ -2,8 +2,8 @@ import { WikiLayout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "이용약관 | GAMEMOA" },
-    { name: "description", content: "GAMEMOA 서비스 이용약관" },
+    { title: "이용약관 | OwOGG" },
+    { name: "description", content: "OwOGG 서비스 이용약관" },
     { name: "robots", content: "noindex" },
   ];
 }
@@ -23,7 +23,7 @@ export default function TermsRoute() {
       <div className="space-y-8 rounded-2xl border border-border bg-surface-raised p-5 md:p-8">
         <Section title="1. 서비스 개요">
           <p>
-            GAMEMOA(이하 "서비스")는 설치 없이 브라우저에서 바로 즐기는 웹 미니게임 모음 플랫폼이며,
+            OwOGG(이하 "서비스")는 설치 없이 브라우저에서 바로 즐기는 웹 미니게임 모음 플랫폼이며,
             Discord 서버 연동, 랭킹/경험치(XP), Creator 채널 인증 등 부가 기능을 함께 제공합니다.
           </p>
         </Section>

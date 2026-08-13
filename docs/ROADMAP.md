@@ -1,7 +1,7 @@
-# GAMEMOA 향후 로드맵 (ROADMAP)
+# OwOGG 향후 로드맵 (ROADMAP)
 
-GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아키텍처 기반으로 설계된 미니게임 플랫폼입니다.  
-계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 완료 이후, GAMEMOA는 "미니게임 모음"에서
+OwOGG는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아키텍처 기반으로 설계된 미니게임 플랫폼입니다.  
+계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 완료 이후, OwOGG는 "미니게임 모음"에서
 **경쟁형 플레이어 플랫폼**(개인 진행도/XP/레벨/도전과제, My Page, Creator 생태계, Discord 커뮤니티 경쟁)으로
 확장하는 대형 스프린트를 여러 세션에 걸쳐 진행합니다. 이 로드맵은 그 스프린트의 단계 구조를 반영합니다.
 
@@ -23,8 +23,8 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 | E2A   | Creator Featured 심사 엔진 (자격 정책, 6시간 자동 재심사 스케줄러, 잡 모델)                                 | ✅ 완료                                                                        |
 | E2B   | Featured 수동 심사(운영진 리뷰), 14일 재검증/하이스테리시스, 관리 도구                                      | ✅ 완료                                                                        |
 | F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어                                                | ✅ 완료                                                                        |
-| H1    | Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`                                                           | ✅ 완료                                                                        |
-| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`)                                  | ✅ 완료                                                                        |
+| H1    | Discord 길드 XP 귀속 파운데이션 & `/owogg play`                                                             | ✅ 완료                                                                        |
+| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/owogg rank/leaderboard/server`)                                    | ✅ 완료                                                                        |
 | I     | 계정 통합 회귀 테스트, 플랫폼 무결성, Admin Center, Discord 안내 및 프로덕션 검증                           | ✅ 완료                                                                        |
 | J     | 프로덕션 하드닝: 리더보드 SQL 무결성, Creator UNKNOWN 지표, Admin Origin, Creator CI/CD, Admin Step-Up 인증 | ✅ 완료                                                                        |
 | K-A   | Admin Login 복구 & 관리형 관리자 계정(D1 bootstrap, 비밀번호 변경, 계정 관리, 감사 로그)                    | ✅ 완료                                                                        |
@@ -38,10 +38,10 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 ### Discord Integration Foundation (HTTP Interactions) — Phase F, H1, H2 완료, 상세는 `docs/DISCORD_INTEGRATION.md`
 
 - **아키텍처 (v1, 구현됨)**: `discord.js` 상시 Gateway / VM / Docker 데몬 없이 **HTTP Interactions** 베이스.
-  - Discord App → HTTP Interactions → Hono Worker → GAMEMOA 애플리케이션 서비스 → D1
+  - Discord App → HTTP Interactions → Hono Worker → OwOGG 애플리케이션 서비스 → D1
   - 영구 WebSocket 연결, Gateway 서버, 봇 프로세스 데몬은 사용하지 않습니다.
-- **구현된 명령어**: `/gamemoa link`, `/gamemoa profile`, `/gamemoa games`, `/gamemoa play`, `/gamemoa rank`, `/gamemoa leaderboard`, `/gamemoa server`.
-- **서버 랭킹 정책**: 서버 랭킹은 **"해당 Discord 서버에서 GAMEMOA와 연결된 사용자들"**의 랭킹으로 제한합니다. 모든 서버 멤버를 대상으로 하지 않아 권한 서버 멤버 인텐트(Server Member Intent) 없이 구현 가능합니다.
+- **구현된 명령어**: `/owogg link`, `/owogg profile`, `/owogg games`, `/owogg play`, `/owogg rank`, `/owogg leaderboard`, `/owogg server`.
+- **서버 랭킹 정책**: 서버 랭킹은 **"해당 Discord 서버에서 OwOGG와 연결된 사용자들"**의 랭킹으로 제한합니다. 모든 서버 멤버를 대상으로 하지 않아 권한 서버 멤버 인텐트(Server Member Intent) 없이 구현 가능합니다.
 - **외부 설정 대기**: `DISCORD_PUBLIC_KEY` GitHub Actions Variable 등록, Developer Portal Interactions Endpoint URL 설정, `pnpm discord:commands:register` 실행 — 전부 사용자의 Discord Developer Portal 접근이 필요해 이 저장소만으로는 완결되지 않습니다. 정확한 절차는 `docs/DISCORD_INTEGRATION.md` §8 참고.
 - **운영 안내**: Discord 사용자/운영자 가이드는 `docs/DISCORD_BOT_GUIDE.md`, 웹 사용 가이드는 `/discord/guide`, 관리자 운영 가이드는 `docs/ADMIN_GUIDE.md`입니다.
 
@@ -88,7 +88,7 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 
 ## ☁️ 4. Cloudflare 이탈 전략 (Exit Strategy)
 
-GAMEMOA는 핵심 도메인 로직과 저장소 인터페이스를 명확하게 분리하여 미래 인프라 전환 가능성을 고려해 설계되었습니다:
+OwOGG는 핵심 도메인 로직과 저장소 인터페이스를 명확하게 분리하여 미래 인프라 전환 가능성을 고려해 설계되었습니다:
 
-- **API 엔진**: `@gamemoa/api` (Hono 기반)는 Hono의 이식 가능 웹 표준 아키텍처를 활용하여 Cloudflare Workers뿐만 아니라 Node.js (`@hono/node-server`), Bun, Deno, Docker 컨테이너 환경으로 유연하게 이식이 가능합니다.
+- **API 엔진**: `@owogg/api` (Hono 기반)는 Hono의 이식 가능 웹 표준 아키텍처를 활용하여 Cloudflare Workers뿐만 아니라 Node.js (`@hono/node-server`), Bun, Deno, Docker 컨테이너 환경으로 유연하게 이식이 가능합니다.
 - **영속성 어댑터**: `packages/core`의 저장소 인터페이스 (`ScoreRepository`, `UserRepository`, `SessionRepository`)를 따르므로, Cloudflare D1 전용 어댑터 이면에 의존성을 격리하여 향후 PostgreSQL/MySQL ORM 어댑터 변경 시 핵심 비즈니스 로직 수정 범위를 최소화합니다.

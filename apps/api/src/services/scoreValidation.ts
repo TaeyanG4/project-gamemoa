@@ -1,1 +1,1 @@
-export { validateScorePayload } from "@gamemoa/core";
+export { validateScorePayload } from "@owogg/core";

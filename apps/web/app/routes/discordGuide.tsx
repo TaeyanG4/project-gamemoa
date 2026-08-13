@@ -18,20 +18,20 @@ import type { Dictionary } from "../features/i18n/dictionary";
 
 export function meta() {
   return [
-    { title: "Discord에서 GAMEMOA 사용하기 | GAMEMOA" },
-    { name: "description", content: "Discord 서버에서 GAMEMOA 게임과 서버 XP를 사용하는 방법" },
+    { title: "Discord에서 OwOGG 사용하기 | OwOGG" },
+    { name: "description", content: "Discord 서버에서 OwOGG 게임과 서버 XP를 사용하는 방법" },
   ];
 }
 
 function buildCommands(dict: Dictionary["discordGuide"]) {
   return [
-    ["/gamemoa games", dict.commandGamesDesc],
-    ["/gamemoa link", dict.commandLinkDesc],
-    ["/gamemoa profile", dict.commandProfileDesc],
-    ["/gamemoa play", dict.commandPlayDesc],
-    ["/gamemoa rank", dict.commandRankDesc],
-    ["/gamemoa leaderboard", dict.commandLeaderboardDesc],
-    ["/gamemoa server", dict.commandServerDesc],
+    ["/owogg games", dict.commandGamesDesc],
+    ["/owogg link", dict.commandLinkDesc],
+    ["/owogg profile", dict.commandProfileDesc],
+    ["/owogg play", dict.commandPlayDesc],
+    ["/owogg rank", dict.commandRankDesc],
+    ["/owogg leaderboard", dict.commandLeaderboardDesc],
+    ["/owogg server", dict.commandServerDesc],
   ] as const;
 }
 
@@ -132,7 +132,7 @@ export default function DiscordGuideRoute() {
           <ol className="space-y-2 text-sm text-text-secondary">
             <li>
               <b className="text-text-primary">1.</b> {dict.discordGuide.accountStep1Prefix}{" "}
-              <code>/gamemoa link</code> {dict.discordGuide.accountStep1Suffix}
+              <code>/owogg link</code> {dict.discordGuide.accountStep1Suffix}
             </li>
             <li>
               <b className="text-text-primary">2.</b> {dict.discordGuide.accountStep2}

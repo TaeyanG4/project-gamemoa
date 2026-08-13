@@ -1,4 +1,4 @@
-import type { AdminAuthRepository, AdminSessionRecord } from "@gamemoa/core";
+import type { AdminAuthRepository, AdminSessionRecord } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 import { hashSessionToken } from "./D1SessionRepository.js";
 

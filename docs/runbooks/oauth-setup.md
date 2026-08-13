@@ -1,6 +1,6 @@
-# GAMEMOA 소셜 로그인 설정 런북 (OAuth Setup Guide)
+# OwOGG 소셜 로그인 설정 런북 (OAuth Setup Guide)
 
-GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 설정 및 배포 런북입니다.
+OwOGG 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 설정 및 배포 런북입니다.
 
 ---
 
@@ -46,7 +46,7 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
 ### A. Discord Developer Portal 작업
 
 1. [Discord Developer Portal](https://discord.com/developers/applications) 접속
-2. **New Application** 클릭 후 이름 설정 (예: `GAMEMOA`)
+2. **New Application** 클릭 후 이름 설정 (예: `OwOGG`)
 3. **OAuth2 > General** 메뉴 이동
 4. **Client ID** 복사
 5. **Client Secret** 생성 후 안전한 장소에 복사 (절대 공개 금지)
@@ -66,7 +66,7 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
   - `DISCORD_INSTALL_URL`: 선택 사항. Developer Portal에서 실제로 구성한 HTTPS 설치 URL을 사용할 때만 등록
 - **Worker Secret 등록 (Command Line)**:
   ```bash
-  pnpm --filter @gamemoa/api exec wrangler secret put DISCORD_CLIENT_SECRET
+  pnpm --filter @owogg/api exec wrangler secret put DISCORD_CLIENT_SECRET
   ```
   명령어 실행 후 복사한 Client Secret 입력.
 
@@ -95,9 +95,9 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
 
 ### B. 브라우저 실제 테스트
 
-1. GAMEMOA 프로덕션 상단 **로그인** 버튼 클릭
+1. OwOGG 프로덕션 상단 **로그인** 버튼 클릭
 2. Google / Discord 로그인 선택
-3. 계정 인증 완료 후 `gamemoa_session` 쿠키 생성 확인
+3. 계정 인증 완료 후 `owogg_session` 쿠키 생성 확인
 4. `/api/auth/me` 응답이 `authenticated: true` 및 사용자 프로필 데이터 반환 확인
 5. 상단 프로필 유저 정보 표시 및 프로필 페이지 접근 확인
 6. 로그아웃 클릭 후 세션 정상 파기 확인

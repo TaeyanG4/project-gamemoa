@@ -1,5 +1,5 @@
-import type { GameModule, GameManifest } from "@gamemoa/game-sdk";
-import { GAME_MANIFESTS } from "@gamemoa/core";
+import type { GameModule, GameManifest } from "@owogg/game-sdk";
+import { GAME_MANIFESTS } from "@owogg/core";
 import { GAME_LOADERS } from "./gameLoaders.generated.js";
 
 export const gameRegistry = GAME_LOADERS;

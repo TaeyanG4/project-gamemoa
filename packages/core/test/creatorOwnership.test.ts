@@ -222,7 +222,7 @@ test("verifyChannelOwnership — rejects duplicate channel verification across d
   assert.equal(res2.ok, false);
   if (!res2.ok) {
     assert.equal(res2.code, "CHANNEL_ALREADY_VERIFIED");
-    assert.match(res2.message, /이미 다른 GAMEMOA 크리에이터/);
+    assert.match(res2.message, /이미 다른 OwOGG 크리에이터/);
   }
 });
 

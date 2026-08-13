@@ -4,8 +4,8 @@ import { PlatformIcon } from "../components/ui/PlatformIcon";
 
 export function meta() {
   return [
-    { title: "채널 소유권 인증 | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA Creator 채널 소유권 인증 방법" },
+    { title: "채널 소유권 인증 | OwOGG Wiki" },
+    { name: "description", content: "OwOGG Creator 채널 소유권 인증 방법" },
   ];
 }
 
@@ -33,8 +33,8 @@ export default function WikiCreatorVerificationRoute() {
         <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-text-secondary">
           <li>
             위 4개 플랫폼(YouTube · CHZZK · SOOP · Twitch) 중{" "}
-            <b className="text-text-primary">단 하나만</b> 인증에 성공하면 GAMEMOA Creator로
-            인정되며, 4개를 모두 인증할 필요는 없습니다.
+            <b className="text-text-primary">단 하나만</b> 인증에 성공하면 OwOGG Creator로 인정되며,
+            4개를 모두 인증할 필요는 없습니다.
           </li>
           <li>
             현재 구독자/팔로워 수나 채널 개설 기간에 대한 최소 기준은 요구하지 않습니다. 채널
@@ -44,7 +44,7 @@ export default function WikiCreatorVerificationRoute() {
             소유권 인증은 항상 각 플랫폼의 공식 OAuth 로그인 화면을 통해서만 이루어지며, 채널
             URL이나 닉네임을 직접 입력하는 방식은 지원하지 않습니다.
           </li>
-          <li>하나의 외부 채널은 한 GAMEMOA 계정에만 연동할 수 있습니다(1채널 = 1계정).</li>
+          <li>하나의 외부 채널은 한 OwOGG 계정에만 연동할 수 있습니다(1채널 = 1계정).</li>
         </ul>
       </section>
 
@@ -56,20 +56,20 @@ export default function WikiCreatorVerificationRoute() {
               "내 프로필 페이지의 [크리에이터 채널 소유권 인증] 섹션으로 이동합니다.",
               "인증하려는 플랫폼의 [채널 소유권 인증] 버튼을 클릭합니다.",
               "해당 플랫폼의 공식 로그인 화면에서 본인 계정으로 로그인·승인합니다.",
-              "GAMEMOA로 돌아오면 채널 정보가 자동으로 확인되어 표시됩니다.",
+              "OwOGG로 돌아오면 채널 정보가 자동으로 확인되어 표시됩니다.",
             ]}
           />
         </div>
       </section>
 
       <WikiCallout>
-        <b className="text-text-primary">GAMEMOA 로그인과 채널 인증은 별개입니다.</b> Google로
+        <b className="text-text-primary">OwOGG 로그인과 채널 인증은 별개입니다.</b> Google로
         로그인했다고 해서 자동으로 YouTube 채널이 연동되지 않습니다 — 명시적인 인증 절차를 거쳐야
         합니다.
       </WikiCallout>
 
       <WikiCallout tone="warning">
-        하나의 외부 채널은 한 GAMEMOA 계정에만 연동될 수 있습니다. 이미 다른 사용자가 인증한 채널은
+        하나의 외부 채널은 한 OwOGG 계정에만 연동될 수 있습니다. 이미 다른 사용자가 인증한 채널은
         다시 인증할 수 없습니다.
       </WikiCallout>
 

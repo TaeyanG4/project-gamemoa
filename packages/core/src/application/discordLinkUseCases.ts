@@ -5,7 +5,7 @@ export class DiscordLinkUseCases {
 
   constructor(private repo: DiscordLinkRepository) {}
 
-  /** Called from the verified Discord interaction handler for `/gamemoa link`. */
+  /** Called from the verified Discord interaction handler for `/owogg link`. */
   async createLinkChallenge(
     discordUserId: string,
     discordUsername: string,

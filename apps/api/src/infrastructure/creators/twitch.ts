@@ -2,7 +2,7 @@ import type {
   CreatorProviderAdapter,
   CreatorChannelInfo,
   CreatorChannelMetrics,
-} from "@gamemoa/core";
+} from "@owogg/core";
 
 interface TwitchAppTokenCache {
   token: string;

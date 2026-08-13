@@ -4,8 +4,8 @@ import { getDiscordRegisterAuthUrl } from "../features/discord/discordGuildApi";
 
 export function meta() {
   return [
-    { title: "서버 등록 | GAMEMOA Wiki" },
-    { name: "description", content: "Discord 서버를 GAMEMOA 커뮤니티로 등록하는 방법" },
+    { title: "서버 등록 | OwOGG Wiki" },
+    { name: "description", content: "Discord 서버를 OwOGG 커뮤니티로 등록하는 방법" },
   ];
 }
 
@@ -19,9 +19,9 @@ export default function WikiDiscordServerRegistrationRoute() {
       <section>
         <h2 className="text-lg font-black text-text-primary">등록 요건</h2>
         <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-text-secondary">
-          <li>GAMEMOA 계정으로 로그인되어 있어야 합니다.</li>
+          <li>OwOGG 계정으로 로그인되어 있어야 합니다.</li>
           <li>등록하려는 Discord 서버에서 서버 관리(Manage Server) 권한이 있어야 합니다.</li>
-          <li>GAMEMOA 앱이 해당 서버에 이미 설치되어 있어야 합니다.</li>
+          <li>OwOGG 앱이 해당 서버에 이미 설치되어 있어야 합니다.</li>
         </ul>
       </section>
 
@@ -30,7 +30,7 @@ export default function WikiDiscordServerRegistrationRoute() {
         <div className="mt-3">
           <WikiSteps
             steps={[
-              "GAMEMOA에 로그인한 상태로 Discord 서버 등록 인증을 시작합니다.",
+              "OwOGG에 로그인한 상태로 Discord 서버 등록 인증을 시작합니다.",
               "Discord가 요청하는 권한(서버 목록 확인)을 승인합니다.",
               "관리 가능한 서버 목록에서 등록할 서버를 선택합니다.",
               "서버 slug(URL 이름)와 소개, 공개 범위를 설정합니다.",
@@ -51,9 +51,7 @@ export default function WikiDiscordServerRegistrationRoute() {
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4">
             <p className="text-sm font-black text-emerald-300">PUBLIC</p>
-            <p className="mt-1 text-xs text-text-muted">
-              GAMEMOA 서버 디렉토리와 검색에 노출됩니다.
-            </p>
+            <p className="mt-1 text-xs text-text-muted">OwOGG 서버 디렉토리와 검색에 노출됩니다.</p>
           </div>
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
             <p className="text-sm font-black text-amber-300">UNLISTED</p>

@@ -1,5 +1,5 @@
 {
-  "name": "@gamemoa/game-aim-test",
+  "name": "@owogg/game-aim-test",
   "version": "0.0.1",
   "type": "module",
   "exports": {
@@ -9,8 +9,8 @@
     }
   },
   "dependencies": {
-    "@gamemoa/game-sdk": "workspace:*",
-    "@gamemoa/shared": "workspace:*",
+    "@owogg/game-sdk": "workspace:*",
+    "@owogg/shared": "workspace:*",
     "react": "^19.1.0"
   },
   "devDependencies": {

@@ -9,13 +9,13 @@ import {
   ServerSearchQuerySchema,
   DiscordGuildRankingQuerySchema,
   DiscordGuildGameRankingQuerySchema,
-} from "@gamemoa/contracts";
-import { GAME_MANIFEST_MAP, type DiscordGuild } from "@gamemoa/core";
+} from "@owogg/contracts";
+import { GAME_MANIFEST_MAP, type DiscordGuild } from "@owogg/core";
 
 async function requireAuth(
   c: Context<ApiEnv>,
 ): Promise<{ userId: number; user: { id: number; nickname: string } } | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId) return null;
   const { sessionRepo } = createContainer(c.env.DB);
   const result = await sessionRepo.findSession(sessionId);

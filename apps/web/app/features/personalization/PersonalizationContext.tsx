@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { GAME_MANIFEST_MAP } from "@gamemoa/core";
+import { GAME_MANIFEST_MAP } from "@owogg/core";
 import { useAuth } from "../auth";
 import {
   getGuestPersonalization,

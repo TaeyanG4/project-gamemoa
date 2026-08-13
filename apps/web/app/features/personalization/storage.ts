@@ -1,7 +1,7 @@
-import { GAME_MANIFEST_MAP } from "@gamemoa/core";
+import { GAME_MANIFEST_MAP } from "@owogg/core";
 
-export const LOCAL_STORAGE_KEY = "gamemoa.personalization.v2";
-export const LEGACY_STORAGE_KEY = "gamemoa.personalization.v1";
+export const LOCAL_STORAGE_KEY = "owogg.personalization.v2";
+export const LEGACY_STORAGE_KEY = "owogg.personalization.v1";
 
 export interface PersistedPersonalizationState {
   version: number;

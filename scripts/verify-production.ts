@@ -112,7 +112,7 @@ const CREATOR_PLATFORM_KEYS = ["YOUTUBE", "TWITCH", "CHZZK", "SOOP"] as const;
 type CreatorPlatformKey = (typeof CREATOR_PLATFORM_KEYS)[number];
 
 /**
- * Creator providers are optional integrations — GAMEMOA must deploy cleanly with some (or all)
+ * Creator providers are optional integrations — OwOGG must deploy cleanly with some (or all)
  * unconfigured. `CREATOR_ENABLED_PROVIDERS` (comma-separated) is this deployment's explicit list
  * of providers operations expects to be live; only those are required to report configured=true.
  * An unconfigured provider that was never declared enabled is reported, not treated as failure.

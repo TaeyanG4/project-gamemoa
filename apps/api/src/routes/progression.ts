@@ -6,14 +6,14 @@ import {
   XpLeaderboardResponseSchema,
   XpLeaderboardQuerySchema,
   AchievementSummaryResponseSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer } from "../container.js";
 
 export const progressionRouter = new Hono<ApiEnv>();
 
 async function getAuthUserId(c: Context<ApiEnv>): Promise<number | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId || !c.env?.DB) return null;
 
   try {
@@ -48,7 +48,7 @@ progressionRouter.get("/me", async (c) => {
 });
 
 // GET /api/progression/leaderboard?limit=20 — public global XP ranking ("who has been
-// actively using GAMEMOA"), separate from any game skill leaderboard.
+// actively using OwOGG"), separate from any game skill leaderboard.
 progressionRouter.get("/leaderboard", async (c) => {
   const query = XpLeaderboardQuerySchema.safeParse({ limit: c.req.query("limit") });
   if (!query.success) {

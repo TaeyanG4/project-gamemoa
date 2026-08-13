@@ -1,15 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "../src/index.js";
-import { hashSessionToken } from "@gamemoa/db";
+import { hashSessionToken } from "@owogg/db";
 
 // Every test in this file authenticates with these two fixed raw tokens; the mock DB below
 // answers admin_sessions lookups by comparing against their precomputed hashes, mirroring what
 // D1AdminAuthRepository does for real (see packages/db/test/D1AdminAuthRepository.test.ts for
 // the repository's own behavioral tests against a real SQLite engine).
-const GAMEMOA_SESSION_RAW_TOKEN = "valid_session";
+const OWOGG_SESSION_RAW_TOKEN = "valid_session";
 const ADMIN_SESSION_RAW_TOKEN = "admin_session_valid_token";
-const GAMEMOA_SESSION_TOKEN_HASH = await hashSessionToken(GAMEMOA_SESSION_RAW_TOKEN);
+const OWOGG_SESSION_TOKEN_HASH = await hashSessionToken(OWOGG_SESSION_RAW_TOKEN);
 const ADMIN_SESSION_TOKEN_HASH = await hashSessionToken(ADMIN_SESSION_RAW_TOKEN);
 
 function createAdminDb(options: { userId: number; verified?: boolean } = { userId: 1 }) {
@@ -107,7 +107,7 @@ function createAdminDb(options: { userId: number; verified?: boolean } = { userI
             id: 1,
             token_hash: ADMIN_SESSION_TOKEN_HASH,
             user_id: options.userId,
-            session_token_hash: GAMEMOA_SESSION_TOKEN_HASH,
+            session_token_hash: OWOGG_SESSION_TOKEN_HASH,
             created_at: new Date().toISOString(),
             expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
             revoked_at: null,
@@ -193,7 +193,7 @@ test("admin creator queue — non-admin is denied even with admin-like email and
     "/api/admin/creators/reviews",
     {
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
       },
     },
     { DB: mock.db, ADMIN_USER_IDS: "1" } as any,
@@ -208,7 +208,7 @@ test("admin creator queue — missing ADMIN_USER_IDS denies by default", async (
     "/api/admin/creators/reviews",
     {
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
       },
     },
     { DB: mock.db } as any,
@@ -222,7 +222,7 @@ test("admin creator queue — configured user can read qualification-only data",
     "/api/admin/creators/reviews",
     {
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
       },
     },
     { DB: mock.db, ADMIN_USER_IDS: "1" } as any,
@@ -242,7 +242,7 @@ test("manual approval — requires verified ownership and explicit reason", asyn
     {
       method: "POST",
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
         "Content-Type": "application/json",
         Origin: "http://localhost:5173",
       },
@@ -257,7 +257,7 @@ test("manual approval — requires verified ownership and explicit reason", asyn
     {
       method: "POST",
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
         "Content-Type": "application/json",
         Origin: "http://localhost:5173",
       },
@@ -274,7 +274,7 @@ test("manual approval — transitions once, creates audit row, and replay is saf
   const request = {
     method: "POST",
     headers: {
-      Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+      Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
       "Content-Type": "application/json",
       Origin: "http://localhost:5173",
     },
@@ -309,7 +309,7 @@ test("manual rejection — transitions manual review to NOT_ELIGIBLE", async () 
     {
       method: "POST",
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
         "Content-Type": "application/json",
         Origin: "http://localhost:5173",
       },
@@ -345,7 +345,7 @@ test("admin me defaults to no access and never reveals ADMIN_USER_IDS", async ()
     "/api/admin/me",
     {
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
       },
     },
     { DB: mock.db, ADMIN_USER_IDS: "1,999" } as any,
@@ -367,7 +367,7 @@ test("admin me defaults to no access and never reveals ADMIN_USER_IDS", async ()
   // No managed admin account exists in this mock DB, so bootstrap is still available.
   const notElevated = await app.request(
     "/api/admin/me",
-    { headers: { Cookie: "gamemoa_session=valid_session" } },
+    { headers: { Cookie: "owogg_session=valid_session" } },
     { DB: mock.db, ADMIN_USER_IDS: "1,999" } as any,
   );
   assert.deepEqual(await notElevated.json(), {
@@ -387,7 +387,7 @@ test("admin overview is denied for non-admin and is cache-disabled for an admin"
     "/api/admin/overview",
     {
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
       },
     },
     { DB: nonAdmin.db, ADMIN_USER_IDS: "1" } as any,
@@ -400,7 +400,7 @@ test("admin overview is denied for non-admin and is cache-disabled for an admin"
     "/api/admin/overview",
     {
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
       },
     },
     { DB: admin.db, ADMIN_USER_IDS: "1" } as any,
@@ -418,7 +418,7 @@ test("admin mutations require a trusted Origin even with an authenticated admin 
     {
       method: "POST",
       headers: {
-        Cookie: "gamemoa_session=valid_session; gamemoa_admin_session=admin_session_valid_token",
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ action: "REJECT_FEATURED", reason: "확인 결과 기준 미달" }),

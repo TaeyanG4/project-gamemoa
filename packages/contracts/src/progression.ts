@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// CRITICAL: XP/level represent GAMEMOA activity/progression only — never game score or
+// CRITICAL: XP/level represent OwOGG activity/progression only — never game score or
 // ranking skill. These schemas must never be combined with score/leaderboard contracts.
 
 export const ProgressionSummarySchema = z.object({

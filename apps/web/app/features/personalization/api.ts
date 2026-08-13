@@ -2,7 +2,7 @@ import {
   PersonalizationStateSchema,
   MutationResultSchema,
   type PersonalizationState,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import { apiFetch } from "../../lib/api";
 
 export async function fetchPersonalizationStateApi(): Promise<PersonalizationState> {

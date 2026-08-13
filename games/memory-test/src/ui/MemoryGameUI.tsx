@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Play, RotateCcw, Brain } from "lucide-react";
-import type { GameProps } from "@gamemoa/game-sdk";
+import type { GameProps } from "@owogg/game-sdk";
 import {
   type MemoryColor,
   generateNextColor,

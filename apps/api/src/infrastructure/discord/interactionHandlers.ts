@@ -1,4 +1,4 @@
-import { GAME_MANIFEST_MAP } from "@gamemoa/core";
+import { GAME_MANIFEST_MAP } from "@owogg/core";
 import type { AppContainer } from "../../container.js";
 import { DISCORD_SUBCOMMANDS } from "./commands.js";
 import {
@@ -11,7 +11,7 @@ import {
   type DiscordInteractionUser,
 } from "./types.js";
 
-// GAMEMOA brand palette (apps/web/app/app.css) used consistently across every embed so the
+// OwOGG brand palette (apps/web/app/app.css) used consistently across every embed so the
 // bot's messages read as a matched extension of the site, not a bare-bones text bot.
 const COLOR_BRAND = 0x6366f1; // --color-brand — default/neutral
 const COLOR_XP = 0xf59e0b; // --color-accent-yellow — level/XP/leaderboard
@@ -19,8 +19,8 @@ const COLOR_SERVER = 0xa855f7; // --color-accent-purple — server-wide info
 const COLOR_SUCCESS = 0x10b981; // --color-accent-green
 const COLOR_ERROR = 0xf43f5e; // --color-accent-red
 
-function gamemoaFooter(frontendUrl: string): DiscordEmbedFooter {
-  return { text: "GAMEMOA", icon_url: `${frontendUrl}/favicon-192x192.png` };
+function owoggFooter(frontendUrl: string): DiscordEmbedFooter {
+  return { text: "OwOGG", icon_url: `${frontendUrl}/favicon-192x192.png` };
 }
 
 /** Renders a fixed-width block-character progress bar (Arcane-style rank-card progress
@@ -32,11 +32,11 @@ function progressBar(percent: number, length = 12): string {
   return "▰".repeat(filled) + "▱".repeat(length - filled) + ` ${Math.round(clamped)}%`;
 }
 
-/** Neutralizes Discord markdown syntax in user-controlled strings (GAMEMOA nicknames, Discord
+/** Neutralizes Discord markdown syntax in user-controlled strings (OwOGG nicknames, Discord
  * guild names, Discord display names) before they're interpolated into an embed. Unlike plain
  * message `content`, embed `description`/`field.value` fully render `[text](url)` masked
  * links — without this, a nickname like `[Free Nitro](evil.example)` would render as a
- * clickable phishing link in the public `/gamemoa leaderboard` embed. */
+ * clickable phishing link in the public `/owogg leaderboard` embed. */
 function escapeMarkdown(text: string): string {
   return text
     .replace(/\\/g, "\\\\")
@@ -76,12 +76,12 @@ function errorEmbed(description: string, frontendUrl: string): DiscordInteractio
     title: "⚠️ 오류",
     description,
     color: COLOR_ERROR,
-    footer: gamemoaFooter(frontendUrl),
+    footer: owoggFooter(frontendUrl),
   });
 }
 
-/** Dispatches a verified `/gamemoa <subcommand>` interaction to its handler. */
-export async function handleGamemoaCommand(
+/** Dispatches a verified `/owogg <subcommand>` interaction to its handler. */
+export async function handleOwoggCommand(
   container: AppContainer,
   interaction: DiscordInteraction,
   frontendUrl: string,
@@ -117,11 +117,11 @@ export async function handleGamemoaCommand(
 
 function handleGamesCommand(frontendUrl: string): DiscordInteractionResponse {
   const published = Object.values(GAME_MANIFEST_MAP).filter((m) => m.status === "published");
-  const footer = gamemoaFooter(frontendUrl);
+  const footer = owoggFooter(frontendUrl);
 
   if (published.length === 0) {
     return publicEmbed({
-      title: "🎮 GAMEMOA 게임 목록",
+      title: "🎮 OwOGG 게임 목록",
       description: "현재 플레이 가능한 게임이 없습니다.",
       color: COLOR_BRAND,
       footer,
@@ -130,7 +130,7 @@ function handleGamesCommand(frontendUrl: string): DiscordInteractionResponse {
 
   const lines = published.map((g) => `• [${g.title}](${frontendUrl}/games/${g.slug})`);
   return publicEmbed({
-    title: "🎮 GAMEMOA 게임 목록",
+    title: "🎮 OwOGG 게임 목록",
     description: lines.join("\n"),
     color: COLOR_BRAND,
     footer,
@@ -142,12 +142,12 @@ async function handleLinkCommand(
   discordUser: DiscordInteractionUser,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
-  const footer = gamemoaFooter(frontendUrl);
+  const footer = owoggFooter(frontendUrl);
   const existing = await container.userRepo.findOAuthAccount("discord", discordUser.id);
   if (existing) {
     return ephemeralEmbed({
       title: "🔗 Discord 계정 연동",
-      description: "✅ 이 Discord 계정은 이미 GAMEMOA 계정과 연동되어 있습니다.",
+      description: "✅ 이 Discord 계정은 이미 OwOGG 계정과 연동되어 있습니다.",
       color: COLOR_SUCCESS,
       footer,
     });
@@ -168,7 +168,7 @@ async function handleLinkCommand(
   return ephemeralEmbed({
     title: "🔗 Discord 계정 연동",
     description:
-      `GAMEMOA 계정과 연동하려면 아래 링크를 열고 로그인해주세요.\n\n` +
+      `OwOGG 계정과 연동하려면 아래 링크를 열고 로그인해주세요.\n\n` +
       `🔗 [연동 링크 열기](${linkUrl})\n\n` +
       `⏱️ 이 링크는 ${expiresInMinutes}분 후 만료되며, 1회만 사용할 수 있습니다.`,
     color: COLOR_BRAND,
@@ -181,11 +181,11 @@ async function handleProfileCommand(
   discordUser: DiscordInteractionUser,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
-  const footer = gamemoaFooter(frontendUrl);
+  const footer = owoggFooter(frontendUrl);
   const user = await container.userRepo.findByOAuth("discord", discordUser.id);
   if (!user) {
     return errorEmbed(
-      "이 Discord 계정은 아직 GAMEMOA 계정과 연동되지 않았습니다. `/gamemoa link`로 먼저 연동해주세요.",
+      "이 Discord 계정은 아직 OwOGG 계정과 연동되지 않았습니다. `/owogg link`로 먼저 연동해주세요.",
       frontendUrl,
     );
   }
@@ -261,7 +261,7 @@ async function handleRankCommand(
   discordUser: DiscordInteractionUser,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
-  const footer = gamemoaFooter(frontendUrl);
+  const footer = owoggFooter(frontendUrl);
   const guildId = interaction.guild_id;
   if (!guildId) {
     return errorEmbed("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.", frontendUrl);
@@ -270,7 +270,7 @@ async function handleRankCommand(
   const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
   if (!guild || guild.registration_status !== "ACTIVE") {
     return errorEmbed(
-      "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+      "이 Discord 서버는 아직 OwOGG에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
       frontendUrl,
     );
   }
@@ -278,7 +278,7 @@ async function handleRankCommand(
   const oauthAccount = await container.userRepo.findOAuthAccount("discord", discordUser.id);
   if (!oauthAccount) {
     return errorEmbed(
-      "GAMEMOA 계정이 Discord와 연결되어 있지 않습니다. `/gamemoa link` 명령어로 계정을 먼저 연결해 주세요.",
+      "OwOGG 계정이 Discord와 연결되어 있지 않습니다. `/owogg link` 명령어로 계정을 먼저 연결해 주세요.",
       frontendUrl,
     );
   }
@@ -296,7 +296,7 @@ async function handleRankCommand(
     return ephemeralEmbed({
       title: `🏆 ${guildName}`,
       description:
-        "아직 이 서버에 기여한 XP가 없습니다. `/gamemoa play` 명령어로 게임을 플레이해보세요!",
+        "아직 이 서버에 기여한 XP가 없습니다. `/owogg play` 명령어로 게임을 플레이해보세요!",
       color: COLOR_BRAND,
       ...(thumbnail ? { thumbnail } : {}),
       footer,
@@ -322,7 +322,7 @@ async function handleLeaderboardCommand(
   interaction: DiscordInteraction,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
-  const footer = gamemoaFooter(frontendUrl);
+  const footer = owoggFooter(frontendUrl);
   const guildId = interaction.guild_id;
   if (!guildId) {
     return errorEmbed("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.", frontendUrl);
@@ -331,7 +331,7 @@ async function handleLeaderboardCommand(
   const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
   if (!guild || guild.registration_status !== "ACTIVE") {
     return errorEmbed(
-      "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+      "이 Discord 서버는 아직 OwOGG에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
       frontendUrl,
     );
   }
@@ -350,7 +350,7 @@ async function handleLeaderboardCommand(
   if (leaderboard.entries.length === 0) {
     return publicEmbed({
       title: `📊 ${guildName} 서버 XP 리더보드`,
-      description: "아직 등록된 활동 XP가 없습니다. `/gamemoa play`로 첫 기여를 시작해보세요!",
+      description: "아직 등록된 활동 XP가 없습니다. `/owogg play`로 첫 기여를 시작해보세요!",
       color: COLOR_BRAND,
       ...(thumbnail ? { thumbnail } : {}),
       fields: [{ name: "전체 랭킹", value: `[웹에서 보기](${serverUrl})` }],
@@ -377,7 +377,7 @@ async function handleServerCommand(
   interaction: DiscordInteraction,
   frontendUrl: string,
 ): Promise<DiscordInteractionResponse> {
-  const footer = gamemoaFooter(frontendUrl);
+  const footer = owoggFooter(frontendUrl);
   const guildId = interaction.guild_id;
   if (!guildId) {
     return errorEmbed("이 명령어는 Discord 서버(길드) 채널에서만 실행할 수 있습니다.", frontendUrl);
@@ -386,7 +386,7 @@ async function handleServerCommand(
   const guild = await container.discordGuildDirectoryUseCases.getGuildByGuildId(guildId);
   if (!guild || guild.registration_status !== "ACTIVE") {
     return errorEmbed(
-      "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+      "이 Discord 서버는 아직 OwOGG에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
       frontendUrl,
     );
   }
@@ -403,7 +403,7 @@ async function handleServerCommand(
     fields: [
       { name: "전체 활동 XP", value: `${summary.totalXp.toLocaleString()} XP`, inline: true },
       { name: "이번 주 활동 XP", value: `${summary.weeklyXp.toLocaleString()} XP`, inline: true },
-      { name: "GAMEMOA 참여자", value: `${summary.participantCount}명`, inline: true },
+      { name: "OwOGG 참여자", value: `${summary.participantCount}명`, inline: true },
     ],
     footer,
   });

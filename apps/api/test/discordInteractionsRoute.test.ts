@@ -123,7 +123,7 @@ test("POST /api/discord/interactions returns a safe fallback for an unrecognized
   const timestamp = String(Math.floor(Date.now() / 1000));
   const rawBody = JSON.stringify({
     type: 2,
-    data: { name: "gamemoa", options: [{ name: "games", type: 1 }] },
+    data: { name: "owogg", options: [{ name: "games", type: 1 }] },
     member: { user: { id: "123", username: "tester" } },
   });
   const signatureHex = signMessage(privateKey, timestamp + rawBody);

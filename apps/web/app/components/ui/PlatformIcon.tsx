@@ -1,4 +1,4 @@
-import type { CreatorPlatform } from "@gamemoa/contracts";
+import type { CreatorPlatform } from "@owogg/contracts";
 import { useI18n } from "../../features/i18n/I18nContext";
 import type { Dictionary } from "../../features/i18n/dictionary";
 

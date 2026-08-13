@@ -97,7 +97,7 @@ export async function buildRegistrySources(rootDir = process.cwd()): Promise<Reg
 
   // 1. Core Manifest Registry Raw Code
   const rawCoreRegistryCode = `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
-import type { GameManifest } from "@gamemoa/game-sdk";
+import type { GameManifest } from "@owogg/game-sdk";
 
 export const GAME_MANIFESTS: GameManifest[] = ${JSON.stringify(manifests, null, 2)};
 
@@ -135,7 +135,7 @@ export function validateScoreByManifest(gameId: string, score: number): { valid:
     .join("\n");
 
   const rawWebLoaderCode = `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
-import type { GameModule } from "@gamemoa/game-sdk";
+import type { GameModule } from "@owogg/game-sdk";
 
 export type GameLoader = () => Promise<{ default: GameModule } | GameModule>;
 

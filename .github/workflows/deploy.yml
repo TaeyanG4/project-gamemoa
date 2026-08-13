@@ -9,7 +9,7 @@ on:
       - main
 
 concurrency:
-  group: gamemoa-production
+  group: owogg-production
   cancel-in-progress: true
 
 jobs:
@@ -46,7 +46,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
-          # Creator provider client IDs/redirect URIs are non-secret and optional — GAMEMOA must
+          # Creator provider client IDs/redirect URIs are non-secret and optional — OwOGG must
           # still deploy when some (or all) are unconfigured (`|| ''`). Client secrets/API keys go
           # through `secrets:` below, never `--var`.
           command: >-
@@ -120,7 +120,7 @@ jobs:
           CREATOR_ENABLED_PROVIDERS: ${{ vars.CREATOR_ENABLED_PROVIDERS || '' }}
 
       - name: Build Web Frontend
-        run: pnpm --filter @gamemoa/web build
+        run: pnpm --filter @owogg/web build
         env:
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}

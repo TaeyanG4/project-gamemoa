@@ -16,12 +16,12 @@ import type {
   AdminAccountSummary,
   AdminAccountAuditEntry,
   AdminAccountRoleValue,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 
 export function meta() {
   return [
-    { title: "관리자 계정 관리 | GAMEMOA" },
-    { name: "description", content: "GAMEMOA 관리자 계정 관리 (SUPERADMIN 전용)" },
+    { title: "관리자 계정 관리 | OwOGG" },
+    { name: "description", content: "OwOGG 관리자 계정 관리 (SUPERADMIN 전용)" },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }
@@ -80,7 +80,7 @@ export default function AdminAccountsRoute() {
   if (!isAuthenticated) {
     return (
       <PageMessage>
-        <Link to="/">GAMEMOA 로그인</Link>이 필요합니다.
+        <Link to="/">OwOGG 로그인</Link>이 필요합니다.
       </PageMessage>
     );
   }
@@ -109,7 +109,7 @@ export default function AdminAccountsRoute() {
         </div>
         <h1 className="text-3xl font-black tracking-tight text-text-primary">관리자 계정 관리</h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
-          모든 관리자 계정은 이미 존재하는 GAMEMOA 사용자와, 그 사용자에게 연결된 Google 계정을
+          모든 관리자 계정은 이미 존재하는 OwOGG 사용자와, 그 사용자에게 연결된 Google 계정을
           기준으로만 생성됩니다.
         </p>
       </header>
@@ -385,7 +385,7 @@ function CreateAdminForm({
       className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-surface-raised p-5"
     >
       <label className="flex flex-col gap-1 text-xs font-bold text-text-primary">
-        GAMEMOA 사용자 ID
+        OwOGG 사용자 ID
         <input
           type="number"
           min={1}

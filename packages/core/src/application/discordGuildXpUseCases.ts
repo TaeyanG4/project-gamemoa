@@ -23,14 +23,14 @@ export class DiscordGuildXpUseCases {
     const guild = await this.guildRepo.findByGuildId(input.guildId);
     if (!guild || guild.registration_status !== "ACTIVE") {
       throw new Error(
-        "이 Discord 서버는 아직 GAMEMOA에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
+        "이 Discord 서버는 아직 OwOGG에 등록되지 않았거나 비활성화되었습니다. 웹사이트(/discord/servers)에서 먼저 서버를 등록해 주세요.",
       );
     }
 
     const oauthAccount = await this.userRepo.findOAuthAccount("discord", input.discordUserId);
     if (!oauthAccount) {
       throw new Error(
-        "GAMEMOA 계정이 Discord와 연결되어 있지 않습니다. /gamemoa link 명령어로 계정을 연결해 주세요.",
+        "OwOGG 계정이 Discord와 연결되어 있지 않습니다. /owogg link 명령어로 계정을 연결해 주세요.",
       );
     }
 

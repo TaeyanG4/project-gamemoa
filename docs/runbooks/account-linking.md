@@ -1,15 +1,15 @@
-# GAMEMOA 계정 연결 및 통합 런북 (Account Linking & Merge Runbook)
+# OwOGG 계정 연결 및 통합 런북 (Account Linking & Merge Runbook)
 
-GAMEMOA 계정 식별 모델, OAuth 공급자 연결/연결 해제, 그리고 Primary Account Wins 계정
+OwOGG 계정 식별 모델, OAuth 공급자 연결/연결 해제, 그리고 Primary Account Wins 계정
 통합 정책과 절차를 설명합니다.
 
 ---
 
 ## 1. 계정 식별 모델 (기본 정책)
 
-1. **Google 로그인과 Discord 로그인은 기본적으로 별도 GAMEMOA 계정입니다.**
-   - Google OAuth → GAMEMOA 계정 A
-   - Discord OAuth → GAMEMOA 계정 B
+1. **Google 로그인과 Discord 로그인은 기본적으로 별도 OwOGG 계정입니다.**
+   - Google OAuth → OwOGG 계정 A
+   - Discord OAuth → OwOGG 계정 B
 2. **이메일이 동일해도 자동 병합하지 않습니다.**
    - 이메일은 메타데이터(검증 힌트, 중복 계정 안내)로만 사용하며, 정규 식별자로 사용하지
      않습니다.
@@ -26,8 +26,8 @@ GAMEMOA 계정 식별 모델, OAuth 공급자 연결/연결 해제, 그리고 Pr
 여부로 LOGIN을 LINK로 자동 전환하지 않습니다.
 
 - **LOGIN**: `/api/auth/google`, `/api/auth/discord(+callback)` — 공급자 식별 → 기존 연결
-  GAMEMOA 계정 또는 신규 별도 GAMEMOA 계정 생성.
-- **LINK**: 이미 인증된 GAMEMOA 계정 + 새로 인증된 두 번째 공급자를 현재 계정에 추가.
+  OwOGG 계정 또는 신규 별도 OwOGG 계정 생성.
+- **LINK**: 이미 인증된 OwOGG 계정 + 새로 인증된 두 번째 공급자를 현재 계정에 추가.
   - `POST /api/auth/link/google` (GIS 자격증명 검증 후 연결)
   - `GET /api/auth/link/discord` 후 공용 `GET /api/auth/discord/callback` (state 쿠키로 LINK 흐름 식별)
 
@@ -46,19 +46,19 @@ LINK 흐름의 Discord OAuth `state`는 인증된 세션과 연결 계정에 바
 
 ## 3. 공급자 연결 충돌 (ACCOUNT_ALREADY_LINKED)
 
-연결하려는 공급자 식별자가 이미 다른 GAMEMOA 계정에 속해 있으면 자동으로 이동/병합하지
+연결하려는 공급자 식별자가 이미 다른 OwOGG 계정에 속해 있으면 자동으로 이동/병합하지
 않고 **명시적 충돌**을 반환합니다.
 
 - 응답: `409`, `error.code = "ACCOUNT_ALREADY_LINKED"`, `conflictUserId`, 그리고
   갓 생성된 단기 `mergeChallenge`(신규 인증 증거에 바인딩).
-- 웹은 "이 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다." 안내와 함께 **계정 통합**을
+- 웹은 "이 계정은 이미 다른 OwOGG 계정으로 사용 중입니다." 안내와 함께 **계정 통합**을
   제안합니다.
 
 ---
 
 ## 4. Primary Account Wins 계정 통합 정책
 
-사용자가 두 GAMEMOA 계정을 통합할 때, v1 구현은 **Primary Account Wins** 방식을 사용합니다.
+사용자가 두 OwOGG 계정을 통합할 때, v1 구현은 **Primary Account Wins** 방식을 사용합니다.
 
 - **Primary(유지)** 계정: 사용자가 선택한 데이터를 유지하는 계정.
 - **Secondary(삭제)** 계정: 통합 시 데이터를 폐기하는 계정.
@@ -84,7 +84,7 @@ LINK 흐름의 Discord OAuth `state`는 인증된 세션과 연결 계정에 바
 
 통합은 기존 관계만으로 진행되지 않으며, 아래를 모두 요구합니다.
 
-1. 현재 유효한 GAMEMOA 세션 (소유 계정 증명).
+1. 현재 유효한 OwOGG 세션 (소유 계정 증명).
 2. 갓 인증된 두 번째 OAuth 공급자 증거 (LINK 충돌 시점에서 발행).
 3. 단기/일회용 서버측 `mergeChallenge` (10분 TTL, 후보 쌍 + 공급자 증거에 바인딩).
 4. 명시적 최종 확인 (삭제 경고 포함).

@@ -1,4 +1,4 @@
-import type { AdminAccountUseCases, AdminAccountRecord } from "@gamemoa/core";
+import type { AdminAccountUseCases, AdminAccountRecord } from "@owogg/core";
 import { isAdminUserId } from "./admin.js";
 
 export interface AdminEligibilityResult {

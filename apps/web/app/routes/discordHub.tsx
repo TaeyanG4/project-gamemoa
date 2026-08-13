@@ -6,7 +6,7 @@ import {
   getDiscordRegisterAuthUrl,
 } from "../features/discord/discordGuildApi";
 import { fetchDiscordBotStatusApi } from "../features/discord/api";
-import type { DiscordGuildDto, GlobalGuildRankEntryDto } from "@gamemoa/contracts";
+import type { DiscordGuildDto, GlobalGuildRankEntryDto } from "@owogg/contracts";
 import { ExternalLink, Trophy } from "lucide-react";
 import { useI18n } from "../features/i18n/I18nContext";
 
@@ -50,7 +50,7 @@ export default function DiscordHubRoute() {
 
         <div className="relative z-10 max-w-2xl space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-4 py-1.5 text-xs font-semibold text-indigo-300 backdrop-blur-md">
-            <span>🎮 GAMEMOA × Discord</span>
+            <span>🎮 OwOGG × Discord</span>
             <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
             <span>Community Hub</span>
           </div>

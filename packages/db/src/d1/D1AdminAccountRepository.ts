@@ -5,7 +5,7 @@ import type {
   AdminAccountRole,
   AdminAccountStatus,
   AdminAccountAuditAction,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 function mapAccountRow(r: Record<string, unknown>): AdminAccountRecord {

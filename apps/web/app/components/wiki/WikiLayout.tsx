@@ -27,7 +27,7 @@ export function WikiLayout({
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
       <div className="mb-6 flex items-center gap-2 text-xs font-bold text-text-muted">
         <Link to="/wiki" className="flex items-center gap-1.5 hover:text-brand-light">
-          <BookOpen className="h-3.5 w-3.5" /> GAMEMOA Wiki
+          <BookOpen className="h-3.5 w-3.5" /> OwOGG Wiki
         </Link>
       </div>
 

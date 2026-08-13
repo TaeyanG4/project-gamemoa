@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
-// /gamemoa link — Discord account-linking challenge (website side)
+// /owogg link — Discord account-linking challenge (website side)
 // ---------------------------------------------------------------------------
 
 export const DiscordLinkPreviewResponseSchema = z.object({

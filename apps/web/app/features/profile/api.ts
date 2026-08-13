@@ -5,7 +5,7 @@ import {
   UpdateCountryResponseSchema,
   type UpdateNicknameResponse,
   type UpdateCountryResponse,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import { apiFetch } from "../../lib/api";
 
 export async function updateNicknameApi(nickname: string): Promise<UpdateNicknameResponse> {

@@ -19,7 +19,7 @@ export const RESERVED_GUILD_SLUGS = new Set<string>([
   "servers",
   "bot",
   "help",
-  "gamemoa",
+  "owogg",
   "null",
   "undefined",
   "system",

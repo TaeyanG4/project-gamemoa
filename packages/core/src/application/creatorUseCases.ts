@@ -196,7 +196,7 @@ export class CreatorUseCases {
         message: string;
       }
   > {
-    // 1. Single-owner invariant: Check if another GAMEMOA user has ALREADY verified this identical platform + platformUserId channel
+    // 1. Single-owner invariant: Check if another OwOGG user has ALREADY verified this identical platform + platformUserId channel
     const existingPlatformAcc = await this.creatorRepo.findPlatformAccount(
       channelInfo.platform,
       channelInfo.platformUserId,
@@ -208,7 +208,7 @@ export class CreatorUseCases {
         return {
           ok: false,
           code: "CHANNEL_ALREADY_VERIFIED",
-          message: "이 채널은 이미 다른 GAMEMOA 크리에이터 계정에 연동되어 있습니다.",
+          message: "이 채널은 이미 다른 OwOGG 크리에이터 계정에 연동되어 있습니다.",
         };
       }
     }

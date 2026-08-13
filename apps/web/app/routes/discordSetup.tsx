@@ -19,8 +19,8 @@ import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
-    { title: "Discord 설치 가이드 | GAMEMOA" },
-    { name: "description", content: "GAMEMOA를 Discord 서버에 설치하고 시작하는 5단계 가이드" },
+    { title: "Discord 설치 가이드 | OwOGG" },
+    { name: "description", content: "OwOGG를 Discord 서버에 설치하고 시작하는 5단계 가이드" },
   ];
 }
 
@@ -67,7 +67,7 @@ export default function DiscordSetupRoute() {
 
   const discordLinked = Boolean(user?.providers?.includes("discord"));
 
-  // Installation itself can never be confirmed from GAMEMOA — Discord doesn't tell us. We only
+  // Installation itself can never be confirmed from OwOGG — Discord doesn't tell us. We only
   // ever show "설치 진행" (never fabricate "설치됨").
   const installState: StepState = "unknown";
   const linkState: StepState = !isAuthenticated ? "todo" : discordLinked ? "done" : "todo";
@@ -135,11 +135,11 @@ export default function DiscordSetupRoute() {
               onClick={openLoginModal}
               className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light cursor-pointer"
             >
-              {dict.discordSetup.gamemoaLoginCta}
+              {dict.discordSetup.owoggLoginCta}
             </button>
           ) : discordLinked ? (
             <p className="text-xs font-semibold text-accent-green">
-              {dict.discordSetup.linkedNote1} <code>/gamemoa profile</code>
+              {dict.discordSetup.linkedNote1} <code>/owogg profile</code>
               {dict.discordSetup.linkedNote2}
             </p>
           ) : (
@@ -191,7 +191,7 @@ export default function DiscordSetupRoute() {
           description={dict.discordSetup.step4Description}
         >
           <code className="rounded-lg bg-surface px-2 py-1 text-xs font-black text-brand-light">
-            /gamemoa games
+            /owogg games
           </code>
           <p className="mt-2 text-[11px] text-text-muted">
             {dict.discordSetup.notShowingUp}{" "}
@@ -213,7 +213,7 @@ export default function DiscordSetupRoute() {
           description={dict.discordSetup.step5Description}
         >
           <code className="rounded-lg bg-surface px-2 py-1 text-xs font-black text-brand-light">
-            /gamemoa play
+            /owogg play
           </code>
           <Link
             to="/discord/guide"

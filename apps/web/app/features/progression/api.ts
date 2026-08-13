@@ -5,7 +5,7 @@ import {
   type ProgressResponse,
   type AchievementSummaryResponse,
   type XpLeaderboardResponse,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import { apiFetch } from "../../lib/api";
 
 export async function fetchMyProgressApi(): Promise<ProgressResponse> {

@@ -1,4 +1,4 @@
-import type { Session, SessionRepository, User } from "@gamemoa/core";
+import type { Session, SessionRepository, User } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export async function hashSessionToken(token: string): Promise<string> {

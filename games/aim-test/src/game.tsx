@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import type { GameProps } from "@gamemoa/game-sdk";
+import type { GameProps } from "@owogg/game-sdk";
 import { Target, RotateCcw, Play } from "lucide-react";
 import {
   TOTAL_TARGETS,

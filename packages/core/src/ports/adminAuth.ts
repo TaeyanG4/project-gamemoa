@@ -19,7 +19,7 @@ export interface AdminSessionRecord {
  * Persistence port for the admin step-up authentication layer. Every raw opaque token this
  * repository issues (challenge tokens, admin session tokens) is stored as a SHA-256 hash only —
  * callers never persist a raw token. Every challenge/session is additionally bound to the raw
- * underlying `gamemoa_session` token (also stored hashed) so that an expired/rotated/revoked
+ * underlying `owogg_session` token (also stored hashed) so that an expired/rotated/revoked
  * normal session immediately invalidates the elevated admin layer bound to it.
  */
 export interface AdminAuthRepository {
@@ -61,10 +61,10 @@ export interface AdminAuthRepository {
   revokeAdminSession(rawToken: string): Promise<void>;
 
   /** Revokes every admin session bound to a given underlying session token — used when the
-   * normal GAMEMOA session itself is logged out, so no admin session can outlive it. */
+   * normal OwOGG session itself is logged out, so no admin session can outlive it. */
   revokeAdminSessionsForSessionToken(rawSessionToken: string): Promise<void>;
 
-  /** Revokes every admin session for a given GAMEMOA user — used by managed admin account
+  /** Revokes every admin session for a given OwOGG user — used by managed admin account
    * password change/reset/disable so no stale elevated session survives those actions. */
   revokeAllAdminSessionsForUserId(userId: number): Promise<void>;
 

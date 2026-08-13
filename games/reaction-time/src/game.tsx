@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { GameProps } from "@gamemoa/game-sdk";
+import type { GameProps } from "@owogg/game-sdk";
 import {
   type RoundState,
   INITIAL_ROUND_STATE,

@@ -3,7 +3,7 @@ import type {
   RecordCompletionOutcome,
   UserProgress,
   XpLeaderboardEntry,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export class D1ProgressionRepository implements ProgressionRepository {

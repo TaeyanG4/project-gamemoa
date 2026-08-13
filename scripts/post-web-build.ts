@@ -21,7 +21,7 @@ console.log(
   `✅ Deployment Provenance version.json written to ${versionPath} (Commit: ${commitSha})`,
 );
 
-// Inject GAMEMOA favicon / manifest links into the SPA HTML shell so the initial
+// Inject OwOGG favicon / manifest links into the SPA HTML shell so the initial
 // document references the brand icons before client hydration.
 const indexPath = path.join(clientDir, "index.html");
 if (fs.existsSync(indexPath)) {
@@ -36,6 +36,6 @@ if (fs.existsSync(indexPath)) {
   if (!html.includes('rel="manifest"')) {
     html = html.replace(/<head>/, `<head>${faviconLinks}`);
     fs.writeFileSync(indexPath, html, "utf-8");
-    console.log("✅ GAMEMOA favicon links injected into SPA index.html.");
+    console.log("✅ OwOGG favicon links injected into SPA index.html.");
   }
 }

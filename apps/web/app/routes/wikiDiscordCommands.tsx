@@ -3,8 +3,8 @@ import { WikiLayout, WikiCallout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "명령어 | GAMEMOA Wiki" },
-    { name: "description", content: "/gamemoa 슬래시 명령어 전체 안내" },
+    { title: "명령어 | OwOGG Wiki" },
+    { name: "description", content: "/owogg 슬래시 명령어 전체 안내" },
   ];
 }
 
@@ -12,74 +12,74 @@ export function meta() {
 // registered command source of truth. Never document a subcommand that doesn't exist there.
 const COMMANDS = [
   {
-    name: "/gamemoa link",
-    purpose: "이 Discord 계정을 GAMEMOA 계정과 연결합니다.",
+    name: "/owogg link",
+    purpose: "이 Discord 계정을 OwOGG 계정과 연결합니다.",
     where: "서버 채널 또는 DM",
     accountLinkRequired: false,
     guildRequired: false,
     args: "없음",
-    example: "/gamemoa link",
+    example: "/owogg link",
     commonError: "이미 연결되어 있으면 새 링크 대신 안내 메시지만 옵니다.",
   },
   {
-    name: "/gamemoa profile",
-    purpose: "연결된 GAMEMOA 계정의 닉네임, 레벨, 총 XP를 확인합니다.",
+    name: "/owogg profile",
+    purpose: "연결된 OwOGG 계정의 닉네임, 레벨, 총 XP를 확인합니다.",
     where: "서버 채널 또는 DM",
     accountLinkRequired: true,
     guildRequired: false,
     args: "없음",
-    example: "/gamemoa profile",
-    commonError: "계정이 연결되지 않았으면 /gamemoa link 안내가 옵니다.",
+    example: "/owogg profile",
+    commonError: "계정이 연결되지 않았으면 /owogg link 안내가 옵니다.",
   },
   {
-    name: "/gamemoa games",
-    purpose: "현재 GAMEMOA에서 플레이 가능한 게임 목록과 링크를 확인합니다.",
+    name: "/owogg games",
+    purpose: "현재 OwOGG에서 플레이 가능한 게임 목록과 링크를 확인합니다.",
     where: "서버 채널 또는 DM, 로그인 불필요",
     accountLinkRequired: false,
     guildRequired: false,
     args: "없음",
-    example: "/gamemoa games",
+    example: "/owogg games",
     commonError: "없음 (항상 공개적으로 응답)",
   },
   {
-    name: "/gamemoa play",
+    name: "/owogg play",
     purpose: "이 서버에 XP가 귀속되는 1회용 게임 플레이 링크를 발급합니다.",
     where: "등록된 서버 채널",
     accountLinkRequired: true,
     guildRequired: true,
     args: "game (선택) — 특정 게임을 지정, 생략 시 게임 목록으로 이동",
-    example: "/gamemoa play game:reaction-time",
+    example: "/owogg play game:reaction-time",
     commonError:
       "서버가 미등록이거나 계정 미연결 시 안내 메시지가 옵니다. 링크는 15분간 1회만 유효합니다.",
   },
   {
-    name: "/gamemoa rank",
+    name: "/owogg rank",
     purpose: "이 서버 내 나의 순위와 서버 기여 XP를 확인합니다.",
     where: "등록된 서버 채널",
     accountLinkRequired: true,
     guildRequired: true,
     args: "없음",
-    example: "/gamemoa rank",
+    example: "/owogg rank",
     commonError: "계정 미연결 또는 이 서버에서 아직 활동이 없으면 안내 메시지가 옵니다.",
   },
   {
-    name: "/gamemoa leaderboard",
-    purpose: "이 서버의 GAMEMOA XP 리더보드 Top 10을 확인합니다.",
+    name: "/owogg leaderboard",
+    purpose: "이 서버의 OwOGG XP 리더보드 Top 10을 확인합니다.",
     where: "등록된 서버 채널",
     accountLinkRequired: false,
     guildRequired: true,
     args: "없음",
-    example: "/gamemoa leaderboard",
+    example: "/owogg leaderboard",
     commonError: "서버가 미등록이면 안내 메시지가 옵니다.",
   },
   {
-    name: "/gamemoa server",
+    name: "/owogg server",
     purpose: "이 서버의 전체 XP와 주간 활동 요약을 확인합니다.",
     where: "등록된 서버 채널",
     accountLinkRequired: false,
     guildRequired: true,
     args: "없음",
-    example: "/gamemoa server",
+    example: "/owogg server",
     commonError: "서버가 미등록이면 안내 메시지가 옵니다.",
   },
 ] as const;
@@ -89,7 +89,7 @@ export default function WikiDiscordCommandsRoute() {
     <WikiLayout
       eyebrow="DISCORD"
       title="명령어"
-      description="모든 GAMEMOA Discord 명령어는 /gamemoa의 서브커맨드입니다."
+      description="모든 OwOGG Discord 명령어는 /owogg의 서브커맨드입니다."
     >
       <WikiCallout>
         표시된 응답은 명령어를 실행한 사용자에게만 보이는 임시(ephemeral) 메시지입니다 — 채널의 다른

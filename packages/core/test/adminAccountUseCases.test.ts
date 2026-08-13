@@ -172,7 +172,7 @@ test("createAdmin rejects duplicate userId/username/googleSub", async () => {
     () =>
       useCases.createAdmin({
         actorAdminId: superadmin.id,
-        userId: 1, // duplicate GAMEMOA user
+        userId: 1, // duplicate OwOGG user
         googleSub: "sub-x",
         username: "other-name",
         passwordHash: "hash",

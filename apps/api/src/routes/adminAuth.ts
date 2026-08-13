@@ -7,14 +7,14 @@ import {
   AdminMeResponseSchema,
   AdminBootstrapRequestSchema,
   AdminBootstrapResponseSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import {
   ADMIN_AUTH_POLICY,
   isAdminGoogleSub,
   evaluateAdminPasswordPolicy,
   AdminAccountUseCaseFailure,
   type AdminAccountRecord,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
 import { resolveAdminEligibility } from "../auth/adminEligibility.js";
@@ -24,8 +24,8 @@ import { isLocalhost, type ApiEnv } from "./auth.js";
 
 export const adminAuthRouter = new Hono<ApiEnv>();
 
-const ADMIN_STEP_UP_COOKIE = "gamemoa_admin_stepup";
-export const ADMIN_SESSION_COOKIE = "gamemoa_admin_session";
+const ADMIN_STEP_UP_COOKIE = "owogg_admin_stepup";
+export const ADMIN_SESSION_COOKIE = "owogg_admin_session";
 const STEP_UP_MAX_AGE_SECONDS = Math.floor(ADMIN_AUTH_POLICY.STEP_UP_CHALLENGE_TTL_MS / 1000);
 export const ADMIN_SESSION_MAX_AGE_SECONDS = Math.floor(
   ADMIN_AUTH_POLICY.ADMIN_SESSION_TTL_MS / 1000,
@@ -54,7 +54,7 @@ interface EligibleAdmin {
  * used by the step-up/login/bootstrap endpoints themselves, which exist precisely to grant the
  * elevated layer these guard. */
 async function requireEligible(c: Context<ApiEnv>): Promise<Response | EligibleAdmin> {
-  const rawSessionToken = getCookie(c, "gamemoa_session");
+  const rawSessionToken = getCookie(c, "owogg_session");
   if (!rawSessionToken) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
   }
@@ -102,7 +102,7 @@ export function setAdminCookie(
 // GET /api/admin/me — safe state only; never returns ADMIN_USER_IDS/ADMIN_GOOGLE_SUBS/
 // ADMIN_LOGIN_USERNAME/password hash/internal challenge hashes.
 adminAuthRouter.get("/me", async (c) => {
-  const rawSessionToken = getCookie(c, "gamemoa_session");
+  const rawSessionToken = getCookie(c, "owogg_session");
   const notAuthenticated = () =>
     c.json(
       AdminMeResponseSchema.parse({
@@ -183,12 +183,12 @@ adminAuthRouter.post("/auth/google", async (c) => {
   }
 
   // ADMIN_GOOGLE_SUBS is an OPTIONAL extra restriction (break-glass allowlist). When unset, the
-  // primary binding below (this exact sub must already be linked to the current GAMEMOA account
-  // via GAMEMOA's own OAuth linking) is the sole authority — an unset optional allowlist must
+  // primary binding below (this exact sub must already be linked to the current OwOGG account
+  // via OwOGG's own OAuth linking) is the sole authority — an unset optional allowlist must
   // never make an otherwise-valid, DB-managed administrator permanently unable to log in.
   if (c.env.ADMIN_GOOGLE_SUBS && !isAdminGoogleSub(sub, c.env.ADMIN_GOOGLE_SUBS)) return deny();
 
-  // The Google sub must be linked (via GAMEMOA's own OAuth linking) to THIS GAMEMOA account —
+  // The Google sub must be linked (via OwOGG's own OAuth linking) to THIS OwOGG account —
   // never authorized by email/display-name match.
   const { userRepo, adminAuthUseCases } = createContainer(c.env.DB);
   const linkedAccount = await userRepo.findOAuthAccount("google", sub);
@@ -335,7 +335,7 @@ adminAuthRouter.post("/auth/login", async (c) => {
   let mustChangePassword = false;
 
   if (eligible.account) {
-    // This GAMEMOA user already has a managed admin account — it alone governs; never falls
+    // This OwOGG user already has a managed admin account — it alone governs; never falls
     // back to legacy env credentials once a managed account exists for this user.
     const usernameOk = safeStringEqual(parsed.data.username, eligible.account.username);
     const passwordOk = await verifyAdminPassword(

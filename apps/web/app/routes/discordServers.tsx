@@ -6,7 +6,7 @@ import {
   registerDiscordGuild,
   getDiscordRegisterAuthUrl,
 } from "../features/discord/discordGuildApi";
-import type { DiscordGuildDto, DiscordCandidateGuildDto } from "@gamemoa/contracts";
+import type { DiscordGuildDto, DiscordCandidateGuildDto } from "@owogg/contracts";
 import { useI18n } from "../features/i18n/I18nContext";
 
 export default function DiscordServersRoute() {
@@ -388,7 +388,7 @@ export default function DiscordServersRoute() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between pt-3 border-t border-white/5 text-[11px] text-slate-400">
-                  <span>{dict.discordServers.gamemoaServerLabel}</span>
+                  <span>{dict.discordServers.owoggServerLabel}</span>
                   <span className="text-indigo-400 font-medium group-hover:translate-x-0.5 transition-transform">
                     {dict.discordServers.viewPageArrow}
                   </span>

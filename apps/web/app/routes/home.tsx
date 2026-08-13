@@ -11,7 +11,7 @@ import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
-    { title: "gamemoa — 심심할 틈 없이, 게임을 한곳에" },
+    { title: "OwOGG — 심심할 틈 없이, 게임을 한곳에" },
     { name: "description", content: "설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼" },
   ];
 }

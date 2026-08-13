@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import { Buffer } from "node:buffer";
 
 // ---------------------------------------------------------------------------
-// GAMEMOA favicon generator — deterministic, dependency-free.
+// OwOGG favicon generator — deterministic, dependency-free.
 //
 // Canonical source: apps/web/public/favicon.svg (hand-authored).
 // This script rasterises the SAME design — lucide-react's actual Gamepad2 icon
@@ -405,7 +405,7 @@ function main() {
     throw new Error(`Canonical favicon.svg not found at ${SVG_PATH}`);
   }
 
-  console.log("🎨 Generating GAMEMOA favicon variants from favicon.svg ...");
+  console.log("🎨 Generating OwOGG favicon variants from favicon.svg ...");
 
   const png16 = rasterize(16);
   const png32 = rasterize(32);
@@ -436,8 +436,8 @@ function main() {
   );
 
   const manifest = {
-    name: "GAMEMOA",
-    short_name: "GAMEMOA",
+    name: "OwOGG",
+    short_name: "OwOGG",
     description: "설치 없이 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼",
     theme_color: "#6366f1",
     background_color: "#0b0d14",

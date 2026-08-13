@@ -1,5 +1,5 @@
 {
-  "name": "@gamemoa/game-sdk",
+  "name": "@owogg/game-sdk",
   "version": "0.0.1",
   "type": "module",
   "exports": {

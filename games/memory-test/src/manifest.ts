@@ -1,4 +1,4 @@
-import type { GameManifest } from "@gamemoa/game-sdk";
+import type { GameManifest } from "@owogg/game-sdk";
 
 export const memoryTestManifest: GameManifest = {
   id: "memory-test",

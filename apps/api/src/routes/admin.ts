@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { AdminOverviewResponseSchema } from "@gamemoa/contracts";
+import { AdminOverviewResponseSchema } from "@owogg/contracts";
 import { createContainer } from "../container.js";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";

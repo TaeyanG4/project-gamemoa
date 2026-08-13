@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { X, AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import { fetchMergePreview, confirmAccountMerge } from "../../features/auth/authService";
-import type { MergePreview, SocialProvider } from "@gamemoa/contracts";
+import type { MergePreview, SocialProvider } from "@owogg/contracts";
 
 interface MergeModalProps {
   challengeId: string;
@@ -117,7 +117,7 @@ export function MergeModal({ challengeId, onClose, onMerged }: MergeModalProps) 
             <h2 className="text-xl font-extrabold text-text-primary">계정 통합</h2>
           </div>
           <p className="text-xs text-text-secondary">
-            두 개의 GAMEMOA 계정이 각각 존재합니다. 유지할 계정(Primary)을 선택해주세요.
+            두 개의 OwOGG 계정이 각각 존재합니다. 유지할 계정(Primary)을 선택해주세요.
           </p>
         </div>
 

@@ -1,4 +1,4 @@
-# GAMEMOA 작업 진행 현황 (WORK_PROGRESS)
+# OwOGG 작업 진행 현황 (WORK_PROGRESS)
 
 # 현재 목표
 
@@ -32,7 +32,7 @@ G. Discord Bot UX/기능 고도화 (신규, 현재 진행 중)      ← Embed �
 ### Admin 최초 bootstrap 외부 설정 — repository 쪽 차단 요인 해소
 
 - [x] 운영자 승인 하에, 이미 인증되어 있던 `wrangler`(taeyang95@naver.com)로 프로덕션 D1을
-      **읽기 전용**으로 조회해 운영자의 GAMEMOA 사용자 ID(`1`, "Taeyang (G4)", Google·Discord
+      **읽기 전용**으로 조회해 운영자의 OwOGG 사용자 ID(`1`, "Taeyang (G4)", Google·Discord
       모두 연결됨)를 확인했습니다.
 - [x] GitHub Actions Variable `ADMIN_USER_IDS=1`을 설정했습니다(`gh variable set`). 같은 세션의
       배포로 즉시 반영 확인.
@@ -76,10 +76,10 @@ G. Discord Bot UX/기능 고도화 (신규, 현재 진행 중)      ← Embed �
 기능과 완성도를 보완하자" — Wiki 본문 번역 등 남은 i18n 작업은 보류하고, Discord 봇 메시지 UX
 고도화(Embed 전환)로 전환.
 
-### `/gamemoa` 봇 응답 전체 Discord Embed 전환
+### `/owogg` 봇 응답 전체 Discord Embed 전환
 
 - [x] `games`/`link`/`profile`/`play`/`rank`/`leaderboard`/`server` 및 모든 에러/폴백 경로를
-      평문 `content`에서 Discord Embed로 전환. GAMEMOA 브랜드 팔레트(`apps/web/app/app.css`)를
+      평문 `content`에서 Discord Embed로 전환. OwOGG 브랜드 팔레트(`apps/web/app/app.css`)를
       그대로 사용(브랜드 인디고/XP 앰버/서버 퍼플/성공 그린/에러 레드).
 - [x] 썸네일 추가: `/profile`은 호출한 Discord 유저 본인 아바타, `/rank`·`/leaderboard`·`/server`는
       등록된 길드 아이콘.
@@ -92,11 +92,11 @@ G. Discord Bot UX/기능 고도화 (신규, 현재 진행 중)      ← Embed �
 ### 리뷰 패스에서 발견/수정한 실제 버그 (같은 세션, 사용자 요청: "문제 없는지 점검 및 검토")
 
 - [x] **마크다운 마스킹 링크 취약점**: Embed의 `description`/`field.value`는 평문 `content`와
-      달리 `[텍스트](url)` 마스킹 링크를 완전히 렌더링합니다. GAMEMOA 닉네임은 마크다운 특수문자
+      달리 `[텍스트](url)` 마스킹 링크를 완전히 렌더링합니다. OwOGG 닉네임은 마크다운 특수문자
       제한이 없어(`validateNickname`은 길이/제어문자만 검사), 악의적 사용자가 닉네임을
-      `[Free Nitro](evil.example)` 형태로 설정하면 **공개** `/gamemoa leaderboard` 임베드에
+      `[Free Nitro](evil.example)` 형태로 설정하면 **공개** `/owogg leaderboard` 임베드에
       클릭 가능한 피싱 링크가 그대로 노출될 수 있었습니다. `escapeMarkdown()` 헬퍼를 추가해
-      Discord 길드 이름·GAMEMOA 닉네임 등 사용자 제어 문자열을 모든 임베드 삽입 지점에서
+      Discord 길드 이름·OwOGG 닉네임 등 사용자 제어 문자열을 모든 임베드 삽입 지점에서
       이스케이프 처리. 회귀 테스트 2건 추가(공개 리더보드/서버 임베드 각각 마스킹 링크 무력화
       검증).
 - [x] `ranking.tsx` Creator 탭의 플랫폼 필터 pill에 하드코딩된 한국어 `"치지직 (CHZZK)"`/
@@ -111,7 +111,7 @@ G. Discord Bot UX/기능 고도화 (신규, 현재 진행 중)      ← Embed �
 
 ### 검증
 
-- [x] `pnpm --filter @gamemoa/api` 전체 테스트 GREEN(15/15 discord 핸들러 테스트 포함, 신규 보안
+- [x] `pnpm --filter @owogg/api` 전체 테스트 GREEN(15/15 discord 핸들러 테스트 포함, 신규 보안
       회귀 테스트 2건 포함).
 - [x] `pnpm verify` 전체 GREEN.
 
@@ -132,7 +132,7 @@ G. Discord Bot UX/기능 고도화 (신규, 현재 진행 중)      ← Embed �
   웹 엔드포인트를 전혀 거치지 않고** 직접 INSERT(`must_change_password=1`). 운영자 요청("혹시
   모를 버그 있을지 모르니 백그라운드에서 직접 설정")과 일치하는 방식.
 - 부트스트랩·로그인 게이트 코드(`resolveAdminEligibility`, `isAdminUserId`,
-  `isTrustedAdminOrigin`)를 직접 리뷰 — root 세션 + `ADMIN_USER_IDS` + 이 GAMEMOA 계정에 실제
+  `isTrustedAdminOrigin`)를 직접 리뷰 — root 세션 + `ADMIN_USER_IDS` + 이 OwOGG 계정에 실제
   연동된 Google 계정의 신선한(iat 검증) OIDC step-up을 모두 요구하는 구조로, 익명 공격자가 뚫을
   틈은 찾지 못함.
 - 임시 스크립트/SQL 파일은 사용 직후 삭제, `git status` 클린 확인 — 저장소에는 아무 흔적도 남지
@@ -198,7 +198,7 @@ are not supported (requested 210000).
 ## 완료 (같은 세션 — Discord 봇 실사용 준비: 설치 링크/명령어 등록/Interactions Endpoint 진단, 아이콘 통일)
 
 운영자가 `/discord/setup` 가이드를 실제로 따라해보며 3가지 문제를 보고: (1) 1단계 설치 링크가
-안 보임, (2) `/gamemoa` 명령어가 전혀 동작하지 않고 서버 멤버 목록에 봇 자체가 안 보임,
+안 보임, (2) `/owogg` 명령어가 전혀 동작하지 않고 서버 멤버 목록에 봇 자체가 안 보임,
 (3) 명령어를 등록한 뒤에도 "애플리케이션이 응답하지 않았어요" 에러.
 
 ### 1) 설치 링크 + Bot Token 발급 → 테스트 서버에 즉시 명령어 등록
@@ -258,7 +258,7 @@ to-accent-purple` 배지 안의 흰색 `Gamepad2`(게임패드) 아이콘 — �
 ### 검증
 
 - [x] `pnpm verify` 및 강제 재실행 전부 GREEN.
-- [ ] Interactions Endpoint URL 등록 후 `/gamemoa` 명령어 실제 동작 여부 — 다음 세션에서 먼저
+- [ ] Interactions Endpoint URL 등록 후 `/owogg` 명령어 실제 동작 여부 — 다음 세션에서 먼저
       확인.
 - [ ] 새 파비콘/Discord 아이콘이 실제 배포된 프로덕션과 Discord 클라이언트에 반영됐는지 육안
       확인(배포 직후 브라우저/Discord 캐시로 인해 즉시 안 바뀌어 보일 수 있음 — 강력 새로고침
@@ -293,7 +293,7 @@ to-accent-purple` 배지 안의 흰색 `Gamepad2`(게임패드) 아이콘 — �
 컨텍스트 취급) 어떤 순간에든 Header 위로 그려질 수 있었음. `Sidebar`를 `z-30`으로 낮춰 Header가
 항상 우선하도록 수정.
 
-### `/gamemoa profile`에 XP 진행바 추가
+### `/owogg profile`에 XP 진행바 추가
 
 운영자가 Arcane의 rank 카드(레벨/XP/진행바)를 참고 사례로 제시. 실제 이미지 생성(Arcane처럼
 아바타+막대를 합성한 PNG)은 Cloudflare Workers에서 가능은 하지만(`satori`+`@resvg/resvg-wasm`,
@@ -352,8 +352,8 @@ Discord 앱 "인증 자격" 체크리스트가 ToS/Privacy Policy 링크를 요�
 
 ### Phase C: Discord 온보딩 / 명령어 자동화
 
-- [x] `/discord/setup` 신규 라우트: 5단계(설치→계정 연결→서버 등록→`/gamemoa games`→
-      `/gamemoa play`) 안내. 실제로 확인 가능한 상태(계정 연결 여부·관리 서버 수)만 "완료"로
+- [x] `/discord/setup` 신규 라우트: 5단계(설치→계정 연결→서버 등록→`/owogg games`→
+      `/owogg play`) 안내. 실제로 확인 가능한 상태(계정 연결 여부·관리 서버 수)만 "완료"로
       표시하고, 확인 불가한 "설치 완료 여부"는 항상 "직접 확인"으로 정직하게 표시(허위 완료 표시
       금지). `/discord` Hub에 설치 CTA(`DISCORD_INSTALL_URL` 있을 때만)와 설치 가이드 링크 추가.
 - [x] `apps/api/src/infrastructure/discord/commandDrift.ts`: Discord 생성 필드(id/application_id/
@@ -400,7 +400,7 @@ Discord 앱 "인증 자격" 체크리스트가 ToS/Privacy Policy 링크를 요�
 - [x] **저장**: 마이그레이션 `0017_user_locale.sql`(`users.locale`, nullable). `UserRepository`/
       `D1UserRepository`/`D1SessionRepository`에 locale 필드 배선. `ProfileUseCases.updateLocale`
       (닉네임/국가와 달리 쿨다운 없음 — 언어는 즉시 전환). `POST /api/profile/locale` 신규.
-      게스트는 `localStorage`("gamemoa_locale")만 사용.
+      게스트는 `localStorage`("owogg_locale")만 사용.
 - [x] **해석 순서**: 인증 사용자 저장값 → 게스트/현재 `localStorage` → `navigator.languages` 매칭
       → `ko-KR`. 로그인 사용자가 저장된 값이 없으면 현재 로컬 선호도를 1회 채택해 서버에 저장(요구
       사항의 "adopt current preference once" 규칙), 세션당 1회로 제한.
@@ -469,20 +469,20 @@ Actions 기록이 원본입니다.
    말하기 전까지 착수하지 마세요.**
 2. **웹사이트 UI/UX 개선 — 좌우 공간 활용도 (신규, 운영자 피드백)**: 운영자가 Arcane 대시보드
    (`docs.arcane.bot` 스크린샷 — 넓은 폭의 리더보드 테이블 + 우측 정보 패널 구조)를 참고 사례로
-   들며, GAMEMOA 현재 레이아웃이 좌우 공간을 잘 못 쓰고 있다고 지적. 실제 원인: 메인 콘텐츠가
+   들며, OwOGG 현재 레이아웃이 좌우 공간을 잘 못 쓰고 있다고 지적. 실제 원인: 메인 콘텐츠가
    `max-w-7xl`(1280px)로 중앙 정렬되어 있고, 데스크톱 사이드바(`Sidebar.tsx`)는 기본
    `w-16`(64px, hover 시에만 `w-56`으로 확장)이라 — 와이드 모니터(1920px+)에서는 좌우로 큰 빈
    여백이 생기고, 사이드바 자체도 네비게이션 아이콘 몇 개 외에는 세로 공간을 활용하지 않음.
    착수 전에 범위를 먼저 정하는 게 좋습니다(랭킹/게임 목록 등 데이터 밀도 높은 페이지부터 넓히기
    vs. 전체 레이아웃 시스템 재설계 vs. 사이드바에 상시 정보 패널 추가 등) — 운영자에게 우선순위
    확인 후 착수.
-3. **Discord 봇 기능/완성도 보완 (진행 중)** — `/gamemoa profile`에 XP 진행바(▰▰▰▱▱ 62%) 추가
+3. **Discord 봇 기능/완성도 보완 (진행 중)** — `/owogg profile`에 XP 진행바(▰▰▰▱▱ 62%) 추가
    완료. 다음 후보:
-   - `/gamemoa leaderboard`에 주간(weekly) 옵션 추가(`getGuildLeaderboard`는 이미 `period`
+   - `/owogg leaderboard`에 주간(weekly) 옵션 추가(`getGuildLeaderboard`는 이미 `period`
      파라미터를 지원하므로 커맨드 옵션만 추가하면 됨).
-   - `/gamemoa help` 명령어 신설.
-   - `/gamemoa achievements`(도전과제 확인) 신설.
-   - `/gamemoa play game:` 옵션을 정적 `choices`에서 Discord Autocomplete 상호작용으로 전환.
+   - `/owogg help` 명령어 신설.
+   - `/owogg achievements`(도전과제 확인) 신설.
+   - `/owogg play game:` 옵션을 정적 `choices`에서 Discord Autocomplete 상호작용으로 전환.
    - **(큰 작업, 운영자 확인 필요) Arcane 스타일 생성 이미지 랭크 카드**: 아바타+레벨+XP바를
      실제 PNG 이미지로 합성하는 기능. Cloudflare Workers에서 가능은 하지만(`satori`로 JSX→SVG,
      `@resvg/resvg-wasm`으로 SVG→PNG — Vercel OG와 동일한 패턴) **새 의존성 추가 + 폰트 임베딩
@@ -503,7 +503,7 @@ Actions 기록이 원본입니다.
    - [ ] "앱은 팀에 속해 있어야 해요" — Developer Portal에서 Team 생성 후 앱을 이전하는 건 순수
          Discord 쪽 조작이라 운영자가 직접 해야 함. 코딩 세션이 할 수 있는 일 없음.
 5. **외부 설정**: Discord 설치 링크/Bot Token/Interactions Endpoint URL/명령어 등록까지 이번
-   세션에 전부 완료. **Interactions Endpoint URL 저장 후 `/gamemoa` 명령어가 실제로 동작하는지는
+   세션에 전부 완료. **Interactions Endpoint URL 저장 후 `/owogg` 명령어가 실제로 동작하는지는
    아직 운영자 확인 전** — 다음 세션 최우선 확인 사항(위 "0순위" 참고, 최신 상태로 갱신 필요).
 6. **실사용자 E2E 인수 테스트**: Creator 플랫폼 인증, 4개 언어 실환경 확인은 운영자의 실계정
    조작이 필요해 이 세션에서 완결할 수 없었습니다. Discord 봇 명령어는 이번 세션에 상당 부분
@@ -515,7 +515,7 @@ Actions 기록이 원본입니다.
 **0순위(다음 세션 시작 시 가장 먼저 확인)**:
 
 1. Admin 로그인은 이번 세션에 실제 성공까지 확인됨 — 재확인 불필요.
-2. **Discord Interactions Endpoint URL을 운영자가 실제로 등록했는지, 등록 후 `/gamemoa`
+2. **Discord Interactions Endpoint URL을 운영자가 실제로 등록했는지, 등록 후 `/owogg`
    명령어가 정상 동작하는지 확인.** 안 된다면 `wrangler tail --format pretty`로
    `/api/discord/interactions`에 요청이 실제로 들어오는지부터 확인 — 요청 자체가 안 찍히면
    Portal 설정 문제, 요청은 찍히는데 에러가 나면 코드/서명 문제. 이번 세션에서 이미 이 방법으로
@@ -529,7 +529,7 @@ Actions 기록이 원본입니다.
    확인.
 
 이 항목들이 확인되면: 운영자가 지적한 **웹사이트 UI/UX(좌우 공간 활용도)** 개선 범위를 먼저
-확인 후 착수 → Discord 봇 기능/완성도 보완 계속(주간 리더보드 옵션, `/gamemoa help`, Autocomplete
+확인 후 착수 → Discord 봇 기능/완성도 보완 계속(주간 리더보드 옵션, `/owogg help`, Autocomplete
 등, 큰 항목인 생성 이미지 랭크 카드·온라인 상태 표시는 운영자 확인 후에만) → i18n 번역 재개는
 운영자가 명시적으로 요청할 때까지 대기 → 필요 시 Admin 흐름 UI 텍스트(표시 문자열만, 인증/보안
 로직 불변). Admin **로직**은 운영자가 먼저 언급하지 않는 한 건드리지 마세요 — 다만 "운영자가

@@ -10,5 +10,5 @@ test("Discord guide route is registered and has the public usage heading", () =>
     "utf8",
   );
   assert.match(routes, /route\("discord\/guide", "routes\/discordGuide\.tsx"\)/);
-  assert.match(guide, /Discord에서 GAMEMOA 사용하기/);
+  assert.match(guide, /Discord에서 OwOGG 사용하기/);
 });

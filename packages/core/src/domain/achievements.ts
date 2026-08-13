@@ -1,4 +1,4 @@
-// Pure domain data for the GAMEMOA v1 achievement set. Stable, extensible codes —
+// Pure domain data for the OwOGG v1 achievement set. Stable, extensible codes —
 // never rename an existing code, only add new ones.
 
 export const ACHIEVEMENT_CODES = {

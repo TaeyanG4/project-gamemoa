@@ -3,7 +3,7 @@ import {
   CreatorManualReviewActionResponseSchema,
   CreatorManualReviewQueueResponseSchema,
   type CreatorManualReviewActionRequest,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import { apiFetch } from "../../lib/api/client";
 
 export function fetchManualCreatorReviewsApi(limit = 20, offset = 0) {

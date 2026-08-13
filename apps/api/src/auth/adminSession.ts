@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
-import type { AdminAccountRecord } from "@gamemoa/core";
+import type { AdminAccountRecord } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { resolveAdminEligibility } from "./adminEligibility.js";
 import type { ApiEnv } from "../routes/auth.js";
@@ -17,9 +17,9 @@ export interface ElevatedAdmin {
  * Full admin authorization chain for every protected `/api/admin/*` endpoint (GET included —
  * review data is sensitive). ADMIN_USER_IDS alone is never sufficient after this migration:
  *
- *   1. valid GAMEMOA session (gamemoa_session)
+ *   1. valid OwOGG session (owogg_session)
  *   2. session user.id is eligible: ADMIN_USER_IDS (root) OR an ACTIVE managed admin_accounts row
- *   3. a valid, unexpired, unrevoked admin session (gamemoa_admin_session) bound to this exact
+ *   3. a valid, unexpired, unrevoked admin session (owogg_admin_session) bound to this exact
  *      underlying session token
  *   4. (unless `allowPasswordChangeRequired`) the managed account, if any, does not still have a
  *      forced password change pending — sensitive admin functions stay locked until it's cleared
@@ -30,7 +30,7 @@ export async function requireElevatedAdmin(
   c: Context<ApiEnv>,
   options: { allowPasswordChangeRequired?: boolean } = {},
 ): Promise<Response | ElevatedAdmin> {
-  const rawSessionToken = getCookie(c, "gamemoa_session");
+  const rawSessionToken = getCookie(c, "owogg_session");
   if (!rawSessionToken) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
   }
@@ -51,7 +51,7 @@ export async function requireElevatedAdmin(
     return c.json({ error: { code: "FORBIDDEN", message: "관리자 권한이 필요합니다." } }, 403);
   }
 
-  const rawAdminSessionToken = getCookie(c, "gamemoa_admin_session");
+  const rawAdminSessionToken = getCookie(c, "owogg_admin_session");
   const adminSession = await container.adminAuthUseCases.validateAdminSession({
     rawToken: rawAdminSessionToken,
     rawSessionToken,

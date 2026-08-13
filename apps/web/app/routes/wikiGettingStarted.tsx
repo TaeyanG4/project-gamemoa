@@ -3,8 +3,8 @@ import { WikiLayout, WikiCallout, WikiSteps } from "../components/wiki/WikiLayou
 
 export function meta() {
   return [
-    { title: "시작하기 | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA를 처음 사용하는 방법" },
+    { title: "시작하기 | OwOGG Wiki" },
+    { name: "description", content: "OwOGG를 처음 사용하는 방법" },
   ];
 }
 
@@ -20,7 +20,7 @@ export default function WikiGettingStartedRoute() {
         <div className="mt-3">
           <WikiSteps
             steps={[
-              "GAMEMOA 계정으로 로그인합니다 (Google 또는 Discord).",
+              "OwOGG 계정으로 로그인합니다 (Google 또는 Discord).",
               "게임 카탈로그에서 원하는 미니게임을 선택합니다.",
               "게임을 플레이하고 결과를 확인합니다 — 유효한 기록은 자동으로 저장됩니다.",
               "명예의 전당(랭킹)에서 나의 순위와 XP를 확인합니다.",

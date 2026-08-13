@@ -1,5 +1,5 @@
 {
-  "name": "@gamemoa/core",
+  "name": "@owogg/core",
   "version": "0.0.1",
   "type": "module",
   "exports": {
@@ -9,7 +9,7 @@
     }
   },
   "dependencies": {
-    "@gamemoa/game-sdk": "workspace:*"
+    "@owogg/game-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

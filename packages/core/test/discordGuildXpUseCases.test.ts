@@ -505,7 +505,7 @@ test("Phase H1 Invariants & Play Context Tests", async (t) => {
       userId: 1,
     });
 
-    // Create GAMEMOA user 1 linked to discord_user_1
+    // Create OwOGG user 1 linked to discord_user_1
     const user1 = await userRepo.createUser({ nickname: "PlayerOne" });
     await userRepo.linkOAuthAccount({
       userId: user1.id,

@@ -3,15 +3,15 @@ import { useSearchParams, Link } from "react-router";
 import { useAuth } from "../features/auth";
 import { fetchDiscordLinkPreviewApi, confirmDiscordLinkApi } from "../features/discord/api";
 import { ApiClientError } from "../lib/api";
-import type { CreateMergeChallengeResponse } from "@gamemoa/contracts";
+import type { CreateMergeChallengeResponse } from "@owogg/contracts";
 import { MergeModal } from "../components/ui/MergeModal";
 import { Link2, Loader2, CheckCircle2, XCircle, LogIn } from "lucide-react";
 import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
-    { title: "Discord 계정 연동 | gamemoa" },
-    { name: "description", content: "Discord 계정을 GAMEMOA 계정과 연동합니다." },
+    { title: "Discord 계정 연동 | OwOGG" },
+    { name: "description", content: "Discord 계정을 OwOGG 계정과 연동합니다." },
   ];
 }
 
@@ -110,7 +110,7 @@ export default function DiscordLinkPage() {
         <h1 className="text-xl font-black text-text-primary">{dict.discordLink.invalidTitle}</h1>
         <p className="text-sm text-text-secondary">
           {dict.discordLink.invalidBodyPrefix}{" "}
-          <code className="px-1.5 py-0.5 rounded bg-surface text-brand-light">/gamemoa link</code>
+          <code className="px-1.5 py-0.5 rounded bg-surface text-brand-light">/owogg link</code>
           {dict.discordLink.invalidBodySuffix}
         </p>
       </Shell>
@@ -149,7 +149,7 @@ export default function DiscordLinkPage() {
         </h1>
         <p className="text-sm text-text-secondary">
           {dict.discordLink.successBodyPrefix}{" "}
-          <code className="px-1.5 py-0.5 rounded bg-surface">/gamemoa</code>{" "}
+          <code className="px-1.5 py-0.5 rounded bg-surface">/owogg</code>{" "}
           {dict.discordLink.successBodySuffix}
         </p>
         <Link

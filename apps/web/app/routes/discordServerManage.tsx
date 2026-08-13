@@ -5,7 +5,7 @@ import {
   updateDiscordGuild,
   unregisterDiscordGuild,
 } from "../features/discord/discordGuildApi";
-import type { DiscordGuildDto, DiscordGuildVisibility } from "@gamemoa/contracts";
+import type { DiscordGuildDto, DiscordGuildVisibility } from "@owogg/contracts";
 import { useI18n } from "../features/i18n/I18nContext";
 
 export default function DiscordServerManageRoute() {

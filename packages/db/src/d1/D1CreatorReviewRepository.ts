@@ -11,7 +11,7 @@ import type {
   CreatorReviewQueueResult,
   CreatorReviewRepository,
   CreatorReviewType,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 const ACQUISITION_ACTIVE_STATUSES = "'AUTO_REVIEW_PENDING', 'FAILED_RETRYABLE'";

@@ -6,14 +6,14 @@ import {
   ConfirmDiscordLinkRequestSchema,
   ConfirmDiscordLinkResponseSchema,
   CreateMergeChallengeResponseSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer } from "../container.js";
 
 export const discordLinkRouter = new Hono<ApiEnv>();
 
 async function getAuthUserId(c: Context<ApiEnv>): Promise<number | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId || !c.env?.DB) return null;
 
   try {
@@ -54,7 +54,7 @@ discordLinkRouter.get("/link/preview", async (c) => {
     return linkError(
       c,
       "LINK_CHALLENGE_EXPIRED",
-      "연동 링크가 만료되었거나 이미 사용되었습니다. Discord에서 `/gamemoa link`를 다시 실행해주세요.",
+      "연동 링크가 만료되었거나 이미 사용되었습니다. Discord에서 `/owogg link`를 다시 실행해주세요.",
       404,
     );
   }
@@ -66,7 +66,7 @@ discordLinkRouter.get("/link/preview", async (c) => {
   return c.json(validated, 200);
 });
 
-// POST /api/discord/link/confirm — requires an authenticated GAMEMOA session. Reuses
+// POST /api/discord/link/confirm — requires an authenticated OwOGG session. Reuses
 // IdentityUseCases.linkProvider verbatim (same ACCOUNT_ALREADY_LINKED / PROVIDER_ALREADY_LINKED
 // rules and merge-challenge flow as OAuth-based linking) — no parallel merge subsystem.
 discordLinkRouter.post("/link/confirm", async (c) => {
@@ -90,7 +90,7 @@ discordLinkRouter.post("/link/confirm", async (c) => {
     return linkError(
       c,
       "LINK_CHALLENGE_EXPIRED",
-      "연동 링크가 만료되었거나 이미 사용되었습니다. Discord에서 `/gamemoa link`를 다시 실행해주세요.",
+      "연동 링크가 만료되었거나 이미 사용되었습니다. Discord에서 `/owogg link`를 다시 실행해주세요.",
       404,
     );
   }
@@ -121,7 +121,7 @@ discordLinkRouter.post("/link/confirm", async (c) => {
           error: {
             code: "ACCOUNT_ALREADY_LINKED",
             message:
-              "이 Discord 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다. 계정 통합을 진행할 수 있습니다.",
+              "이 Discord 계정은 이미 다른 OwOGG 계정으로 사용 중입니다. 계정 통합을 진행할 수 있습니다.",
           },
           mergeChallenge: validated,
         },

@@ -41,9 +41,9 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
               <Gamepad2 className="w-5 h-5 text-white" />
             </div>
             <span className="font-extrabold text-xl tracking-tight text-text-primary">
-              game
+              OwO
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-accent-purple">
-                moa
+                GG
               </span>
             </span>
           </Link>

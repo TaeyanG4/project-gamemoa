@@ -102,7 +102,7 @@ export class AdminAuthUseCases {
     await this.repo.revokeAdminSession(rawToken);
   }
 
-  /** Called from normal GAMEMOA logout so no admin session can outlive its underlying session. */
+  /** Called from normal OwOGG logout so no admin session can outlive its underlying session. */
   async logoutAllForSession(rawSessionToken: string): Promise<void> {
     await this.repo.revokeAdminSessionsForSessionToken(rawSessionToken);
   }

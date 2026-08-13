@@ -24,7 +24,7 @@ test("create + find round-trip by id/userId/username/googleSub", async () => {
   const created = await repo.create({
     userId: 1,
     googleSub: "sub-1",
-    username: "gamemoa-admin",
+    username: "owogg-admin",
     passwordHash: "pbkdf2_sha256$1$c2FsdA==$aGFzaA==",
     role: "SUPERADMIN",
     mustChangePassword: true,
@@ -39,7 +39,7 @@ test("create + find round-trip by id/userId/username/googleSub", async () => {
 
   assert.deepEqual(await repo.findById(created.id), created);
   assert.deepEqual(await repo.findByUserId(1), created);
-  assert.deepEqual(await repo.findByUsername("gamemoa-admin"), created);
+  assert.deepEqual(await repo.findByUsername("owogg-admin"), created);
   assert.deepEqual(await repo.findByGoogleSub("sub-1"), created);
   assert.equal(await repo.findByUserId(999), null);
 });

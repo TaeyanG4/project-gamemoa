@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import type { GameProps } from "@gamemoa/game-sdk";
+import type { GameProps } from "@owogg/game-sdk";
 import {
   getRandomPassage,
   calculateTypingResult,

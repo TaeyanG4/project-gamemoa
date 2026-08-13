@@ -27,7 +27,7 @@ test("validateVanitySlug rejects reserved slugs", () => {
   assert.equal(validateVanitySlug("admin").valid, false);
   assert.equal(validateVanitySlug("api").valid, false);
   assert.equal(validateVanitySlug("link").valid, false);
-  assert.equal(validateVanitySlug("gamemoa").valid, false);
+  assert.equal(validateVanitySlug("owogg").valid, false);
 });
 
 test("hasGuildManagementPermission accurately evaluates permissions bitfield and owner state", () => {

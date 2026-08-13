@@ -13,12 +13,12 @@ export function Footer() {
           <Link to="/" className="flex items-center gap-2 group">
             <Gamepad2 className="w-5 h-5 text-brand" />
             <span className="font-bold text-lg tracking-tight text-text-primary">
-              game<span className="text-brand">moa</span>
+              OwO<span className="text-brand">GG</span>
             </span>
           </Link>
           <p className="text-xs text-text-muted">{dict.footer.tagline}</p>
           <p className="text-xs text-text-muted">
-            &copy; {new Date().getFullYear()} gamemoa. {dict.footer.rightsReserved}
+            &copy; {new Date().getFullYear()} OwOGG. {dict.footer.rightsReserved}
           </p>
         </div>
 

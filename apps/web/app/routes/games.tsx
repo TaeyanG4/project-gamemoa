@@ -10,7 +10,7 @@ import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
-    { title: "전체 미니게임 목록 | gamemoa" },
+    { title: "전체 미니게임 목록 | OwOGG" },
     { name: "description", content: "설치 없는 모든 웹 미니게임을 한 곳에서 탐색하고 즐기세요." },
   ];
 }

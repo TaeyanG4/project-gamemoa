@@ -9,7 +9,7 @@ import {
 test("evaluateAdminPasswordPolicy: rejects passwords shorter than the minimum length", () => {
   const result = evaluateAdminPasswordPolicy({
     newPassword: "short1234567".slice(0, ADMIN_ACCOUNT_POLICY.MIN_PASSWORD_LENGTH - 1),
-    username: "gamemoa-admin",
+    username: "owogg-admin",
     matchesCurrentPassword: false,
   });
   assert.deepEqual(result, { ok: false, reason: "TOO_SHORT" });
@@ -18,7 +18,7 @@ test("evaluateAdminPasswordPolicy: rejects passwords shorter than the minimum le
 test("evaluateAdminPasswordPolicy: accepts a 12+ character password with no composition rules", () => {
   const result = evaluateAdminPasswordPolicy({
     newPassword: "all lowercase long enough",
-    username: "gamemoa-admin",
+    username: "owogg-admin",
     matchesCurrentPassword: false,
   });
   assert.deepEqual(result, { ok: true });
@@ -26,8 +26,8 @@ test("evaluateAdminPasswordPolicy: accepts a 12+ character password with no comp
 
 test("evaluateAdminPasswordPolicy: rejects a password identical to the username", () => {
   const result = evaluateAdminPasswordPolicy({
-    newPassword: "GamemoaAdmin1234",
-    username: "GamemoaAdmin1234",
+    newPassword: "OwoggAdmin1234",
+    username: "OwoggAdmin1234",
     matchesCurrentPassword: false,
   });
   assert.deepEqual(result, { ok: false, reason: "SAME_AS_USERNAME" });
@@ -40,7 +40,7 @@ test(
   () => {
     const result = evaluateAdminPasswordPolicy({
       newPassword: "whatever-the-current-password-is",
-      username: "gamemoa-admin",
+      username: "owogg-admin",
       matchesCurrentPassword: true,
     });
     assert.deepEqual(result, { ok: false, reason: "SAME_AS_CURRENT" });
@@ -50,14 +50,14 @@ test(
 test("evaluateAdminPasswordPolicy: rejects passwords over the maximum length", () => {
   const result = evaluateAdminPasswordPolicy({
     newPassword: "a".repeat(ADMIN_ACCOUNT_POLICY.MAX_PASSWORD_LENGTH + 1),
-    username: "gamemoa-admin",
+    username: "owogg-admin",
     matchesCurrentPassword: false,
   });
   assert.deepEqual(result, { ok: false, reason: "TOO_LONG" });
 });
 
 test("isValidAdminUsername: accepts alnum/._- within length bounds, rejects everything else", () => {
-  assert.equal(isValidAdminUsername("gamemoa-admin_1"), true);
+  assert.equal(isValidAdminUsername("owogg-admin_1"), true);
   assert.equal(isValidAdminUsername("ab"), false); // too short
   assert.equal(isValidAdminUsername("a".repeat(65)), false); // too long
   assert.equal(isValidAdminUsername("admin user"), false); // whitespace

@@ -76,7 +76,7 @@ function checkCorePureness(coreSrcDir: string) {
     "localStorage.",
     "fetch(",
     "import.meta.env",
-    "gamemoa.workers.dev",
+    "owogg.workers.dev",
   ];
 
   const scan = (dir: string) => {
@@ -131,31 +131,31 @@ function checkDbDecoupling(dbSrcDir: string) {
 
 console.log("🔍 Checking Architecture Layer Boundaries...");
 
-// Rule 1: packages/core MUST NOT import hono, react, @cloudflare/*, @gamemoa/db
+// Rule 1: packages/core MUST NOT import hono, react, @cloudflare/*, @owogg/db
 scanDir(
   path.join(rootDir, "packages", "core", "src"),
-  ["hono", "react", "react-dom", "@cloudflare/workers-types", "@gamemoa/db"],
+  ["hono", "react", "react-dom", "@cloudflare/workers-types", "@owogg/db"],
   "packages/core must remain pure domain/application logic without infrastructure or framework dependencies",
 );
 
-// Rule 2: packages/contracts MUST NOT import react, hono, @gamemoa/db
+// Rule 2: packages/contracts MUST NOT import react, hono, @owogg/db
 scanDir(
   path.join(rootDir, "packages", "contracts", "src"),
-  ["react", "react-dom", "hono", "@gamemoa/db", "@cloudflare/workers-types"],
+  ["react", "react-dom", "hono", "@owogg/db", "@cloudflare/workers-types"],
   "packages/contracts must only contain pure TypeScript types and Zod schemas",
 );
 
-// Rule 3: apps/web MUST NOT import @gamemoa/db or @gamemoa/auth
+// Rule 3: apps/web MUST NOT import @owogg/db or @owogg/auth
 scanDir(
   path.join(rootDir, "apps", "web", "app"),
-  ["@gamemoa/db", "@gamemoa/auth"],
+  ["@owogg/db", "@owogg/auth"],
   "apps/web must not import database adapters or legacy auth package directly",
 );
 
-// Rule 4: games/* MUST NOT import @gamemoa/db or hono
+// Rule 4: games/* MUST NOT import @owogg/db or hono
 scanDir(
   path.join(rootDir, "games"),
-  ["@gamemoa/db", "hono"],
+  ["@owogg/db", "hono"],
   "games/* packages must not depend on database or backend HTTP framework",
 );
 
@@ -166,10 +166,10 @@ scanDir(
   "apps/api routes must use dependency injection container (Composition Root)",
 );
 
-// Rule 6: apps/web package.json MUST NOT depend on @gamemoa/db or @gamemoa/auth
+// Rule 6: apps/web package.json MUST NOT depend on @owogg/db or @owogg/auth
 checkPackageJson(
   path.join(rootDir, "apps", "web", "package.json"),
-  ["@gamemoa/db", "@gamemoa/auth"],
+  ["@owogg/db", "@owogg/auth"],
   "apps/web package.json must not list database or legacy auth as dependencies",
 );
 

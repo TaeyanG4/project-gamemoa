@@ -1,4 +1,4 @@
-import type { PersonalizationRepository } from "@gamemoa/core";
+import type { PersonalizationRepository } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export class D1PersonalizationRepository implements PersonalizationRepository {

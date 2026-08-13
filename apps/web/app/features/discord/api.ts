@@ -5,7 +5,7 @@ import {
   type ConfirmDiscordLinkResponse,
   DiscordBotStatusResponseSchema,
   type DiscordBotStatusResponse,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import { apiFetch } from "../../lib/api";
 
 export async function fetchDiscordLinkPreviewApi(

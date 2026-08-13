@@ -71,7 +71,7 @@ export function evaluateAdminPasswordPolicy(
   return { ok: true };
 }
 
-/** A managed administrator account is only ever created for a GAMEMOA user who already has a
+/** A managed administrator account is only ever created for a OwOGG user who already has a
  * Google identity linked — never a freestanding credential. */
 export function isValidAdminUsername(username: string): boolean {
   const trimmed = username.trim();

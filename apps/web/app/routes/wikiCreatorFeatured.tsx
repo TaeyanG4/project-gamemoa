@@ -2,8 +2,8 @@ import { WikiLayout, WikiCallout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "Featured Creator | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA Featured Creator 자격 기준 안내" },
+    { title: "Featured Creator | OwOGG Wiki" },
+    { name: "description", content: "OwOGG Featured Creator 자격 기준 안내" },
   ];
 }
 
@@ -12,7 +12,7 @@ export default function WikiCreatorFeaturedRoute() {
     <WikiLayout
       eyebrow="CREATOR"
       title="Featured Creator"
-      description="Featured는 GAMEMOA 기준 공개 채널 지표로 심사하는 표시·필터링 전용 배지입니다."
+      description="Featured는 OwOGG 기준 공개 채널 지표로 심사하는 표시·필터링 전용 배지입니다."
     >
       <section>
         <h2 className="text-lg font-black text-text-primary">개념 구분</h2>
@@ -22,7 +22,7 @@ export default function WikiCreatorFeaturedRoute() {
             상태.
           </li>
           <li>
-            <b className="text-text-primary">Featured Creator</b> — Creator 중에서 GAMEMOA
+            <b className="text-text-primary">Featured Creator</b> — Creator 중에서 OwOGG
             기준(구독자/팔로워, 채널 개설 기간 등 공개 지표)을 충족해 자동/수동 심사를 통과한 상태.
           </li>
         </ul>

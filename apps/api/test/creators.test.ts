@@ -90,7 +90,7 @@ test("GET /api/creators/verify/:platform returns unconfigured error when provide
   const res = await app.request(
     "/api/creators/verify/youtube",
     {
-      headers: { Cookie: "gamemoa_session=valid_session" },
+      headers: { Cookie: "owogg_session=valid_session" },
     },
     mockEnv as any,
   );
@@ -109,14 +109,14 @@ test("GET /api/creators/verify/:platform initiates OAuth redirect when provider 
   const res = await app.request(
     "/api/creators/verify/youtube",
     {
-      headers: { Cookie: "gamemoa_session=valid_session" },
+      headers: { Cookie: "owogg_session=valid_session" },
     },
     mockEnv as any,
   );
 
   assert.equal(res.status, 302);
   const location = res.headers.get("location");
-  assert.ok(location?.includes("https://mock.gamemoa.dev/auth/YOUTUBE"));
+  assert.ok(location?.includes("https://mock.owogg.dev/auth/YOUTUBE"));
   assert.ok(location?.includes("state="));
 
   const setCookie = res.headers.get("set-cookie");
@@ -265,7 +265,7 @@ test("GET /api/creators/me returns featuredReview and platform account metrics w
 
   const res = await app.request(
     "/api/creators/me",
-    { headers: { Cookie: "gamemoa_session=valid_session" } },
+    { headers: { Cookie: "owogg_session=valid_session" } },
     mockEnv as any,
   );
   assert.equal(res.status, 200);

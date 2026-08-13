@@ -13,8 +13,8 @@ const GOOGLE_JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs";
 const CLIENT_ID = "test-google-client-id.apps.googleusercontent.com";
 const ADMIN_GOOGLE_SUB = "admin-google-sub-1";
 const ADMIN_USER_ID = 1;
-const GAMEMOA_SESSION_RAW = "e2e_valid_session_token";
-const ADMIN_USERNAME = "gamemoa-admin";
+const OWOGG_SESSION_RAW = "e2e_valid_session_token";
+const ADMIN_USERNAME = "owogg-admin";
 const ADMIN_PASSWORD = "correct-horse-battery-staple";
 // Synthetic local-SQLite fixture values only — never real credentials, never used against any
 // real deployment. Named constants (not inline literals) so nothing here reads as an actual
@@ -243,7 +243,7 @@ async function seedFixtures(raw: import("node:sqlite").DatabaseSync) {
     .run(ADMIN_USER_ID, "AdminUser", now, now);
   raw
     .prepare(`INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)`)
-    .run(GAMEMOA_SESSION_RAW, ADMIN_USER_ID, now, expires);
+    .run(OWOGG_SESSION_RAW, ADMIN_USER_ID, now, expires);
   raw
     .prepare(
       `INSERT INTO oauth_accounts (user_id, provider, provider_user_id, provider_email, created_at) VALUES (?, 'google', ?, ?, ?)`,
@@ -288,7 +288,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
 
   try {
     const { env } = await setup();
-    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
 
     // Before any step-up: eligible, not admin-authenticated.
     const meBefore = await app.request(
@@ -323,7 +323,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
     );
     assert.equal(stepUpRes.status, 200);
     assert.deepEqual(await stepUpRes.json(), { stepUpVerified: true });
-    const stepUpCookie = extractCookie(stepUpRes, "gamemoa_admin_stepup");
+    const stepUpCookie = extractCookie(stepUpRes, "owogg_admin_stepup");
     assert.ok(stepUpCookie, "step-up cookie must be set");
 
     // Step 2: admin username/password login.
@@ -332,7 +332,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       {
         method: "POST",
         headers: {
-          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+          Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -345,13 +345,13 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       adminAuthenticated: true,
       mustChangePassword: false,
     });
-    const adminSessionCookie = extractCookie(loginRes, "gamemoa_admin_session");
+    const adminSessionCookie = extractCookie(loginRes, "owogg_admin_session");
     assert.ok(adminSessionCookie, "admin session cookie must be set");
 
     // Now elevated.
     const meAfter = await app.request(
       "/api/admin/me",
-      { headers: { Cookie: `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}` } },
+      { headers: { Cookie: `${sessionCookie}; owogg_admin_session=${adminSessionCookie}` } },
       env as any,
     );
     assert.deepEqual(await meAfter.json(), {
@@ -367,7 +367,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
     // Protected admin endpoint now succeeds.
     const overview = await app.request(
       "/api/admin/overview",
-      { headers: { Cookie: `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}` } },
+      { headers: { Cookie: `${sessionCookie}; owogg_admin_session=${adminSessionCookie}` } },
       env as any,
     );
     assert.equal(overview.status, 200);
@@ -378,7 +378,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       {
         method: "POST",
         headers: {
-          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+          Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -394,7 +394,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       {
         method: "POST",
         headers: {
-          Cookie: `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}`,
+          Cookie: `${sessionCookie}; owogg_admin_session=${adminSessionCookie}`,
           Origin: "http://localhost:5173",
         },
       },
@@ -404,7 +404,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
 
     const afterLogout = await app.request(
       "/api/admin/overview",
-      { headers: { Cookie: `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}` } },
+      { headers: { Cookie: `${sessionCookie}; owogg_admin_session=${adminSessionCookie}` } },
       env as any,
     );
     assert.equal(afterLogout.status, 403);
@@ -416,7 +416,7 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
 test("login without completing step-up first is denied (403), never bypasses to a session", async () => {
   clearGoogleJwksCache();
   const { env } = await setup();
-  const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+  const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
 
   const res = await app.request(
     "/api/admin/auth/login",
@@ -441,7 +441,7 @@ test("Google step-up: sub not in ADMIN_GOOGLE_SUBS is denied even for an eligibl
   jwks.install();
   try {
     const { env } = await setup();
-    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
     const idToken = buildJwt(privateKey, freshGooglePayload({ sub: "some-other-sub" }));
 
     const res = await app.request(
@@ -470,7 +470,7 @@ test("Google step-up: stale token (old iat) is rejected even though still crypto
   jwks.install();
   try {
     const { env } = await setup();
-    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
     const staleIat = Math.floor(Date.now() / 1000) - 600; // 10 minutes ago
     const idToken = buildJwt(privateKey, freshGooglePayload({ iat: staleIat }));
 
@@ -500,7 +500,7 @@ test("admin login: wrong password after valid step-up is rate-limited after 5 fa
   jwks.install();
   try {
     const { env } = await setup();
-    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
 
     for (let i = 0; i < 5; i++) {
       const idToken = buildJwt(privateKey, freshGooglePayload());
@@ -517,14 +517,14 @@ test("admin login: wrong password after valid step-up is rate-limited after 5 fa
         },
         env as any,
       );
-      const stepUpCookie = extractCookie(stepUpRes, "gamemoa_admin_stepup");
+      const stepUpCookie = extractCookie(stepUpRes, "owogg_admin_stepup");
 
       const loginRes = await app.request(
         "/api/admin/auth/login",
         {
           method: "POST",
           headers: {
-            Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+            Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
             "Content-Type": "application/json",
             Origin: "http://localhost:5173",
           },
@@ -550,14 +550,14 @@ test("admin login: wrong password after valid step-up is rate-limited after 5 fa
       },
       env as any,
     );
-    const stepUpCookie = extractCookie(stepUpRes, "gamemoa_admin_stepup");
+    const stepUpCookie = extractCookie(stepUpRes, "owogg_admin_stepup");
 
     const lockedRes = await app.request(
       "/api/admin/auth/login",
       {
         method: "POST",
         headers: {
-          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+          Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -579,7 +579,7 @@ test("ADMIN_USER_IDS removed after an admin session was already issued is immedi
   jwks.install();
   try {
     const { env } = await setup();
-    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
     const idToken = buildJwt(privateKey, freshGooglePayload());
     const stepUpRes = await app.request(
       "/api/admin/auth/google",
@@ -594,13 +594,13 @@ test("ADMIN_USER_IDS removed after an admin session was already issued is immedi
       },
       env as any,
     );
-    const stepUpCookie = extractCookie(stepUpRes, "gamemoa_admin_stepup");
+    const stepUpCookie = extractCookie(stepUpRes, "owogg_admin_stepup");
     const loginRes = await app.request(
       "/api/admin/auth/login",
       {
         method: "POST",
         headers: {
-          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+          Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -608,14 +608,14 @@ test("ADMIN_USER_IDS removed after an admin session was already issued is immedi
       },
       env as any,
     );
-    const adminSessionCookie = extractCookie(loginRes, "gamemoa_admin_session");
+    const adminSessionCookie = extractCookie(loginRes, "owogg_admin_session");
 
     // Operator removes this user from ADMIN_USER_IDS — the still-unexpired admin session cookie
     // must no longer grant access.
     const envWithoutAdmin = { ...env, ADMIN_USER_IDS: "" };
     const res = await app.request(
       "/api/admin/overview",
-      { headers: { Cookie: `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}` } },
+      { headers: { Cookie: `${sessionCookie}; owogg_admin_session=${adminSessionCookie}` } },
       envWithoutAdmin as any,
     );
     assert.equal(res.status, 403);
@@ -648,7 +648,7 @@ async function googleStepUp(
     },
     env as any,
   );
-  return { res, stepUpCookie: extractCookie(res, "gamemoa_admin_stepup") };
+  return { res, stepUpCookie: extractCookie(res, "owogg_admin_stepup") };
 }
 
 test("Google step-up: unset ADMIN_GOOGLE_SUBS (optional allowlist) never blocks an otherwise-linked eligible user", async () => {
@@ -660,7 +660,7 @@ test("Google step-up: unset ADMIN_GOOGLE_SUBS (optional allowlist) never blocks 
     const { env } = await setup();
     const envWithoutAllowlist: Record<string, unknown> = { ...(env as Record<string, unknown>) };
     delete envWithoutAllowlist.ADMIN_GOOGLE_SUBS;
-    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
     const { res } = await googleStepUp(envWithoutAllowlist, privateKey, sessionCookie);
     assert.equal(res.status, 200);
   } finally {
@@ -675,7 +675,7 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
   jwks.install();
   try {
     const { env } = await setup();
-    const sessionCookie = `gamemoa_session=${GAMEMOA_SESSION_RAW}`;
+    const sessionCookie = `owogg_session=${OWOGG_SESSION_RAW}`;
 
     // Root-eligible + no admin account exists anywhere yet -> bootstrapAvailable.
     const meBeforeBootstrap = await app.request(
@@ -693,7 +693,7 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
       {
         method: "POST",
         headers: {
-          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${stepUpCookie}`,
+          Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -710,9 +710,9 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
       adminAuthenticated: true,
       mustChangePassword: true,
     });
-    const adminSessionCookie = extractCookie(bootstrapRes, "gamemoa_admin_session");
+    const adminSessionCookie = extractCookie(bootstrapRes, "owogg_admin_session");
     assert.ok(adminSessionCookie);
-    const authedCookie = `${sessionCookie}; gamemoa_admin_session=${adminSessionCookie}`;
+    const authedCookie = `${sessionCookie}; owogg_admin_session=${adminSessionCookie}`;
 
     // /me now reports SUPERADMIN + mustChangePassword, and bootstrap is no longer available.
     const meAfter = await app.request(
@@ -802,9 +802,9 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
     assert.deepEqual(await changeRes.json(), { success: true });
     // Password change rotates the admin session cleanly — a fresh cookie is issued so the caller
     // is never logged out by their own password change.
-    const rotatedAdminSessionCookie = extractCookie(changeRes, "gamemoa_admin_session");
+    const rotatedAdminSessionCookie = extractCookie(changeRes, "owogg_admin_session");
     assert.ok(rotatedAdminSessionCookie);
-    const rotatedCookie = `${sessionCookie}; gamemoa_admin_session=${rotatedAdminSessionCookie}`;
+    const rotatedCookie = `${sessionCookie}; owogg_admin_session=${rotatedAdminSessionCookie}`;
 
     const meFinal = await app.request(
       "/api/admin/me",
@@ -829,7 +829,7 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
       {
         method: "POST",
         headers: {
-          Cookie: `${sessionCookie}; gamemoa_admin_stepup=${secondStepUpCookie}`,
+          Cookie: `${sessionCookie}; owogg_admin_stepup=${secondStepUpCookie}`,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },

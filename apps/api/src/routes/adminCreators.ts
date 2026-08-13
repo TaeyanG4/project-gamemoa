@@ -3,8 +3,8 @@ import {
   CreatorManualReviewActionRequestSchema,
   AdminPaginationQuerySchema,
   type CreatorManualReviewAction,
-} from "@gamemoa/contracts";
-import type { CreatorManualReviewItem, CreatorReviewAuditLog } from "@gamemoa/core";
+} from "@owogg/contracts";
+import type { CreatorManualReviewItem, CreatorReviewAuditLog } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
 import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";

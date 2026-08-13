@@ -3,8 +3,8 @@ import { WikiLayout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "게임과 랭킹 | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA 게임 카탈로그, 랭킹, XP 개요" },
+    { title: "게임과 랭킹 | OwOGG Wiki" },
+    { name: "description", content: "OwOGG 게임 카탈로그, 랭킹, XP 개요" },
   ];
 }
 
@@ -13,7 +13,7 @@ export default function WikiGamesRoute() {
     <WikiLayout
       eyebrow="GAMES"
       title="게임과 랭킹 개요"
-      description="GAMEMOA는 반응속도, 순서 기억력, 에임, 타자 속도 등 미니게임 카탈로그를 제공합니다."
+      description="OwOGG는 반응속도, 순서 기억력, 에임, 타자 속도 등 미니게임 카탈로그를 제공합니다."
     >
       <p>
         각 게임은 독립적인 규칙과 점수 방식을 가지며, 유효한 기록은 자동으로 랭킹에 반영됩니다.

@@ -4,14 +4,14 @@ import { getCookie } from "hono/cookie";
 import {
   ImportGuestPersonalizationRequestSchema,
   PersonalizationStateSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer, evaluateAchievementsForUser } from "../container.js";
 
 export const personalizationRouter = new Hono<ApiEnv>();
 
 async function getAuthUser(c: Context<ApiEnv>) {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId) return null;
 
   if (!c.env?.DB) return null;

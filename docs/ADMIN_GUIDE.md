@@ -1,38 +1,38 @@
-# GAMEMOA 관리자 센터 운영 가이드
+# OwOGG 관리자 센터 운영 가이드
 
-이 문서는 GAMEMOA 관리자 센터(`/admin`)의 다층 인증 모델, 관리형 관리자 계정, bootstrap 절차,
+이 문서는 OwOGG 관리자 센터(`/admin`)의 다층 인증 모델, 관리형 관리자 계정, bootstrap 절차,
 Creator 수동 심사와 보안 점검 방법을 설명합니다.
 
 ## 1. 관리자 권한 모델 (다층 방어 + 관리형 계정)
 
 관리자 권한은 두 층으로 구성됩니다.
 
-- **root/break-glass 자격**: `ADMIN_USER_IDS`(GitHub Actions Variable, 쉼표 구분 GAMEMOA
+- **root/break-glass 자격**: `ADMIN_USER_IDS`(GitHub Actions Variable, 쉼표 구분 OwOGG
   사용자 ID). 최초 관리자를 bootstrap하거나, 관리형 계정 시스템에 문제가 생겼을 때의 비상 경로로
   영구히 유지됩니다.
-- **관리형 자격**: D1 `admin_accounts` 테이블에 `status='ACTIVE'`인 행이 있는 GAMEMOA 사용자.
+- **관리형 자격**: D1 `admin_accounts` 테이블에 `status='ACTIVE'`인 행이 있는 OwOGG 사용자.
   최초 관리자가 bootstrap된 이후, **새 관리자를 추가할 때 더 이상 `ADMIN_USER_IDS`를 편집할 필요가
   없습니다** — SUPERADMIN이 `/admin/accounts`에서 추가합니다.
 
 두 자격은 OR 조건입니다(`ADMIN_USER_IDS` 포함 **또는** 활성 관리형 계정 보유 시 자격 있음). 어느
 쪽으로 자격을 얻었든, 실제 관리자 기능을 사용하려면 아래 단계를 모두 통과해야 합니다.
 
-1. 유효한 GAMEMOA 로그인 세션 (`gamemoa_session`)
+1. 유효한 OwOGG 로그인 세션 (`owogg_session`)
 2. 위 두 자격 중 하나
 3. **신선한(fresh) Google 계정 본인 확인** — 평소 로그인 세션 재사용이 아닌, 그 자리에서 새로 발급된
    Google ID Token(발급 5분 이내). Google 계정 선택 화면에 표시되는 이름/이메일은 어떤 단계에서도
    권한 판단에 사용하지 않습니다 — 오직 서명된 토큰의 canonical `sub`만 사용합니다.
-4. Google 토큰의 `sub`가 **현재 GAMEMOA 계정에 실제로 연결된** `oauth_accounts`(google) 행과
+4. Google 토큰의 `sub`가 **현재 OwOGG 계정에 실제로 연결된** `oauth_accounts`(google) 행과
    일치. `ADMIN_GOOGLE_SUBS`가 설정되어 있으면 추가로 그 허용 목록에도 포함되어야 합니다(§5 참고).
 5. **관리자 전용 아이디/비밀번호** 로그인 성공(관리형 계정 또는 §6의 레거시 브리지)
 
-5단계를 모두 통과해야 짧은 수명의 **관리자 세션**(`gamemoa_admin_session`)이 발급되며, 이 세션이
+5단계를 모두 통과해야 짧은 수명의 **관리자 세션**(`owogg_admin_session`)이 발급되며, 이 세션이
 있어야만 `/api/admin/*` 보호 엔드포인트(GET 포함)를 사용할 수 있습니다. 이메일, 닉네임, Discord 계정,
 Creator/Featured 상태, 길드 소유권은 어떤 단계에서도 관리자 근거로 사용하지 않습니다.
 
-## 2. 자신의 GAMEMOA 사용자 ID 확인 (최초 bootstrap에만 필요)
+## 2. 자신의 OwOGG 사용자 ID 확인 (최초 bootstrap에만 필요)
 
-1. 자신의 GAMEMOA 계정으로 로그인합니다.
+1. 자신의 OwOGG 계정으로 로그인합니다.
 2. 같은 브라우저에서 `GET /api/auth/me`를 호출하거나 브라우저 개발자 도구의 Network 응답을 확인합니다.
 3. 인증된 본인 응답의 `user.id` 숫자를 확인합니다.
 4. 그 숫자를 기록하되 채팅, 이슈, 로그에 불필요하게 공유하지 않습니다.
@@ -46,7 +46,7 @@ Creator/Featured 상태, 길드 소유권은 어떤 단계에서도 관리자 �
 시스템 전체에 활성 관리자 계정이 **0개**일 때만 가능한 1회성 절차입니다.
 
 1. `Settings → Secrets and variables → Actions → Variables`에서 `ADMIN_USER_IDS`에 본인의
-   GAMEMOA 숫자 사용자 ID(§2)를 등록하고, `main` 배포가 성공했는지 확인합니다.
+   OwOGG 숫자 사용자 ID(§2)를 등록하고, `main` 배포가 성공했는지 확인합니다.
 2. `/admin`에 방문합니다. root 자격이 확인되면 **Step 1: Google 본인 확인**이 나타납니다 — 실제로
    보이는 Google 버튼을 직접 클릭합니다(숨겨진 버튼을 프로그램적으로 클릭하는 방식이 아닙니다).
 3. Google 본인 확인이 성공하고, 시스템에 관리자 계정이 아직 없으면 **"초기 관리자 설정"** 폼이
@@ -67,7 +67,7 @@ bootstrap 비밀번호는 어떤 형태로도 소스 코드, 마이그레이션,
 SUPERADMIN은 `/admin/accounts`에서 새 관리자를 추가합니다. **GitHub Secret/Variable 편집이
 필요 없습니다.**
 
-- 대상은 **이미 존재하는 GAMEMOA 사용자**여야 하고, 그 사용자는 **이미 Google 계정이 연결되어
+- 대상은 **이미 존재하는 OwOGG 사용자**여야 하고, 그 사용자는 **이미 Google 계정이 연결되어
   있어야** 합니다(관리자 계정 생성 시 Google 계정을 새로 연결시키지 않습니다).
 - Google `sub`는 그 사용자의 기존 `oauth_accounts` 행에서 서버가 자동으로 가져옵니다. 수동으로
   임의의 `sub` 문자열을 입력하는 경로는 없습니다.
@@ -89,7 +89,7 @@ SUPERADMIN은 `/admin/accounts`에서 새 관리자를 추가합니다. **GitHub
 
 - **설정된 경우**: Google Step-Up 시 해당 `sub`가 이 목록에도 포함되어야 합니다(추가 break-glass
   제한).
-- **설정되지 않은 경우**: 이 검사를 건너뛰고, "현재 GAMEMOA 계정에 실제로 연결된 Google
+- **설정되지 않은 경우**: 이 검사를 건너뛰고, "현재 OwOGG 계정에 실제로 연결된 Google
   oauth_account"라는 1차 바인딩만으로 로그인이 항상 가능합니다. 즉 **미설정 상태가 정상적인
   DB 관리형 관리자를 영구히 막지 않습니다.**
 
@@ -147,11 +147,11 @@ stepUpRequired, bootstrapAvailable, mustChangePassword, role }`만 반환.
 
 - 성공적인 Google 본인 확인은 5분 수명의 1회용 step-up challenge를 발급합니다(해시만 DB 저장).
 - 성공적인 관리자 로그인/bootstrap/비밀번호 변경은 30분 절대 수명의 관리자 세션
-  (`gamemoa_admin_session`)을 발급합니다(해시만 DB 저장, HttpOnly, 프로덕션 Secure,
+  (`owogg_admin_session`)을 발급합니다(해시만 DB 저장, HttpOnly, 프로덕션 Secure,
   SameSite=None).
-- 관리자 세션은 발급 당시의 `gamemoa_session` 원본 토큰 해시에 묶입니다. 일반 GAMEMOA 로그아웃이나
+- 관리자 세션은 발급 당시의 `owogg_session` 원본 토큰 해시에 묶입니다. 일반 OwOGG 로그아웃이나
   세션 만료 시 관리자 세션도 즉시 무효화됩니다.
-- 계정 비활성화, 비밀번호 변경/재설정, SUPERADMIN의 명시적 "세션 해제"는 해당 GAMEMOA 사용자의
+- 계정 비활성화, 비밀번호 변경/재설정, SUPERADMIN의 명시적 "세션 해제"는 해당 OwOGG 사용자의
   **모든** 관리자 세션을 즉시 무효화합니다(`admin_sessions.user_id` 기준 일괄 해제).
 
 ## 11. 로그인 실패 제한
@@ -186,7 +186,7 @@ SUPERADMIN만 `/admin/accounts`에서 조회할 수 있습니다.
 - 요청 본문은 Zod 계약으로 검증합니다. 상태를 변경하는 GET 요청은 없습니다.
 - 민감한 관리자 응답은 `Cache-Control: no-store`입니다.
 - 관리자 ID를 이메일, 닉네임, Google 표시 이름 또는 OAuth provider ID로 등록하지 않습니다 —
-  오직 canonical `sub` + 해당 GAMEMOA 계정의 기존 OAuth 연결만 사용합니다.
+  오직 canonical `sub` + 해당 OwOGG 계정의 기존 OAuth 연결만 사용합니다.
 - 비밀번호는 PBKDF2-HMAC-SHA256(100,000 iterations)으로만 저장하며 평문을 어디에도 남기지
   않습니다. 100,000은 앱이 고른 값이 아니라 Cloudflare Workers `crypto.subtle`의 PBKDF2 반복
   횟수 상한(그 이상은 `NotSupportedError`)이며, Node 기반 로컬 테스트에는 이 상한이 없어 실제
@@ -211,7 +211,7 @@ SUPERADMIN만 `/admin/accounts`에서 조회할 수 있습니다.
 ### 403 `STEP_UP_FAILED` / `STEP_UP_REQUIRED`
 
 Google 토큰이 5분 이상 지난 뒤 로그인 요청을 보냈거나, `ADMIN_GOOGLE_SUBS`가 설정되어 있는데 그
-목록에 없는 계정이거나, 해당 Google 계정이 현재 GAMEMOA 계정에 연결되어 있지 않습니다.
+목록에 없는 계정이거나, 해당 Google 계정이 현재 OwOGG 계정에 연결되어 있지 않습니다.
 
 ### 409 `ALREADY_BOOTSTRAPPED`
 

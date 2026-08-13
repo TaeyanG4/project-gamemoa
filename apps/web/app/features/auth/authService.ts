@@ -16,7 +16,7 @@ import {
   type SocialProvider,
   type UnlinkProviderResponse,
   type ConfirmAccountMergeResponse,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import { API_URL, apiFetch } from "../../lib/api";
 
 export type { AuthUser, AuthMeResponse, SocialProvider };

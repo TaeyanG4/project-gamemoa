@@ -5,14 +5,14 @@ import {
   UpdateNicknameRequestSchema,
   UpdateCountryRequestSchema,
   UpdateLocaleRequestSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer } from "../container.js";
 
 export const profileRouter = new Hono<ApiEnv>();
 
 async function getAuthUserId(c: Context<ApiEnv>): Promise<number | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId || !c.env?.DB) return null;
 
   try {
@@ -34,7 +34,7 @@ function profileError(
   return c.json({ error: { code, message }, ...(extra ?? {}) }, status);
 }
 
-// POST /api/profile/nickname — change the GAMEMOA nickname (independent from any OAuth
+// POST /api/profile/nickname — change the OwOGG nickname (independent from any OAuth
 // display name), subject to a centralized cooldown.
 profileRouter.post("/nickname", async (c) => {
   const userId = await getAuthUserId(c);

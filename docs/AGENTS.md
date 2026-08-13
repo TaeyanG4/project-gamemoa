@@ -1,9 +1,9 @@
-# AGENTS.md — GAMEMOA 코딩 및 개발 규칙 명세서
+# AGENTS.md — OwOGG 코딩 및 개발 규칙 명세서
 
 이 파일은 AI 코딩 에이전트(Codex, Claude Code, Antigravity)가 코드를 수정하거나 기능을 확장할 때 반드시 준수해야 하는 강제 규칙 명세서입니다.
 
 > **아키텍처 방향**: **Modular Monolith & Cloudflare Free Tier Production**  
-> GAMEMOA의 핵심 비즈니스 로직과 도메인 레이어는 Hono 및 Repository abstraction 인터페이스를 통해 Cloudflare 인프라와 격리되며, 향후 **Node.js + Docker + PostgreSQL** 환경으로 이탈(Exit Strategy) 가능한 구조를 유지합니다. 모든 문서 설명 본문은 **한국어(KOREAN)**로 작성합니다.
+> OwOGG의 핵심 비즈니스 로직과 도메인 레이어는 Hono 및 Repository abstraction 인터페이스를 통해 Cloudflare 인프라와 격리되며, 향후 **Node.js + Docker + PostgreSQL** 환경으로 이탈(Exit Strategy) 가능한 구조를 유지합니다. 모든 문서 설명 본문은 **한국어(KOREAN)**로 작성합니다.
 
 ---
 
@@ -14,11 +14,11 @@
 1. **Game Loader 수동 등록 금지**: `apps/web/app/features/catalog/registry.ts`에 게임 로더를 수동으로 등록하지 않으며, `pnpm generate:registry`를 통해 자동 생성된 `gameLoaders.generated.ts`를 사용합니다.
 2. **생성된 파일 결정론성 및 불변성**: 생성 파일(`gameRegistry.generated.ts`, `gameLoaders.generated.ts`)은 Prettier 경로별 설정으로 캐노니컬(canonical)하게 생성되며, 수동 편집을 엄금합니다. `pnpm registry:check`는 `pnpm format` 실행 후에도 0 diff 통과해야 합니다.
 3. **Game Manifest Export 규칙**: 모든 미니게임 패키지(`games/*`)는 `src/manifest.ts`에서 `export const manifest` 규칙을 준수해야 합니다.
-4. **Domain/Core 순수성 (`packages/core`)**: Browser API (`window`, `localStorage`, `fetch`), Hono, Cloudflare bindings, React, `@gamemoa/db` 어댑터, 프로덕션 URL을 절대 포섭하거나 import하지 않습니다.
-5. **API Contract 일원화 (`packages/contracts`)**: API 요청/응답 Zod 스키마 및 DTO 타입은 `@gamemoa/contracts`에 위치하며, `@gamemoa/shared`에 중복 정의하지 않습니다.
+4. **Domain/Core 순수성 (`packages/core`)**: Browser API (`window`, `localStorage`, `fetch`), Hono, Cloudflare bindings, React, `@owogg/db` 어댑터, 프로덕션 URL을 절대 포섭하거나 import하지 않습니다.
+5. **API Contract 일원화 (`packages/contracts`)**: API 요청/응답 Zod 스키마 및 DTO 타입은 `@owogg/contracts`에 위치하며, `@owogg/shared`에 중복 정의하지 않습니다.
 6. **Persistence Adapter 순수성 (`packages/db`)**: D1 저장소 어댑터는 `GAME_MANIFEST_MAP`에 의존하지 않으며 순수 SQL 실행 역할만 수행합니다. 게임 점수 정렬 및 포맷 정책은 Application Layer에서 결정합니다.
-7. **Web App (`apps/web`)**: `@gamemoa/db` 또는 D1 concrete repository를 직접 import하지 않습니다.
-8. **Games (`games/*`)**: `@gamemoa/db` 또는 Hono/Cloudflare bindings를 import하지 않습니다.
+7. **Web App (`apps/web`)**: `@owogg/db` 또는 D1 concrete repository를 직접 import하지 않습니다.
+8. **Games (`games/*`)**: `@owogg/db` 또는 Hono/Cloudflare bindings를 import하지 않습니다.
 9. **API Routes (`apps/api/src/routes`)**: Thin Controller 역할을 수행하며 `new D1UserRepository` 등 Concrete Infrastructure를 직접 생성하지 않고 Composition Root (`apps/api/src/container.ts`) DI를 사용합니다.
 
 ---

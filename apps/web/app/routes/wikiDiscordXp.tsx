@@ -3,8 +3,8 @@ import { WikiLayout, WikiCallout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "서버 XP | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA 글로벌 XP와 Discord 서버별 XP의 차이" },
+    { title: "서버 XP | OwOGG Wiki" },
+    { name: "description", content: "OwOGG 글로벌 XP와 Discord 서버별 XP의 차이" },
   ];
 }
 
@@ -19,13 +19,13 @@ export default function WikiDiscordXpRoute() {
         <h2 className="text-lg font-black text-text-primary">세 가지 XP는 다릅니다</h2>
         <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-text-secondary">
           <li>
-            <b className="text-text-primary">일반 GAMEMOA XP (글로벌)</b> — 계정 전체의 누적 경험치.
+            <b className="text-text-primary">일반 OwOGG XP (글로벌)</b> — 계정 전체의 누적 경험치.
             프로필/전체 랭킹에 사용됩니다.
           </li>
           <li>
             <b className="text-text-primary">Discord 서버별 사용자 XP</b> — 그 서버에서{" "}
-            <code className="rounded bg-surface px-1 py-0.5 text-xs font-mono">/gamemoa play</code>
-            로 만든 유효한 완료만 누적됩니다.
+            <code className="rounded bg-surface px-1 py-0.5 text-xs font-mono">/owogg play</code>로
+            만든 유효한 완료만 누적됩니다.
           </li>
           <li>
             <b className="text-text-primary">Discord 서버 활동 XP</b> — 서버 구성원 전체가 기여한
@@ -38,7 +38,7 @@ export default function WikiDiscordXpRoute() {
         <h2 className="text-lg font-black text-text-primary">예시</h2>
         <p className="mt-2 text-sm text-text-secondary">
           Global XP가 25,000인 사용자가 새로 등록된 Guild A에서{" "}
-          <code className="rounded bg-surface px-1 py-0.5 text-xs font-mono">/gamemoa play</code>로
+          <code className="rounded bg-surface px-1 py-0.5 text-xs font-mono">/owogg play</code>로
           유효한 완료 1회(+10)를 만들면:
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-3">

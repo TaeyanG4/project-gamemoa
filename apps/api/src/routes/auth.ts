@@ -20,8 +20,8 @@ import {
   ConfirmAccountMergeResponseSchema,
   MergeChallengeResolveRequestSchema,
   MergePreviewQuerySchema,
-} from "@gamemoa/contracts";
-import type { SocialProvider } from "@gamemoa/contracts";
+} from "@owogg/contracts";
+import type { SocialProvider } from "@owogg/contracts";
 
 const KNOWN_PROVIDERS: SocialProvider[] = ["google", "discord"];
 
@@ -42,7 +42,7 @@ function accountError(
 async function requireAuth(
   c: Context<ApiEnv>,
 ): Promise<{ userId: number; user: { id: number; nickname: string } } | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId) return null;
   const { sessionRepo } = createContainer(c.env.DB);
   const result = await sessionRepo.findSession(sessionId);
@@ -67,7 +67,7 @@ export type ApiEnv = {
     DISCORD_COMMAND_SYNC_ENABLED?: string;
     FRONTEND_URL?: string;
     COMMIT_SHA?: string;
-    /** 쉼표로 구분한 명시적 GAMEMOA 사용자 ID. 미설정 시 관리자 권한 없음 (ROOT eligibility). */
+    /** 쉼표로 구분한 명시적 OwOGG 사용자 ID. 미설정 시 관리자 권한 없음 (ROOT eligibility). */
     ADMIN_USER_IDS?: string;
     /** 쉼표로 구분한, 관리자 Google 계정 step-up에 허용된 Google canonical OIDC subject(sub) 목록. */
     ADMIN_GOOGLE_SUBS?: string;
@@ -169,7 +169,7 @@ authRouter.post("/google", async (c) => {
     const session = await sessionRepo.createSession(user.id);
     const secure = !isLocalhost(c.req.url);
 
-    setCookie(c, "gamemoa_session", session.id, {
+    setCookie(c, "owogg_session", session.id, {
       httpOnly: true,
       secure,
       sameSite: secure ? "None" : "Lax",
@@ -420,7 +420,7 @@ authRouter.get("/discord/callback", async (c) => {
   const session = await sessionRepo.createSession(user.id);
   const secure = !isLocalhost(c.req.url);
 
-  setCookie(c, "gamemoa_session", session.id, {
+  setCookie(c, "owogg_session", session.id, {
     httpOnly: true,
     secure,
     sameSite: secure ? "None" : "Lax",
@@ -433,7 +433,7 @@ authRouter.get("/discord/callback", async (c) => {
 
 // GET /api/auth/me
 authRouter.get("/me", async (c) => {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId) {
     return c.json({ authenticated: false }, 401);
   }
@@ -443,7 +443,7 @@ authRouter.get("/me", async (c) => {
     const result = await sessionRepo.findSession(sessionId);
 
     if (!result) {
-      deleteCookie(c, "gamemoa_session", { path: "/" });
+      deleteCookie(c, "owogg_session", { path: "/" });
       return c.json({ authenticated: false }, 401);
     }
 
@@ -459,12 +459,12 @@ authRouter.get("/me", async (c) => {
 
 // POST /api/auth/logout
 authRouter.post("/logout", async (c) => {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (sessionId) {
     try {
       const { sessionRepo, adminAuthUseCases } = createContainer(c.env.DB);
       await sessionRepo.deleteSession(sessionId);
-      // A normal GAMEMOA logout must never leave an elevated admin session alive on top of a
+      // A normal OwOGG logout must never leave an elevated admin session alive on top of a
       // now-dead underlying session.
       await adminAuthUseCases.logoutAllForSession(sessionId);
     } catch {
@@ -472,8 +472,8 @@ authRouter.post("/logout", async (c) => {
     }
   }
 
-  deleteCookie(c, "gamemoa_session", { path: "/" });
-  deleteCookie(c, "gamemoa_admin_session", { path: "/" });
+  deleteCookie(c, "owogg_session", { path: "/" });
+  deleteCookie(c, "owogg_admin_session", { path: "/" });
   return c.json({ success: true });
 });
 
@@ -551,7 +551,7 @@ authRouter.post("/link/google", async (c) => {
           error: {
             code: "ACCOUNT_ALREADY_LINKED",
             message:
-              "이 Google 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다. 계정 통합을 진행할 수 있습니다.",
+              "이 Google 계정은 이미 다른 OwOGG 계정으로 사용 중입니다. 계정 통합을 진행할 수 있습니다.",
           },
           mergeChallenge: validated,
         },

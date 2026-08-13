@@ -1,4 +1,4 @@
-import { hasGuildManagementPermission } from "@gamemoa/core";
+import { hasGuildManagementPermission } from "@owogg/core";
 
 export interface DiscordUserProfile {
   id: string;

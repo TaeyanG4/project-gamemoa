@@ -24,21 +24,21 @@ import {
   postAdminBootstrap,
   postAdminPasswordChange,
 } from "../features/adminApi";
-import type { AdminMeResponse, AdminOverviewResponse } from "@gamemoa/contracts";
+import type { AdminMeResponse, AdminOverviewResponse } from "@owogg/contracts";
 import { ApiClientError } from "../lib/api/errors";
 import { useAuth } from "../features/auth";
 
 export function meta() {
   return [
-    { title: "관리자 센터 | GAMEMOA" },
-    { name: "description", content: "GAMEMOA 관리자 전용 운영 센터" },
+    { title: "관리자 센터 | OwOGG" },
+    { name: "description", content: "OwOGG 관리자 전용 운영 센터" },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }
 
 type Stage =
   | "loading"
-  | "need-gamemoa-login"
+  | "need-owogg-login"
   | "not-eligible"
   | "step-up"
   | "must-change-password"
@@ -77,7 +77,7 @@ export default function AdminRoute() {
 
   let stage: Stage = "loading";
   if (!authLoading && !loadingMe && me) {
-    if (!isAuthenticated || !me.authenticated) stage = "need-gamemoa-login";
+    if (!isAuthenticated || !me.authenticated) stage = "need-owogg-login";
     else if (!me.eligible) stage = "not-eligible";
     else if (!me.adminAuthenticated) stage = "step-up";
     else if (me.mustChangePassword) stage = "must-change-password";
@@ -86,19 +86,19 @@ export default function AdminRoute() {
 
   if (stage === "loading") return <PageMessage>관리자 권한을 확인하는 중...</PageMessage>;
 
-  if (stage === "need-gamemoa-login") {
+  if (stage === "need-owogg-login") {
     return (
       <PageMessage>
         <ShieldCheck className="mx-auto mb-4 h-10 w-10 text-text-muted" />
-        <h1 className="text-lg font-black text-text-primary">GAMEMOA 로그인이 필요합니다</h1>
+        <h1 className="text-lg font-black text-text-primary">OwOGG 로그인이 필요합니다</h1>
         <p className="mt-2 text-sm text-text-muted">
-          관리자 센터는 GAMEMOA 로그인 이후 추가 본인 확인을 거쳐 접근할 수 있습니다.
+          관리자 센터는 OwOGG 로그인 이후 추가 본인 확인을 거쳐 접근할 수 있습니다.
         </p>
         <button
           onClick={openLoginModal}
           className="mt-6 inline-flex items-center rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer"
         >
-          GAMEMOA 로그인
+          OwOGG 로그인
         </button>
       </PageMessage>
     );
@@ -258,7 +258,7 @@ function GoogleStepUpPanel({
             onGoogleStepDone();
           } catch {
             setGoogleError(
-              "Google 본인 확인에 실패했습니다. 허용된 Google 계정이 현재 GAMEMOA 계정에 연결되어 있는지 확인해주세요.",
+              "Google 본인 확인에 실패했습니다. 허용된 Google 계정이 현재 OwOGG 계정에 연결되어 있는지 확인해주세요.",
             );
           } finally {
             setVerifying(false);
@@ -392,7 +392,7 @@ function AdminLoginForm({ onLoggedIn }: { onLoggedIn: () => void }) {
 }
 
 /** One-time first-administrator setup — only ever shown while no administrator account exists
- * anywhere, after root eligibility + a fresh Google step-up for this exact GAMEMOA account. */
+ * anywhere, after root eligibility + a fresh Google step-up for this exact OwOGG account. */
 function BootstrapForm({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -672,7 +672,7 @@ function AdminDashboard({
         <div>
           <div className="mb-2 inline-flex items-center gap-2 text-accent-yellow">
             <ShieldCheck className="h-5 w-5" />
-            <span className="text-[11px] font-black uppercase tracking-[0.2em]">GAMEMOA Admin</span>
+            <span className="text-[11px] font-black uppercase tracking-[0.2em]">OwOGG Admin</span>
           </div>
           <h1 className="text-3xl font-black tracking-tight text-text-primary">관리자 센터</h1>
           <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
@@ -822,10 +822,10 @@ function AdminDashboard({
         </div>
         <div className="mt-3 rounded-xl bg-surface px-3 py-2.5">
           <p className="text-xs font-bold text-text-primary">
-            로컬 /gamemoa 서브커맨드 ({overview.discord.localSubcommands.length}개)
+            로컬 /owogg 서브커맨드 ({overview.discord.localSubcommands.length}개)
           </p>
           <p className="mt-1 text-[11px] text-text-muted">
-            {overview.discord.localSubcommands.map((s) => `/gamemoa ${s}`).join(" · ")}
+            {overview.discord.localSubcommands.map((s) => `/owogg ${s}`).join(" · ")}
           </p>
         </div>
         <p className="mt-3 text-[11px] text-text-muted">

@@ -11,7 +11,7 @@ import type {
   GlobalGuildRankEntry,
   ServerGameLeaderboardEntry,
   GuildSummaryData,
-} from "@gamemoa/core";
+} from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 async function hashToken(token: string): Promise<string> {

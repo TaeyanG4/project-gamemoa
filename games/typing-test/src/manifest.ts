@@ -1,4 +1,4 @@
-import type { GameManifest } from "@gamemoa/game-sdk";
+import type { GameManifest } from "@owogg/game-sdk";
 
 export const manifest: GameManifest = {
   id: "typing-test",

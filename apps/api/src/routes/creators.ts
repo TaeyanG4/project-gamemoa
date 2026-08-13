@@ -3,8 +3,8 @@ import type { Context } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createContainer } from "../container.js";
 import type { ApiEnv } from "./auth.js";
-import { CreatorRankingQuerySchema, type CreatorPlatform } from "@gamemoa/contracts";
-import { GAME_MANIFEST_MAP, type CreatorPlatformType } from "@gamemoa/core";
+import { CreatorRankingQuerySchema, type CreatorPlatform } from "@owogg/contracts";
+import { GAME_MANIFEST_MAP, type CreatorPlatformType } from "@owogg/core";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
 
 function isLocalhost(urlStr: string): boolean {
@@ -19,7 +19,7 @@ function isLocalhost(urlStr: string): boolean {
 async function requireAuth(
   c: Context<ApiEnv>,
 ): Promise<{ userId: number; user: { id: number; nickname: string } } | null> {
-  const sessionId = getCookie(c, "gamemoa_session");
+  const sessionId = getCookie(c, "owogg_session");
   if (!sessionId) return null;
   const { sessionRepo } = createContainer(c.env.DB);
   const result = await sessionRepo.findSession(sessionId);

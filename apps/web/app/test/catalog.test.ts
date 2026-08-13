@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { GAME_MANIFESTS, GAME_MANIFEST_MAP, validateScoreByManifest } from "@gamemoa/core";
+import { GAME_MANIFESTS, GAME_MANIFEST_MAP, validateScoreByManifest } from "@owogg/core";
 
 test("Game Catalog manifests contain published games", () => {
   assert.ok(GAME_MANIFESTS.length >= 2);

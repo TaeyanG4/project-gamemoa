@@ -59,7 +59,7 @@ export class AdminAccountUseCases {
   /** First-admin bootstrap: only ever succeeds while zero active admin accounts exist anywhere.
    * The caller (route layer) is responsible for having already verified: root eligibility
    * (ADMIN_USER_IDS), a fresh Google step-up, and that the step-up's googleSub is the one linked
-   * to this exact GAMEMOA user. */
+   * to this exact OwOGG user. */
   async bootstrapFirstSuperadmin(input: {
     userId: number;
     googleSub: string;
@@ -91,7 +91,7 @@ export class AdminAccountUseCases {
     return account;
   }
 
-  /** SUPERADMIN-only: create another administrator bound to an existing GAMEMOA user + their
+  /** SUPERADMIN-only: create another administrator bound to an existing OwOGG user + their
    * already-linked Google identity. */
   async createAdmin(input: {
     actorAdminId: number;

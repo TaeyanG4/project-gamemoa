@@ -4,12 +4,12 @@ import { ShieldAlert, Lock } from "lucide-react";
 import { useAuth } from "../features/auth";
 import { fetchAdminMe } from "../features/adminApi";
 import { PasswordChangeForm } from "./admin";
-import type { AdminMeResponse } from "@gamemoa/contracts";
+import type { AdminMeResponse } from "@owogg/contracts";
 
 export function meta() {
   return [
-    { title: "관리자 보안 설정 | GAMEMOA" },
-    { name: "description", content: "GAMEMOA 관리자 비밀번호 변경" },
+    { title: "관리자 보안 설정 | OwOGG" },
+    { name: "description", content: "OwOGG 관리자 비밀번호 변경" },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }

@@ -1,14 +1,14 @@
-# GAMEMOA — 시스템 설계 및 블루프린트 (GAMEMOA_BLUEPRINT)
+# OwOGG — 시스템 설계 및 블루프린트 (OWOGG_BLUEPRINT)
 
 > **기준일**: 2026-08-12  
-> **목적**: GAMEMOA 미니게임 플랫폼의 현재 프로덕션 아키텍처 및 미래 확장 로드맵 명세서  
+> **목적**: OwOGG 미니게임 플랫폼의 현재 프로덕션 아키텍처 및 미래 확장 로드맵 명세서  
 > **언어 규칙**: 본 문서의 설명 문장은 한국어(KOREAN)로 작성되며, 기술명/패키지명/코드/경로/API명은 표준 표기법을 유지합니다.
 
 ---
 
 ## 1. 🏗️ 프로덕션 시스템 아키텍처 (Current Architecture)
 
-GAMEMOA는 **Modular Monolith + Game Plugin Architecture** 기반으로 구축되어 Cloudflare 에지 인프라에서 구동됩니다.
+OwOGG는 **Modular Monolith + Game Plugin Architecture** 기반으로 구축되어 Cloudflare 에지 인프라에서 구동됩니다.
 
 ```text
                                 [ Client Browser ]
@@ -20,7 +20,7 @@ GAMEMOA는 **Modular Monolith + Game Plugin Architecture** 기반으로 구축�
                          │                             │
                          ├─────────────────────────────┤
                          ▼                             ▼
-               [@gamemoa/contracts]           [packages/core]
+               [@owogg/contracts]           [packages/core]
                Zod Request/Response           Domain/Application
                          │                             │
                          └──────────────┬──────────────┘
@@ -36,7 +36,7 @@ GAMEMOA는 **Modular Monolith + Game Plugin Architecture** 기반으로 구축�
 3. **`packages/contracts`**: Zod 요청/응답 스키마 및 TypeScript DTO 타입. 프론트엔드와 백엔드가 공유하는 단일 계약 소스(Single Source of Truth).
 4. **`packages/core`**: 프레임워크 및 인프라 종속성이 제거된 순수 도메인엔티티, 점수 검증 규칙(`domain`), 유즈케이스(`application/ScoreUseCases`), 포트 인터페이스(`ports`).
 5. **`packages/db`**: Cloudflare D1 (SQL) 스키마, 마이그레이션 및 저장소 어댑터 구현체 (`D1UserRepository`, `D1SessionRepository`, `D1ScoreRepository`). 게임 매니페스트 정책에 직접 의존하지 않는 순수 SQL 어댑터.
-6. **`games/*`**: 독립적인 미니게임 패키지 (`@gamemoa/game-reaction-time`, `@gamemoa/game-memory-test`, `@gamemoa/game-aim-test`).
+6. **`games/*`**: 독립적인 미니게임 패키지 (`@owogg/game-reaction-time`, `@owogg/game-memory-test`, `@owogg/game-aim-test`).
 
 ---
 
@@ -50,7 +50,7 @@ GAMEMOA는 **Modular Monolith + Game Plugin Architecture** 기반으로 구축�
 
 ```ts
 // games/<game-slug>/src/manifest.ts
-import type { GameManifest } from "@gamemoa/game-sdk";
+import type { GameManifest } from "@owogg/game-sdk";
 
 export const manifest: GameManifest = {
   id: "aim-test",
@@ -94,7 +94,7 @@ export const manifest: GameManifest = {
 ### 3.1 세션 인증 및 Cookie 관리
 
 - **Google OAuth (GIS)** & **Discord OAuth 2.0** 지원.
-- 로그인 성공 시 서버에서 무작위 세션 토큰을 생성하고, D1 데이터베이스에 세션을 저장한 후 `HttpOnly`, `SameSite=None` (또는 로컬 개발 시 `Lax`), `Secure` 세션 쿠키(`gamemoa_session`)를 발급.
+- 로그인 성공 시 서버에서 무작위 세션 토큰을 생성하고, D1 데이터베이스에 세션을 저장한 후 `HttpOnly`, `SameSite=None` (또는 로컬 개발 시 `Lax`), `Secure` 세션 쿠키(`owogg_session`)를 발급.
 
 ### 3.2 Security Guard
 
@@ -105,7 +105,7 @@ export const manifest: GameManifest = {
 
 ## 4. 🔄 Cloudflare 탈출 전략 (Exit Strategy)
 
-GAMEMOA의 비즈니스 로직 및 저장소 구조는 Cloudflare 전용 API에 얽매이지 않도록 설계되었습니다:
+OwOGG의 비즈니스 로직 및 저장소 구조는 Cloudflare 전용 API에 얽매이지 않도록 설계되었습니다:
 
 - **API 백엔드**: Hono 프레임워크 기반으로 작성되어 Node.js (`@hono/node-server`), Bun, Deno 또는 Docker 컨테이너 환경으로 쉽게 이식 가능.
 - **데이터베이스 저장소**: `packages/core`의 포트 인터페이스 (`ScoreRepository`, `UserRepository`, `SessionRepository`)를 준수하므로, Cloudflare D1 대신 PostgreSQL/MySQL 기반 ORM 어댑터로 교체 가능.

@@ -29,7 +29,7 @@ fs.mkdirSync(path.join(gameDir, "test"), { recursive: true });
 
 // 1. package.json
 const pkgJson = {
-  name: `@gamemoa/game-${slug}`,
+  name: `@owogg/game-${slug}`,
   version: "0.0.1",
   type: "module",
   exports: {
@@ -39,8 +39,8 @@ const pkgJson = {
     },
   },
   dependencies: {
-    "@gamemoa/game-sdk": "workspace:*",
-    "@gamemoa/shared": "workspace:*",
+    "@owogg/game-sdk": "workspace:*",
+    "@owogg/shared": "workspace:*",
     react: "^19.1.0",
   },
   devDependencies: {
@@ -63,7 +63,7 @@ const webPkgPath = path.join(rootDir, "apps", "web", "package.json");
 if (fs.existsSync(webPkgPath)) {
   const webPkg = JSON.parse(fs.readFileSync(webPkgPath, "utf-8"));
   webPkg.dependencies = webPkg.dependencies || {};
-  webPkg.dependencies[`@gamemoa/game-${slug}`] = "workspace:*";
+  webPkg.dependencies[`@owogg/game-${slug}`] = "workspace:*";
   // Sort dependencies alphabetically
   webPkg.dependencies = Object.fromEntries(
     Object.entries(webPkg.dependencies).sort(([a], [b]) => a.localeCompare(b)),
@@ -87,7 +87,7 @@ const titleName = slug
   .split("-")
   .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
   .join(" ");
-const manifestCode = `import type { GameManifest } from "@gamemoa/game-sdk";
+const manifestCode = `import type { GameManifest } from "@owogg/game-sdk";
 
 export const manifest: GameManifest = {
   id: "${slug}",

@@ -1,4 +1,4 @@
-import type { CreatorProviderAdapter, CreatorPlatformType } from "@gamemoa/core";
+import type { CreatorProviderAdapter, CreatorPlatformType } from "@owogg/core";
 import { YouTubeCreatorProvider } from "./youtube.js";
 import { TwitchCreatorProvider } from "./twitch.js";
 import { ChzzkCreatorProvider } from "./chzzk.js";

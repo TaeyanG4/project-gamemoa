@@ -16,7 +16,7 @@ test("diffDiscordCommands: identical local and remote command sets are in sync",
 });
 
 test("diffDiscordCommands: ignores Discord-generated fields (id/application_id/version/guild_id)", () => {
-  const local: CommandLike[] = [{ name: "gamemoa", description: "d", options: [] }];
+  const local: CommandLike[] = [{ name: "owogg", description: "d", options: [] }];
   const remote = [
     {
       id: "123456789",
@@ -25,7 +25,7 @@ test("diffDiscordCommands: ignores Discord-generated fields (id/application_id/v
       guild_id: undefined,
       default_member_permissions: null,
       dm_permission: true,
-      name: "gamemoa",
+      name: "owogg",
       description: "d",
       options: [],
     },
@@ -36,16 +36,16 @@ test("diffDiscordCommands: ignores Discord-generated fields (id/application_id/v
 });
 
 test("diffDiscordCommands: a command missing from Discord is reported", () => {
-  const local: CommandLike[] = [{ name: "gamemoa", description: "d" }];
+  const local: CommandLike[] = [{ name: "owogg", description: "d" }];
   const result = diffDiscordCommands(local, []);
   assert.equal(result.inSync, false);
-  assert.deepEqual(result.missing, ["gamemoa"]);
+  assert.deepEqual(result.missing, ["owogg"]);
 });
 
 test("diffDiscordCommands: an unexpected extra command registered on Discord is reported", () => {
-  const local: CommandLike[] = [{ name: "gamemoa", description: "d" }];
+  const local: CommandLike[] = [{ name: "owogg", description: "d" }];
   const remote: CommandLike[] = [
-    { name: "gamemoa", description: "d" },
+    { name: "owogg", description: "d" },
     { name: "leftover-old-command", description: "stale" },
   ];
   const result = diffDiscordCommands(local, remote);
@@ -54,18 +54,18 @@ test("diffDiscordCommands: an unexpected extra command registered on Discord is 
 });
 
 test("diffDiscordCommands: description drift is detected", () => {
-  const local: CommandLike[] = [{ name: "gamemoa", description: "새 설명" }];
-  const remote: CommandLike[] = [{ name: "gamemoa", description: "예전 설명" }];
+  const local: CommandLike[] = [{ name: "owogg", description: "새 설명" }];
+  const remote: CommandLike[] = [{ name: "owogg", description: "예전 설명" }];
   const result = diffDiscordCommands(local, remote);
   assert.equal(result.inSync, false);
   assert.equal(result.mismatched.length, 1);
-  assert.equal(result.mismatched[0]?.name, "gamemoa");
+  assert.equal(result.mismatched[0]?.name, "owogg");
 });
 
 test("diffDiscordCommands: subcommand/option drift is detected (added subcommand)", () => {
   const local: CommandLike[] = [
     {
-      name: "gamemoa",
+      name: "owogg",
       description: "d",
       options: [
         { type: 1, name: "games", description: "games" },
@@ -75,7 +75,7 @@ test("diffDiscordCommands: subcommand/option drift is detected (added subcommand
   ];
   const remote: CommandLike[] = [
     {
-      name: "gamemoa",
+      name: "owogg",
       description: "d",
       options: [{ type: 1, name: "games", description: "games" }],
     },
@@ -88,7 +88,7 @@ test("diffDiscordCommands: subcommand/option drift is detected (added subcommand
 test("diffDiscordCommands: option/subcommand order does not cause false drift", () => {
   const local: CommandLike[] = [
     {
-      name: "gamemoa",
+      name: "owogg",
       description: "d",
       options: [
         { type: 1, name: "play", description: "play" },
@@ -98,7 +98,7 @@ test("diffDiscordCommands: option/subcommand order does not cause false drift", 
   ];
   const remote: CommandLike[] = [
     {
-      name: "gamemoa",
+      name: "owogg",
       description: "d",
       options: [
         { type: 1, name: "games", description: "games" },
@@ -113,7 +113,7 @@ test("diffDiscordCommands: option/subcommand order does not cause false drift", 
 test("diffDiscordCommands: choice value drift is detected", () => {
   const local: CommandLike[] = [
     {
-      name: "gamemoa",
+      name: "owogg",
       description: "d",
       options: [
         {
@@ -134,7 +134,7 @@ test("diffDiscordCommands: choice value drift is detected", () => {
   ];
   const remote: CommandLike[] = [
     {
-      name: "gamemoa",
+      name: "owogg",
       description: "d",
       options: [
         {

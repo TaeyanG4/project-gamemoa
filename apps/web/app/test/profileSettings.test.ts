@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { UpdateNicknameRequestSchema, UpdateCountryRequestSchema } from "@gamemoa/contracts";
+import { UpdateNicknameRequestSchema, UpdateCountryRequestSchema } from "@owogg/contracts";
 import { COUNTRY_OPTIONS, countryLabel } from "../lib/countries.js";
 
 describe("Profile settings (nickname/country) client contracts", () => {

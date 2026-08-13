@@ -3,8 +3,8 @@ import { WikiLayout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "Creator | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA Creator(스트리머) 채널 소유권 인증 개요" },
+    { title: "Creator | OwOGG Wiki" },
+    { name: "description", content: "OwOGG Creator(스트리머) 채널 소유권 인증 개요" },
   ];
 }
 
@@ -13,7 +13,7 @@ export default function WikiCreatorRoute() {
     <WikiLayout
       eyebrow="CREATOR"
       title="Creator 개요"
-      description="공식 OAuth/API로 채널 소유권을 검증한 스트리머/유튜버를 GAMEMOA Creator로 인정합니다."
+      description="공식 OAuth/API로 채널 소유권을 검증한 스트리머/유튜버를 OwOGG Creator로 인정합니다."
     >
       <p>
         Creator 인증은 게임 점수나 XP에 어떤 가산점도 주지 않습니다. 대신 명예의 전당의 스트리머

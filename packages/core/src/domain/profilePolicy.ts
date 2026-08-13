@@ -1,8 +1,8 @@
-// Pure domain policy for the GAMEMOA nickname and country/region fields.
+// Pure domain policy for the OwOGG nickname and country/region fields.
 // Centralized here so cooldown days and validation rules are never duplicated
 // across API routes or the web app.
 
-/** GAMEMOA nickname is independent from any OAuth provider display name. */
+/** OwOGG nickname is independent from any OAuth provider display name. */
 export const NICKNAME_MIN_LENGTH = 2;
 export const NICKNAME_MAX_LENGTH = 20;
 

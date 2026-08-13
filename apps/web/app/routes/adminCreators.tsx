@@ -6,16 +6,13 @@ import {
   applyManualCreatorReviewApi,
   fetchManualCreatorReviewsApi,
 } from "../features/creators/adminCreatorApi";
-import type {
-  CreatorManualReviewAction,
-  CreatorManualReviewQueueResponse,
-} from "@gamemoa/contracts";
+import type { CreatorManualReviewAction, CreatorManualReviewQueueResponse } from "@owogg/contracts";
 import { ApiClientError } from "../lib/api";
 
 export function meta() {
   return [
-    { title: "Creator 수동 심사 | gamemoa" },
-    { name: "description", content: "GAMEMOA Featured Creator 수동 심사" },
+    { title: "Creator 수동 심사 | OwOGG" },
+    { name: "description", content: "OwOGG Featured Creator 수동 심사" },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }
@@ -40,7 +37,7 @@ export default function AdminCreatorsRoute() {
         setError(
           err.code === "ADMIN_SESSION_REQUIRED"
             ? "관리자 로그인이 필요합니다. /admin 에서 본인 확인을 먼저 완료해주세요."
-            : "이 페이지는 지정된 GAMEMOA 관리자만 사용할 수 있습니다.",
+            : "이 페이지는 지정된 OwOGG 관리자만 사용할 수 있습니다.",
         );
       } else {
         setError(err instanceof Error ? err.message : "수동 심사 큐를 불러올 수 없습니다.");
@@ -83,7 +80,7 @@ export default function AdminCreatorsRoute() {
   if (!isAuthenticated) {
     return (
       <PageMessage>
-        관리자 심사 도구를 사용하려면 <Link to="/profile">GAMEMOA 로그인</Link>이 필요합니다.
+        관리자 심사 도구를 사용하려면 <Link to="/profile">OwOGG 로그인</Link>이 필요합니다.
       </PageMessage>
     );
   }
@@ -93,7 +90,7 @@ export default function AdminCreatorsRoute() {
       <PageMessage>
         <h1 className="text-lg font-black text-text-primary">접근 권한이 없습니다</h1>
         <p className="mt-2 text-sm text-text-muted">
-          지정된 GAMEMOA 관리자 계정만 Creator 심사를 진행할 수 있습니다.
+          지정된 OwOGG 관리자 계정만 Creator 심사를 진행할 수 있습니다.
         </p>
         <Link
           to="/admin"

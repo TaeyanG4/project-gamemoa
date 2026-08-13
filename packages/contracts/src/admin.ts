@@ -62,7 +62,7 @@ export const AdminAccountStatusSchema = z.enum(["ACTIVE", "DISABLED"]);
 export type AdminAccountStatusValue = z.infer<typeof AdminAccountStatusSchema>;
 
 /** First-admin bootstrap — only reachable while zero administrator accounts exist anywhere and
- * only after a fresh Google step-up bound to the current GAMEMOA account. */
+ * only after a fresh Google step-up bound to the current OwOGG account. */
 export const AdminBootstrapRequestSchema = z
   .object({
     username: ADMIN_USERNAME_SCHEMA,
@@ -117,7 +117,7 @@ export const AdminAccountListResponseSchema = z.object({
 });
 export type AdminAccountListResponse = z.infer<typeof AdminAccountListResponseSchema>;
 
-/** SUPERADMIN-only: creates another administrator bound to an existing GAMEMOA user whose Google
+/** SUPERADMIN-only: creates another administrator bound to an existing OwOGG user whose Google
  * identity is derived server-side from that user's already-linked oauth_accounts row — never
  * accepted as free-text input here. */
 export const AdminAccountCreateRequestSchema = z.object({

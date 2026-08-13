@@ -2,7 +2,7 @@ import type {
   CreatorProviderAdapter,
   CreatorChannelInfo,
   CreatorChannelMetrics,
-} from "@gamemoa/core";
+} from "@owogg/core";
 
 export class YouTubeCreatorProvider implements CreatorProviderAdapter {
   public platform = "YOUTUBE" as const;

@@ -1,4 +1,4 @@
-import { ADMIN_AUTH_POLICY } from "@gamemoa/core";
+import { ADMIN_AUTH_POLICY } from "@owogg/core";
 
 /**
  * Web Crypto (PBKDF2-HMAC-SHA256) admin password hashing — Cloudflare Workers/Node compatible,

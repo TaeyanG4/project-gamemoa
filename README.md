@@ -1,8 +1,8 @@
-# GAMEMOA (게임모아) 🎮
+# OwOGG (게임모아) 🎮
 
 > **설치 없이 웹 브라우저에서 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼**
 
-GAMEMOA는 **Game Plugin Architecture** 및 **Clean Layered Monorepo Architecture** 기반으로 설계된 미니게임 플랫폼입니다.  
+OwOGG는 **Game Plugin Architecture** 및 **Clean Layered Monorepo Architecture** 기반으로 설계된 미니게임 플랫폼입니다.  
 CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만에 플레이 가능한 비주얼 스포트라이트와 고밀도 게임 카탈로그를 제공합니다.
 
 ---
@@ -23,24 +23,24 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
 - ⭐️ **사용자 맞춤화 레이어 (Personalization & Account Foundation)**:
   - 📜 **최근 플레이 (Recent Plays)**: 실제 게임 시작 시점(`game_started`)에 타임스탬프 자동 기록 및 최근 플레이 탭 제공
   - ⭐ **즐겨찾기 (Favorites, 로그인 전용)**: 게임 카드 북마크, 카테고리 칩 필터링 및 홈 화면 전용 섹션 — 게스트는 즐겨찾기 클릭 시 로그인 유도(게스트 즐겨찾기 미저장). 레거시 v1 게스트 즐겨찾기는 안전한 v2 마이그레이션으로 폐기되며 최근 플레이만 보존됨
-  - 🔐 **계정 식별/통합 (Account Identity & Merge)**: Google/Discord 로그인은 기본적으로 별도 GAMEMOA 계정(이메일 자동 병합 금지). 사용자 명시 요청 시 **Primary Account Wins** 계정 통합(Primary 데이터 유지, Secondary 데이터 삭제, Secondary 로그인 수단은 Primary로 이전). D1 원자 트랜잭션 기반
+  - 🔐 **계정 식별/통합 (Account Identity & Merge)**: Google/Discord 로그인은 기본적으로 별도 OwOGG 계정(이메일 자동 병합 금지). 사용자 명시 요청 시 **Primary Account Wins** 계정 통합(Primary 데이터 유지, Secondary 데이터 삭제, Secondary 로그인 수단은 Primary로 이전). D1 원자 트랜잭션 기반
   - 🔗 **연결된 로그인 계정 관리**: 프로필에서 Google/Discord 연결/연결해제 및 충돌 시 계정 통합 UI 제공
   - 🔒 **SHA-256 세션 보안 & Google ID Token JWT/JWKS 검증**: 세션 토큰 해싱 저장 및 Google OpenID JWKS 기반 RS256 서명/iss/aud/exp/sub 검증(`tokeninfo` 비의존)
   - 💾 **게스트 로컬스토리지 & 계정 D1 동기화**: 로그인 없이 최근 플레이를 로컬스토리지에 보존하며, 로그인 시 계정 D1로 안전한 1-Way 최근 플레이 통합(게스트 즐겨찾기는 미통합)
-- 🎨 **GAMEMOA 브랜드 파비콘**: 4-타일 게임 허브 마크의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`
+- 🎨 **OwOGG 브랜드 파비콘**: 4-타일 게임 허브 마크의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`
 - 🏆 **진행도 시스템 (XP / 레벨 / 도전과제)**: 서버 권위 XP(인증된 게임 완료 1회당 +10, 사용자×게임×UTC일 기준 최대 10회 상한), `xp_events` 원장 기반 멱등 지급, 결정론적 레벨 공식(`100×(L-1)²`), 7종 초기 도전과제(FIRST_PLAY/PLAY_10/PLAY_100/FIRST_FAVORITE/LEVEL_5/LEVEL_10/ALL_GAMES), 글로벌 XP 리더보드. 게임 점수(실력)와 XP(활동)는 항상 분리되어 랭킹 무결성을 해치지 않습니다. 자세한 내용은 `docs/PROGRESSION.md` 참고.
 - 📊 **My Page ("내 프로필 & 기록")**: `/profile`의 "내 프로필"(사용자 정보, 레벨/XP, 닉네임·국가/지역 변경, 즐겨찾기, 최근 플레이, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록) 탭 분리. 게임 기록 카드는 실제 썸네일 기반으로 재구성.
 - 🎥 **Creator & Featured 시스템**: YouTube/CHZZK/SOOP/Twitch 공식 소유권 검증, Featured 자격 자동 심사, 14일 보수적 재검증, 지정된 `ADMIN_USER_IDS` 관리자 전용 수동 심사 큐와 append-only 감사 원장. Featured는 게임 점수·XP·랭킹에 영향을 주지 않습니다. 상세 정책은 `docs/CREATOR_SYSTEM.md` 참고.
 - 🤖 **Discord HTTP Interactions & 커뮤니티 Hub**:
-  - `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/gamemoa games|link|profile|play|rank|leaderboard|server`).
-  - **Discord 서버 시스템 & Hub 페이지**: OAuth `guilds` 1회용 인증으로 `MANAGE_GUILD`/`ADMINISTRATOR` 권한 검증 후 서버 등록, 1회용 해시 챌린지 기반 access_token 미저장 보안, 공개 디렉토리 검색(`/discord/servers`), 공개 서버 페이지(`/discord/servers/:slug`), 가시성(`PUBLIC`/`UNLISTED`/`PRIVATE`), 서버 관리 페이지. 일반 GAMEMOA 게임 랭킹과 Discord 서버 공간은 명확히 분리되어 동작합니다. 자세한 내용은 `docs/DISCORD_INTEGRATION.md` 참고.
-  - **Discord 사용 안내**: `/discord/guide` 공개 사용 가이드와 `docs/DISCORD_BOT_GUIDE.md` 운영 가이드 제공. 앱 설치와 GAMEMOA 서버 등록은 별도 단계이며 기존 글로벌 XP는 새 Guild로 복사되지 않습니다.
+  - `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/owogg games|link|profile|play|rank|leaderboard|server`).
+  - **Discord 서버 시스템 & Hub 페이지**: OAuth `guilds` 1회용 인증으로 `MANAGE_GUILD`/`ADMINISTRATOR` 권한 검증 후 서버 등록, 1회용 해시 챌린지 기반 access_token 미저장 보안, 공개 디렉토리 검색(`/discord/servers`), 공개 서버 페이지(`/discord/servers/:slug`), 가시성(`PUBLIC`/`UNLISTED`/`PRIVATE`), 서버 관리 페이지. 일반 OwOGG 게임 랭킹과 Discord 서버 공간은 명확히 분리되어 동작합니다. 자세한 내용은 `docs/DISCORD_INTEGRATION.md` 참고.
+  - **Discord 사용 안내**: `/discord/guide` 공개 사용 가이드와 `docs/DISCORD_BOT_GUIDE.md` 운영 가이드 제공. 앱 설치와 OwOGG 서버 등록은 별도 단계이며 기존 글로벌 XP는 새 Guild로 복사되지 않습니다.
 - 🛡️ **다층 방어 Admin Center**: `/admin`은 `ADMIN_USER_IDS`(근본 자격) + 신선한 Google Step-Up 본인 확인(canonical `sub` 허용 목록, 5분 이내 발급) + 관리자 전용 아이디/PBKDF2 비밀번호 로그인을 모두 통과해야 30분 수명의 별도 관리자 세션이 발급되는 다층 인증 구조입니다. 관리자 로그인 실패는 15분 rate limit으로 보호되며, Creator 수동 심사(`/admin/creators`)와 감사 요약은 GET을 포함해 관리자 세션을 요구합니다. 관리자 페이지는 검색 색인에서 제외됩니다. 설정 절차는 `docs/ADMIN_GUIDE.md`, 외부 설정 체크리스트는 `docs/PRODUCTION_INTEGRATIONS.md` 참고.
 
 - 🧩 **Game Plugin Architecture**:
   - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
 - 🛡️ **Clean Monorepo & Architecture Guard**:
-  - `packages/core` (Domain, Application, Ports), `packages/db` (Cloudflare D1 Persistence), `@gamemoa/contracts` (Single Source of Truth Schemas)
+  - `packages/core` (Domain, Application, Ports), `packages/db` (Cloudflare D1 Persistence), `@owogg/contracts` (Single Source of Truth Schemas)
   - CI 자동화 Architecture Guard (`pnpm verify`, `pnpm architecture:check`, `pnpm registry:check`)로 레이어 위반 및 생성 파일 이탈 자동 차단
 - ☁️ **Cloudflare Free Tier Production Architecture**:
   - **Hono + Cloudflare Workers**: 고성능 서버리스 API 백엔드
@@ -76,13 +76,13 @@ pnpm dev
 웹 앱 전용 실행:
 
 ```bash
-pnpm --filter @gamemoa/web dev
+pnpm --filter @owogg/web dev
 ```
 
 API 백엔드 전용 실행:
 
 ```bash
-pnpm --filter @gamemoa/api dev
+pnpm --filter @owogg/api dev
 ```
 
 ### 4. 웹 페이지 접속 (Open Page)
@@ -116,7 +116,7 @@ pnpm registry:check
 # 게임 레지스트리 자동 생성 (Core Manifest Registry & Web Dynamic Loaders)
 pnpm generate:registry
 
-# GAMEMOA 파비콘/아이콘 자산 결정론적 생성 (favicon.svg -> favicon.ico/PNG/manifest)
+# OwOGG 파비콘/아이콘 자산 결정론적 생성 (favicon.svg -> favicon.ico/PNG/manifest)
 pnpm generate:favicon
 
 # 새 게임 스캐폴딩 생성
@@ -152,15 +152,15 @@ pnpm build
 ## 📁 프로젝트 구조 (Project Structure)
 
 ```text
-gamemoa/
+owogg/
 ├── apps/
 │   ├── web/                   # React Router v7 SPA 웹 프론트엔드
 │   └── api/                   # Hono API Backend (Workers / Node.js portable)
 ├── games/
-│   ├── reaction-time/         # 반응속도 테스트 게임 (@gamemoa/game-reaction-time)
-│   ├── memory-test/           # 순서 기억력 테스트 게임 (@gamemoa/game-memory-test)
-│   ├── aim-test/              # 에임 테스트 게임 (@gamemoa/game-aim-test)
-│   └── typing-test/           # 타자 속도 테스트 게임 (@gamemoa/game-typing-test)
+│   ├── reaction-time/         # 반응속도 테스트 게임 (@owogg/game-reaction-time)
+│   ├── memory-test/           # 순서 기억력 테스트 게임 (@owogg/game-memory-test)
+│   ├── aim-test/              # 에임 테스트 게임 (@owogg/game-aim-test)
+│   └── typing-test/           # 타자 속도 테스트 게임 (@owogg/game-typing-test)
 ├── packages/
 │   ├── contracts/             # Zod 요청/응답 스키마 & API Single Source of Truth
 │   ├── core/                  # Pure Domain, Application Use Cases & Ports (No Infra/Browser deps)
@@ -171,7 +171,7 @@ gamemoa/
 ├── scripts/                   # Architecture Guard, Registry Generator & SPA Build 스크립트
 └── docs/                      # 아키텍처, 시스템 설계, 작업 진행 상황 & 로드맵
     ├── ARCHITECTURE.md        # 레이어 의존성 & 플러그인 아키텍처 명세서
-    ├── GAMEMOA_BLUEPRINT.md   # 전체 시스템 블루프린트
+    ├── OWOGG_BLUEPRINT.md   # 전체 시스템 블루프린트
     ├── PROGRESS.md            # 기능별 구현 진행 현황
     ├── WORK_PROGRESS.md       # CI/CD 및 작업 진행 상황
     ├── ROADMAP.md             # 플랫폼 향후 로드맵
@@ -190,7 +190,7 @@ gamemoa/
 
 ## ☁️ 배포 파이프라인 (Deployment Pipeline)
 
-GAMEMOA는 **GitHub Actions**와 **Wrangler CLI**를 통해 Cloudflare Workers에 자동 배포됩니다:
+OwOGG는 **GitHub Actions**와 **Wrangler CLI**를 통해 Cloudflare Workers에 자동 배포됩니다:
 
 ```text
 git push origin main

@@ -6,8 +6,8 @@ import { fetchDiscordBotStatusApi } from "../features/discord/api";
 
 export function meta() {
   return [
-    { title: "Discord 설치하기 | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA Discord 앱을 서버에 설치하는 방법" },
+    { title: "Discord 설치하기 | OwOGG Wiki" },
+    { name: "description", content: "OwOGG Discord 앱을 서버에 설치하는 방법" },
   ];
 }
 
@@ -23,8 +23,8 @@ export default function WikiDiscordInstallRoute() {
   return (
     <WikiLayout
       eyebrow="DISCORD"
-      title="Discord에 GAMEMOA 설치하기"
-      description="Discord 앱 설치는 GAMEMOA를 서버에서 사용할 준비 단계입니다. 서버 등록과는 별개입니다."
+      title="Discord에 OwOGG 설치하기"
+      description="Discord 앱 설치는 OwOGG를 서버에서 사용할 준비 단계입니다. 서버 등록과는 별개입니다."
     >
       <WikiCallout>
         <b className="text-text-primary">일반 사용자는 Bot Token을 입력할 필요가 없습니다.</b> 아래
@@ -36,11 +36,11 @@ export default function WikiDiscordInstallRoute() {
         <div className="mt-3">
           <WikiSteps
             steps={[
-              "아래 [Discord에 GAMEMOA 추가] 버튼을 클릭합니다.",
+              "아래 [Discord에 OwOGG 추가] 버튼을 클릭합니다.",
               "Discord 계정으로 로그인되어 있는지 확인합니다.",
               "앱을 추가할 서버를 선택합니다 (서버 관리 권한이 있는 서버만 목록에 보입니다).",
               "요청된 권한을 확인하고 승인합니다.",
-              "완료 후 GAMEMOA로 돌아와 계정 연결과 서버 등록을 진행합니다.",
+              "완료 후 OwOGG로 돌아와 계정 연결과 서버 등록을 진행합니다.",
             ]}
           />
         </div>
@@ -52,7 +52,7 @@ export default function WikiDiscordInstallRoute() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-xl bg-indigo-500 px-4 py-2.5 text-xs font-black text-white shadow-lg shadow-indigo-500/25 hover:bg-indigo-400"
             >
-              Discord에 GAMEMOA 추가 <ExternalLink className="h-4 w-4" />
+              Discord에 OwOGG 추가 <ExternalLink className="h-4 w-4" />
             </a>
           ) : (
             <p className="text-xs text-text-muted">
@@ -67,8 +67,8 @@ export default function WikiDiscordInstallRoute() {
       </section>
 
       <WikiCallout tone="warning">
-        <b className="text-text-primary">앱 설치 ≠ GAMEMOA 서버 등록입니다.</b> 앱을 설치해도 서버가
-        자동으로 GAMEMOA 디렉토리에 게시되지 않습니다. 관리자가{" "}
+        <b className="text-text-primary">앱 설치 ≠ OwOGG 서버 등록입니다.</b> 앱을 설치해도 서버가
+        자동으로 OwOGG 디렉토리에 게시되지 않습니다. 관리자가{" "}
         <Link
           to="/wiki/discord/server-registration"
           className="font-bold text-brand-light hover:underline"

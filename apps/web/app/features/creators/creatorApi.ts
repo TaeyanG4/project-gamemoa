@@ -4,7 +4,7 @@ import {
   CreatorRankEntrySchema,
   CreatorPlatformSchema,
   CreatorProfileDtoSchema,
-} from "@gamemoa/contracts";
+} from "@owogg/contracts";
 
 export const CreatorRankingsResponseSchema = z.object({
   entries: z.array(CreatorRankEntrySchema),

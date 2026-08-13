@@ -1,5 +1,5 @@
 {
-  "name": "@gamemoa/game-memory-test",
+  "name": "@owogg/game-memory-test",
   "version": "0.0.1",
   "type": "module",
   "exports": {
@@ -13,7 +13,7 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
-    "@gamemoa/game-sdk": "workspace:*",
+    "@owogg/game-sdk": "workspace:*",
     "lucide-react": "^0.479.0"
   },
   "devDependencies": {

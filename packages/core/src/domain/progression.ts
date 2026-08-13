@@ -1,4 +1,4 @@
-// Pure domain rules for GAMEMOA progression (XP / Level).
+// Pure domain rules for OwOGG progression (XP / Level).
 //
 // CRITICAL SEMANTIC RULE: XP != SKILL.
 // Game score represents competitive performance and remains the sole ranking truth.

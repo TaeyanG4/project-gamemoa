@@ -6,7 +6,7 @@ import {
   type GameRuntimeContext,
   type GameResult,
   type GameProps,
-} from "@gamemoa/game-sdk";
+} from "@owogg/game-sdk";
 import {
   saveLocalBestScore,
   submitScoreApi,

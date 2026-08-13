@@ -4,16 +4,16 @@ import { fetchLeaderboardApi } from "../features/scores/api";
 import { fetchXpLeaderboardApi } from "../features/progression/api";
 import { fetchCreatorRankingsApi } from "../features/creators/creatorApi";
 import { PlatformIconRow, PlatformIcon } from "../components/ui/PlatformIcon";
-import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@gamemoa/contracts";
+import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@owogg/contracts";
 
-import { levelForTotalXp } from "@gamemoa/core";
+import { levelForTotalXp } from "@owogg/core";
 
 import { gameManifests } from "../features/catalog/registry";
 import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
-    { title: "명예의 전당 (랭킹) | GAMEMOA" },
+    { title: "명예의 전당 (랭킹) | OwOGG" },
     { name: "description", content: "최고 기록, XP 레벨, 스트리머 랭킹을 확인하세요." },
   ];
 }

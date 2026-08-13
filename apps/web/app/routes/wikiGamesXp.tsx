@@ -3,8 +3,8 @@ import { WikiLayout, WikiCallout } from "../components/wiki/WikiLayout";
 
 export function meta() {
   return [
-    { title: "XP와 레벨 | GAMEMOA Wiki" },
-    { name: "description", content: "GAMEMOA 경험치(XP)와 레벨 계산 방식" },
+    { title: "XP와 레벨 | OwOGG Wiki" },
+    { name: "description", content: "OwOGG 경험치(XP)와 레벨 계산 방식" },
   ];
 }
 

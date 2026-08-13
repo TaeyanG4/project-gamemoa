@@ -44,19 +44,19 @@ importers:
 
   apps/api:
     dependencies:
-      "@gamemoa/contracts":
+      "@owogg/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
-      "@gamemoa/core":
+      "@owogg/core":
         specifier: workspace:*
         version: link:../../packages/core
-      "@gamemoa/db":
+      "@owogg/db":
         specifier: workspace:*
         version: link:../../packages/db
-      "@gamemoa/game-sdk":
+      "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
-      "@gamemoa/shared":
+      "@owogg/shared":
         specifier: workspace:*
         version: link:../../packages/shared
       hono:
@@ -84,31 +84,31 @@ importers:
 
   apps/web:
     dependencies:
-      "@gamemoa/contracts":
+      "@owogg/contracts":
         specifier: workspace:*
         version: link:../../packages/contracts
-      "@gamemoa/core":
+      "@owogg/core":
         specifier: workspace:*
         version: link:../../packages/core
-      "@gamemoa/game-aim-test":
+      "@owogg/game-aim-test":
         specifier: workspace:*
         version: link:../../games/aim-test
-      "@gamemoa/game-memory-test":
+      "@owogg/game-memory-test":
         specifier: workspace:*
         version: link:../../games/memory-test
-      "@gamemoa/game-reaction-time":
+      "@owogg/game-reaction-time":
         specifier: workspace:*
         version: link:../../games/reaction-time
-      "@gamemoa/game-sdk":
+      "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
-      "@gamemoa/game-typing-test":
+      "@owogg/game-typing-test":
         specifier: workspace:*
         version: link:../../games/typing-test
-      "@gamemoa/shared":
+      "@owogg/shared":
         specifier: workspace:*
         version: link:../../packages/shared
-      "@gamemoa/ui":
+      "@owogg/ui":
         specifier: workspace:*
         version: link:../../packages/ui
       "@react-router/cloudflare":
@@ -166,10 +166,10 @@ importers:
 
   games/aim-test:
     dependencies:
-      "@gamemoa/game-sdk":
+      "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
-      "@gamemoa/shared":
+      "@owogg/shared":
         specifier: workspace:*
         version: link:../../packages/shared
       react:
@@ -191,7 +191,7 @@ importers:
 
   games/memory-test:
     dependencies:
-      "@gamemoa/game-sdk":
+      "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
       lucide-react:
@@ -219,13 +219,13 @@ importers:
 
   games/reaction-time:
     dependencies:
-      "@gamemoa/game-sdk":
+      "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
-      "@gamemoa/shared":
+      "@owogg/shared":
         specifier: workspace:*
         version: link:../../packages/shared
-      "@gamemoa/ui":
+      "@owogg/ui":
         specifier: workspace:*
         version: link:../../packages/ui
       react:
@@ -250,10 +250,10 @@ importers:
 
   games/typing-test:
     dependencies:
-      "@gamemoa/game-sdk":
+      "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
-      "@gamemoa/shared":
+      "@owogg/shared":
         specifier: workspace:*
         version: link:../../packages/shared
       react:
@@ -285,7 +285,7 @@ importers:
 
   packages/core:
     dependencies:
-      "@gamemoa/game-sdk":
+      "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../game-sdk
     devDependencies:
@@ -301,7 +301,7 @@ importers:
 
   packages/db:
     dependencies:
-      "@gamemoa/core":
+      "@owogg/core":
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -326,7 +326,7 @@ importers:
 
   packages/shared:
     dependencies:
-      "@gamemoa/contracts":
+      "@owogg/contracts":
         specifier: workspace:*
         version: link:../contracts
       zod:

@@ -16,7 +16,7 @@ import { adminAccountsRouter } from "./routes/adminAccounts.js";
 import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { createContainer } from "./container.js";
 import { getCreatorProviderAdapters } from "./infrastructure/creators/index.js";
-import { FEATURED_POLICY } from "@gamemoa/core";
+import { FEATURED_POLICY } from "@owogg/core";
 import type { ApiEnv } from "./routes/auth.js";
 
 const app = new Hono<ApiEnv>();
@@ -75,7 +75,7 @@ app.use("*", async (c, next) => {
 app.get("/", (c) => {
   return c.json({
     status: "ok",
-    service: "gamemoa-hono-api",
+    service: "owogg-hono-api",
     runtime: "Cloudflare Workers",
   });
 });

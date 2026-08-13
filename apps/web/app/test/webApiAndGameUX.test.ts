@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { LeaderboardResponseSchema, LeaderRecordSchema } from "@gamemoa/contracts";
+import { LeaderboardResponseSchema, LeaderRecordSchema } from "@owogg/contracts";
 import { gameManifests } from "../features/catalog/registry.js";
 
 describe("Product Integrity & Web API Contracts", () => {

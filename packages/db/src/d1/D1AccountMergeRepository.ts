@@ -1,4 +1,4 @@
-import type { AccountMergeRepository, MergeChallenge, MergePreview } from "@gamemoa/core";
+import type { AccountMergeRepository, MergeChallenge, MergePreview } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export class D1AccountMergeRepository implements AccountMergeRepository {

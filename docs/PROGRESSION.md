@@ -1,22 +1,22 @@
-# GAMEMOA 경험치 / 레벨 / 도전과제 (PROGRESSION)
+# OwOGG 경험치 / 레벨 / 도전과제 (PROGRESSION)
 
-이 문서는 GAMEMOA 플랫폼 확장 스프린트("Player Platform / My Page / Creator Ranking / Discord Community")의
+이 문서는 OwOGG 플랫폼 확장 스프린트("Player Platform / My Page / Creator Ranking / Discord Community")의
 **Phase B: 진행도(Progression) 파운데이션**과 현재 Creator/Discord 연동과의 경계를 설명합니다.
 
 ---
 
 ## 1. 핵심 원칙 — XP ≠ 실력
 
-GAMEMOA에는 서로 다른 두 가지 개념이 존재하며, 이 둘은 **절대 섞이지 않습니다**.
+OwOGG에는 서로 다른 두 가지 개념이 존재하며, 이 둘은 **절대 섞이지 않습니다**.
 
-| 개념           | 의미                                  | 저장 위치                          |
-| -------------- | ------------------------------------- | ---------------------------------- |
-| **게임 점수**  | 경쟁적 실력/기록 (랭킹의 유일한 근거) | `scores` (기존)                    |
-| **GAMEMOA XP** | 플랫폼 활동/진행도 (레벨의 근거)      | `xp_events`, `user_progress`(신규) |
+| 개념          | 의미                                  | 저장 위치                          |
+| ------------- | ------------------------------------- | ---------------------------------- |
+| **게임 점수** | 경쟁적 실력/기록 (랭킹의 유일한 근거) | `scores` (기존)                    |
+| **OwOGG XP**  | 플랫폼 활동/진행도 (레벨의 근거)      | `xp_events`, `user_progress`(신규) |
 
 - XP는 게임 점수를 절대 변경하지 않습니다.
 - Creator/Discord 상태는 게임 점수에 어떠한 영향도 주지 않습니다 (향후 단계 포함, 영구 원칙).
-- XP 랭킹("누가 GAMEMOA를 활발히 이용하는가")과 게임 랭킹("누가 잘하는가")은 완전히 분리된 리더보드입니다.
+- XP 랭킹("누가 OwOGG를 활발히 이용하는가")과 게임 랭킹("누가 잘하는가")은 완전히 분리된 리더보드입니다.
 
 ---
 
@@ -99,7 +99,7 @@ API는 다음 파생 필드를 함께 노출합니다: `level`, `totalXp`, `curr
 
 ## 6. 글로벌 XP 랭킹
 
-- `GET /api/progression/leaderboard` — "누가 GAMEMOA를 활발히 이용하는가"에 대한 공개 리더보드.
+- `GET /api/progression/leaderboard` — "누가 OwOGG를 활발히 이용하는가"에 대한 공개 리더보드.
 - `GET /api/progression/me` — 인증된 사용자 본인의 레벨/XP/전역 순위 요약.
 - 국가별/Creator별/기간별 필터는 이번 스프린트 범위 밖이며, 스키마상 자연스럽게 확장 가능하도록 설계되었습니다
   (시즌 시스템 등 복잡한 구조는 이번 단계에서 도입하지 않음).
@@ -130,7 +130,7 @@ API는 다음 파생 필드를 함께 노출합니다: `level`, `totalXp`, `curr
 
 `packages/core/src/domain/profilePolicy.ts`에 중앙화되어 있습니다.
 
-- **닉네임**: GAMEMOA 자체 정체성이며 Google/Discord 표시 이름과 독립적입니다. 공백 트리밍, 빈 값/제어 문자 거부,
+- **닉네임**: OwOGG 자체 정체성이며 Google/Discord 표시 이름과 독립적입니다. 공백 트리밍, 빈 값/제어 문자 거부,
   Unicode 코드포인트 기준 2~20자, **변경 후 7일 쿨다운**(최초 변경은 쿨다운 없음).
 - **국가/지역**: "국적 인증"이 아닌 자기 신고 메타데이터이며, ISO 3166-1 alpha-2 코드로 저장됩니다(`KR`, `JP`, `US` 등).
   `null`은 "설정 안 함"을 의미하며 IP로 추론하지 않습니다. **변경 후 30일 쿨다운**.
