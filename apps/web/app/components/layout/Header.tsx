@@ -3,6 +3,7 @@ import { Search, Menu, Gamepad2, Bookmark, User, Command, LogOut, Trophy } from 
 import { useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useI18n } from "../../features/i18n/I18nContext";
+import { LanguageSelector } from "../ui/LanguageSelector";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -76,6 +77,8 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           >
             <Bookmark className="w-5 h-5" />
           </Link>
+
+          <LanguageSelector />
 
           {isAuthenticated && user ? (
             <div className="relative">

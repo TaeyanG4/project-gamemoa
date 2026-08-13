@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import { Gamepad2 } from "lucide-react";
 import { useI18n } from "../../features/i18n/I18nContext";
-import { LanguageSelector } from "../ui/LanguageSelector";
 
 export function Footer() {
   const { dict } = useI18n();
@@ -47,7 +46,6 @@ export function Footer() {
           <Link to="/privacy" className="hover:text-text-primary transition-colors">
             개인정보처리방침
           </Link>
-          <LanguageSelector />
         </div>
       </div>
     </footer>

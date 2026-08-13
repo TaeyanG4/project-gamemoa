@@ -1,4 +1,5 @@
-import { Languages } from "lucide-react";
+import { useState } from "react";
+import { Check, Languages } from "lucide-react";
 import { SUPPORTED_LOCALES } from "@gamemoa/core";
 import type { SupportedLocale } from "@gamemoa/contracts";
 import { useI18n } from "../../features/i18n/I18nContext";
@@ -10,27 +11,59 @@ const NATIVE_LABELS: Record<SupportedLocale, string> = {
   "zh-CN": "简体中文",
 };
 
-/** Accessible language selector — changes apply immediately (no page reload). Suitable for the
- * footer/global navigation and for Profile/Account settings. */
+/** Icon-triggered language switcher for the global header — lives next to the favorites
+ * shortcut. Changes apply immediately (no page reload). Mirrors the header's existing user
+ * dropdown pattern (button + absolutely-positioned panel, closes on mouse leave). */
 export function LanguageSelector({ className = "" }: { className?: string }) {
   const { locale, setLocale, dict } = useI18n();
+  const [open, setOpen] = useState(false);
 
   return (
-    <label className={`inline-flex items-center gap-1.5 text-xs ${className}`}>
-      <span className="sr-only">{dict.language.label}</span>
-      <Languages className="h-3.5 w-3.5 text-text-muted" aria-hidden="true" />
-      <select
-        value={locale}
-        onChange={(e) => setLocale(e.target.value as SupportedLocale)}
+    <div className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="p-2.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors cursor-pointer"
+        title={dict.language.label}
         aria-label={dict.language.label}
-        className="cursor-pointer rounded-lg border border-border bg-surface-raised px-2 py-1 text-xs font-semibold text-text-secondary hover:text-text-primary focus:outline-none focus:ring-2 focus:ring-brand"
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        {SUPPORTED_LOCALES.map((l) => (
-          <option key={l} value={l}>
-            {NATIVE_LABELS[l]}
-          </option>
-        ))}
-      </select>
-    </label>
+        <Languages className="w-5 h-5" />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          aria-label={dict.language.label}
+          className="absolute right-0 mt-2 w-40 bg-surface-raised border border-border rounded-2xl shadow-2xl py-1.5 flex flex-col z-50 animate-in fade-in zoom-in-95 duration-150"
+          onMouseLeave={() => setOpen(false)}
+        >
+          {SUPPORTED_LOCALES.map((l) => {
+            const active = l === locale;
+            return (
+              <button
+                key={l}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  setLocale(l);
+                  setOpen(false);
+                }}
+                className={`flex items-center justify-between gap-2 px-4 py-2 text-xs font-semibold transition-colors cursor-pointer ${
+                  active
+                    ? "text-brand-light bg-brand/10"
+                    : "text-text-primary hover:bg-surface-overlay"
+                }`}
+              >
+                <span>{NATIVE_LABELS[l]}</span>
+                {active && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

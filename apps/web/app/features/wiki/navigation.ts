@@ -55,6 +55,13 @@ export function buildWikiSections(dict: Dictionary["wiki"]): WikiNavSection[] {
         { path: "/wiki/creator/featured", label: dict.navCreatorFeatured },
       ],
     },
+    {
+      title: "정책",
+      items: [
+        { path: "/terms", label: "이용약관" },
+        { path: "/privacy", label: "개인정보처리방침" },
+      ],
+    },
   ];
 }
 

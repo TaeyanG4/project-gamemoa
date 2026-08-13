@@ -1,3 +1,5 @@
+import { WikiLayout } from "../components/wiki/WikiLayout";
+
 export function meta() {
   return [
     { title: "이용약관 | GAMEMOA" },
@@ -17,15 +19,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function TermsRoute() {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-10 md:px-8">
-      <header>
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-light">GAMEMOA</p>
-        <h1 className="mt-2 text-2xl font-black tracking-tight text-text-primary md:text-3xl">
-          이용약관
-        </h1>
-        <p className="mt-2 text-xs text-text-muted">시행일: 2026년 8월 14일</p>
-      </header>
-
+    <WikiLayout eyebrow="정책" title="이용약관" description="시행일: 2026년 8월 14일">
       <div className="space-y-8 rounded-2xl border border-border bg-surface-raised p-5 md:p-8">
         <Section title="1. 서비스 개요">
           <p>
@@ -100,6 +94,6 @@ export default function TermsRoute() {
           </p>
         </Section>
       </div>
-    </div>
+    </WikiLayout>
   );
 }

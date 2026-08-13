@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { BookOpen, Gamepad2, MessagesSquare, User, Video } from "lucide-react";
+import { BookOpen, FileText, Gamepad2, MessagesSquare, User, Video } from "lucide-react";
 import { useI18n } from "../features/i18n/I18nContext";
 import type { Dictionary } from "../features/i18n/dictionary";
 
@@ -46,6 +46,13 @@ function buildCategories(dict: Dictionary["wiki"]) {
       description: dict.catCreatorDesc,
       path: "/wiki/creator",
       tone: "text-purple-300 bg-purple-500/10 border-purple-500/30",
+    },
+    {
+      icon: FileText,
+      title: "정책",
+      description: "이용약관과 개인정보 처리방침을 확인하세요.",
+      path: "/terms",
+      tone: "text-sky-300 bg-sky-500/10 border-sky-500/30",
     },
   ] as const;
 }

@@ -1,3 +1,5 @@
+import { WikiLayout } from "../components/wiki/WikiLayout";
+
 export function meta() {
   return [
     { title: "개인정보 처리방침 | GAMEMOA" },
@@ -17,15 +19,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function PrivacyRoute() {
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-8 px-4 py-10 md:px-8">
-      <header>
-        <p className="text-xs font-black uppercase tracking-[0.2em] text-brand-light">GAMEMOA</p>
-        <h1 className="mt-2 text-2xl font-black tracking-tight text-text-primary md:text-3xl">
-          개인정보 처리방침
-        </h1>
-        <p className="mt-2 text-xs text-text-muted">시행일: 2026년 8월 14일</p>
-      </header>
-
+    <WikiLayout eyebrow="정책" title="개인정보 처리방침" description="시행일: 2026년 8월 14일">
       <div className="space-y-8 rounded-2xl border border-border bg-surface-raised p-5 md:p-8">
         <Section title="1. 수집하는 개인정보 항목">
           <p>GAMEMOA는 서비스 제공을 위해 아래 정보만 수집합니다.</p>
@@ -111,6 +105,6 @@ export default function PrivacyRoute() {
           </p>
         </Section>
       </div>
-    </div>
+    </WikiLayout>
   );
 }
