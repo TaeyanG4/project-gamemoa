@@ -8,8 +8,8 @@
 **Phase H1(Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`)**, **Phase H2(Discord 서버 리더보드 & 커맨드)**,
 **Phase E1(Creator 채널 소유권 검증)**, **Phase E2A(Featured Creator 자격 심사 엔진)**,
 **Phase E2B(Featured 수동 심사·재검증·관리자 안전)**를 완수했습니다.
-현재 **Phase I 계정 통합 회귀·플랫폼 무결성·Admin Center·Discord 가이드 구현**을 완료하고
-통합 품질 게이트와 원격 배포 검증을 진행 중입니다.
+현재 **Phase I 계정 통합 회귀·플랫폼 무결성·Admin Center·Discord 가이드 구현**과
+통합 품질 게이트·원격 배포 검증을 모두 완료했습니다.
 전체 스프린트 단계 구조는 `docs/ROADMAP.md` §1, 상세 설계는 `docs/PROGRESSION.md`(진행도),
 `docs/DISCORD_INTEGRATION.md`(Discord), `docs/CREATOR_SYSTEM.md`(Creator)를 참고하세요.
 
@@ -104,13 +104,22 @@
 
 ## 남은 작업
 
-1. 로컬 `pnpm verify`와 D1 migration/registry 검증
-2. 커밋·푸시 후 GitHub Actions CI 및 Cloudflare Deploy GREEN 확인
-3. `/api/health`, `/version.json`, `pnpm smoke:prod`의 최종 SHA provenance 확인
-4. 외부 설정 항목(Discord Portal endpoint/명령어 등록, `ADMIN_USER_IDS`, 선택적 설치 링크)의 실제 설정 여부 확인
+1. 외부 설정 항목(Discord Portal endpoint/명령어 등록, `ADMIN_USER_IDS`, 선택적 설치 링크)의 실제 설정 여부 확인
+
+## 최종 검증
+
+- [x] `pnpm generate:registry`, `pnpm format`, `pnpm verify`, 로컬 D1 migration 검증
+- [x] GitHub Actions CI GREEN
+- [x] Cloudflare Deploy GREEN
+- [x] `/api/health`와 `/version.json`이 동일한 최종 배포 provenance 반환
+- [x] `pnpm smoke:prod` 및 주요 Web route production smoke 통과
+- [x] 관리자 인증되지 않은 요청은 `/api/admin/me`에서 기본 거부되고 민감 관리자 응답은 `no-store`
+
+Discord Developer Portal 명령어 등록/Interactions Endpoint, `ADMIN_USER_IDS`, 선택적 `DISCORD_INSTALL_URL`은
+외부 접근이 필요한 **외부 설정 대기** 항목이며 저장소 검증 완료와 별개입니다.
 
 ---
 
 ## 다음 작업 (Next Action)
 
-`Phase I 로컬 품질 게이트 완료 후 커밋·원격 CI/Deploy·Provenance·프로덕션 smoke 검증`
+`Post-Sprint Production Readiness & UX QA`
