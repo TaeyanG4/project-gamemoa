@@ -21,7 +21,9 @@ function mapPlatformAccountRow(r: Record<string, unknown>): CreatorPlatformAccou
     avatarUrl: r.avatar_url ? String(r.avatar_url) : null,
     verificationStatus: String(r.verification_status),
     verifiedAt: r.verified_at ? String(r.verified_at) : null,
-    audienceCount: r.audience_count !== undefined ? Number(r.audience_count) : 0,
+    // audience_count_known distinguishes "official API confirmed zero" from "never obtained" —
+    // never coerce an unknown value to 0.
+    audienceCount: Number(r.audience_count_known) === 1 ? Number(r.audience_count ?? 0) : null,
     channelCreatedAt: r.channel_created_at ? String(r.channel_created_at) : null,
     metricsSyncedAt: r.metrics_synced_at ? String(r.metrics_synced_at) : null,
     createdAt: String(r.created_at),
@@ -134,11 +136,12 @@ export class D1CreatorRepository implements CreatorRepository {
     await this.db
       .prepare(
         `UPDATE creator_platform_accounts
-         SET audience_count = ?, channel_created_at = ?, metrics_synced_at = ?, updated_at = ?
+         SET audience_count = ?, audience_count_known = ?, channel_created_at = ?, metrics_synced_at = ?, updated_at = ?
          WHERE id = ?`,
       )
       .bind(
         input.audienceCount,
+        input.audienceCount !== null ? 1 : 0,
         input.channelCreatedAt,
         input.syncedAt,
         input.syncedAt,
@@ -263,13 +266,18 @@ export class D1CreatorRepository implements CreatorRepository {
     const verAt = verStatus === "VERIFIED" ? now : null;
     const existing = await this.findPlatformAccount(input.platform, input.platformUserId);
 
+    // A fresh provider response with no audience value must persist as UNKNOWN — never fall
+    // back to a stale/previous value or coerce to a known zero.
+    const audienceKnown = input.audienceCount !== undefined;
+    const audienceValue = audienceKnown ? (input.audienceCount as number) : null;
+
     if (existing) {
       await this.db
         .prepare(
           `UPDATE creator_platform_accounts
            SET creator_id = ?, channel_name = ?, channel_handle = ?, channel_url = ?, avatar_url = ?,
-               verification_status = ?, verified_at = ?, audience_count = ?, channel_created_at = ?,
-               metrics_synced_at = ?, updated_at = ?
+               verification_status = ?, verified_at = ?, audience_count = ?, audience_count_known = ?,
+               channel_created_at = ?, metrics_synced_at = ?, updated_at = ?
            WHERE platform = ? AND platform_user_id = ?`,
         )
         .bind(
@@ -280,7 +288,8 @@ export class D1CreatorRepository implements CreatorRepository {
           input.avatarUrl ?? null,
           verStatus,
           verAt,
-          input.audienceCount ?? existing.audienceCount ?? 0,
+          audienceValue,
+          audienceKnown ? 1 : 0,
           input.channelCreatedAt ?? existing.channelCreatedAt ?? null,
           now,
           now,
@@ -296,8 +305,8 @@ export class D1CreatorRepository implements CreatorRepository {
     await this.db
       .prepare(
         `INSERT INTO creator_platform_accounts
-         (creator_id, platform, platform_user_id, channel_name, channel_handle, channel_url, avatar_url, verification_status, verified_at, audience_count, channel_created_at, metrics_synced_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (creator_id, platform, platform_user_id, channel_name, channel_handle, channel_url, avatar_url, verification_status, verified_at, audience_count, audience_count_known, channel_created_at, metrics_synced_at, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         input.creatorId,
@@ -309,7 +318,8 @@ export class D1CreatorRepository implements CreatorRepository {
         input.avatarUrl ?? null,
         verStatus,
         verAt,
-        input.audienceCount ?? 0,
+        audienceValue,
+        audienceKnown ? 1 : 0,
         input.channelCreatedAt ?? null,
         now,
         now,
@@ -340,63 +350,80 @@ export class D1CreatorRepository implements CreatorRepository {
     const limit = options.limit ?? 20;
     const offset = options.offset ?? 0;
 
+    // EXISTS avoids joining creator_platform_accounts directly onto the ranked row set, which
+    // would duplicate a creator's PB row once per matching platform account.
     const platformFilterClause = options.platform
-      ? `AND cp.id IN (SELECT creator_id FROM creator_platform_accounts WHERE platform = ? AND verification_status = 'VERIFIED')`
+      ? `AND EXISTS (
+           SELECT 1 FROM creator_platform_accounts cpa
+           WHERE cpa.creator_id = cp.id AND cpa.platform = ? AND cpa.verification_status = 'VERIFIED'
+         )`
       : "";
 
     if (options.mode === "score") {
       const selectedGameId = options.gameId && options.gameId !== "all" ? options.gameId : null;
       const orderClause = options.direction === "asc" ? "ASC" : "DESC";
+      const gameFilterClause = selectedGameId ? `AND s.game_id = ?` : "";
 
-      let query = `
-        SELECT s.id, s.user_id, u.nickname, u.avatar_url, u.country, s.game_id, s.score, s.created_at,
-               cp.id as creator_id, cp.featured_status
-        FROM scores s
-        JOIN users u ON u.id = s.user_id
-        JOIN creator_profiles cp ON cp.user_id = s.user_id
-        WHERE cp.status = 'VERIFIED' ${platformFilterClause}
+      // One canonical PB row per eligible Creator user is selected in SQL (ROW_NUMBER, before
+      // LIMIT/OFFSET) so a single Creator with hundreds of raw score rows can never crowd other
+      // Creators out of the page or corrupt the total count. Deterministic tie-break: score,
+      // then earliest created_at, then row id.
+      const rankedCte = `
+        WITH eligible AS (
+          SELECT s.id, s.user_id, s.game_id, s.score, s.created_at, cp.id AS creator_id, cp.featured_status
+          FROM scores s
+          JOIN creator_profiles cp ON cp.user_id = s.user_id
+          WHERE cp.status = 'VERIFIED' ${gameFilterClause} ${platformFilterClause}
+        ),
+        pb AS (
+          SELECT *, ROW_NUMBER() OVER (
+            PARTITION BY user_id
+            ORDER BY score ${orderClause}, created_at ASC, id ASC
+          ) AS rn
+          FROM eligible
+        )
+        SELECT * FROM pb WHERE rn = 1
       `;
 
-      if (selectedGameId) {
-        query += ` AND s.game_id = ?`;
-      }
+      const bindArgs: (string | number)[] = [];
+      if (selectedGameId) bindArgs.push(selectedGameId);
+      if (options.platform) bindArgs.push(options.platform);
 
-      query += ` ORDER BY s.score ${orderClause}, s.created_at ASC LIMIT 200`;
+      const countQuery = `SELECT COUNT(*) as total FROM (${rankedCte})`;
+      const countRow = await this.db
+        .prepare(countQuery)
+        .bind(...bindArgs)
+        .first<{ total: number }>();
+      const total = countRow?.total ?? 0;
 
-      const stmt = options.platform
-        ? selectedGameId
-          ? this.db.prepare(query).bind(options.platform, selectedGameId)
-          : this.db.prepare(query).bind(options.platform)
-        : selectedGameId
-          ? this.db.prepare(query).bind(selectedGameId)
-          : this.db.prepare(query);
+      const dataQuery = `
+        SELECT * FROM (${rankedCte})
+        ORDER BY score ${orderClause}, created_at ASC, user_id ASC
+        LIMIT ? OFFSET ?
+      `;
+      const res = await this.db
+        .prepare(dataQuery)
+        .bind(...bindArgs, limit, offset)
+        .all<Record<string, unknown>>();
+      const page = res.results || [];
 
-      const res = await stmt.all<Record<string, unknown>>();
-
-      const seen = new Set<number>();
-      const rawCandidates: Record<string, unknown>[] = [];
-
-      for (const row of res.results || []) {
-        const userId = Number(row.user_id);
-        if (isNaN(userId) || seen.has(userId)) continue;
-        seen.add(userId);
-        rawCandidates.push(row);
-      }
-
-      const total = rawCandidates.length;
-      const page = rawCandidates.slice(offset, offset + limit);
-
+      const userIds = page.map((r) => Number(r.user_id));
       const creatorIds = page.map((r) => Number(r.creator_id));
-      const platformMap = await this.loadPlatformsForCreators(creatorIds);
+      const [profileMap, platformMap] = await Promise.all([
+        this.loadUsersByIds(userIds),
+        this.loadPlatformsForCreators(creatorIds),
+      ]);
 
       const entries: CreatorRankEntry[] = page.map((row, idx) => {
         const gId = String(row.game_id);
+        const userId = Number(row.user_id);
+        const profile = profileMap.get(userId);
 
         return {
-          userId: Number(row.user_id),
-          nickname: String(row.nickname),
-          avatarUrl: row.avatar_url ? String(row.avatar_url) : null,
-          country: row.country ? String(row.country) : null,
+          userId,
+          nickname: profile?.nickname ?? "",
+          avatarUrl: profile?.avatarUrl ?? null,
+          country: profile?.country ?? null,
           creatorId: Number(row.creator_id),
           featuredStatus: String(row.featured_status) as FeaturedStatusType,
           platformAccounts: platformMap.get(Number(row.creator_id)) || [],
@@ -513,6 +540,31 @@ export class D1CreatorRepository implements CreatorRepository {
       map.set(cId, list);
     }
 
+    return map;
+  }
+
+  private async loadUsersByIds(
+    userIds: number[],
+  ): Promise<Map<number, { nickname: string; avatarUrl: string | null; country: string | null }>> {
+    const map = new Map<
+      number,
+      { nickname: string; avatarUrl: string | null; country: string | null }
+    >();
+    if (userIds.length === 0) return map;
+
+    const placeholders = userIds.map(() => "?").join(",");
+    const res = await this.db
+      .prepare(`SELECT id, nickname, avatar_url, country FROM users WHERE id IN (${placeholders})`)
+      .bind(...userIds)
+      .all<Record<string, unknown>>();
+
+    for (const r of res.results || []) {
+      map.set(Number(r.id), {
+        nickname: String(r.nickname),
+        avatarUrl: r.avatar_url ? String(r.avatar_url) : null,
+        country: r.country ? String(r.country) : null,
+      });
+    }
     return map;
   }
 }

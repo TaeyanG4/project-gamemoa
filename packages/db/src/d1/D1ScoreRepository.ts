@@ -1,6 +1,18 @@
 import type { Score, ScoreRepository, UserPersonalBestAggregate } from "@gamemoa/core";
 import type { D1Database } from "./D1UserRepository.js";
 
+function mapScoreRow(row: Record<string, unknown>): Score {
+  return {
+    id: Number(row.id),
+    user_id: Number(row.user_id),
+    nickname: String(row.nickname),
+    avatar_url: row.avatar_url ? String(row.avatar_url) : null,
+    game_id: String(row.game_id),
+    score: Number(row.score),
+    created_at: String(row.created_at),
+  };
+}
+
 export class D1ScoreRepository implements ScoreRepository {
   constructor(private db: D1Database) {}
 
@@ -52,44 +64,42 @@ export class D1ScoreRepository implements ScoreRepository {
     limit = 20,
     direction: "asc" | "desc" = "desc",
   ): Promise<Score[]> {
+    // `direction` must only ever originate from the trusted game manifest (never from raw
+    // user/query input) — it is interpolated directly into SQL below.
     const orderClause = direction === "asc" ? "ASC" : "DESC";
 
-    const query =
-      gameId === "all"
-        ? `SELECT * FROM scores WHERE user_id IS NOT NULL ORDER BY created_at DESC LIMIT ?`
-        : `SELECT * FROM scores WHERE user_id IS NOT NULL AND game_id = ? ORDER BY score ${orderClause}, created_at ASC LIMIT 100`;
-
-    const prepared =
-      gameId === "all" ? this.db.prepare(query).bind(limit) : this.db.prepare(query).bind(gameId);
-
-    const res = await prepared.all<Record<string, unknown>>();
-
-    // Deduplicate top score per authenticated user
-    const seen = new Set<number>();
-    const leaderboard: Score[] = [];
-
-    for (const row of res.results) {
-      if (row.user_id === null || row.user_id === undefined) continue;
-      const userId = Number(row.user_id);
-      if (isNaN(userId)) continue;
-
-      if (seen.has(userId)) continue;
-      seen.add(userId);
-
-      leaderboard.push({
-        id: Number(row.id),
-        user_id: userId,
-        nickname: String(row.nickname),
-        avatar_url: row.avatar_url ? String(row.avatar_url) : null,
-        game_id: String(row.game_id),
-        score: Number(row.score),
-        created_at: String(row.created_at),
-      });
-
-      if (leaderboard.length >= limit) break;
+    if (gameId === "all") {
+      // Recent-activity feed, not a per-user ranked leaderboard — no PB dedup semantics apply.
+      const res = await this.db
+        .prepare(`SELECT * FROM scores WHERE user_id IS NOT NULL ORDER BY created_at DESC LIMIT ?`)
+        .bind(limit)
+        .all<Record<string, unknown>>();
+      return res.results.map(mapScoreRow);
     }
 
-    return leaderboard;
+    // One canonical personal-best row per user is selected IN SQL (via ROW_NUMBER, before
+    // LIMIT), then the deduplicated PB set is ranked and paginated. This must never regress to
+    // "ORDER BY score LIMIT N" followed by JS de-duplication — a single user holding many of the
+    // top-N raw rows would otherwise crowd out every other player from the leaderboard.
+    // Deterministic tie-break: score, then earliest created_at, then row id.
+    const query = `
+      WITH ranked AS (
+        SELECT *, ROW_NUMBER() OVER (
+          PARTITION BY user_id
+          ORDER BY score ${orderClause}, created_at ASC, id ASC
+        ) AS rn
+        FROM scores
+        WHERE user_id IS NOT NULL AND game_id = ?
+      )
+      SELECT * FROM ranked
+      WHERE rn = 1
+      ORDER BY score ${orderClause}, created_at ASC, id ASC
+      LIMIT ?
+    `;
+
+    const res = await this.db.prepare(query).bind(gameId, limit).all<Record<string, unknown>>();
+
+    return res.results.map(mapScoreRow);
   }
 
   async getUserPersonalBests(userId: number): Promise<UserPersonalBestAggregate[]> {
