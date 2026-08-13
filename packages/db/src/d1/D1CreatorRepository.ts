@@ -163,7 +163,11 @@ export class D1CreatorRepository implements CreatorRepository {
     if (existing) {
       const featStatus = input.featuredStatus ?? existing.featuredStatus;
       const featSince =
-        featStatus !== "NONE" && existing.featuredStatus === "NONE" ? now : existing.featuredSince;
+        featStatus === "NONE"
+          ? null
+          : existing.featuredStatus === "NONE"
+            ? now
+            : existing.featuredSince;
 
       await this.db
         .prepare(

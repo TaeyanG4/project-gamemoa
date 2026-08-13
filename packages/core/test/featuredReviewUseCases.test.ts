@@ -60,12 +60,14 @@ class MemoryReviewRepo implements CreatorReviewRepository {
     const job: CreatorReviewJob = {
       id: this.nextId++,
       creatorPlatformAccountId: input.creatorPlatformAccountId,
+      reviewType: "ACQUISITION",
       status: "AUTO_REVIEW_PENDING",
       initialAudience: input.initialAudience,
       initialChannelCreatedAt: input.initialChannelCreatedAt,
       nextCheckAt: input.nextCheckAt,
       attemptCount: 0,
       lastError: null,
+      reviewReason: null,
       createdAt: NOW_ISO,
       updatedAt: NOW_ISO,
       completedAt: null,
@@ -74,11 +76,68 @@ class MemoryReviewRepo implements CreatorReviewRepository {
     return job;
   }
 
+  async findLatestRevalidationJobByAccountId(id: number): Promise<CreatorReviewJob | null> {
+    const candidates = this.jobs.filter(
+      (j) => j.creatorPlatformAccountId === id && j.reviewType === "REVALIDATION",
+    );
+    return candidates.length > 0 ? candidates[candidates.length - 1] : null;
+  }
+
+  async scheduleRevalidationJob(input: {
+    creatorPlatformAccountId: number;
+    nextCheckAt: string;
+    nowIso: string;
+  }): Promise<CreatorReviewJob> {
+    const existing = await this.findLatestRevalidationJobByAccountId(
+      input.creatorPlatformAccountId,
+    );
+    if (
+      existing &&
+      (existing.status === "REVALIDATION_PENDING" ||
+        existing.status === "REVALIDATION_FAILED_RETRYABLE" ||
+        existing.status === "MANUAL_REVIEW")
+    ) {
+      return existing;
+    }
+    const job: CreatorReviewJob = {
+      id: this.nextId++,
+      creatorPlatformAccountId: input.creatorPlatformAccountId,
+      reviewType: "REVALIDATION",
+      status: "REVALIDATION_PENDING",
+      initialAudience: null,
+      initialChannelCreatedAt: null,
+      nextCheckAt: input.nextCheckAt,
+      attemptCount: 0,
+      lastError: null,
+      reviewReason: null,
+      createdAt: input.nowIso,
+      updatedAt: input.nowIso,
+      completedAt: null,
+    };
+    this.jobs.push(job);
+    return job;
+  }
+
+  async ensureRevalidationJobs(): Promise<number> {
+    return 0;
+  }
+
   async listDuePendingJobs(limit: number, nowIso: string): Promise<CreatorReviewJob[]> {
     return this.jobs
       .filter(
         (j) =>
           (j.status === "AUTO_REVIEW_PENDING" || j.status === "FAILED_RETRYABLE") &&
+          j.nextCheckAt <= nowIso,
+      )
+      .slice(0, limit);
+  }
+
+  async listDueRevalidationJobs(limit: number, nowIso: string): Promise<CreatorReviewJob[]> {
+    return this.jobs
+      .filter(
+        (j) =>
+          j.reviewType === "REVALIDATION" &&
+          (j.status === "REVALIDATION_PENDING" || j.status === "REVALIDATION_FAILED_RETRYABLE") &&
           j.nextCheckAt <= nowIso,
       )
       .slice(0, limit);
@@ -92,7 +151,8 @@ class MemoryReviewRepo implements CreatorReviewRepository {
   ): Promise<void> {
     const job = this.jobs.find((j) => j.id === id);
     if (!job) return;
-    job.status = "FAILED_RETRYABLE";
+    job.status =
+      job.reviewType === "REVALIDATION" ? "REVALIDATION_FAILED_RETRYABLE" : "FAILED_RETRYABLE";
     job.attemptCount += 1;
     job.lastError = error;
     job.nextCheckAt = nextCheckAt;
@@ -103,6 +163,7 @@ class MemoryReviewRepo implements CreatorReviewRepository {
     id: number,
     status: Exclude<CreatorReviewJob["status"], "AUTO_REVIEW_PENDING" | "FAILED_RETRYABLE">,
     completedAt: string,
+    reason?: string,
   ): Promise<boolean> {
     const job = this.jobs.find((j) => j.id === id);
     if (
@@ -114,9 +175,27 @@ class MemoryReviewRepo implements CreatorReviewRepository {
       return false;
     }
     job.status = status;
+    job.reviewReason = reason ?? job.reviewReason;
     job.completedAt = completedAt;
     job.updatedAt = completedAt;
     return true;
+  }
+
+  async listManualReviewQueue(): Promise<{ items: never[]; total: number }> {
+    return { items: [], total: 0 };
+  }
+
+  async listAuditLogs(): Promise<{ entries: never[]; total: number }> {
+    return { entries: [], total: 0 };
+  }
+
+  async applyManualReviewDecision(): Promise<{
+    applied: false;
+    code: "NOT_FOUND";
+    previousStatus: null;
+    newStatus: null;
+  }> {
+    return { applied: false, code: "NOT_FOUND", previousStatus: null, newStatus: null };
   }
 }
 
@@ -247,7 +326,9 @@ class MemoryCreatorRepo implements CreatorRepository {
         featuredSince:
           input.featuredStatus === "FEATURED"
             ? (existing.featuredSince ?? now)
-            : existing.featuredSince,
+            : input.featuredStatus === "NONE"
+              ? null
+              : existing.featuredSince,
         updatedAt: now,
       };
       this.profiles.set(existing.id, updated);
@@ -421,7 +502,14 @@ test("runDueFeaturedReviews — qualified recheck promotes profile to FEATURED a
   assert.equal(updated?.metricsSyncedAt, NOW_ISO);
 
   const job = await reviewRepo.findLatestJobByAccountIds([account.id]);
-  assert.equal(job?.status, "FEATURED");
+  assert.equal(job?.status, "REVALIDATION_PENDING");
+  assert.equal(
+    reviewRepo.jobs.find(
+      (candidate) =>
+        candidate.creatorPlatformAccountId === account.id && candidate.reviewType === "ACQUISITION",
+    )?.status,
+    "FEATURED",
+  );
 });
 
 test("runDueFeaturedReviews — audience drop below minimum → NOT_ELIGIBLE and badge not granted", async () => {
@@ -553,7 +641,7 @@ test("runDueFeaturedReviews — duplicate run is idempotent (completed jobs are 
     batchSize: 10,
   });
   const first = await reviewRepo.findLatestJobByAccountIds([account.id]);
-  assert.equal(first?.status, "FEATURED");
+  assert.equal(first?.status, "REVALIDATION_PENDING");
 
   const summary2 = await useCases.runDueFeaturedReviews({
     adapters: makeAdapters(),
@@ -621,4 +709,144 @@ test("Featured processing never touches scores, XP or ranking inputs", async () 
   assert.equal(rankings.total, 0);
   const profile = await repo.findProfileByUserId(16);
   assert.equal(profile?.featuredStatus, "FEATURED");
+});
+
+async function setupFeaturedForRevalidation(userId: number) {
+  const repo = new MemoryCreatorRepo();
+  const reviewRepo = new MemoryReviewRepo();
+  const { useCases, account } = await setupVerifiedAccount(repo, reviewRepo, userId);
+  await useCases.runDueFeaturedReviews({
+    adapters: makeAdapters(),
+    now: new Date(NOW_MS),
+    batchSize: 10,
+  });
+  const revalidationJob = reviewRepo.jobs.find(
+    (job) => job.creatorPlatformAccountId === account.id && job.reviewType === "REVALIDATION",
+  );
+  assert.ok(revalidationJob);
+  revalidationJob.nextCheckAt = NOW_ISO;
+  return { repo, reviewRepo, useCases, account, revalidationJob };
+}
+
+test("runDueFeaturedRevalidations — fresh audience >= 8,000 retains Featured and schedules next cadence", async () => {
+  const { repo, reviewRepo, useCases, account } = await setupFeaturedForRevalidation(30);
+  const summary = await useCases.runDueFeaturedRevalidations({
+    adapters: makeAdapters({
+      YOUTUBE: new FakeProvider("YOUTUBE", {
+        audienceCount: 8000,
+        channelCreatedAt: isoDaysAgo(500),
+        channelState: "ACTIVE",
+      }),
+    }),
+    now: new Date(NOW_MS),
+    batchSize: 10,
+  });
+
+  assert.deepEqual(summary, { processed: 1, retained: 1, revoked: 0, manualReview: 0, failed: 0 });
+  assert.equal((await repo.findProfileByUserId(30))?.featuredStatus, "FEATURED");
+  assert.equal(
+    reviewRepo.jobs.filter(
+      (job) => job.creatorPlatformAccountId === account.id && job.reviewType === "REVALIDATION",
+    ).length,
+    2,
+  );
+});
+
+test("runDueFeaturedRevalidations — fresh audience below 8,000 revokes Featured", async () => {
+  const { repo, useCases } = await setupFeaturedForRevalidation(31);
+  const summary = await useCases.runDueFeaturedRevalidations({
+    adapters: makeAdapters({
+      YOUTUBE: new FakeProvider("YOUTUBE", {
+        audienceCount: 7999,
+        channelCreatedAt: isoDaysAgo(500),
+        channelState: "ACTIVE",
+      }),
+    }),
+    now: new Date(NOW_MS),
+    batchSize: 10,
+  });
+
+  assert.equal(summary.revoked, 1);
+  const profile = await repo.findProfileByUserId(31);
+  assert.equal(profile?.featuredStatus, "NONE");
+  assert.equal(profile?.featuredSince, null);
+});
+
+test("runDueFeaturedRevalidations — temporary provider error preserves Featured and retries", async () => {
+  const { repo, reviewRepo, useCases, account } = await setupFeaturedForRevalidation(32);
+  const summary = await useCases.runDueFeaturedRevalidations({
+    adapters: makeAdapters({
+      YOUTUBE: new FakeProvider("YOUTUBE", undefined, true, "temporary outage"),
+    }),
+    now: new Date(NOW_MS),
+    batchSize: 10,
+  });
+
+  assert.equal(summary.failed, 1);
+  assert.equal((await repo.findProfileByUserId(32))?.featuredStatus, "FEATURED");
+  assert.equal(
+    reviewRepo.jobs.find(
+      (job) => job.creatorPlatformAccountId === account.id && job.reviewType === "REVALIDATION",
+    )?.status,
+    "REVALIDATION_FAILED_RETRYABLE",
+  );
+});
+
+test("runDueFeaturedRevalidations — unavailable metric routes to manual review without stripping badge", async () => {
+  const { repo, reviewRepo, useCases, account } = await setupFeaturedForRevalidation(33);
+  const summary = await useCases.runDueFeaturedRevalidations({
+    adapters: makeAdapters({
+      YOUTUBE: new FakeProvider("YOUTUBE", {
+        audienceCount: null,
+        channelCreatedAt: null,
+        channelState: "ACTIVE",
+      }),
+    }),
+    now: new Date(NOW_MS),
+    batchSize: 10,
+  });
+
+  assert.equal(summary.manualReview, 1);
+  assert.equal((await repo.findProfileByUserId(33))?.featuredStatus, "FEATURED");
+  assert.equal(
+    reviewRepo.jobs.find(
+      (job) => job.creatorPlatformAccountId === account.id && job.reviewType === "REVALIDATION",
+    )?.status,
+    "MANUAL_REVIEW",
+  );
+});
+
+test("runDueFeaturedRevalidations — authoritative deleted channel revokes eligibility", async () => {
+  const { repo, useCases } = await setupFeaturedForRevalidation(34);
+  const summary = await useCases.runDueFeaturedRevalidations({
+    adapters: makeAdapters({
+      YOUTUBE: new FakeProvider("YOUTUBE", {
+        audienceCount: null,
+        channelCreatedAt: null,
+        channelState: "NOT_FOUND",
+      }),
+    }),
+    now: new Date(NOW_MS),
+    batchSize: 10,
+  });
+
+  assert.equal(summary.revoked, 1);
+  assert.equal((await repo.findProfileByUserId(34))?.featuredStatus, "NONE");
+});
+
+test("runDueFeaturedRevalidations — bounded and idempotent after a completed revalidation", async () => {
+  const { useCases } = await setupFeaturedForRevalidation(35);
+  const adapters = makeAdapters();
+  const first = await useCases.runDueFeaturedRevalidations({
+    adapters,
+    now: new Date(NOW_MS),
+    batchSize: 1,
+  });
+  const second = await useCases.runDueFeaturedRevalidations({
+    adapters,
+    now: new Date(NOW_MS),
+    batchSize: 1,
+  });
+  assert.equal(first.processed, 1);
+  assert.equal(second.processed, 0);
 });

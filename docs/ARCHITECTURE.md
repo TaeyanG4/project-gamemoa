@@ -12,6 +12,8 @@ gamemoa/
 │   │   └── app/features/scores/ # 클라이언트 점수 API 및 저장소 헬퍼
 │   └── api/                     # Hono API 백엔드 (Cloudflare Workers / Node.js portable)
 │       ├── src/container.ts     # API Composition Root (의존성 주입 컨테이너)
+│       ├── src/auth/admin.ts    # 명시적 ADMIN_USER_IDS 서버 권한 가드
+│       ├── src/routes/adminCreators.ts # 보호된 Creator 수동 심사 Thin Controller
 │       └── src/infrastructure/discord/ # Discord HTTP Interactions (Ed25519 서명 검증, 명령어 정의/핸들러) — Gateway 없음
 ├── games/
 │   ├── reaction-time/           # 반응속도 테스트 게임 모듈 (@gamemoa/game-reaction-time)
@@ -26,7 +28,7 @@ gamemoa/
 │   │   ├── src/ports/           # 저장소 포트 인터페이스 (UserRepository, AccountMergeRepository, ProgressionRepository, AchievementRepository, DiscordLinkRepository, CreatorRepository, CreatorReviewRepository 포함)
 │   │   └── src/registry/        # 자동 생성된 도메인 레지스트리 (gameRegistry.generated.ts)
 │   ├── db/                      # Cloudflare D1 저장소 어댑터 및 SQL 마이그레이션 (@gamemoa/db)
-│   │   └── migrations/         # 0000 초기 스키마, 0002 점수 인증 무결성, 0003 계정 식별(UNIQUE(user_id,provider)), 0004 계정 통합 챌린지, 0005 진행도(XP/레벨/도전과제) + 닉네임/국가 메타데이터, 0006 Discord 계정 연동 챌린지, 0009-0010 Discord 길드/XP, 0010-0011 Creator 파운데이션/지표, 0012 Creator 심사 잡
+│   │   └── migrations/         # 0000 초기 스키마, 0002 점수 인증 무결성, 0003 계정 식별(UNIQUE(user_id,provider)), 0004 계정 통합 챌린지, 0005 진행도(XP/레벨/도전과제) + 닉네임/국가 메타데이터, 0006 Discord 계정 연동 챌린지, 0009-0010 Discord 길드/XP, 0010-0011 Creator 파운데이션/지표, 0012 Creator 심사 잡, 0013 수동 심사 감사/14일 재검증
 │   ├── ui/                      # 공통 UI 컴포넌트 및 GameShell 컨테이너 (@gamemoa/ui)
 │   └── shared/                  # 공통 유틸리티 및 re-export (@gamemoa/shared)
 ├── scripts/
@@ -56,6 +58,10 @@ API Composition Root (apps/api/src/container.ts)
    ↑
 @gamemoa/db (Cloudflare D1 저장소 어댑터 - 게임 카탈로그 매니페스트와 완전 분리)
 ```
+
+- `apps/api/src/routes`는 세션 인증과 `ADMIN_USER_IDS` 서버 설정을 통과한 뒤에만 Creator 수동 심사 자료를 조회하거나 결정할 수 있습니다.
+- `apps/api/src/index.ts`의 단일 Cron 핸들러는 6시간 취득 심사와 14일 Featured 재검증을 별도 repository query와 bounded batch로 실행합니다.
+- `creator_review_audit_log`는 일반 API에서 UPDATE/DELETE하지 않는 append-only 감사 원장입니다.
 
 ---
 

@@ -170,8 +170,37 @@
 - **CHZZK/SOOP**처럼 필수 지표를 공식 API로 제공하지 않는 플랫폼은 추정 금지 원칙에 따라 `MANUAL_REVIEW`로 안전하게 라우팅됩니다.
 - YouTube 지표 재조회에는 별도 `YOUTUBE_API_KEY` 환경변수가 필요합니다 (OAuth Client ID와 별개).
 
-### 6-6. E2B 예고 (향후 확장)
+### 6-6. E2B 재검증 정책
 
-- 수동 심사(운영진 리뷰) 관리 도구 및 Featured 해제(revalidation) 워크플로우.
-- `RETENTION_AUDIENCE_FLOOR`(8,000) 기반 하이스테리시스 적용.
-- 기존 Featured Creator의 재검증 주기 7~30일 수준으로 조정 (`FUTURE_REVALIDATION_INTERVAL_DAYS_MIN/MAX`).
+- 기존 Featured Creator는 취득 심사와 별도의 `REVALIDATION` 잡으로 관리합니다. 모든 Featured를 6시간 파이프라인에 계속 넣지 않습니다.
+- v1 중앙 주기는 **14일**(`REVALIDATION_INTERVAL_MS`)이며, 문서화된 7~30일 범위 안에 있습니다.
+- 신선한 공식 audience가 8,000 이상이면 Featured를 유지하고 다음 14일 잡을 예약합니다.
+- 신선한 공식 audience가 8,000 미만이면 `NOT_ELIGIBLE`로 종결하고 Featured 배지를 제거합니다.
+- 일시적 API 오류·필수 지표 미제공은 재시도 후 `MANUAL_REVIEW`로 보내며 기존 Featured 배지를 자동 제거하지 않습니다.
+- 공식 API가 채널 삭제/철회를 확정한 `NOT_FOUND`/`REVOKED` 결과는 `NOT_ELIGIBLE`로 종결합니다.
+
+## 7. 운영진 수동 심사 및 관리자 안전 (Phase E2B)
+
+### 7-1. 관리자 권한
+
+- 관리자 권한은 서버 바인딩 `ADMIN_USER_IDS`에 쉼표로 등록한 **명시적 GAMEMOA 사용자 ID**만 인정합니다.
+- 값이 없거나 ID가 일치하지 않으면 기본적으로 관리자 권한이 없습니다.
+- 이메일, 닉네임, Discord 이름, Creator 상태, OAuth provider identity는 관리자 권한 근거로 사용하지 않습니다.
+- `ADMIN_USER_IDS`는 API Worker 서버 설정/GitHub Actions Variable로만 전달하며 Web API나 클라이언트에 노출하지 않습니다.
+
+### 7-2. 수동 심사 큐
+
+- 보호된 API/UI 경로: `GET /api/admin/creators/reviews`, `POST /api/admin/creators/reviews/:jobId/action`, `/admin/creators`.
+- 큐에는 `MANUAL_REVIEW`로 종결된 합법적인 심사 잡만 포함합니다. 취득 심사와 재검증 심사는 `review_type`으로 구분합니다.
+- 관리자에게 표시하는 정보는 사용자 ID/닉네임, 플랫폼·채널 identity/name/link, 소유권 검증 상태, audience, 채널 생성일, 최신 동기화 시각, 시스템 심사 사유, 이전 상태로 제한합니다.
+- OAuth access/refresh token, client secret, provider response 원문, 내부 `last_error`는 큐/UI/API에 노출하지 않습니다.
+- `APPROVE_FEATURED`는 Creator profile과 platform account가 모두 `VERIFIED`일 때만 허용합니다.
+- `REJECT_FEATURED`는 `NOT_ELIGIBLE`로 전이하고, `KEEP_FOR_REVIEW`는 Featured 상태를 변경하지 않은 채 추가 확인 상태를 유지합니다.
+- 모든 결정은 사유를 필수로 받고 `creator_review_audit_log`에 reviewer/action/reason/상태 전이/안전한 지표 snapshot을 append-only로 기록합니다. 일반 UI/API에는 감사 로그 수정·삭제 기능이 없습니다.
+- 동일 승인/거절 요청을 재전송해도 이미 종결된 잡에는 새 전이·감사 행을 만들지 않습니다. 동일한 `KEEP_FOR_REVIEW` 재전송도 중복 감사 행을 만들지 않습니다.
+
+### 7-3. Creator 노출 원칙
+
+- Creator 화면에는 `✓ Creator`, `★ Featured Creator`, `자동 심사 대기`, `추가 확인 필요`, `기준 미달` 상태만 안전한 공개 사유와 함께 표시합니다.
+- 운영진이 입력한 내부 심사 사유는 Creator API/UI로 전달하지 않습니다.
+- Featured는 표시·필터링 전용이며 게임 점수, XP, 게임 랭킹 계산에는 절대 사용하지 않습니다.

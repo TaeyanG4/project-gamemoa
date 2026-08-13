@@ -35,6 +35,8 @@ export const CreatorFeaturedReviewSchema = z.object({
     "NOT_ELIGIBLE",
     "MANUAL_REVIEW",
     "FAILED_RETRYABLE",
+    "REVALIDATION_PENDING",
+    "REVALIDATION_FAILED_RETRYABLE",
   ]),
   reason: z.string().nullable(),
   nextCheckAt: z.string().nullable(),

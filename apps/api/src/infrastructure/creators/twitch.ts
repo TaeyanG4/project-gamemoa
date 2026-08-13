@@ -174,6 +174,9 @@ export class TwitchCreatorProvider implements CreatorProviderAdapter {
       { headers: this.helixHeaders(appToken) },
     );
     if (!userRes.ok) {
+      if (userRes.status === 404) {
+        return { audienceCount: null, channelCreatedAt: null, channelState: "NOT_FOUND" };
+      }
       const errText = await userRes.text();
       throw new Error(`Twitch users API (metric refresh) failed: ${userRes.status} ${errText}`);
     }
@@ -181,6 +184,9 @@ export class TwitchCreatorProvider implements CreatorProviderAdapter {
       data?: Array<{ created_at?: string }>;
     };
     const user = userData.data?.[0];
+    if (!user) {
+      return { audienceCount: null, channelCreatedAt: null, channelState: "NOT_FOUND" };
+    }
     const channelCreatedAt = user?.created_at ?? null;
 
     const followersRes = await fetch(
@@ -190,6 +196,9 @@ export class TwitchCreatorProvider implements CreatorProviderAdapter {
       { headers: this.helixHeaders(appToken) },
     );
     if (!followersRes.ok) {
+      if (followersRes.status === 404) {
+        return { audienceCount: null, channelCreatedAt, channelState: "NOT_FOUND" };
+      }
       const errText = await followersRes.text();
       throw new Error(
         `Twitch channels/followers API (metric refresh) failed: ${followersRes.status} ${errText}`,
@@ -198,6 +207,6 @@ export class TwitchCreatorProvider implements CreatorProviderAdapter {
     const followersData = (await followersRes.json()) as { total?: number };
     const audienceCount = typeof followersData.total === "number" ? followersData.total : null;
 
-    return { audienceCount, channelCreatedAt };
+    return { audienceCount, channelCreatedAt, channelState: "ACTIVE" };
   }
 }

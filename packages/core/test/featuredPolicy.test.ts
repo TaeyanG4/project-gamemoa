@@ -4,6 +4,7 @@ import {
   FEATURED_POLICY,
   channelAgeDays,
   evaluateFeaturedInitial,
+  evaluateFeaturedRevalidation,
   evaluateFeaturedRecheck,
 } from "../src/index.js";
 
@@ -148,4 +149,25 @@ test("FEATURED_POLICY — thresholds are explicit and documented", () => {
   assert.equal(FEATURED_POLICY.MAX_ATTEMPTS, 5);
   assert.equal(FEATURED_POLICY.MAX_BATCH_SIZE, 50);
   assert.equal(FEATURED_POLICY.DEFAULT_BATCH_SIZE, 20);
+  assert.equal(FEATURED_POLICY.REVALIDATION_INTERVAL_MS, 14 * 24 * 60 * 60 * 1000);
+  assert.equal(FEATURED_POLICY.REVALIDATION_RETRY_INTERVAL_MS, 6 * 60 * 60 * 1000);
+});
+
+test("evaluateFeaturedRevalidation — audience at or above 8,000 retains Featured", () => {
+  assert.equal(evaluateFeaturedRevalidation({ audienceCount: 8000 }).status, "RETAIN_FEATURED");
+  assert.equal(evaluateFeaturedRevalidation({ audienceCount: 12000 }).status, "RETAIN_FEATURED");
+});
+
+test("evaluateFeaturedRevalidation — audience below 8,000 revokes Featured", () => {
+  const decision = evaluateFeaturedRevalidation({ audienceCount: 7999 });
+  assert.equal(decision.status, "REVOKE_FEATURED");
+  assert.match(decision.reason, /유지 기준 미달/);
+});
+
+test("evaluateFeaturedRevalidation — temporary or unavailable metrics preserve badge via manual review", () => {
+  assert.equal(evaluateFeaturedRevalidation({ audienceCount: null }).status, "MANUAL_REVIEW");
+  assert.equal(
+    evaluateFeaturedRevalidation({ audienceCount: 20000, channelState: "NOT_FOUND" }).status,
+    "REVOKE_FEATURED",
+  );
 });

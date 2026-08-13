@@ -440,6 +440,8 @@ export interface DiscordGuildRepository {
 export type CreatorPlatformType = "YOUTUBE" | "CHZZK" | "SOOP" | "TWITCH";
 export type CreatorStatusType = "UNVERIFIED" | "VERIFIED" | "SUSPENDED";
 export type FeaturedStatusType = "NONE" | "FEATURED" | "PARTNER";
+export type CreatorReviewType = "ACQUISITION" | "REVALIDATION";
+export type CreatorReviewAction = "APPROVE_FEATURED" | "REJECT_FEATURED" | "KEEP_FOR_REVIEW";
 
 export interface CreatorProfile {
   id: number;
@@ -493,20 +495,83 @@ export interface CreatorRankEntry {
 }
 
 export type CreatorReviewJobStatus =
-  "AUTO_REVIEW_PENDING" | "FEATURED" | "NOT_ELIGIBLE" | "MANUAL_REVIEW" | "FAILED_RETRYABLE";
+  | "AUTO_REVIEW_PENDING"
+  | "FEATURED"
+  | "NOT_ELIGIBLE"
+  | "MANUAL_REVIEW"
+  | "FAILED_RETRYABLE"
+  | "REVALIDATION_PENDING"
+  | "REVALIDATION_FAILED_RETRYABLE";
 
 export interface CreatorReviewJob {
   id: number;
   creatorPlatformAccountId: number;
+  reviewType: CreatorReviewType;
   status: CreatorReviewJobStatus;
   initialAudience: number | null;
   initialChannelCreatedAt: string | null;
   nextCheckAt: string;
   attemptCount: number;
   lastError: string | null;
+  reviewReason: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+}
+
+export interface CreatorManualReviewItem {
+  job: CreatorReviewJob;
+  userId: number;
+  nickname: string;
+  creatorId: number;
+  creatorStatus: CreatorStatusType;
+  featuredStatus: FeaturedStatusType;
+  platformAccount: CreatorPlatformAccount;
+}
+
+export interface CreatorReviewMetricSnapshot {
+  platform: CreatorPlatformType;
+  channelName: string;
+  channelUrl: string;
+  verificationStatus: string;
+  audienceCount: number | null;
+  channelCreatedAt: string | null;
+  metricsSyncedAt: string | null;
+}
+
+export interface CreatorReviewAuditLog {
+  id: number;
+  creatorPlatformAccountId: number;
+  reviewJobId: number | null;
+  reviewerUserId: number;
+  action: CreatorReviewAction;
+  reason: string;
+  previousStatus: CreatorReviewJobStatus;
+  newStatus: CreatorReviewJobStatus;
+  metricSnapshot: CreatorReviewMetricSnapshot | null;
+  createdAt: string;
+  platform?: CreatorPlatformType | undefined;
+  channelName?: string | undefined;
+}
+
+export interface CreatorReviewQueueResult {
+  items: CreatorManualReviewItem[];
+  total: number;
+}
+
+export interface CreatorReviewAuditResult {
+  entries: CreatorReviewAuditLog[];
+  total: number;
+}
+
+export type CreatorManualReviewFailureCode =
+  "NOT_FOUND" | "ALREADY_DECIDED" | "OWNERSHIP_NOT_VERIFIED" | "ALREADY_APPLIED" | "INVALID_REASON";
+
+export interface CreatorManualReviewDecisionResult {
+  applied: boolean;
+  code?: CreatorManualReviewFailureCode;
+  previousStatus: CreatorReviewJobStatus | null;
+  newStatus: CreatorReviewJobStatus | null;
 }
 
 export interface CreatorReviewRepository {
@@ -514,6 +579,10 @@ export interface CreatorReviewRepository {
   findLatestJobByAccountIds(creatorPlatformAccountIds: number[]): Promise<CreatorReviewJob | null>;
   /** 아직 활성 상태(진행/재시도 대기)인 계정의 잡을 조회. */
   findActiveJobByAccountId(creatorPlatformAccountId: number): Promise<CreatorReviewJob | null>;
+  /** 계정별 최신 재검증 잡을 조회합니다. */
+  findLatestRevalidationJobByAccountId(
+    creatorPlatformAccountId: number,
+  ): Promise<CreatorReviewJob | null>;
   /** 활성 잡이 없으면 신규 생성, 있으면 스냅샷/다음 심사 시각을 리셋(멱등). */
   createOrResetJob(input: {
     creatorPlatformAccountId: number;
@@ -521,8 +590,18 @@ export interface CreatorReviewRepository {
     initialChannelCreatedAt: string | null;
     nextCheckAt: string;
   }): Promise<CreatorReviewJob>;
+  /** 기존 Featured Creator의 14일 재검증 잡을 멱등적으로 예약합니다. */
+  scheduleRevalidationJob(input: {
+    creatorPlatformAccountId: number;
+    nextCheckAt: string;
+    nowIso: string;
+  }): Promise<CreatorReviewJob>;
+  /** 기존 Featured 계정 중 재검증 잡이 없는 계정을 제한된 수만큼 보충합니다. */
+  ensureRevalidationJobs(limit: number, nextCheckAt: string, nowIso: string): Promise<number>;
   /** 예정 시각이 지난 진행/재시도 잡을 바운디드 배치로 조회 (unbounded scan 금지). */
   listDuePendingJobs(limit: number, nowIso: string): Promise<CreatorReviewJob[]>;
+  /** 14일 재검증 잡만 조회합니다 (6시간 취득 파이프라인과 분리). */
+  listDueRevalidationJobs(limit: number, nowIso: string): Promise<CreatorReviewJob[]>;
   /** 재시도 가능 실패 기록. attempt_count 1 증가. */
   markJobFailed(id: number, error: string, nextCheckAt: string, nowIso: string): Promise<void>;
   /**
@@ -531,9 +610,27 @@ export interface CreatorReviewRepository {
    */
   completeJob(
     id: number,
-    status: Exclude<CreatorReviewJobStatus, "AUTO_REVIEW_PENDING" | "FAILED_RETRYABLE">,
+    status: Exclude<
+      CreatorReviewJobStatus,
+      | "AUTO_REVIEW_PENDING"
+      | "FAILED_RETRYABLE"
+      | "REVALIDATION_PENDING"
+      | "REVALIDATION_FAILED_RETRYABLE"
+    >,
     completedAt: string,
+    reason?: string,
   ): Promise<boolean>;
+  listManualReviewQueue(limit: number, offset: number): Promise<CreatorReviewQueueResult>;
+  listAuditLogs(limit: number, offset: number): Promise<CreatorReviewAuditResult>;
+  applyManualReviewDecision(input: {
+    jobId: number;
+    reviewerUserId: number;
+    action: CreatorReviewAction;
+    reason: string;
+    publicProfileReason: string;
+    nextRevalidationAt: string;
+    nowIso: string;
+  }): Promise<CreatorManualReviewDecisionResult>;
 }
 
 export interface CreatorRepository {

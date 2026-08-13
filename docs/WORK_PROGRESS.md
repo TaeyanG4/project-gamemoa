@@ -6,7 +6,8 @@
 **Phase B(진행도 파운데이션)**, **Phase C(My Page)**, **Phase D(XP 랭킹 UI & Creator 모델 파운데이션)**,
 **Phase F(Discord HTTP Interactions 파운데이션)**, **Phase G(Discord 서버 시스템 & 커뮤니티 Hub)**,
 **Phase H1(Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`)**, **Phase H2(Discord 서버 리더보드 & 커맨드)**,
-**Phase E1(Creator 채널 소유권 검증)**, **Phase E2A(Featured Creator 자격 심사 엔진)**를 완수했습니다.
+**Phase E1(Creator 채널 소유권 검증)**, **Phase E2A(Featured Creator 자격 심사 엔진)**,
+**Phase E2B(Featured 수동 심사·재검증·관리자 안전)**를 완수했습니다.
 전체 스프린트 단계 구조는 `docs/ROADMAP.md` §1, 상세 설계는 `docs/PROGRESSION.md`(진행도),
 `docs/DISCORD_INTEGRATION.md`(Discord), `docs/CREATOR_SYSTEM.md`(Creator)를 참고하세요.
 
@@ -32,6 +33,27 @@
   - "Featured 심사 상태" 카드: ★ Featured Creator / 자동 심사 대기 / 추가 확인 필요 / 기준 미달 / 재시도 대기 표시.
 - [x] **테스트**: `featuredPolicy.test.ts` (정책 결정 매트릭스) & `featuredReviewUseCases.test.ts` (승급/탈락/수동심사/실패 격리/재시도 상한/멱등/스코어 불변) & 스케줄러 통합 테스트 전원 그린.
 - [x] **한국어 문서화 (`docs/CREATOR_SYSTEM.md` §6)**: 정책, 잡 모델, 스케줄러, 플랫폼 매트릭스, E2B 예고.
+
+### Phase E2B: Featured Creator Manual Review, Revalidation & Admin Safety (이번 세션)
+
+- [x] **관리자 권한 안전장치**:
+  - 서버 바인딩 `ADMIN_USER_IDS`의 명시적 GAMEMOA 사용자 ID만 허용하며, 미설정 기본값은 관리자 없음.
+  - 이메일/닉네임/Discord 이름/Creator 상태/provider identity를 권한 근거로 사용하지 않음.
+- [x] **수동 심사 큐 및 API/UI**:
+  - `GET /api/admin/creators/reviews`, `POST /api/admin/creators/reviews/:jobId/action`, `/admin/creators` 구현.
+  - 소유권·플랫폼·채널·공식 지표 등 자격 관련 데이터만 노출하고 토큰/secret/내부 오류는 제외.
+  - `APPROVE_FEATURED`/`REJECT_FEATURED`/`KEEP_FOR_REVIEW`, 필수 결정 사유, 검증된 소유권 승인 가드 구현.
+- [x] **감사 원장 (D1 마이그레이션 `0013_creator_review_e2b.sql`)**:
+  - `creator_review_audit_log` append-only 테이블 및 UPDATE/DELETE 차단 트리거.
+  - 승인·거절·검토 유지 결정의 reviewer/action/reason/상태 전이/안전한 지표 snapshot 기록.
+- [x] **Featured 재검증**:
+  - 기존 Featured와 취득 심사를 `review_type`으로 분리.
+  - 14일 중앙 cadence, bounded batch, 재시도/멱등성 유지.
+  - audience 8,000 이상 유지, 8,000 미만 철회, 일시 오류/지표 불가 수동 심사, 공식 삭제·철회 확정 시 철회.
+- [x] **Creator UX 무결성**:
+  - 운영진 내부 사유는 Creator API/UI에 노출하지 않음.
+  - Featured 상태는 표시·필터링 전용이며 score/XP/ranking에 영향 없음.
+- [x] **테스트**: 관리자 거부/허용/기본 거부, 승인 소유권 가드, 사유 필수, 승인·거절·감사·재전송, 14일 재검증 유지/철회/실패 격리/수동 라우팅/삭제 확정 테스트.
 
 ### Phase E1: Creator Channel Ownership Verification (이전 세션)
 
@@ -69,14 +91,11 @@
 
 `docs/ROADMAP.md` §1 단계 순서대로 진행:
 
-1. **Phase E2B — Featured Creator Manual Review, Revalidation & Admin Safety**
-   - 운영진 수동 심사(Manual Review) 관리 도구 및 심사 API/UI.
-   - `RETENTION_AUDIENCE_FLOOR`(8,000) 기반 하이스테리시스 및 Featured 해제(revalidation) 워크플로우.
-   - 기존 Featured Creator 재검증 주기(7~30일) 적용 (`FUTURE_REVALIDATION_INTERVAL_DAYS_MIN/MAX`).
-2. **Phase I — 계정 통합 회귀 테스트 & 프로덕션 검증**
+1. **Phase I — Account Merge Regression, Platform Integrity & Final Sprint Verification**
+   - 계정 통합 회귀 테스트, 플랫폼·Creator 무결성 점검, 최종 문서화 및 프로덕션 검증.
 
 ---
 
 ## 다음 작업 (Next Action)
 
-`Phase E2B — Featured Creator Manual Review, Revalidation & Admin Safety`
+`Phase I — Account Merge Regression, Platform Integrity & Final Sprint Verification`

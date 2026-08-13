@@ -1,3 +1,4 @@
+import type { CreatorChannelState } from "../domain/featuredPolicy.js";
 import type { CreatorPlatformType } from "./repositories.js";
 
 export interface CreatorChannelInfo {
@@ -20,6 +21,8 @@ export interface CreatorChannelMetrics {
   audienceCount: number | null;
   /** 공식 채널/계정 생성 타임스탬프. 플랫폼이 미제공이면 null */
   channelCreatedAt: string | null;
+  /** 공식 API가 채널의 삭제/철회를 확정한 경우에만 ACTIVE 이외의 값을 사용합니다. */
+  channelState?: CreatorChannelState;
 }
 
 export interface CreatorProviderAdapter {

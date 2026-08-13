@@ -6,6 +6,7 @@ export default [
   route("games/:slug", "routes/game-slug.tsx"),
   route("ranking", "routes/ranking.tsx"),
   route("profile", "routes/profile.tsx"),
+  route("admin/creators", "routes/adminCreators.tsx"),
   route("discord", "routes/discordHub.tsx"),
   route("discord/link", "routes/discordLink.tsx"),
   route("discord/servers", "routes/discordServers.tsx"),

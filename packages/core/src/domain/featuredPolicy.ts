@@ -15,6 +15,8 @@ export type FeaturedReviewStatus =
 
 export type InitialFeaturedDecision = "AUTO_REVIEW_PENDING" | "NOT_ELIGIBLE" | "MANUAL_REVIEW";
 export type RecheckFeaturedDecision = "FEATURED" | "NOT_ELIGIBLE" | "MANUAL_REVIEW";
+export type FeaturedRevalidationDecision = "RETAIN_FEATURED" | "REVOKE_FEATURED" | "MANUAL_REVIEW";
+export type CreatorChannelState = "ACTIVE" | "NOT_FOUND" | "REVOKED";
 
 export const FEATURED_POLICY = {
   /** 자격 미달 기준 (audience < 이 값 → NOT_ELIGIBLE) */
@@ -42,6 +44,10 @@ export const FEATURED_POLICY = {
   MAX_BATCH_SIZE: 50,
   /** 기본 스케줄 배치 크기 */
   DEFAULT_BATCH_SIZE: 20,
+  /** 기존 Featured Creator의 보수적 재검증 주기 (E2B v1: 14일) */
+  REVALIDATION_INTERVAL_MS: 14 * 24 * 60 * 60 * 1000,
+  /** 재검증 일시 실패 재시도 주기 */
+  REVALIDATION_RETRY_INTERVAL_MS: 6 * 60 * 60 * 1000,
   /**
    * 향후 E2B: 기존 Featured Creator 재검증 주기는 6시간이 아니라 7~30일 수준이어야 합니다.
    * 이 값은 해당 단계에서 사용할 문서화된 기준입니다.
@@ -194,5 +200,43 @@ export function evaluateFeaturedRecheck(
   return {
     status: "MANUAL_REVIEW",
     reason: `추가 확인 필요 (구독자/팔로워 ${input.audienceCount.toLocaleString()}명 · 채널 ${ageDays}일)`,
+  };
+}
+
+/**
+ * 기존 Featured Creator의 보수적 재검증 정책.
+ * - 8,000 이상이면 Featured 유지
+ * - 8,000 미만이면 Featured 자격 철회
+ * - 지표 누락/일시 오류는 배지를 자동 제거하지 않고 수동 심사로 보냅니다.
+ * - NOT_FOUND/REVOKED는 공식 API가 채널 무효를 확정한 경우에만 철회합니다.
+ */
+export function evaluateFeaturedRevalidation(input: {
+  audienceCount: number | null | undefined;
+  channelState?: CreatorChannelState | undefined;
+}): { status: FeaturedRevalidationDecision; reason: string } {
+  if (input.channelState === "NOT_FOUND" || input.channelState === "REVOKED") {
+    return {
+      status: "REVOKE_FEATURED",
+      reason: "공식 API에서 채널이 삭제되었거나 접근 권한이 철회된 것으로 확인되었습니다.",
+    };
+  }
+
+  if (input.audienceCount === null || input.audienceCount === undefined) {
+    return {
+      status: "MANUAL_REVIEW",
+      reason: "신선한 공식 구독자/팔로워 지표를 확인할 수 없어 Featured를 자동 변경하지 않습니다.",
+    };
+  }
+
+  if (input.audienceCount < FEATURED_POLICY.RETENTION_AUDIENCE_FLOOR) {
+    return {
+      status: "REVOKE_FEATURED",
+      reason: `유지 기준 미달 (구독자/팔로워 ${input.audienceCount.toLocaleString()}명 · 유지 기준 ${FEATURED_POLICY.RETENTION_AUDIENCE_FLOOR.toLocaleString()}명)`,
+    };
+  }
+
+  return {
+    status: "RETAIN_FEATURED",
+    reason: `Featured 유지 (공식 구독자/팔로워 ${input.audienceCount.toLocaleString()}명)`,
   };
 }

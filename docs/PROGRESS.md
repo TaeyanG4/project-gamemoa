@@ -22,10 +22,18 @@
 | **Phase 13** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase C 완료(My Page 탭 분리, 닉네임/국가 UI, 즐겨찾기/최근 플레이) + Discord `잘못된 redirect_uri` 버그 수정 + Phase F(Discord HTTP Interactions)** | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0006 로컬 적용 검증, Ed25519 실서명 테스트 포함 신규 단위/통합 테스트 전원 통과 |
 | **Phase 14** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase G: Discord 서버 시스템 (서버 등록 / 디렉토리·검색 / 공개 서버 페이지 / 서버 관리)**                                                            | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0007 로컬 적용 검증, 단위/통합 테스트 전원 통과                                 |
 | **Phase 15** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase H1: Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`**                                                                                        | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0008 로컬 적용 검증, 100/100 단위 테스트 전원 통과                              |
+| **Phase 16** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase E2A: Featured Creator 자격 심사 엔진 및 6시간 자동 재심사**                                                                                    | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0012, 공식 지표 재조회·재시도·스케줄러 테스트 통과                              |
+| **Phase 17** | GAMEMOA 플레이어 플랫폼 확장 스프린트 — **Phase E2B: 수동 심사·감사 원장·14일 Featured 재검증·관리자 안전**                                                                                    | ✅ 완료 | `pnpm verify`, D1 마이그레이션 0013, 관리자/재검증/감사/기존 회귀 테스트 통과                                  |
 
 ---
 
 ## 2. ⚙️ 현재 작업 (Current Phase)
+
+- **GAMEMOA 플레이어 플랫폼 확장 스프린트 — Phase E2B 완료**:
+  - `ADMIN_USER_IDS` 명시적 사용자 ID 기반 서버 관리자 권한(기본 거부), 보호된 Creator 수동 심사 큐/API/UI, 승인·거절·검토 유지 액션과 필수 사유.
+  - `creator_review_audit_log` append-only 감사 원장 및 UPDATE/DELETE 차단 트리거.
+  - 취득 심사(6시간)와 Featured 재검증(14일)을 잡 유형으로 분리하고, audience 8,000 유지 기준·일시 오류 보존·공식 삭제 확정 철회 정책 적용.
+  - 수동 심사 내부 사유는 Creator API/UI에 노출하지 않으며 Featured는 score/XP/ranking에 영향을 주지 않음.
 
 - **GAMEMOA 플레이어 플랫폼 확장 스프린트 — Phase H1: Discord 길드 XP 귀속 파운데이션 (Phase 15)**:
   - **3개 XP 개념 엄격 분리**: Global GAMEMOA XP, Discord Guild-local User XP, Discord Guild Activity XP. (유저의 기존 글로벌 XP 25,000 보유 시에도 길드 가입 시 Guild XP = 0에서 시작).
@@ -71,10 +79,9 @@
 
 플레이어 플랫폼 확장 스프린트는 여러 세션에 걸쳐 단계적으로 진행됩니다 (`docs/WORK_PROGRESS.md`의 Next Action 참고):
 
-1. **Phase E2B: Featured Creator 수동 심사 & 재검증** — 운영진 수동 심사(Manual Review) 관리 도구, `RETENTION_AUDIENCE_FLOOR`(8,000) 기반 하이스테리시스 및 Featured 해제 워크플로우, 재검증 주기(7~30일) 적용. (E2A 자동 심사 엔진은 완료)
-2. **Phase G~H: Discord 서버 시스템** — 서버 등록/검색/관리 페이지, 길드-로컬 XP, `/gamemoa rank|leaderboard|play|server`.
-3. **Phase C 잔여**: 공개 프로필(`/profile/:id`), 필요 시 `/me`·`/account` 완전 라우트 분리.
-4. **신규 미니게임 확장**: 색각 이상 테스트(color-test), 숫자 암기 테스트(number-memory), CPS 테스트(cps-test).
+1. **Phase I — Account Merge Regression, Platform Integrity & Final Sprint Verification** — 계정 통합 회귀 테스트, 플랫폼·Creator 무결성 점검, 최종 문서화 및 프로덕션 검증.
+2. **Phase C 잔여**: 공개 프로필(`/profile/:id`), 필요 시 `/me`·`/account` 완전 라우트 분리.
+3. **신규 미니게임 확장**: 색각 이상 테스트(color-test), 숫자 암기 테스트(number-memory), CPS 테스트(cps-test).
 
 ---
 
@@ -90,6 +97,7 @@
 ## 5. 📜 주요 변경 이력 (History)
 
 - **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase E2A(Featured Creator 자격 심사 엔진) 완수 — 순수 도메인 정책(`featuredPolicy.ts`), 심사 잡 모델(마이그레이션 `0012`), 6시간 Cron 스케줄러, 플랫폼별 공식 지표 재조회(YouTube/Twitch/CHZZK), 실패 격리·재시도·수동 심사 라우팅.
+- **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase E2B(Featured Creator 수동 심사·재검증·관리자 안전) 완수 — 명시적 관리자 ID 권한, 보호된 심사 큐/API/UI, append-only 감사 원장(마이그레이션 `0013`), 14일 재검증 및 8,000 audience 하이스테리시스.
 - **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase C 완료(My Page 탭 분리, 닉네임/국가 UI, 즐겨찾기/최근 플레이) + Discord 계정 연결 redirect_uri 버그 수정 + `/api/auth/me` 필드 누락 버그 수정 + 푸터 정리 + Phase F(Discord HTTP Interactions: Ed25519 서명 검증, `/gamemoa link|profile|games`, 1회용 연동 토큰) 완수.
 - **2026-08-13**: GAMEMOA 플레이어 플랫폼 확장 스프린트 Phase B(진행도 파운데이션) 완수 — 서버 권위 XP 원장/일일 상한/멱등성, 결정론적 레벨 공식, 7종 초기 도전과제, 닉네임/국가·지역 정책 중앙화(쿨다운), `/api/progression/*` 및 `/api/profile/*` 신규 API, 계정 통합 시 Secondary 진행도 삭제 정합성 확장.
 - **2026-08-13**: 계정 식별/통합 & 즐겨찾기 접근통제 & OAuth 보안 & 브랜드 파비콘 스프린트 완수 — Google/Discord 별도 계정 기본, 게스트 즐겨찾기 로그인 전용화 및 v1→v2 마이그레이션, OAuth 공급자 연결/연결해제, Primary Account Wins 원자 통합, Google JWT/JWKS 검증, 프로필 계정 관리 UX, GAMEMOA 파비콘 자산.

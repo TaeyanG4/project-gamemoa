@@ -9,3 +9,4 @@ export * from "./profile.js";
 export * from "./discord.js";
 export * from "./discordGuild.js";
 export * from "./creator.js";
+export * from "./creatorAdmin.js";

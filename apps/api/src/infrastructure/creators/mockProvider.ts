@@ -67,6 +67,7 @@ export class MockCreatorProvider implements CreatorProviderAdapter {
     return {
       audienceCount: 15000,
       channelCreatedAt: "2023-01-01T00:00:00Z",
+      channelState: "ACTIVE",
     };
   }
 }

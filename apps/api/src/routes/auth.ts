@@ -59,6 +59,8 @@ export type ApiEnv = {
     DISCORD_PUBLIC_KEY?: string;
     FRONTEND_URL?: string;
     COMMIT_SHA?: string;
+    /** 쉼표로 구분한 명시적 GAMEMOA 사용자 ID. 미설정 시 관리자 권한 없음. */
+    ADMIN_USER_IDS?: string;
     YOUTUBE_CLIENT_ID?: string;
     YOUTUBE_CLIENT_SECRET?: string;
     /** YouTube Data API key (public data) — 6시간 자동 재심사용 공식 지표 조회. */

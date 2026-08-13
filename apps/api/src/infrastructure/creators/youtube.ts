@@ -140,6 +140,9 @@ export class YouTubeCreatorProvider implements CreatorProviderAdapter {
     const res = await fetch(`https://www.googleapis.com/youtube/v3/channels?${params.toString()}`);
 
     if (!res.ok) {
+      if (res.status === 404) {
+        return { audienceCount: null, channelCreatedAt: null, channelState: "NOT_FOUND" };
+      }
       const errText = await res.text();
       throw new Error(`YouTube channels API (metric refresh) failed: ${res.status} ${errText}`);
     }
@@ -153,7 +156,7 @@ export class YouTubeCreatorProvider implements CreatorProviderAdapter {
 
     const item = data.items?.[0];
     if (!item) {
-      return { audienceCount: null, channelCreatedAt: null };
+      return { audienceCount: null, channelCreatedAt: null, channelState: "NOT_FOUND" };
     }
 
     const subscriberCount = item.statistics?.subscriberCount
@@ -164,6 +167,7 @@ export class YouTubeCreatorProvider implements CreatorProviderAdapter {
       audienceCount:
         subscriberCount !== null && !Number.isNaN(subscriberCount) ? subscriberCount : null,
       channelCreatedAt: item.snippet?.publishedAt ?? null,
+      channelState: "ACTIVE",
     };
   }
 }

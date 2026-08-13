@@ -10,6 +10,7 @@ import { discordRouter } from "./routes/discordInteractions.js";
 import { discordLinkRouter } from "./routes/discordLink.js";
 import { discordGuildsRouter } from "./routes/discordGuilds.js";
 import { creatorsRouter } from "./routes/creators.js";
+import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { createContainer } from "./container.js";
 import { getCreatorProviderAdapters } from "./infrastructure/creators/index.js";
 import { FEATURED_POLICY } from "@gamemoa/core";
@@ -87,6 +88,7 @@ app.route("/api/discord", discordRouter);
 app.route("/api/discord", discordLinkRouter);
 app.route("/api/discord/guilds", discordGuildsRouter);
 app.route("/api/creators", creatorsRouter);
+app.route("/api/admin/creators", adminCreatorsRouter);
 
 // 404 Handler
 app.notFound((c) => {
@@ -100,8 +102,8 @@ app.onError((err, c) => {
 });
 
 /**
- * Phase E2A: Featured Creator 자동 재심사 스케줄러 (Cron: 6시간 간격).
- * - 예정 시각이 지난 AUTO_REVIEW_PENDING / FAILED_RETRYABLE 잡만 바운디드 배치로 처리.
+ * Phase E2A/E2B: Featured Creator 취득 심사(6시간)와 기존 Featured 재검증(14일) 스케줄러.
+ * - 취득 심사와 재검증 잡을 서로 다른 repository query로 바운디드 처리.
  * - 단일 잡/프로바이더 실패가 배치 전체를 막지 않음 (잡 단위 FAILED_RETRYABLE 처리).
  * - 사용자 OAuth 토큰은 저장하지 않으며, 공식 app-level/공개 API만 사용합니다.
  */
@@ -113,21 +115,29 @@ async function scheduledHandler(
   const adapters = getCreatorProviderAdapters(env);
   const { creatorUseCases } = createContainer(env.DB);
 
-  ctx.waitUntil(
-    creatorUseCases
-      .runDueFeaturedReviews({
-        adapters,
-        batchSize: FEATURED_POLICY.DEFAULT_BATCH_SIZE,
-      })
-      .then((summary) => {
-        console.log(
-          `[creator-review] scheduled run done: processed=${summary.processed} featured=${summary.featured} notEligible=${summary.notEligible} manualReview=${summary.manualReview} failed=${summary.failed}`,
-        );
-      })
-      .catch((err) => {
-        console.error("[creator-review] scheduled run crashed:", err);
-      }),
-  );
+  const task = (async () => {
+    const now = new Date();
+    await creatorUseCases.ensureFeaturedRevalidationJobs({
+      now,
+      batchSize: FEATURED_POLICY.DEFAULT_BATCH_SIZE,
+    });
+    const acquisition = await creatorUseCases.runDueFeaturedReviews({
+      adapters,
+      now,
+      batchSize: FEATURED_POLICY.DEFAULT_BATCH_SIZE,
+    });
+    const revalidation = await creatorUseCases.runDueFeaturedRevalidations({
+      adapters,
+      now,
+      batchSize: FEATURED_POLICY.DEFAULT_BATCH_SIZE,
+    });
+    console.log(
+      `[creator-review] scheduled run done: acquisitionProcessed=${acquisition.processed} acquisitionFeatured=${acquisition.featured} acquisitionNotEligible=${acquisition.notEligible} acquisitionManualReview=${acquisition.manualReview} acquisitionFailed=${acquisition.failed} revalidationProcessed=${revalidation.processed} retained=${revalidation.retained} revoked=${revalidation.revoked} revalidationManualReview=${revalidation.manualReview} revalidationFailed=${revalidation.failed}`,
+    );
+  })().catch((err) => {
+    console.error("[creator-review] scheduled run crashed:", err);
+  });
+  ctx.waitUntil(task);
 }
 
 export { app };

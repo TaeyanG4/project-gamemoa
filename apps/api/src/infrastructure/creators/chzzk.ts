@@ -121,6 +121,9 @@ export class ChzzkCreatorProvider implements CreatorProviderAdapter {
     );
 
     if (!res.ok) {
+      if (res.status === 404) {
+        return { audienceCount: null, channelCreatedAt: null, channelState: "NOT_FOUND" };
+      }
       const errText = await res.text();
       throw new Error(`CHZZK channels API (metric refresh) failed: ${res.status} ${errText}`);
     }
@@ -138,9 +141,14 @@ export class ChzzkCreatorProvider implements CreatorProviderAdapter {
         : null;
 
     // 공식 API가 채널 생성일을 제공하지 않음 → UNKNOWN으로 명시 (추정 금지)
+    if (!first) {
+      return { audienceCount: null, channelCreatedAt: null, channelState: "NOT_FOUND" };
+    }
+
     return {
       audienceCount: followerCount !== null && !Number.isNaN(followerCount) ? followerCount : null,
       channelCreatedAt: null,
+      channelState: "ACTIVE",
     };
   }
 }

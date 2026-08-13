@@ -46,7 +46,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/api
-          command: deploy --var COMMIT_SHA:${{ github.event.workflow_run.head_sha }} GOOGLE_CLIENT_ID:${{ vars.GOOGLE_CLIENT_ID }} DISCORD_CLIENT_ID:${{ vars.DISCORD_CLIENT_ID }} DISCORD_REDIRECT_URI:${{ vars.DISCORD_REDIRECT_URI }} DISCORD_PUBLIC_KEY:${{ vars.DISCORD_PUBLIC_KEY }} FRONTEND_URL:${{ vars.FRONTEND_URL }}
+          command: deploy --var COMMIT_SHA:${{ github.event.workflow_run.head_sha }} GOOGLE_CLIENT_ID:${{ vars.GOOGLE_CLIENT_ID }} DISCORD_CLIENT_ID:${{ vars.DISCORD_CLIENT_ID }} DISCORD_REDIRECT_URI:${{ vars.DISCORD_REDIRECT_URI }} DISCORD_PUBLIC_KEY:${{ vars.DISCORD_PUBLIC_KEY }} FRONTEND_URL:${{ vars.FRONTEND_URL }} ADMIN_USER_IDS:${{ vars.ADMIN_USER_IDS || '' }}
           secrets: |
             DISCORD_CLIENT_SECRET
         env:

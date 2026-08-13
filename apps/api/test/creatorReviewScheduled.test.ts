@@ -48,7 +48,11 @@ function createReviewDb() {
 
   return {
     prepare(sql: string) {
-      if (sql.includes("creator_review_jobs") && sql.includes("next_check_at <=")) {
+      if (
+        sql.includes("creator_review_jobs") &&
+        sql.includes("next_check_at <=") &&
+        sql.includes("review_type = 'ACQUISITION'")
+      ) {
         return {
           bind() {
             return {
@@ -76,6 +80,24 @@ function createReviewDb() {
             return {
               async first() {
                 return profileRow;
+              },
+            };
+          },
+        };
+      }
+      if (
+        sql.includes("creator_review_jobs") &&
+        sql.includes("next_check_at <=") &&
+        sql.includes("review_type = 'REVALIDATION'")
+      ) {
+        return {
+          bind() {
+            return {
+              async all() {
+                return { results: [] };
+              },
+              async run() {
+                return { success: true, meta: { changes: 0 } };
               },
             };
           },
@@ -185,8 +207,8 @@ test("scheduled handler — processes a due Featured review end-to-end (mock pro
 
   const summaryLog = logs.find((l) => l.includes("[creator-review] scheduled run done"));
   assert.ok(summaryLog, "scheduled run must log a summary");
-  assert.match(summaryLog, /processed=1/);
-  assert.match(summaryLog, /featured=1/);
+  assert.match(summaryLog, /acquisitionProcessed=1/);
+  assert.match(summaryLog, /acquisitionFeatured=1/);
 });
 
 test("scheduled handler — no-op when no jobs are due", async () => {
@@ -198,6 +220,9 @@ test("scheduled handler — no-op when no jobs are due", async () => {
             return {
               async all() {
                 return { results: [] };
+              },
+              async run() {
+                return { success: true, meta: { changes: 0 } };
               },
             };
           },
@@ -228,5 +253,5 @@ test("scheduled handler — no-op when no jobs are due", async () => {
 
   const summaryLog = logs.find((l) => l.includes("[creator-review] scheduled run done"));
   assert.ok(summaryLog);
-  assert.match(summaryLog, /processed=0/);
+  assert.match(summaryLog, /acquisitionProcessed=0/);
 });

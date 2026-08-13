@@ -30,6 +30,7 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
 - 🎨 **GAMEMOA 브랜드 파비콘**: 4-타일 게임 허브 마크의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`
 - 🏆 **진행도 시스템 (XP / 레벨 / 도전과제)**: 서버 권위 XP(인증된 게임 완료 1회당 +10, 사용자×게임×UTC일 기준 최대 10회 상한), `xp_events` 원장 기반 멱등 지급, 결정론적 레벨 공식(`100×(L-1)²`), 7종 초기 도전과제(FIRST_PLAY/PLAY_10/PLAY_100/FIRST_FAVORITE/LEVEL_5/LEVEL_10/ALL_GAMES), 글로벌 XP 리더보드. 게임 점수(실력)와 XP(활동)는 항상 분리되어 랭킹 무결성을 해치지 않습니다. 자세한 내용은 `docs/PROGRESSION.md` 참고.
 - 📊 **My Page ("내 프로필 & 기록")**: `/profile`의 "내 프로필"(사용자 정보, 레벨/XP, 닉네임·국가/지역 변경, 즐겨찾기, 최근 플레이, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록) 탭 분리. 게임 기록 카드는 실제 썸네일 기반으로 재구성.
+- 🎥 **Creator & Featured 시스템**: YouTube/CHZZK/SOOP/Twitch 공식 소유권 검증, Featured 자격 자동 심사, 14일 보수적 재검증, 지정된 `ADMIN_USER_IDS` 관리자 전용 수동 심사 큐와 append-only 감사 원장. Featured는 게임 점수·XP·랭킹에 영향을 주지 않습니다. 상세 정책은 `docs/CREATOR_SYSTEM.md` 참고.
 - 🤖 **Discord HTTP Interactions & 커뮤니티 Hub**:
   - `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/gamemoa link|profile|games`).
   - **Discord 서버 시스템 & Hub 페이지**: OAuth `guilds` 1회용 인증으로 `MANAGE_GUILD`/`ADMINISTRATOR` 권한 검증 후 서버 등록, 1회용 해시 챌린지 기반 access_token 미저장 보안, 공개 디렉토리 검색(`/discord/servers`), 공개 서버 페이지(`/discord/servers/:slug`), 가시성(`PUBLIC`/`UNLISTED`/`PRIVATE`), 서버 관리 페이지. 일반 GAMEMOA 게임 랭킹과 Discord 서버 공간은 명확히 분리되어 동작합니다. 자세한 내용은 `docs/DISCORD_INTEGRATION.md` 참고.

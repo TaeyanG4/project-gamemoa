@@ -3,11 +3,16 @@ import { levelForTotalXp } from "../domain/progression.js";
 import {
   FEATURED_POLICY,
   evaluateFeaturedInitial,
+  evaluateFeaturedRevalidation,
   evaluateFeaturedRecheck,
   type FeaturedReviewStatus,
+  type FeaturedRevalidationDecision,
   type RecheckFeaturedDecision,
 } from "../domain/featuredPolicy.js";
 import type {
+  CreatorReviewAction,
+  CreatorManualReviewDecisionResult,
+  CreatorReviewAuditResult,
   CreatorRepository,
   CreatorRankEntry,
   CreatorPlatformType,
@@ -15,6 +20,7 @@ import type {
   CreatorPlatformAccount,
   CreatorReviewRepository,
   CreatorReviewJob,
+  CreatorReviewQueueResult,
 } from "../ports/repositories.js";
 import type { CreatorChannelInfo, CreatorProviderAdapter } from "../ports/creatorProvider.js";
 
@@ -22,6 +28,14 @@ export interface FeaturedReviewRunSummary {
   processed: number;
   featured: number;
   notEligible: number;
+  manualReview: number;
+  failed: number;
+}
+
+export interface FeaturedRevalidationRunSummary {
+  processed: number;
+  retained: number;
+  revoked: number;
   manualReview: number;
   failed: number;
 }
@@ -102,6 +116,68 @@ export class CreatorUseCases {
     const profile = await this.creatorRepo.findProfileByUserId(userId);
     if (!profile || profile.platformAccounts.length === 0) return null;
     return this.reviewRepo.findLatestJobByAccountIds(profile.platformAccounts.map((a) => a.id));
+  }
+
+  async listManualCreatorReviews(options: {
+    limit?: number;
+    offset?: number;
+  }): Promise<CreatorReviewQueueResult & { audits: CreatorReviewAuditResult }> {
+    if (!this.reviewRepo) {
+      return { items: [], total: 0, audits: { entries: [], total: 0 } };
+    }
+
+    const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
+    const offset = Math.max(options.offset ?? 0, 0);
+    const [queue, audits] = await Promise.all([
+      this.reviewRepo.listManualReviewQueue(limit, offset),
+      this.reviewRepo.listAuditLogs(20, 0),
+    ]);
+    return { ...queue, audits };
+  }
+
+  async applyManualCreatorReview(input: {
+    jobId: number;
+    reviewerUserId: number;
+    action: CreatorReviewAction;
+    reason: string;
+    now?: Date;
+  }): Promise<CreatorManualReviewDecisionResult> {
+    const reason = input.reason.trim();
+    if (reason.length < 3) {
+      return {
+        applied: false,
+        code: "INVALID_REASON",
+        previousStatus: null,
+        newStatus: null,
+      };
+    }
+    if (!this.reviewRepo) {
+      return {
+        applied: false,
+        code: "NOT_FOUND",
+        previousStatus: null,
+        newStatus: null,
+      };
+    }
+
+    const nowMs = input.now?.getTime() ?? Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const publicProfileReason =
+      input.action === "APPROVE_FEATURED"
+        ? "운영진 심사 승인"
+        : input.action === "REJECT_FEATURED"
+          ? "운영진 심사 결과 기준 미달"
+          : "운영진 추가 확인 대기";
+
+    return this.reviewRepo.applyManualReviewDecision({
+      jobId: input.jobId,
+      reviewerUserId: input.reviewerUserId,
+      action: input.action,
+      reason,
+      publicProfileReason,
+      nextRevalidationAt: new Date(nowMs + FEATURED_POLICY.REVALIDATION_INTERVAL_MS).toISOString(),
+      nowIso,
+    });
   }
 
   async verifyChannelOwnership(
@@ -235,7 +311,7 @@ export class CreatorUseCases {
             job,
             "MANUAL_REVIEW",
             nowIso,
-            `자동 심사 재시도 횟수 초과 (${message})`,
+            "자동 심사 재시도 횟수 초과로 추가 확인이 필요합니다.",
           );
         } else {
           await this.reviewRepo.markJobFailed(job.id, message, nextCheckAt, nowIso);
@@ -323,7 +399,12 @@ export class CreatorUseCases {
     });
 
     // 잡 전이: 이미 다른 실행에서 전이된 경우(멱등) 프로필 전이를 건너뜁니다.
-    const transitioned = await reviewRepo.completeJob(job.id, decision.status, nowIso);
+    const transitioned = await reviewRepo.completeJob(
+      job.id,
+      decision.status,
+      nowIso,
+      decision.reason,
+    );
     if (!transitioned) return decision.status;
 
     if (decision.status === "FEATURED" && userId !== undefined) {
@@ -333,6 +414,15 @@ export class CreatorUseCases {
         featuredStatus: "FEATURED",
         featuredReason: decision.reason,
       });
+      try {
+        await reviewRepo.scheduleRevalidationJob({
+          creatorPlatformAccountId: account.id,
+          nextCheckAt: new Date(nowMs + FEATURED_POLICY.REVALIDATION_INTERVAL_MS).toISOString(),
+          nowIso,
+        });
+      } catch {
+        // 다음 Cron의 보충 단계가 누락된 재검증 잡을 다시 예약합니다.
+      }
     } else if (userId !== undefined) {
       await this.creatorRepo.upsertProfile({
         userId,
@@ -344,16 +434,195 @@ export class CreatorUseCases {
     return decision.status;
   }
 
+  /** 기존 Featured 계정에 누락된 14일 재검증 잡을 제한된 수만큼 보충합니다. */
+  async ensureFeaturedRevalidationJobs(options?: {
+    now?: Date;
+    batchSize?: number;
+  }): Promise<number> {
+    if (!this.reviewRepo) return 0;
+    const nowMs = options?.now?.getTime() ?? Date.now();
+    const limit = Math.min(
+      Math.max(options?.batchSize ?? FEATURED_POLICY.DEFAULT_BATCH_SIZE, 1),
+      FEATURED_POLICY.MAX_BATCH_SIZE,
+    );
+    const nowIso = new Date(nowMs).toISOString();
+    return this.reviewRepo.ensureRevalidationJobs(
+      limit,
+      new Date(nowMs + FEATURED_POLICY.REVALIDATION_INTERVAL_MS).toISOString(),
+      nowIso,
+    );
+  }
+
+  /** 14일 Featured 재검증 파이프라인. 6시간 취득 심사와 별도 잡/배치로 실행합니다. */
+  async runDueFeaturedRevalidations(options: {
+    adapters: Record<CreatorPlatformType, CreatorProviderAdapter>;
+    now?: Date;
+    batchSize?: number;
+  }): Promise<FeaturedRevalidationRunSummary> {
+    if (!this.reviewRepo) {
+      return { processed: 0, retained: 0, revoked: 0, manualReview: 0, failed: 0 };
+    }
+
+    const nowMs = options.now?.getTime() ?? Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const batchSize = Math.min(
+      Math.max(options.batchSize ?? FEATURED_POLICY.DEFAULT_BATCH_SIZE, 1),
+      FEATURED_POLICY.MAX_BATCH_SIZE,
+    );
+    const jobs = await this.reviewRepo.listDueRevalidationJobs(batchSize, nowIso);
+    const summary: FeaturedRevalidationRunSummary = {
+      processed: jobs.length,
+      retained: 0,
+      revoked: 0,
+      manualReview: 0,
+      failed: 0,
+    };
+
+    for (const job of jobs) {
+      try {
+        const outcome = await this.processRevalidationJob(job, options.adapters, nowMs);
+        if (outcome === "RETAIN_FEATURED") summary.retained += 1;
+        else if (outcome === "REVOKE_FEATURED") summary.revoked += 1;
+        else summary.manualReview += 1;
+      } catch {
+        summary.failed += 1;
+        const nextCheckAt = new Date(
+          nowMs + FEATURED_POLICY.REVALIDATION_RETRY_INTERVAL_MS,
+        ).toISOString();
+        if (job.attemptCount + 1 >= FEATURED_POLICY.MAX_ATTEMPTS) {
+          await this.completeAndSetProfileReason(
+            job,
+            "MANUAL_REVIEW",
+            nowIso,
+            "자동 Featured 재검증에 실패하여 추가 확인이 필요합니다.",
+          );
+        } else {
+          await this.reviewRepo.markJobFailed(
+            job.id,
+            "재검증 공식 API 일시 실패",
+            nextCheckAt,
+            nowIso,
+          );
+        }
+      }
+    }
+
+    return summary;
+  }
+
+  private async processRevalidationJob(
+    job: CreatorReviewJob,
+    adapters: Record<CreatorPlatformType, CreatorProviderAdapter>,
+    nowMs: number,
+  ): Promise<FeaturedRevalidationDecision> {
+    const nowIso = new Date(nowMs).toISOString();
+    const reviewRepo = this.reviewRepo;
+    if (!reviewRepo) return "MANUAL_REVIEW";
+
+    const account = await this.creatorRepo.findPlatformAccountById(job.creatorPlatformAccountId);
+    if (!account) {
+      await this.completeAndSetProfileReason(
+        job,
+        "NOT_ELIGIBLE",
+        nowIso,
+        "채널 계정이 존재하지 않아 Featured 자격을 유지할 수 없습니다.",
+      );
+      return "REVOKE_FEATURED";
+    }
+
+    const profile = await this.creatorRepo.findProfileById(account.creatorId);
+    const userId = profile?.userId;
+    if (!profile || profile.featuredStatus !== "FEATURED") {
+      await this.completeAndSetProfileReason(
+        job,
+        "NOT_ELIGIBLE",
+        nowIso,
+        "현재 Featured 상태가 아니므로 재검증을 종료합니다.",
+        userId,
+      );
+      return "REVOKE_FEATURED";
+    }
+
+    if (account.verificationStatus !== "VERIFIED") {
+      await this.completeAndSetProfileReason(
+        job,
+        "NOT_ELIGIBLE",
+        nowIso,
+        "채널 소유권 검증이 유효하지 않아 Featured 자격을 철회합니다.",
+        userId,
+        "NONE",
+      );
+      return "REVOKE_FEATURED";
+    }
+
+    const adapter = adapters[account.platform];
+    if (!adapter || !adapter.supportsAutomaticMetricRefresh()) {
+      await this.completeAndSetProfileReason(
+        job,
+        "MANUAL_REVIEW",
+        nowIso,
+        "자동 재검증 미지원 플랫폼 — Featured를 자동 변경하지 않고 추가 확인이 필요합니다.",
+        userId,
+      );
+      return "MANUAL_REVIEW";
+    }
+
+    const metrics = await adapter.fetchChannelMetrics(account.platformUserId);
+    const decision = evaluateFeaturedRevalidation({
+      audienceCount: metrics.audienceCount,
+      channelState: metrics.channelState,
+    });
+
+    await this.creatorRepo.updatePlatformAccountMetrics(account.id, {
+      audienceCount: metrics.audienceCount ?? account.audienceCount ?? null,
+      channelCreatedAt: metrics.channelCreatedAt ?? account.channelCreatedAt ?? null,
+      syncedAt: nowIso,
+    });
+
+    const status =
+      decision.status === "RETAIN_FEATURED"
+        ? "FEATURED"
+        : decision.status === "REVOKE_FEATURED"
+          ? "NOT_ELIGIBLE"
+          : "MANUAL_REVIEW";
+    const transitioned = await reviewRepo.completeJob(job.id, status, nowIso, decision.reason);
+    if (!transitioned) return decision.status;
+
+    if (userId !== undefined) {
+      await this.creatorRepo.upsertProfile({
+        userId,
+        status: "VERIFIED",
+        ...(decision.status === "REVOKE_FEATURED" ? { featuredStatus: "NONE" as const } : {}),
+        featuredReason: decision.reason,
+      });
+    }
+
+    if (decision.status === "RETAIN_FEATURED") {
+      try {
+        await reviewRepo.scheduleRevalidationJob({
+          creatorPlatformAccountId: account.id,
+          nextCheckAt: new Date(nowMs + FEATURED_POLICY.REVALIDATION_INTERVAL_MS).toISOString(),
+          nowIso,
+        });
+      } catch {
+        // 다음 Cron의 보충 단계가 누락된 재검증 잡을 다시 예약합니다.
+      }
+    }
+
+    return decision.status;
+  }
+
   private async completeAndSetProfileReason(
     job: CreatorReviewJob,
     status: Exclude<FeaturedReviewStatus, "AUTO_REVIEW_PENDING" | "FAILED_RETRYABLE">,
     completedAt: string,
     reason: string,
     userId?: number,
+    featuredStatus?: "NONE" | "FEATURED" | "PARTNER",
   ): Promise<void> {
     const reviewRepo = this.reviewRepo;
     if (!reviewRepo) return;
-    const transitioned = await reviewRepo.completeJob(job.id, status, completedAt);
+    const transitioned = await reviewRepo.completeJob(job.id, status, completedAt, reason);
     if (!transitioned) return;
     if (userId === undefined) {
       const account = await this.creatorRepo.findPlatformAccountById(job.creatorPlatformAccountId);
@@ -364,6 +633,7 @@ export class CreatorUseCases {
       await this.creatorRepo.upsertProfile({
         userId,
         status: "VERIFIED",
+        ...(featuredStatus ? { featuredStatus } : {}),
         featuredReason: reason,
       });
     }
