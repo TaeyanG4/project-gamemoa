@@ -52,7 +52,8 @@ Creator/Featured 상태, 길드 소유권은 어떤 단계에서도 관리자 �
 3. Google 본인 확인이 성공하고, 시스템에 관리자 계정이 아직 없으면 **"초기 관리자 설정"** 폼이
    나타납니다. 원하는 아이디(3~64자, 영문/숫자/`._-`)와 비밀번호(12자 이상, 구성 규칙 없음)를
    입력합니다.
-4. 서버가 비밀번호를 기존 PBKDF2-HMAC-SHA256(210,000 iterations)으로 해시해 D1에만 저장하고,
+4. 서버가 비밀번호를 PBKDF2-HMAC-SHA256(100,000 iterations — Cloudflare Workers `crypto.subtle`의
+   PBKDF2 반복 횟수 상한)으로 해시해 D1에만 저장하고,
    평문은 어디에도 남기지 않습니다. 첫 SUPERADMIN 계정이 `must_change_password=true` 상태로
    생성됩니다.
 5. 로그인 직후 "관리자 비밀번호를 변경해주세요" 화면이 강제로 표시됩니다. §7에 따라 즉시 새
@@ -186,8 +187,10 @@ SUPERADMIN만 `/admin/accounts`에서 조회할 수 있습니다.
 - 민감한 관리자 응답은 `Cache-Control: no-store`입니다.
 - 관리자 ID를 이메일, 닉네임, Google 표시 이름 또는 OAuth provider ID로 등록하지 않습니다 —
   오직 canonical `sub` + 해당 GAMEMOA 계정의 기존 OAuth 연결만 사용합니다.
-- 비밀번호는 PBKDF2-HMAC-SHA256(210,000 iterations)으로만 저장하며 평문을 어디에도 남기지
-  않습니다.
+- 비밀번호는 PBKDF2-HMAC-SHA256(100,000 iterations)으로만 저장하며 평문을 어디에도 남기지
+  않습니다. 100,000은 앱이 고른 값이 아니라 Cloudflare Workers `crypto.subtle`의 PBKDF2 반복
+  횟수 상한(그 이상은 `NotSupportedError`)이며, Node 기반 로컬 테스트에는 이 상한이 없어 실제
+  프로덕션 로그인 전까지 드러나지 않았던 이력이 있습니다.
 
 ## 15. 문제 해결
 

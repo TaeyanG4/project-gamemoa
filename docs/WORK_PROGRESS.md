@@ -117,6 +117,83 @@ G. Discord Bot UX/기능 고도화 (신규, 현재 진행 중)      ← Embed �
 
 ---
 
+## 완료 (같은 세션 — Admin 최초 부트스트랩 및 그 과정에서 발견한 프로덕션 치명 버그 2건)
+
+운영자가 "관리자 본인 확인" 화면 스크린샷과 함께 초기 관리자 아이디/비밀번호(`admin1234`)를
+전달하며 직접 설정을 요청. 그대로 쓰지 않고 아래 순서로 처리:
+
+### 1) 최초 SUPERADMIN 계정을 웹 부트스트랩 엔드포인트 없이 직접 D1에 생성
+
+- 주어진 비밀번호는 앱 자체 정책(`ADMIN_ACCOUNT_POLICY`: 최소 12자, 아이디와 동일 문자열 금지)을
+  애초에 통과하지 못하는 값이었고, 저장소 자체에 "관리자 비밀번호를 AI 채팅에 붙여넣지 말 것"이라는
+  규칙이 이미 문서화(`scripts/admin-password-hash.ts` 주석)되어 있어 그대로 쓰지 않음.
+- 대신 무작위 임시 비밀번호를 로컬(스크래치패드, 저장소 밖)에서 생성 → 앱과 동일한
+  PBKDF2-HMAC-SHA256 알고리즘으로 해시 → `admin_accounts`에 SUPERADMIN 행을 **`/api/admin/bootstrap`
+  웹 엔드포인트를 전혀 거치지 않고** 직접 INSERT(`must_change_password=1`). 운영자 요청("혹시
+  모를 버그 있을지 모르니 백그라운드에서 직접 설정")과 일치하는 방식.
+- 부트스트랩·로그인 게이트 코드(`resolveAdminEligibility`, `isAdminUserId`,
+  `isTrustedAdminOrigin`)를 직접 리뷰 — root 세션 + `ADMIN_USER_IDS` + 이 GAMEMOA 계정에 실제
+  연동된 Google 계정의 신선한(iat 검증) OIDC step-up을 모두 요구하는 구조로, 익명 공격자가 뚫을
+  틈은 찾지 못함.
+- 임시 스크립트/SQL 파일은 사용 직후 삭제, `git status` 클린 확인 — 저장소에는 아무 흔적도 남지
+  않음.
+
+### 2) Google 본인 확인 버튼이 안 보이는 버그 (레이스 컨디션)
+
+운영자가 실제로 `/admin`에 방문했을 때 1단계("Google 본인 확인") 버튼이 아예 렌더링되지 않는
+빈 박스만 보임(에러 메시지도, 로딩 표시도 없음).
+
+- **원인**: `GoogleStepUpPanel`(`apps/web/app/routes/admin.tsx`)이 Google 공식 버튼을
+  `containerRef`로 가리키는 DOM에 렌더링하는데, 그 컨테이너 `<div>`가 `!scriptReady` 상태일
+  때만 마운트되고 있었음. `root.tsx`가 모든 페이지에서 Google Identity Services 스크립트를
+  미리 로드해두므로, `/admin` 방문 시 이미 스크립트가 준비된 상태(흔한 경우)라면 `useEffect`가
+  `setScriptReady(true)`를 호출한 바로 그 동기 실행 흐름 안에서 `containerRef.current`를
+  확인 — 이 시점엔 React가 아직 그 리렌더링을 커밋하지 않아 `containerRef.current`가 여전히
+  `null`. `renderButton` 호출이 조용히 건너뛰어지고 재시도 로직도 없어 영구히 빈 박스만 남음.
+- **수정**: 컨테이너 `<div>`를 `scriptReady`와 무관하게 항상 마운트하고, 로딩 상태는 그 위에
+  겹치는 오버레이로 처리 — effect의 첫 실행 시점에 이미 ref가 DOM에 연결되어 있도록 변경.
+  같은 패턴 재발 방지용 회귀 테스트(`apps/web/app/test/adminStepUp.test.ts`, 소스 패턴 검사
+  방식 — 이 저장소의 기존 웹 라우트 테스트 스타일과 동일) 추가.
+- 커밋 `58007a7`로 배포, CI/Deploy/provenance/smoke 전부 그린 확인.
+
+### 3) 로그인 시도 시 `Internal server error`(500) — Cloudflare Workers PBKDF2 반복 횟수 상한
+
+버튼 수정 후 운영자가 실제로 Google 본인 확인 → 로그인을 시도했으나 500 에러 발생.
+`wrangler tail`로 프로덕션 로그를 실시간 확인해 원인 특정:
+
+```
+Unhandled Hono Error: NotSupportedError: Pbkdf2 failed: iteration counts above 100000
+are not supported (requested 210000).
+```
+
+- **원인**: `ADMIN_AUTH_POLICY.PBKDF2_ITERATIONS`가 `210_000`으로 설정되어 있었는데, **Cloudflare
+  Workers의 `crypto.subtle.deriveBits`는 PBKDF2 반복 횟수를 100,000까지만 허용**합니다.
+  Node.js에는 이 제한이 없어 로컬 `node --test` 스위트에서는 전혀 드러나지 않았고, 실제 Workers
+  런타임에서 로그인을 시도해야만 재현되는 버그였습니다.
+- `admin_login_attempts`/`admin_sessions`에 아무 행도 생성되지 않은 것으로 보아 예외가
+  `verifyAdminPassword` 내부(해시 검증 자체) 단계에서 발생 — 아이디/비밀번호 문제가 아니라
+  해시 검증 자체가 프로덕션에서 항상 실패하는 구조였습니다.
+- **이 버그는 이번에 처음 생긴 게 아니라 관리자 계정 시스템이 처음 만들어진 이후로 계속
+  있었던 것으로 보입니다** — 웹 부트스트랩 폼을 정상적으로 썼어도 `hashAdminPassword()`가
+  Worker 안에서 210,000회 반복을 시도하는 순간 똑같이 터졌을 것입니다. 즉 지금까지 이 관리자
+  계정 시스템은 프로덕션에서 한 번도 정상 동작한 적이 없었습니다.
+- **수정**: `packages/core/src/domain/adminAuth.ts`의 `PBKDF2_ITERATIONS`를 `210_000` →
+  `100_000`(Workers 상한)으로 수정, 원인을 코드 주석으로 남김. 이미 생성해둔 SUPERADMIN 계정의
+  `password_hash`를 100,000회 반복으로 재해시하여 프로덕션 D1에 직접 UPDATE(운영자에게 새 임시
+  비밀번호 재발급 — 이전 것은 폐기). `docs/ADMIN_GUIDE.md`의 "210,000 iterations" 서술 2곳
+  정정. `packages/core`/`apps/api` 테스트 전체 재실행(173 + 135 통과), 하드코딩된 210000 값에
+  의존하는 테스트 없음을 grep으로 확인.
+
+### 검증
+
+- [x] `pnpm verify` 전체 GREEN.
+- [x] 코드 배포(CI → Deploy → provenance 일치 → `pnpm smoke:prod`) 완료.
+- [ ] **운영자가 새 임시 비밀번호로 실제 로그인 성공을 아직 확인하지 못한 상태** — 다음 세션
+      시작 시 가장 먼저 확인 필요. 만약 여전히 실패한다면 `wrangler tail`로 다시 실시간 로그를
+      확인하는 것이 정답에 가장 빨리 도달하는 방법(이번에도 그렇게 원인을 찾았음).
+
+---
+
 ## 완료 (Phase B~E — Admin/Streamer/Discord/Wiki/i18n 기반)
 
 ### Phase B: 스트리머 랭킹 정책 & 플랫폼 아이콘
@@ -279,12 +356,20 @@ Actions 기록이 원본입니다.
 
 ## 다음 작업 (Next Action)
 
-Discord 봇 기능/완성도 보완을 계속 진행(위 2번 후보 중 운영자에게 우선순위 확인 후 착수) →
-i18n 번역 재개는 운영자가 명시적으로 요청할 때까지 대기 → 운영자의 admin 테스트 완료 확인 후
-Admin 흐름 UI 텍스트(표시 문자열만, 인증/보안 로직 불변) → 필요 시 `Post-Sprint UX / SEO /
-Production Readiness QA`. Admin bootstrap/로그인 자체는 운영자가 직접 진행하므로 다음 세션에서
-먼저 확인하거나 손댈 필요 없음 — 운영자가 먼저 언급하지 않는 한 admin 관련 파일은 (i18n 포함)
-건드리지 마세요.
+**0순위(다음 세션 시작 시 가장 먼저 확인)**: 운영자가 재발급된 임시 비밀번호로 `/admin` 로그인에
+실제로 성공했는지 확인. 아직 확인 전 상태로 이 세션이 종료되었습니다. 만약 여전히 실패한다면
+`wrangler tail --format pretty`로 프로덕션 로그를 실시간으로 보면서 운영자에게 재시도를 요청하는
+방식이 가장 빠르게 원인에 도달합니다(이번 세션에서 두 번의 치명 버그를 모두 이 방법으로
+찾았습니다 — 추측으로 코드를 고치려 하지 말고 실제 에러 스택을 먼저 확인하세요). 로그인 성공
+후에는 강제 비밀번호 변경 화면이 뜨는지, 그 화면에서 새 비밀번호로 변경까지 정상 완료되는지도
+함께 확인.
+
+로그인이 확인되면: Discord 봇 기능/완성도 보완을 계속 진행(운영자에게 우선순위 확인 후 착수) →
+i18n 번역 재개는 운영자가 명시적으로 요청할 때까지 대기 → 필요 시 Admin 흐름 UI 텍스트(표시
+문자열만, 인증/보안 로직 불변) → 필요 시 `Post-Sprint UX / SEO / Production Readiness QA`.
+Admin **로직**은 운영자가 먼저 언급하지 않는 한 건드리지 마세요 — 다만 이번 세션에서 확인했듯
+"운영자가 admin을 직접 다룬다"는 것이 "admin에 실제 버그가 있어도 못 고친다"는 뜻은 아닙니다.
+운영자가 에러를 보고하면 즉시 조사·수정하는 것이 맞습니다.
 
 시작 시 `git log`, `git status`, 이 문서의 "완료" 섹션으로 현재 상태를 재확인한 뒤 처음부터 다시
 설계하지 말고 이어서 진행하세요.

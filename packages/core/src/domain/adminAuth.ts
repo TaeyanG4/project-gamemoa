@@ -16,8 +16,14 @@ export const ADMIN_AUTH_POLICY = {
   LOGIN_RATE_LIMIT_MAX_ATTEMPTS: 5,
   /** Rolling window over which failed attempts are counted. */
   LOGIN_RATE_LIMIT_WINDOW_MS: 15 * 60 * 1000,
-  /** PBKDF2-HMAC-SHA256 iteration count for the admin password hash. */
-  PBKDF2_ITERATIONS: 210_000,
+  /** PBKDF2-HMAC-SHA256 iteration count for the admin password hash. Capped at 100,000 — this is
+   * a Cloudflare Workers `crypto.subtle` platform limit, not an app-chosen value. A higher count
+   * (OWASP currently recommends 600,000+ for PBKDF2-SHA256) throws `NotSupportedError: Pbkdf2
+   * failed: iteration counts above 100000 are not supported` in the Workers runtime specifically
+   * — Node.js has no such cap, so this was never caught by the local test suite (`node --test`),
+   * only surfaced by an actual production login attempt. Every password hash/verify in this app
+   * runs inside a Worker, so this ceiling applies everywhere admin passwords are handled. */
+  PBKDF2_ITERATIONS: 100_000,
   /** A fresh Google ID token must have been issued (iat) within this many seconds of "now" to
    * count as step-up proof — rejects a stale/cached token even though it is still cryptographically valid. */
   GOOGLE_TOKEN_MAX_AGE_SECONDS: 300,
