@@ -1,6 +1,8 @@
-# OwOGG (게임모아) 🎮
+# OwOGG 🎮
 
 > **설치 없이 웹 브라우저에서 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼**
+>
+> 프로덕션: **[owogg.com](https://owogg.com)** · API: `api.owogg.com`
 
 OwOGG는 **Game Plugin Architecture** 및 **Clean Layered Monorepo Architecture** 기반으로 설계된 미니게임 플랫폼입니다.  
 CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만에 플레이 가능한 비주얼 스포트라이트와 고밀도 게임 카탈로그를 제공합니다.
@@ -27,7 +29,7 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
   - 🔗 **연결된 로그인 계정 관리**: 프로필에서 Google/Discord 연결/연결해제 및 충돌 시 계정 통합 UI 제공
   - 🔒 **SHA-256 세션 보안 & Google ID Token JWT/JWKS 검증**: 세션 토큰 해싱 저장 및 Google OpenID JWKS 기반 RS256 서명/iss/aud/exp/sub 검증(`tokeninfo` 비의존)
   - 💾 **게스트 로컬스토리지 & 계정 D1 동기화**: 로그인 없이 최근 플레이를 로컬스토리지에 보존하며, 로그인 시 계정 D1로 안전한 1-Way 최근 플레이 통합(게스트 즐겨찾기는 미통합)
-- 🎨 **OwOGG 브랜드 파비콘**: 4-타일 게임 허브 마크의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`
+- 🎨 **OwOGG 브랜드 파비콘**: 대각선 "OwO" 워드마크(브랜드 그라디언트 배경 + 흰색 라인아트)의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`. 헤더/푸터의 `<OwoWordmarkIcon>`과 동일한 도형을 공유합니다.
 - 🏆 **진행도 시스템 (XP / 레벨 / 도전과제)**: 서버 권위 XP(인증된 게임 완료 1회당 +10, 사용자×게임×UTC일 기준 최대 10회 상한), `xp_events` 원장 기반 멱등 지급, 결정론적 레벨 공식(`100×(L-1)²`), 7종 초기 도전과제(FIRST_PLAY/PLAY_10/PLAY_100/FIRST_FAVORITE/LEVEL_5/LEVEL_10/ALL_GAMES), 글로벌 XP 리더보드. 게임 점수(실력)와 XP(활동)는 항상 분리되어 랭킹 무결성을 해치지 않습니다. 자세한 내용은 `docs/PROGRESSION.md` 참고.
 - 📊 **My Page ("내 프로필 & 기록")**: `/profile`의 "내 프로필"(사용자 정보, 레벨/XP, 닉네임·국가/지역 변경, 즐겨찾기, 최근 플레이, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록) 탭 분리. 게임 기록 카드는 실제 썸네일 기반으로 재구성.
 - 🎥 **Creator & Featured 시스템**: YouTube/CHZZK/SOOP/Twitch 공식 소유권 검증, Featured 자격 자동 심사, 14일 보수적 재검증, 지정된 `ADMIN_USER_IDS` 관리자 전용 수동 심사 큐와 append-only 감사 원장. Featured는 게임 점수·XP·랭킹에 영향을 주지 않습니다. 상세 정책은 `docs/CREATOR_SYSTEM.md` 참고.

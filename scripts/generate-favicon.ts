@@ -1,6 +1,6 @@
 import { deflateSync } from "node:zlib";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 import { Buffer } from "node:buffer";
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,12 @@ const ROUTES_TO_CHECK = [
   "/discord/servers",
   "/discord/guide",
   "/discord/link",
+  "/wiki",
+  // Registered in the Discord Developer Portal as this app's official Terms of Service /
+  // Privacy Policy URLs — if either 404s, Discord app verification silently breaks, so they
+  // are deployment-blocking here rather than something we'd notice weeks later.
+  "/terms",
+  "/privacy",
   "/games/reaction-time",
   "/games/memory-test",
   "/games/aim-test",
