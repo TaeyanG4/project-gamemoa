@@ -1,10 +1,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gamemoa-api",
+  "name": "owogg-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-12",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "routes": [{ "pattern": "api.owogg.com", "custom_domain": true }],
   "d1_databases": [
     {
       "binding": "DB",
