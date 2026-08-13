@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router";
 import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
-import { WIKI_SECTIONS, findAdjacentWikiPages } from "../../features/wiki/navigation";
+import { buildWikiSections, findAdjacentWikiPages } from "../../features/wiki/navigation";
+import { useI18n } from "../../features/i18n/I18nContext";
 
 /** Shared shell for every /wiki/* page — sidebar table of contents (current page highlighted),
  * title/description header, and prev/next footer navigation. Deliberately plain React
@@ -16,9 +17,11 @@ export function WikiLayout({
   eyebrow?: string;
   children: React.ReactNode;
 }) {
+  const { dict } = useI18n();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { prev, next } = findAdjacentWikiPages(currentPath);
+  const wikiSections = buildWikiSections(dict.wiki);
+  const { prev, next } = findAdjacentWikiPages(wikiSections, currentPath);
 
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 md:px-8">
@@ -30,10 +33,10 @@ export function WikiLayout({
 
       <div className="grid gap-8 lg:grid-cols-[220px_1fr]">
         <nav
-          aria-label="Wiki 목차"
+          aria-label={dict.wiki.tocAriaLabel}
           className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 lg:mx-0 lg:block lg:space-y-6 lg:overflow-visible lg:px-0 lg:pb-0"
         >
-          {WIKI_SECTIONS.map((section) => (
+          {wikiSections.map((section) => (
             <div key={section.title} className="shrink-0 lg:shrink">
               <p className="mb-2 text-[10px] font-black uppercase tracking-[0.15em] text-text-muted">
                 {section.title}

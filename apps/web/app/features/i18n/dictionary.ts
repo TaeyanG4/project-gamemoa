@@ -437,6 +437,37 @@ export interface Dictionary {
     loginCta: string;
     linkCta: string;
   };
+  wiki: {
+    navGettingStarted: string;
+    navDiscordOverview: string;
+    navDiscordInstall: string;
+    navDiscordAccountLink: string;
+    navDiscordServerRegistration: string;
+    navDiscordCommands: string;
+    navDiscordXp: string;
+    navDiscordTroubleshooting: string;
+    navAccount: string;
+    navAccountOverview: string;
+    navAccountMerge: string;
+    navGamesRanking: string;
+    navGamesOverview: string;
+    navRanking: string;
+    navGamesXp: string;
+    navCreatorOverview: string;
+    navCreatorVerification: string;
+    navCreatorFeatured: string;
+    tocAriaLabel: string;
+    homeTitle: string;
+    homeSubtitle: string;
+    homeInstallPrompt: string;
+    homeInstallGuideLink: string;
+    homeInstallGuideSuffix: string;
+    catDiscordDesc: string;
+    catGettingStartedDesc: string;
+    catAccountDesc: string;
+    catGamesDesc: string;
+    catCreatorDesc: string;
+  };
 }
 
 export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
@@ -899,6 +930,38 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       loginRequiredHint: "연동하려면 먼저 GAMEMOA에 로그인해주세요.",
       loginCta: "로그인하기",
       linkCta: "연동하기",
+    },
+    wiki: {
+      navGettingStarted: "시작하기",
+      navDiscordOverview: "Discord 개요",
+      navDiscordInstall: "설치하기",
+      navDiscordAccountLink: "계정 연결",
+      navDiscordServerRegistration: "서버 등록",
+      navDiscordCommands: "명령어",
+      navDiscordXp: "서버 XP",
+      navDiscordTroubleshooting: "문제 해결",
+      navAccount: "계정",
+      navAccountOverview: "계정 개요",
+      navAccountMerge: "계정 통합",
+      navGamesRanking: "게임과 랭킹",
+      navGamesOverview: "게임 개요",
+      navRanking: "랭킹",
+      navGamesXp: "XP와 레벨",
+      navCreatorOverview: "Creator 개요",
+      navCreatorVerification: "채널 소유권 인증",
+      navCreatorFeatured: "Featured Creator",
+      tocAriaLabel: "Wiki 목차",
+      homeTitle: "궁금한 걸 빠르게 찾아보세요",
+      homeSubtitle:
+        "Discord 설치부터 랭킹 계산 방식까지, GAMEMOA를 사용하는 데 필요한 모든 설명을 한곳에 모았습니다.",
+      homeInstallPrompt: "더 빠른 Discord 설치가 필요하신가요?",
+      homeInstallGuideLink: "5단계 설치 가이드",
+      homeInstallGuideSuffix: "로 바로 이동하세요.",
+      catDiscordDesc: "서버 설치, 계정 연결, 서버 등록, 명령어, 서버 XP, 문제 해결.",
+      catGettingStartedDesc: "GAMEMOA 계정 만들기부터 첫 게임까지, 가장 빠른 시작 경로.",
+      catAccountDesc: "로그인 방식, 프로필 설정, 여러 계정을 하나로 합치는 계정 통합.",
+      catGamesDesc: "게임 카탈로그, 순위 계산 방식, 경험치(XP)와 레벨.",
+      catCreatorDesc: "채널 소유권 인증, 스트리머 랭킹 자격, Featured Creator 기준.",
     },
   },
   "en-US": {
@@ -1363,6 +1426,40 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       loginRequiredHint: "Please log in to GAMEMOA first to link your account.",
       loginCta: "Log in",
       linkCta: "Link account",
+    },
+    wiki: {
+      navGettingStarted: "Getting Started",
+      navDiscordOverview: "Discord Overview",
+      navDiscordInstall: "Installation",
+      navDiscordAccountLink: "Account Linking",
+      navDiscordServerRegistration: "Server Registration",
+      navDiscordCommands: "Commands",
+      navDiscordXp: "Server XP",
+      navDiscordTroubleshooting: "Troubleshooting",
+      navAccount: "Account",
+      navAccountOverview: "Account Overview",
+      navAccountMerge: "Account Merge",
+      navGamesRanking: "Games & Ranking",
+      navGamesOverview: "Games Overview",
+      navRanking: "Ranking",
+      navGamesXp: "XP & Levels",
+      navCreatorOverview: "Creator Overview",
+      navCreatorVerification: "Channel Ownership Verification",
+      navCreatorFeatured: "Featured Creator",
+      tocAriaLabel: "Wiki table of contents",
+      homeTitle: "Find what you need, fast",
+      homeSubtitle:
+        "From Discord install to how rankings are calculated — everything you need to use GAMEMOA, all in one place.",
+      homeInstallPrompt: "Need a quicker Discord install? Jump straight to",
+      homeInstallGuideLink: "the 5-step install guide",
+      homeInstallGuideSuffix: ".",
+      catDiscordDesc:
+        "Server install, account linking, server registration, commands, server XP, troubleshooting.",
+      catGettingStartedDesc: "The fastest path from creating a GAMEMOA account to your first game.",
+      catAccountDesc: "Login methods, profile settings, and merging multiple accounts into one.",
+      catGamesDesc: "The game catalog, how rankings are calculated, and XP & levels.",
+      catCreatorDesc:
+        "Channel ownership verification, streamer ranking eligibility, and Featured Creator criteria.",
     },
   },
   "ja-JP": {
@@ -1830,6 +1927,40 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       loginCta: "ログインする",
       linkCta: "連携する",
     },
+    wiki: {
+      navGettingStarted: "はじめに",
+      navDiscordOverview: "Discord概要",
+      navDiscordInstall: "インストール",
+      navDiscordAccountLink: "アカウント連携",
+      navDiscordServerRegistration: "サーバー登録",
+      navDiscordCommands: "コマンド",
+      navDiscordXp: "サーバーXP",
+      navDiscordTroubleshooting: "トラブルシューティング",
+      navAccount: "アカウント",
+      navAccountOverview: "アカウント概要",
+      navAccountMerge: "アカウント統合",
+      navGamesRanking: "ゲームとランキング",
+      navGamesOverview: "ゲーム概要",
+      navRanking: "ランキング",
+      navGamesXp: "XPとレベル",
+      navCreatorOverview: "Creator概要",
+      navCreatorVerification: "チャンネル所有権認証",
+      navCreatorFeatured: "Featured Creator",
+      tocAriaLabel: "Wiki目次",
+      homeTitle: "知りたいことをすぐに見つけよう",
+      homeSubtitle:
+        "Discordのインストールからランキングの計算方法まで、GAMEMOAを使うために必要な説明を一箇所にまとめました。",
+      homeInstallPrompt: "もっと早くDiscordをインストールしたいですか？",
+      homeInstallGuideLink: "5ステップのインストールガイド",
+      homeInstallGuideSuffix: "へ直接移動しましょう。",
+      catDiscordDesc:
+        "サーバーへのインストール、アカウント連携、サーバー登録、コマンド、サーバーXP、トラブルシューティング。",
+      catGettingStartedDesc: "GAMEMOAアカウントの作成から最初のゲームまで、最短ルート。",
+      catAccountDesc:
+        "ログイン方法、プロフィール設定、複数アカウントを1つに統合するアカウント統合。",
+      catGamesDesc: "ゲームカタログ、順位の計算方法、経験値（XP）とレベル。",
+      catCreatorDesc: "チャンネル所有権認証、ストリーマーランキング資格、Featured Creator基準。",
+    },
   },
   "zh-CN": {
     common: {
@@ -2273,6 +2404,37 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       loginRequiredHint: "关联前请先登录 GAMEMOA。",
       loginCta: "去登录",
       linkCta: "关联账户",
+    },
+    wiki: {
+      navGettingStarted: "新手指南",
+      navDiscordOverview: "Discord 概览",
+      navDiscordInstall: "安装",
+      navDiscordAccountLink: "账户关联",
+      navDiscordServerRegistration: "服务器注册",
+      navDiscordCommands: "命令",
+      navDiscordXp: "服务器 XP",
+      navDiscordTroubleshooting: "故障排查",
+      navAccount: "账户",
+      navAccountOverview: "账户概览",
+      navAccountMerge: "账户合并",
+      navGamesRanking: "游戏与排行榜",
+      navGamesOverview: "游戏概览",
+      navRanking: "排行榜",
+      navGamesXp: "XP 与等级",
+      navCreatorOverview: "Creator 概览",
+      navCreatorVerification: "频道所有权认证",
+      navCreatorFeatured: "Featured Creator",
+      tocAriaLabel: "Wiki 目录",
+      homeTitle: "快速找到你想了解的内容",
+      homeSubtitle: "从 Discord 安装到排行榜计算方式，使用 GAMEMOA 所需的一切说明都汇总在这里。",
+      homeInstallPrompt: "想要更快安装 Discord？",
+      homeInstallGuideLink: "5 步安装指南",
+      homeInstallGuideSuffix: "，立即前往。",
+      catDiscordDesc: "服务器安装、账户关联、服务器注册、命令、服务器 XP、故障排查。",
+      catGettingStartedDesc: "从创建 GAMEMOA 账户到第一局游戏的最快路径。",
+      catAccountDesc: "登录方式、个人资料设置，以及将多个账户合并为一个的账户合并功能。",
+      catGamesDesc: "游戏目录、排名计算方式、经验值（XP）与等级。",
+      catCreatorDesc: "频道所有权认证、主播排行榜资格、Featured Creator 标准。",
     },
   },
 };

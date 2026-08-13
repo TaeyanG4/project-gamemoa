@@ -51,6 +51,11 @@ F. Full Regression / Production Verification           ← 매 세션 수행
       섹션, 닉네임·국가 편집 폼과 쿨다운 에러, 연동 계정 연결/해제, Creator 채널 소유권 인증 및
       Featured 심사 상태 — `/profile` 전체 화면 텍스트 연결 완료). `COUNTRY_OPTIONS` 국가명은
       여전히 한국어 고정(스코프 밖).
+- [x] `dict.wiki` — `WikiLayout`(사이드바 5개 섹션/15개 항목, prev/next 푸터, 목차 aria-label)과
+      Wiki 홈(`/wiki`: 5개 카테고리 카드, 히어로, 설치 가이드 유도 문구) 연결.
+      `features/wiki/navigation.ts`를 `buildWikiSections(dict.wiki)` 함수로 전환(기존 정적
+      `WIKI_SECTIONS` export 제거). Wiki 본문 17개 상세 라우트(약 1,300줄, 장문 설명/단계별
+      가이드/FAQ)는 셸만 다국어화되고 본문은 여전히 한국어 고정 — 별도 규모의 후속 작업으로 남김.
 - [x] `dict.discord` / `dict.discordSetup` / `dict.discordGuide` / `dict.discordServers` /
       `dict.discordServerSlug` / `dict.discordServerManage` / `dict.discordLink` — Discord 6개
       라우트(Hub/설치 가이드/이용 가이드/서버 디렉토리/서버 공개 페이지/서버 관리/계정 연동) 전체
@@ -198,15 +203,18 @@ Actions 기록이 원본입니다.
 
 ## 남은 작업 (다음 세션에서 이어서 진행)
 
-1. **i18n 화면 번역 확장 (계속)**: Wiki 본문(18개 서브 라우트), Admin 로그인 흐름/센터를 `dict`에
-   연결. `COUNTRY_OPTIONS` 국가명 다국어화(현재 한국어 고정). `common` 사전 섹션은 이미 준비되어
-   있음. 라우트 `meta()` 로케일화 방식 검토(현재 스코프 밖). Discord 6개 라우트(Hub/설치 가이드/
-   이용 가이드/서버 디렉토리/서버 공개 페이지/서버 관리/계정 연동)와 프로필(`/profile`) 전체는
-   이번 세션에 완료.
+1. **i18n 화면 번역 확장 (계속)**: Wiki 본문 17개 상세 라우트(장문 설명·단계별 가이드·FAQ, 약
+   1,300줄 — 셸/내비게이션은 이번 세션에 완료)를 `dict`에 연결. `COUNTRY_OPTIONS` 국가명
+   다국어화(현재 한국어 고정). `common` 사전 섹션은 이미 준비되어 있음. 라우트 `meta()` 로케일화
+   방식 검토(현재 스코프 밖). Discord 6개 라우트, 프로필(`/profile`) 전체, Wiki 셸/홈은 이번
+   세션에 완료.
 2. **Admin bootstrap 관련 작업은 운영자가 직접 진행하기로 함**(2026-08-13 지시: "admin은 추후
    내가 테스트 해볼게") — 코딩 세션은 admin 로그인/bootstrap 플로우를 더 이상 건드리거나
    검증하지 않습니다. `ADMIN_USER_IDS`는 이전 세션에 이미 설정 완료된 상태이며, 나머지는 운영자의
-   `/admin` 브라우저 조작이 필요합니다.
+   `/admin` 브라우저 조작이 필요합니다. **이 세션에서는 admin i18n 번역(표시 문자열만이라도)조차
+   의도적으로 보류했습니다** — 운영자의 진행 중인 검증을 방해하지 않기 위함이며, 인증/보안 로직은
+   물론 UI 텍스트도 변경하지 않았습니다. 운영자가 admin 테스트를 완료했다고 알려주면 그때 admin UI
+   텍스트(표시 문자열만, 로직 불변)의 i18n 연결을 진행하세요.
 3. **외부 설정 대기**(repository만으로 완결 불가, 선택 사항): Discord 명령어 자동 동기화를 원하면
    `DISCORD_COMMAND_SYNC_ENABLED=true` + `DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`/
    `DISCORD_TEST_GUILD_ID`(선택) 등록. 미설정이어도 배포에는 영향 없음.
@@ -215,10 +223,11 @@ Actions 기록이 원본입니다.
 
 ## 다음 작업 (Next Action)
 
-`i18n 화면 번역 확장 마무리`(프로필 세부 마이크로카피 → Wiki 본문 → Admin 흐름 UI 텍스트, 단
-Admin 인증/보안 로직은 절대 건드리지 않고 표시 문자열만) → 필요 시 `Post-Sprint UX / SEO /
-Production Readiness QA`. Admin bootstrap/로그인 자체는 운영자가 직접 진행하므로 다음 세션에서
-먼저 확인하거나 손댈 필요 없음.
+`i18n 화면 번역 확장 마무리`(Wiki 본문 17개 상세 라우트 → `COUNTRY_OPTIONS` 다국어화) → 운영자의
+admin 테스트 완료 확인 후 Admin 흐름 UI 텍스트(표시 문자열만, 인증/보안 로직 불변) → 필요 시
+`Post-Sprint UX / SEO / Production Readiness QA`. Admin bootstrap/로그인 자체는 운영자가 직접
+진행하므로 다음 세션에서 먼저 확인하거나 손댈 필요 없음 — 운영자가 먼저 언급하지 않는 한 admin
+관련 파일은 (i18n 포함) 건드리지 마세요.
 
 시작 시 `git log`, `git status`, 이 문서의 "완료" 섹션으로 현재 상태를 재확인한 뒤 처음부터 다시
 설계하지 말고 이어서 진행하세요.
