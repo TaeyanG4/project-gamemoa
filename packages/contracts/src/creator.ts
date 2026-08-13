@@ -75,7 +75,7 @@ export const CreatorRankEntrySchema = z.object({
   ),
   score: z.number().optional(),
   formattedScore: z.string().optional(),
-  gameId: z.string().optional(),
+  gameId: z.string().trim().min(1).max(64).optional(),
   gameTitle: z.string().optional(),
   totalXp: z.number().optional(),
   level: z.number().optional(),

@@ -15,6 +15,7 @@ export type MergeConfirmResult =
         | "MERGE_CHALLENGE_CONSUMED"
         | "MERGE_CHALLENGE_MISMATCH"
         | "MERGE_PROVIDER_CONFLICT"
+        | "MERGE_CREATOR_CONFLICT"
         | "USER_NOT_FOUND";
     };
 
@@ -95,6 +96,9 @@ export class AccountMergeUseCases {
     if (currentUserId !== challenge.userA && currentUserId !== challenge.userB) {
       return { ok: false, code: "MERGE_CHALLENGE_MISMATCH" };
     }
+    if (challenge.userA === challenge.userB) {
+      return { ok: false, code: "MERGE_CHALLENGE_MISMATCH" };
+    }
 
     const primaryId = keepUserId;
     const secondaryId = primaryId === challenge.userA ? challenge.userB : challenge.userA;
@@ -133,10 +137,19 @@ export class AccountMergeUseCases {
       return { ok: false, code: "MERGE_PROVIDER_CONFLICT" };
     }
 
+    // Creator platform ownership is identity-like. If both profiles contain an
+    // external account on the same platform, there is no safe way to choose one.
+    const integrityConflict = await this.mergeRepo.findMergeIntegrityConflict(
+      primaryId,
+      secondaryId,
+    );
+    if (integrityConflict === "CREATOR_PLATFORM_CONFLICT") {
+      return { ok: false, code: "MERGE_CREATOR_CONFLICT" };
+    }
+
     // Atomic Primary-Wins merge: secondary data deleted, secondary OAuth moved to primary,
     // secondary user deleted. Performed as a single transaction by the repository.
-    await this.mergeRepo.mergeAccounts(primaryId, secondaryId);
-    await this.mergeRepo.consumeMergeChallenge(challengeId);
+    await this.mergeRepo.mergeAccounts(primaryId, secondaryId, challengeId);
 
     return { ok: true, primaryId, secondaryId };
   }

@@ -147,8 +147,16 @@ export interface AccountMergeRepository {
   }): Promise<{ id: string; expiresAt: string }>;
   findMergeChallenge(id: string): Promise<MergeChallenge | null>;
   findPendingMergeChallenge(userA: number, userB: number): Promise<MergeChallenge | null>;
-  consumeMergeChallenge(id: string): Promise<void>;
-  mergeAccounts(primaryId: number, secondaryId: number): Promise<void>;
+  /**
+   * Returns a conflict when both accounts own external Creator channels on the same
+   * platform. The merge must stop before any destructive statement in that case.
+   */
+  findMergeIntegrityConflict(
+    primaryId: number,
+    secondaryId: number,
+  ): Promise<"CREATOR_PLATFORM_CONFLICT" | null>;
+  /** Performs the complete Primary-Wins transfer/deletion in one database transaction. */
+  mergeAccounts(primaryId: number, secondaryId: number, challengeId: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +394,7 @@ export interface DiscordGuildRepository {
   isGuildManager(guildId: string, userId: number): Promise<boolean>;
   addGuildManager(guildId: string, userId: number, role?: string): Promise<void>;
   getUserManagedGuilds(userId: number): Promise<DiscordGuild[]>;
+  getActiveGuildCount(): Promise<number>;
 
   createPlayContext(input: {
     guildId: string;

@@ -7,8 +7,10 @@ import {
   RegisterGuildRequestSchema,
   UpdateGuildRequestSchema,
   ServerSearchQuerySchema,
+  DiscordGuildRankingQuerySchema,
+  DiscordGuildGameRankingQuerySchema,
 } from "@gamemoa/contracts";
-import type { DiscordGuild } from "@gamemoa/core";
+import { GAME_MANIFEST_MAP, type DiscordGuild } from "@gamemoa/core";
 
 async function requireAuth(
   c: Context<ApiEnv>,
@@ -116,9 +118,14 @@ discordGuildsRouter.get("/search", async (c) => {
     offset: c.req.query("offset"),
   });
 
-  const { q, limit, offset } = queryParse.success
-    ? queryParse.data
-    : { q: undefined, limit: 20, offset: 0 };
+  if (!queryParse.success) {
+    return c.json(
+      { error: { code: "INVALID_QUERY", message: "검색어와 페이지 범위를 확인해주세요." } },
+      400,
+    );
+  }
+
+  const { q, limit, offset } = queryParse.data;
 
   const { discordGuildDirectoryUseCases } = createContainer(c.env.DB);
   const result = await discordGuildDirectoryUseCases.searchPublicGuilds(q, limit, offset);
@@ -133,9 +140,20 @@ discordGuildsRouter.get("/search", async (c) => {
 
 // GET /api/discord/guilds/ranking?period=alltime|weekly&limit=...&offset=...
 discordGuildsRouter.get("/ranking", async (c) => {
-  const period = c.req.query("period") === "weekly" ? "weekly" : "alltime";
-  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 20), 1), 50);
-  const offset = Math.max(Number(c.req.query("offset") ?? 0), 0);
+  const queryParse = DiscordGuildRankingQuerySchema.safeParse({
+    period: c.req.query("period"),
+    limit: c.req.query("limit"),
+    offset: c.req.query("offset"),
+  });
+  if (!queryParse.success) {
+    return c.json(
+      {
+        error: { code: "INVALID_QUERY", message: "period, limit, offset 값이 올바르지 않습니다." },
+      },
+      400,
+    );
+  }
+  const { period, limit, offset } = queryParse.data;
 
   const { discordGuildXpUseCases } = createContainer(c.env.DB);
   const result = await discordGuildXpUseCases.getGlobalGuildRanking(period, limit, offset);
@@ -177,13 +195,7 @@ discordGuildsRouter.get("/by-slug/:slug", async (c) => {
   }
 
   if (result.status === "FORBIDDEN") {
-    return c.json(
-      {
-        error: { code: "PRIVATE_GUILD_ACCESS_DENIED", message: "This server is private" },
-        guildName: result.guildName,
-      },
-      403,
-    );
+    return c.json({ error: { code: "NOT_FOUND", message: "Guild not found" } }, 404);
   }
 
   const guildId = result.guild.guild_id;
@@ -204,9 +216,20 @@ discordGuildsRouter.get("/by-slug/:slug", async (c) => {
 discordGuildsRouter.get("/by-slug/:slug/xp-leaderboard", async (c) => {
   const slug = c.req.param("slug");
   const auth = await requireAuth(c);
-  const period = c.req.query("period") === "weekly" ? "weekly" : "alltime";
-  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 20), 1), 50);
-  const offset = Math.max(Number(c.req.query("offset") ?? 0), 0);
+  const queryParse = DiscordGuildRankingQuerySchema.safeParse({
+    period: c.req.query("period"),
+    limit: c.req.query("limit"),
+    offset: c.req.query("offset"),
+  });
+  if (!queryParse.success) {
+    return c.json(
+      {
+        error: { code: "INVALID_QUERY", message: "period, limit, offset 값이 올바르지 않습니다." },
+      },
+      400,
+    );
+  }
+  const { period, limit, offset } = queryParse.data;
 
   const { discordGuildDirectoryUseCases, discordGuildXpUseCases } = createContainer(c.env.DB);
   const pageResult = await discordGuildDirectoryUseCases.getGuildPageBySlug(slug, auth?.userId);
@@ -215,10 +238,7 @@ discordGuildsRouter.get("/by-slug/:slug/xp-leaderboard", async (c) => {
     return c.json({ error: { code: "NOT_FOUND", message: "Guild not found" } }, 404);
   }
   if (pageResult.status === "FORBIDDEN") {
-    return c.json(
-      { error: { code: "PRIVATE_GUILD_ACCESS_DENIED", message: "This server is private" } },
-      403,
-    );
+    return c.json({ error: { code: "NOT_FOUND", message: "Guild not found" } }, 404);
   }
 
   const result = await discordGuildXpUseCases.getGuildLeaderboard(
@@ -241,7 +261,16 @@ discordGuildsRouter.get("/by-slug/:slug/xp-leaderboard", async (c) => {
 discordGuildsRouter.get("/by-slug/:slug/games/:gameId", async (c) => {
   const slug = c.req.param("slug");
   const gameId = c.req.param("gameId");
-  const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 20), 1), 50);
+  const queryParse = DiscordGuildGameRankingQuerySchema.safeParse({
+    limit: c.req.query("limit"),
+  });
+  if (!queryParse.success || !GAME_MANIFEST_MAP[gameId]) {
+    return c.json(
+      { error: { code: "INVALID_QUERY", message: "존재하는 게임 ID와 limit을 입력해주세요." } },
+      400,
+    );
+  }
+  const { limit } = queryParse.data;
   const auth = await requireAuth(c);
 
   const { discordGuildDirectoryUseCases, discordGuildXpUseCases } = createContainer(c.env.DB);
@@ -251,10 +280,7 @@ discordGuildsRouter.get("/by-slug/:slug/games/:gameId", async (c) => {
     return c.json({ error: { code: "NOT_FOUND", message: "Guild not found" } }, 404);
   }
   if (pageResult.status === "FORBIDDEN") {
-    return c.json(
-      { error: { code: "PRIVATE_GUILD_ACCESS_DENIED", message: "This server is private" } },
-      403,
-    );
+    return c.json({ error: { code: "NOT_FOUND", message: "Guild not found" } }, 404);
   }
 
   const leaderboard = await discordGuildXpUseCases.getGuildGameLeaderboard(

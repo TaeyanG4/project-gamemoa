@@ -7,6 +7,7 @@ export const AccountErrorCodeSchema = z.enum([
   "LAST_AUTH_PROVIDER",
   "MERGE_CHALLENGE_EXPIRED",
   "MERGE_PROVIDER_CONFLICT",
+  "MERGE_CREATOR_CONFLICT",
   // Discord bot /gamemoa link challenge (packages/contracts/src/discord.ts)
   "LINK_CHALLENGE_EXPIRED",
   "LINK_CHALLENGE_CONSUMED",
@@ -73,6 +74,11 @@ export const MergePreviewPairSchema = z.object({
 });
 export type MergePreviewPair = z.infer<typeof MergePreviewPairSchema>;
 
+export const MergePreviewQuerySchema = z.object({
+  challenge: z.string().min(1).max(128),
+});
+export type MergePreviewQuery = z.infer<typeof MergePreviewQuerySchema>;
+
 export const CreateMergeChallengeResponseSchema = z.object({
   challengeId: z.string(),
   expiresAt: z.string(),
@@ -81,16 +87,20 @@ export const CreateMergeChallengeResponseSchema = z.object({
 });
 export type CreateMergeChallengeResponse = z.infer<typeof CreateMergeChallengeResponseSchema>;
 
-export const MergeChallengeResolveRequestSchema = z.object({
-  conflictUserId: z.number(),
-  provider: SocialProviderSchema,
-});
+export const MergeChallengeResolveRequestSchema = z
+  .object({
+    conflictUserId: z.number(),
+    provider: SocialProviderSchema,
+  })
+  .strict();
 export type MergeChallengeResolveRequest = z.infer<typeof MergeChallengeResolveRequestSchema>;
 
-export const ConfirmAccountMergeRequestSchema = z.object({
-  challengeId: z.string().min(1),
-  keepUserId: z.number(),
-});
+export const ConfirmAccountMergeRequestSchema = z
+  .object({
+    challengeId: z.string().min(1),
+    keepUserId: z.number(),
+  })
+  .strict();
 export type ConfirmAccountMergeRequest = z.infer<typeof ConfirmAccountMergeRequestSchema>;
 
 export const ConfirmAccountMergeResponseSchema = z.object({

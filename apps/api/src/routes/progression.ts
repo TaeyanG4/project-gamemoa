@@ -4,6 +4,7 @@ import { getCookie } from "hono/cookie";
 import {
   ProgressResponseSchema,
   XpLeaderboardResponseSchema,
+  XpLeaderboardQuerySchema,
   AchievementSummaryResponseSchema,
 } from "@gamemoa/contracts";
 import type { ApiEnv } from "./auth.js";
@@ -49,15 +50,20 @@ progressionRouter.get("/me", async (c) => {
 // GET /api/progression/leaderboard?limit=20 — public global XP ranking ("who has been
 // actively using GAMEMOA"), separate from any game skill leaderboard.
 progressionRouter.get("/leaderboard", async (c) => {
+  const query = XpLeaderboardQuerySchema.safeParse({ limit: c.req.query("limit") });
+  if (!query.success) {
+    return c.json(
+      { error: { code: "INVALID_QUERY", message: "limit은 1에서 100 사이의 정수여야 합니다." } },
+      400,
+    );
+  }
+
   if (!c.env?.DB) {
     return c.json({ entries: [] }, 200);
   }
 
-  const rawLimit = Number(c.req.query("limit") ?? "20");
-  const limit = Number.isFinite(rawLimit) ? Math.min(100, Math.max(1, Math.floor(rawLimit))) : 20;
-
   const { progressionUseCases } = createContainer(c.env.DB);
-  const entries = await progressionUseCases.getGlobalXpLeaderboard(limit);
+  const entries = await progressionUseCases.getGlobalXpLeaderboard(query.data.limit);
 
   const validated = XpLeaderboardResponseSchema.parse({
     entries: entries.map((entry, index) => ({

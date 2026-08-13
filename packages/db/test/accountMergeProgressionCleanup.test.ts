@@ -12,7 +12,8 @@ function createMockD1(seed: {
   xpEvents: { user_id: number }[];
   userProgress: { user_id: number }[];
   userAchievements: { user_id: number }[];
-}): { db: D1Database; deletedFrom: Record<string, number[]> } {
+  creatorConflict?: boolean;
+}): { db: D1Database; deletedFrom: Record<string, number[]>; batchCalls: number } {
   const deletedFrom: Record<string, number[]> = {
     scores: [],
     user_favorites: [],
@@ -20,10 +21,14 @@ function createMockD1(seed: {
     xp_events: [],
     user_progress: [],
     user_achievements: [],
+    discord_guild_xp_events: [],
+    discord_guild_managers: [],
+    creator_profiles: [],
     sessions: [],
     users: [],
   };
 
+  let batchCalls = 0;
   const db: D1Database = {
     prepare(query: string) {
       let bound: unknown[] = [];
@@ -33,6 +38,9 @@ function createMockD1(seed: {
           return stmt;
         },
         async first() {
+          if (seed.creatorConflict && query.includes("creator_platform_accounts")) {
+            return { conflict: 1 };
+          }
           return null;
         },
         async all() {
@@ -41,7 +49,8 @@ function createMockD1(seed: {
         async run() {
           // Matches both `DELETE FROM <table> WHERE user_id = ?` and, for the `users`
           // table itself, `DELETE FROM users WHERE id = ?`.
-          const match = query.match(/DELETE FROM (\w+) WHERE (?:user_id|id) = \?/);
+          const normalized = query.replace(/\s+/g, " ");
+          const match = normalized.match(/DELETE FROM (\w+) WHERE (?:user_id|id) = \?/);
           if (match) {
             deletedFrom[match[1]].push(bound[0] as number);
           }
@@ -51,6 +60,7 @@ function createMockD1(seed: {
       return stmt as unknown as ReturnType<D1Database["prepare"]>;
     },
     async batch(statements) {
+      batchCalls += 1;
       // Real D1 executes batch statements in order within one transaction; the mock
       // just runs each prepared statement's bound run(), matching that ordering.
       const results = [];
@@ -62,7 +72,7 @@ function createMockD1(seed: {
   };
 
   void seed;
-  return { db, deletedFrom };
+  return { db, deletedFrom, batchCalls };
 }
 
 test("mergeAccounts deletes the secondary user's XP events, progress aggregate, and achievements", async () => {
@@ -73,11 +83,12 @@ test("mergeAccounts deletes the secondary user's XP events, progress aggregate, 
   });
   const repo = new D1AccountMergeRepository(db);
 
-  await repo.mergeAccounts(1, 2);
+  await repo.mergeAccounts(1, 2, "merge-1");
 
   assert.deepEqual(deletedFrom.xp_events, [2]);
   assert.deepEqual(deletedFrom.user_progress, [2]);
   assert.deepEqual(deletedFrom.user_achievements, [2]);
+  assert.deepEqual(deletedFrom.discord_guild_xp_events, [2]);
   // Existing invariants must still hold: gameplay/personalization also deleted for secondary.
   assert.deepEqual(deletedFrom.scores, [2]);
   assert.deepEqual(deletedFrom.user_favorites, [2]);
@@ -87,4 +98,17 @@ test("mergeAccounts deletes the secondary user's XP events, progress aggregate, 
   for (const table of Object.keys(deletedFrom)) {
     assert.ok(!deletedFrom[table].includes(1), `primary user must not be deleted from ${table}`);
   }
+});
+
+test("mergeAccounts blocks Creator platform conflicts before opening the destructive batch", async () => {
+  const { db, batchCalls } = createMockD1({
+    xpEvents: [],
+    userProgress: [],
+    userAchievements: [],
+    creatorConflict: true,
+  });
+  const repo = new D1AccountMergeRepository(db);
+
+  await assert.rejects(() => repo.mergeAccounts(1, 2, "merge-1"), /CREATOR_PLATFORM_CONFLICT/);
+  assert.equal(batchCalls, 0);
 });

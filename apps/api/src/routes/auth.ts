@@ -18,6 +18,8 @@ import {
   CreateMergeChallengeResponseSchema,
   ConfirmAccountMergeRequestSchema,
   ConfirmAccountMergeResponseSchema,
+  MergeChallengeResolveRequestSchema,
+  MergePreviewQuerySchema,
 } from "@gamemoa/contracts";
 import type { SocialProvider } from "@gamemoa/contracts";
 
@@ -57,6 +59,8 @@ export type ApiEnv = {
     DISCORD_REDIRECT_URI?: string;
     /** Discord application's public key (non-secret), used to verify Interaction signatures. */
     DISCORD_PUBLIC_KEY?: string;
+    /** Developer Portal에서 명시적으로 구성한 공개 Discord 설치 링크(선택). */
+    DISCORD_INSTALL_URL?: string;
     FRONTEND_URL?: string;
     COMMIT_SHA?: string;
     /** 쉼표로 구분한 명시적 GAMEMOA 사용자 ID. 미설정 시 관리자 권한 없음. */
@@ -629,20 +633,19 @@ authRouter.post("/merge/challenge", async (c) => {
     return c.json({ error: "Database unavailable" }, 500);
   }
 
-  const body = (await c.req
-    .json<{ conflictUserId?: number; provider?: string }>()
-    .catch(() => ({}))) as { conflictUserId?: number; provider?: string };
-  if (typeof body.conflictUserId !== "number" || typeof body.provider !== "string") {
-    return c.json({ error: "conflictUserId and provider are required" }, 400);
-  }
-  if (!isKnownProvider(body.provider)) {
-    return c.json({ error: "Unknown provider" }, 400);
+  const body = await c.req.json().catch(() => ({}));
+  const parsedBody = MergeChallengeResolveRequestSchema.safeParse(body);
+  if (!parsedBody.success || parsedBody.data.conflictUserId === auth.userId) {
+    return c.json(
+      { error: { code: "INVALID_REQUEST", message: "통합 대상 계정과 provider를 확인해주세요." } },
+      400,
+    );
   }
 
   const { accountMergeUseCases } = createContainer(c.env.DB);
   const existing = await accountMergeUseCases.findPendingMergeChallenge(
     auth.userId,
-    body.conflictUserId,
+    parsedBody.data.conflictUserId,
   );
   if (!existing || new Date(existing.expiresAt) <= new Date()) {
     return c.json(
@@ -660,8 +663,8 @@ authRouter.post("/merge/challenge", async (c) => {
   const validated = CreateMergeChallengeResponseSchema.parse({
     challengeId: existing.id,
     expiresAt: existing.expiresAt,
-    conflictUserId: body.conflictUserId,
-    provider: body.provider,
+    conflictUserId: parsedBody.data.conflictUserId,
+    provider: parsedBody.data.provider,
   });
   return c.json(validated, 200);
 });
@@ -676,10 +679,14 @@ authRouter.get("/merge/preview", async (c) => {
     return c.json({ error: "Database unavailable" }, 500);
   }
 
-  const challengeId = c.req.query("challenge");
-  if (!challengeId) {
-    return c.json({ error: "challenge query parameter is required" }, 400);
+  const challengeQuery = MergePreviewQuerySchema.safeParse({ challenge: c.req.query("challenge") });
+  if (!challengeQuery.success) {
+    return c.json(
+      { error: { code: "INVALID_QUERY", message: "challenge 값이 올바르지 않습니다." } },
+      400,
+    );
   }
+  const challengeId = challengeQuery.data.challenge;
 
   const { accountMergeUseCases } = createContainer(c.env.DB);
   const challenge = await accountMergeUseCases.findMergeChallenge(challengeId);
@@ -743,6 +750,7 @@ authRouter.post("/merge/confirm", async (c) => {
       MERGE_CHALLENGE_MISMATCH: 403,
       USER_NOT_FOUND: 404,
       MERGE_PROVIDER_CONFLICT: 409,
+      MERGE_CREATOR_CONFLICT: 409,
     };
     const messageMap: Record<string, string> = {
       MERGE_CHALLENGE_EXPIRED: "계정 통합 세션이 만료되었습니다. 다시 시도해주세요.",
@@ -750,6 +758,8 @@ authRouter.post("/merge/confirm", async (c) => {
       MERGE_CHALLENGE_MISMATCH: "통합 대상 계정이 일치하지 않습니다.",
       USER_NOT_FOUND: "통합 대상 계정을 찾을 수 없습니다.",
       MERGE_PROVIDER_CONFLICT: "두 계정 모두 동일 로그인 수단을 사용 중이라 병합할 수 없습니다.",
+      MERGE_CREATOR_CONFLICT:
+        "두 계정이 같은 플랫폼의 서로 다른 Creator 채널을 소유하고 있어 안전하게 병합할 수 없습니다. 먼저 Creator 채널 충돌을 정리해주세요.",
     };
     const code = result.code;
     return accountError(

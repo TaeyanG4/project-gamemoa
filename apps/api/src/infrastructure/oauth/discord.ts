@@ -21,7 +21,7 @@ export function buildDiscordAuthorizeUrl(params: {
   state: string;
   scope?: string;
 }): string {
-  const discordUrl = new URL("https://discord.com/api/oauth2/authorize");
+  const discordUrl = new URL("https://discord.com/oauth2/authorize");
   discordUrl.searchParams.set("client_id", params.clientId);
   discordUrl.searchParams.set("redirect_uri", params.redirectUri);
   discordUrl.searchParams.set("response_type", "code");
@@ -97,9 +97,10 @@ export async function exchangeDiscordCode(params: {
       },
     };
   } catch (err) {
+    console.error("Discord OAuth exchange failed:", err instanceof Error ? err.name : "unknown");
     return {
       valid: false,
-      reason: err instanceof Error ? err.message : "Discord auth exchange failed",
+      reason: "Discord auth exchange failed",
     };
   }
 }
@@ -133,9 +134,10 @@ export async function fetchUserManageableGuilds(accessToken: string): Promise<{
 
     return { valid: true, guilds: manageable };
   } catch (err) {
+    console.error("Discord guild lookup failed:", err instanceof Error ? err.name : "unknown");
     return {
       valid: false,
-      reason: err instanceof Error ? err.message : "Failed to fetch user guilds",
+      reason: "Failed to fetch user guilds",
     };
   }
 }

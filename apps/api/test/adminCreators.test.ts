@@ -204,7 +204,11 @@ test("manual approval — requires verified ownership and explicit reason", asyn
     "/api/admin/creators/reviews/21/action",
     {
       method: "POST",
-      headers: { Cookie: "gamemoa_session=valid_session", "Content-Type": "application/json" },
+      headers: {
+        Cookie: "gamemoa_session=valid_session",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
       body: JSON.stringify({ action: "APPROVE_FEATURED", reason: "" }),
     },
     { DB: unverified.db, ADMIN_USER_IDS: "1" } as any,
@@ -215,7 +219,11 @@ test("manual approval — requires verified ownership and explicit reason", asyn
     "/api/admin/creators/reviews/21/action",
     {
       method: "POST",
-      headers: { Cookie: "gamemoa_session=valid_session", "Content-Type": "application/json" },
+      headers: {
+        Cookie: "gamemoa_session=valid_session",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
       body: JSON.stringify({ action: "APPROVE_FEATURED", reason: "소유권 확인 필요" }),
     },
     { DB: unverified.db, ADMIN_USER_IDS: "1" } as any,
@@ -228,7 +236,11 @@ test("manual approval — transitions once, creates audit row, and replay is saf
   const mock = createAdminDb({ userId: 1 });
   const request = {
     method: "POST",
-    headers: { Cookie: "gamemoa_session=valid_session", "Content-Type": "application/json" },
+    headers: {
+      Cookie: "gamemoa_session=valid_session",
+      "Content-Type": "application/json",
+      Origin: "http://localhost:5173",
+    },
     body: JSON.stringify({
       action: "APPROVE_FEATURED",
       reason: "공식 지표와 소유권을 확인했습니다.",
@@ -257,7 +269,11 @@ test("manual rejection — transitions manual review to NOT_ELIGIBLE", async () 
     "/api/admin/creators/reviews/21/action",
     {
       method: "POST",
-      headers: { Cookie: "gamemoa_session=valid_session", "Content-Type": "application/json" },
+      headers: {
+        Cookie: "gamemoa_session=valid_session",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
       body: JSON.stringify({
         action: "REJECT_FEATURED",
         reason: "최소 유지 기준을 충족하지 못했습니다.",
@@ -270,4 +286,61 @@ test("manual rejection — transitions manual review to NOT_ELIGIBLE", async () 
   assert.equal(body.applied, true);
   assert.equal(body.newStatus, "NOT_ELIGIBLE");
   assert.equal(mock.state.auditCount, 1);
+});
+
+test("admin me defaults to no access and never reveals ADMIN_USER_IDS", async () => {
+  const anonymous = await app.request("/api/admin/me", {}, { DB: {} } as any);
+  assert.equal(anonymous.status, 200);
+  assert.deepEqual(await anonymous.json(), { authenticated: false, admin: false });
+
+  const mock = createAdminDb({ userId: 1 });
+  const allowed = await app.request(
+    "/api/admin/me",
+    { headers: { Cookie: "gamemoa_session=valid_session" } },
+    { DB: mock.db, ADMIN_USER_IDS: "1,999" } as any,
+  );
+  assert.equal(allowed.status, 200);
+  const body = (await allowed.json()) as Record<string, unknown>;
+  assert.deepEqual(body, { authenticated: true, admin: true });
+  assert.equal(JSON.stringify(body).includes("999"), false);
+});
+
+test("admin overview is denied for non-admin and is cache-disabled for an admin", async () => {
+  const nonAdmin = createAdminDb({ userId: 7 });
+  const denied = await app.request(
+    "/api/admin/overview",
+    { headers: { Cookie: "gamemoa_session=valid_session" } },
+    { DB: nonAdmin.db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(denied.status, 403);
+  assert.equal(denied.headers.get("Cache-Control"), "no-store");
+
+  const admin = createAdminDb({ userId: 1 });
+  const allowed = await app.request(
+    "/api/admin/overview",
+    { headers: { Cookie: "gamemoa_session=valid_session" } },
+    { DB: admin.db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(allowed.status, 200);
+  assert.equal(allowed.headers.get("Cache-Control"), "no-store");
+  const body = (await allowed.json()) as Record<string, unknown>;
+  assert.equal("ADMIN_USER_IDS" in body, false);
+});
+
+test("admin mutations require a trusted Origin even with an authenticated admin session", async () => {
+  const mock = createAdminDb({ userId: 1 });
+  const res = await app.request(
+    "/api/admin/creators/reviews/21/action",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "gamemoa_session=valid_session",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action: "REJECT_FEATURED", reason: "확인 결과 기준 미달" }),
+    },
+    { DB: mock.db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 403);
+  assert.equal(mock.state.batchCount, 0);
 });

@@ -13,10 +13,12 @@ export const CreatorManualReviewActionSchema = z.enum([
 ]);
 export type CreatorManualReviewAction = z.infer<typeof CreatorManualReviewActionSchema>;
 
-export const CreatorManualReviewActionRequestSchema = z.object({
-  action: CreatorManualReviewActionSchema,
-  reason: z.string().trim().min(3).max(1000),
-});
+export const CreatorManualReviewActionRequestSchema = z
+  .object({
+    action: CreatorManualReviewActionSchema,
+    reason: z.string().trim().min(3).max(1000),
+  })
+  .strict();
 export type CreatorManualReviewActionRequest = z.infer<
   typeof CreatorManualReviewActionRequestSchema
 >;

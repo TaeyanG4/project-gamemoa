@@ -170,6 +170,10 @@ class MockDiscordGuildRepo implements DiscordGuildRepository {
   async getUserManagedGuilds(): Promise<DiscordGuild[]> {
     return [];
   }
+  async getActiveGuildCount(): Promise<number> {
+    return Array.from(this.guilds.values()).filter((g) => g.registration_status === "ACTIVE")
+      .length;
+  }
 
   // Phase H2 Query Mock Methods
   async getGuildXpLeaderboard(

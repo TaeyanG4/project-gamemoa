@@ -4,7 +4,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createContainer } from "../container.js";
 import type { ApiEnv } from "./auth.js";
 import { CreatorRankingQuerySchema, type CreatorPlatform } from "@gamemoa/contracts";
-import type { CreatorPlatformType } from "@gamemoa/core";
+import { GAME_MANIFEST_MAP, type CreatorPlatformType } from "@gamemoa/core";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
 
 function isLocalhost(urlStr: string): boolean {
@@ -36,6 +36,25 @@ function getCreatorRedirectUri(c: Context<ApiEnv>, platform: CreatorPlatformType
 
 export const creatorsRouter = new Hono<ApiEnv>();
 
+function getPublicFeaturedReviewReason(status: string): string | null {
+  switch (status) {
+    case "AUTO_REVIEW_PENDING":
+    case "REVALIDATION_PENDING":
+      return "공식 지표 자동 심사를 기다리는 중입니다.";
+    case "FAILED_RETRYABLE":
+    case "REVALIDATION_FAILED_RETRYABLE":
+      return "공식 지표를 다시 확인하는 중입니다.";
+    case "MANUAL_REVIEW":
+      return "추가 확인이 필요한 상태입니다.";
+    case "FEATURED":
+      return "Featured Creator 상태입니다.";
+    case "NOT_ELIGIBLE":
+      return "현재 Featured 기준을 충족하지 않습니다.";
+    default:
+      return null;
+  }
+}
+
 // GET /api/creators/providers — returns non-secret readiness check for creator verification
 creatorsRouter.get("/providers", (c) => {
   const adapters = getCreatorProviderAdapters(c.env);
@@ -57,9 +76,20 @@ creatorsRouter.get("/rankings", async (c) => {
     offset: c.req.query("offset"),
   });
 
-  const { mode, gameId, platform, limit, offset } = queryParse.success
-    ? queryParse.data
-    : { mode: "score" as const, gameId: undefined, platform: undefined, limit: 20, offset: 0 };
+  if (!queryParse.success) {
+    return c.json(
+      { error: { code: "INVALID_QUERY", message: "Creator 랭킹 검색 조건이 올바르지 않습니다." } },
+      400,
+    );
+  }
+
+  const { mode, gameId, platform, limit, offset } = queryParse.data;
+  if (gameId && gameId !== "all" && !GAME_MANIFEST_MAP[gameId]) {
+    return c.json(
+      { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
+      400,
+    );
+  }
 
   const { creatorUseCases } = createContainer(c.env.DB);
 
@@ -118,7 +148,7 @@ creatorsRouter.get("/me", async (c) => {
           featuredReview: featuredReview
             ? {
                 status: featuredReview.status,
-                reason: featuredReview.lastError ?? null,
+                reason: getPublicFeaturedReviewReason(featuredReview.status),
                 nextCheckAt: featuredReview.nextCheckAt,
                 attemptCount: featuredReview.attemptCount,
               }

@@ -14,7 +14,7 @@ test("buildDiscordAuthorizeUrl constructs correct Discord OAuth URL", () => {
     state: "random-csrf-token",
   });
 
-  assert.ok(url.startsWith("https://discord.com/api/oauth2/authorize"));
+  assert.ok(url.startsWith("https://discord.com/oauth2/authorize"));
   assert.ok(url.includes("client_id=12345"));
   assert.ok(url.includes("response_type=code"));
   assert.ok(url.includes("scope=identify+email"));

@@ -1,6 +1,5 @@
 import type {
   DiscordGuild,
-  DiscordGuildManager,
   DiscordGuildRepository,
   DiscordGuildVisibility,
   DiscordGuildRegistrationStatus,
@@ -26,6 +25,10 @@ async function hashToken(token: string): Promise<string> {
 
 function generateRandomToken(): string {
   return crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+}
+
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
 }
 
 function mapGuildRow(row: Record<string, unknown>): DiscordGuild {
@@ -251,13 +254,13 @@ export class D1DiscordGuildRepository implements DiscordGuildRepository {
     const trimmedQuery = query?.trim().toLowerCase() ?? "";
 
     if (trimmedQuery) {
-      const searchPattern = `%${trimmedQuery}%`;
+      const searchPattern = `%${escapeLike(trimmedQuery)}%`;
 
       const countRow = await this.db
         .prepare(
           `SELECT COUNT(*) as total FROM discord_guilds
            WHERE visibility = 'PUBLIC' AND registration_status = 'ACTIVE'
-           AND (LOWER(name) LIKE ? OR LOWER(slug) LIKE ?)`,
+            AND (LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(slug) LIKE ? ESCAPE '\\')`,
         )
         .bind(searchPattern, searchPattern)
         .first<{ total: number }>();
@@ -266,7 +269,7 @@ export class D1DiscordGuildRepository implements DiscordGuildRepository {
         .prepare(
           `SELECT * FROM discord_guilds
            WHERE visibility = 'PUBLIC' AND registration_status = 'ACTIVE'
-           AND (LOWER(name) LIKE ? OR LOWER(slug) LIKE ?)
+            AND (LOWER(name) LIKE ? ESCAPE '\\' OR LOWER(slug) LIKE ? ESCAPE '\\')
            ORDER BY name ASC LIMIT ? OFFSET ?`,
         )
         .bind(searchPattern, searchPattern, limit, offset)
@@ -328,6 +331,13 @@ export class D1DiscordGuildRepository implements DiscordGuildRepository {
       .all<Record<string, unknown>>();
 
     return (rows.results || []).map(mapGuildRow);
+  }
+
+  async getActiveGuildCount(): Promise<number> {
+    const row = await this.db
+      .prepare(`SELECT COUNT(*) AS total FROM discord_guilds WHERE registration_status = 'ACTIVE'`)
+      .first<{ total: number }>();
+    return Number(row?.total ?? 0);
   }
 
   async createPlayContext(input: {

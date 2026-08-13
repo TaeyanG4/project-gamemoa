@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createContainer, evaluateAchievementsForUser } from "../container.js";
 import { scoreSubmissionSchema } from "@gamemoa/contracts";
+import { GAME_MANIFEST_MAP } from "@gamemoa/core";
 import type { ApiEnv } from "./auth.js";
 
 export const scoresRouter = new Hono<ApiEnv>();
@@ -143,6 +144,17 @@ scoresRouter.get("/user/me", async (c) => {
 // GET /api/scores/:gameId
 scoresRouter.get("/:gameId", async (c) => {
   const gameId = c.req.param("gameId");
+
+  if (!GAME_MANIFEST_MAP[gameId]) {
+    return c.json(
+      { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
+      400,
+    );
+  }
+
+  if (!c.env?.DB) {
+    return c.json({ game_id: gameId, leaderboard: [] });
+  }
 
   try {
     const { scoreUseCases } = createContainer(c.env.DB);

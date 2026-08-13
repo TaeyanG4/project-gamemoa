@@ -151,6 +151,11 @@ class FakeDiscordGuildRepository implements DiscordGuildRepository {
     }
     return result;
   }
+
+  async getActiveGuildCount(): Promise<number> {
+    return Array.from(this.guilds.values()).filter((g) => g.registration_status === "ACTIVE")
+      .length;
+  }
 }
 
 test("1. manager-authorized registration succeeds", async () => {

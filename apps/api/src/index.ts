@@ -10,6 +10,7 @@ import { discordRouter } from "./routes/discordInteractions.js";
 import { discordLinkRouter } from "./routes/discordLink.js";
 import { discordGuildsRouter } from "./routes/discordGuilds.js";
 import { creatorsRouter } from "./routes/creators.js";
+import { adminRouter } from "./routes/admin.js";
 import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { createContainer } from "./container.js";
 import { getCreatorProviderAdapters } from "./infrastructure/creators/index.js";
@@ -19,7 +20,17 @@ import type { ApiEnv } from "./routes/auth.js";
 const app = new Hono<ApiEnv>();
 
 // Middleware
-app.use("*", logger());
+function redactLogMessage(message: string): string {
+  return message.replace(
+    /([?&](?:token|register_token|play_token|challenge|code|state)=)[^&\s]*/gi,
+    "$1[redacted]",
+  );
+}
+
+app.use(
+  "*",
+  logger((message) => console.log(redactLogMessage(message))),
+);
 
 function isAllowedOrigin(origin: string | undefined, frontendUrl?: string): boolean {
   if (!origin) return true;
@@ -88,6 +99,7 @@ app.route("/api/discord", discordRouter);
 app.route("/api/discord", discordLinkRouter);
 app.route("/api/discord/guilds", discordGuildsRouter);
 app.route("/api/creators", creatorsRouter);
+app.route("/api/admin", adminRouter);
 app.route("/api/admin/creators", adminCreatorsRouter);
 
 // 404 Handler
@@ -98,7 +110,7 @@ app.notFound((c) => {
 // Error Handler
 app.onError((err, c) => {
   console.error("Unhandled Hono Error:", err);
-  return c.json({ error: err.message || "Internal Server Error" }, 500);
+  return c.json({ error: "Internal server error" }, 500);
 });
 
 /**

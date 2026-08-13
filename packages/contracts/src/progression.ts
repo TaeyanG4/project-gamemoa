@@ -35,6 +35,11 @@ export const XpLeaderboardResponseSchema = z.object({
 });
 export type XpLeaderboardResponse = z.infer<typeof XpLeaderboardResponseSchema>;
 
+export const XpLeaderboardQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type XpLeaderboardQuery = z.infer<typeof XpLeaderboardQuerySchema>;
+
 export const AchievementCodeSchema = z.enum([
   "FIRST_PLAY",
   "PLAY_10",

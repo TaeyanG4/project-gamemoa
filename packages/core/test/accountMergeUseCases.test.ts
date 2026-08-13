@@ -21,6 +21,18 @@ class FixtureState {
   scores: ScoreRow[] = [];
   favorites = new Map<number, Set<string>>();
   recentPlays = new Map<number, Map<string, string>>();
+  xpEvents: { id: number; userId: number }[] = [];
+  progress = new Map<number, { totalXp: number; eligibleCompletions: number }>();
+  achievements = new Map<number, Set<string>>();
+  creatorConflict = false;
+  creatorProfileOwner: number | null = null;
+  creatorSettings = new Map<number, string>();
+  creatorReviewJobAccountIds: number[] = [];
+  creatorAuditAccountIds: number[] = [];
+  guildManagers: { guildId: string; userId: number }[] = [];
+  guildOwners: { guildId: string; userId: number }[] = [];
+  guildXpEvents: { guildId: string; userId: number; sourceXpEventId: number }[] = [];
+  playContexts: { discordUserId: string; userId: number }[] = [];
   sessionUser = new Map<string, number>();
   challenges = new Map<string, MergeChallenge>();
   nextId = 1;
@@ -142,11 +154,14 @@ class FixtureMergeRepo implements AccountMergeRepository {
     }
     return null;
   }
+  async findMergeIntegrityConflict(): Promise<"CREATOR_PLATFORM_CONFLICT" | null> {
+    return this.s.creatorConflict ? "CREATOR_PLATFORM_CONFLICT" : null;
+  }
   async consumeMergeChallenge(id: string): Promise<void> {
     const ch = this.s.challenges.get(id);
     if (ch) this.s.challenges.set(id, { ...ch, consumedAt: new Date().toISOString() });
   }
-  async mergeAccounts(primaryId: number, secondaryId: number): Promise<void> {
+  async mergeAccounts(primaryId: number, secondaryId: number, challengeId: string): Promise<void> {
     if (this.s.failMerge) {
       throw new Error("forced merge failure");
     }
@@ -154,15 +169,42 @@ class FixtureMergeRepo implements AccountMergeRepository {
     this.s.scores = this.s.scores.filter((sc) => sc.userId !== secondaryId);
     this.s.favorites.delete(secondaryId);
     this.s.recentPlays.delete(secondaryId);
+    const secondaryXpEventIds = new Set(
+      this.s.xpEvents.filter((event) => event.userId === secondaryId).map((event) => event.id),
+    );
+    this.s.guildXpEvents = this.s.guildXpEvents.filter(
+      (event) => event.userId !== secondaryId && !secondaryXpEventIds.has(event.sourceXpEventId),
+    );
+    this.s.xpEvents = this.s.xpEvents.filter((event) => event.userId !== secondaryId);
+    this.s.progress.delete(secondaryId);
+    this.s.achievements.delete(secondaryId);
     for (const [token, uid] of Array.from(this.s.sessionUser.entries())) {
       if (uid === secondaryId) this.s.sessionUser.delete(token);
     }
+    for (const manager of this.s.guildManagers) {
+      if (manager.userId === secondaryId) manager.userId = primaryId;
+    }
+    for (const owner of this.s.guildOwners) {
+      if (owner.userId === secondaryId) owner.userId = primaryId;
+    }
+    for (const context of this.s.playContexts) {
+      if (context.userId === secondaryId) context.userId = primaryId;
+    }
+    if (this.s.creatorProfileOwner === secondaryId) this.s.creatorProfileOwner = primaryId;
+    if (!this.s.creatorSettings.has(primaryId) && this.s.creatorSettings.has(secondaryId)) {
+      this.s.creatorSettings.set(primaryId, this.s.creatorSettings.get(secondaryId)!);
+    }
+    this.s.creatorSettings.delete(secondaryId);
+    this.s.creatorReviewJobAccountIds = this.s.creatorReviewJobAccountIds.filter(
+      (accountId) => accountId > 0,
+    );
     // 2. move secondary oauth_accounts to primary
     for (const acc of this.s.oauth.values()) {
       if (acc.user_id === secondaryId) acc.user_id = primaryId;
     }
     // 3. delete secondary user
     this.s.users.delete(secondaryId);
+    await this.consumeMergeChallenge(challengeId);
   }
 }
 
@@ -200,12 +242,25 @@ async function setupTwoAccounts(): Promise<{
   state.favorites.set(userA.id, new Set(["aim-test"]));
   state.recentPlays.set(userA.id, new Map([["memory-test", "2026-08-13T00:00:00Z"]]));
   state.sessionUser.set("sess-A", userA.id);
+  state.xpEvents.push({ id: 100, userId: userA.id });
+  state.progress.set(userA.id, { totalXp: 10, eligibleCompletions: 1 });
+  state.achievements.set(userA.id, new Set(["FIRST_PLAY"]));
+  state.guildXpEvents.push({ guildId: "guild-a", userId: userA.id, sourceXpEventId: 100 });
+  state.guildManagers.push({ guildId: "guild-a", userId: userA.id });
 
   // Seed data for B
   state.scores.push({ userId: userB.id, gameId: "typing-test" });
   state.favorites.set(userB.id, new Set(["reaction-time"]));
   state.recentPlays.set(userB.id, new Map([["aim-test", "2026-08-13T00:00:00Z"]]));
   state.sessionUser.set("sess-B", userB.id);
+  state.xpEvents.push({ id: 200, userId: userB.id });
+  state.progress.set(userB.id, { totalXp: 500, eligibleCompletions: 50 });
+  state.achievements.set(userB.id, new Set(["PLAY_10", "LEVEL_5"]));
+  state.guildXpEvents.push({ guildId: "guild-a", userId: userB.id, sourceXpEventId: 200 });
+  state.guildXpEvents.push({ guildId: "guild-b", userId: userB.id, sourceXpEventId: 200 });
+  state.guildManagers.push({ guildId: "guild-b", userId: userB.id });
+  state.guildOwners.push({ guildId: "guild-b", userId: userB.id });
+  state.playContexts.push({ discordUserId: "discord-id-B", userId: userB.id });
 
   const challenge = await mergeRepo.createMergeChallenge({
     userA: userA.id,
@@ -258,6 +313,22 @@ test("confirmMerge keeping A keeps A data, deletes B data and transfers B provid
   // A current session preserved
   assert.equal(state.sessionUser.has("sess-A"), true);
 
+  // Primary XP/progression/achievement totals remain unchanged. Secondary XP is deleted,
+  // and both Guild XP rows derived from it disappear instead of becoming ghost activity.
+  assert.deepEqual(state.progress.get(userA.id), { totalXp: 10, eligibleCompletions: 1 });
+  assert.equal(state.progress.has(userB.id), false);
+  assert.deepEqual(state.achievements.get(userA.id), new Set(["FIRST_PLAY"]));
+  assert.equal(state.achievements.has(userB.id), false);
+  assert.deepEqual(state.guildXpEvents, [
+    { guildId: "guild-a", userId: userA.id, sourceXpEventId: 100 },
+  ]);
+  assert.deepEqual(state.guildManagers, [
+    { guildId: "guild-a", userId: userA.id },
+    { guildId: "guild-b", userId: userA.id },
+  ]);
+  assert.deepEqual(state.guildOwners, [{ guildId: "guild-b", userId: userA.id }]);
+  assert.deepEqual(state.playContexts, [{ discordUserId: "discord-id-B", userId: userA.id }]);
+
   // B provider (discord) transferred to A
   const aAccounts = await useCases.findPendingMergeChallenge(userA.id, userB.id);
   void aAccounts;
@@ -291,6 +362,8 @@ test("confirmMerge keeping B (reverse) keeps B data and deletes A data", async (
     false,
   );
   assert.equal(state.favorites.has(userA.id), false);
+  assert.equal(state.progress.has(userA.id), false);
+  assert.deepEqual(state.progress.get(userB.id), { totalXp: 500, eligibleCompletions: 50 });
 
   // A session (current) invalidated; B session preserved
   assert.equal(state.sessionUser.has("sess-A"), false);
@@ -302,6 +375,37 @@ test("confirmMerge keeping B (reverse) keeps B data and deletes A data", async (
     .map((o) => o.provider)
     .sort();
   assert.deepEqual(providers, ["discord", "google"]);
+});
+
+test("conflicting Creator platform ownership blocks merge before destructive work", async () => {
+  const { state, useCases, userA, userB, challengeId } = await setupTwoAccounts();
+  state.creatorConflict = true;
+
+  const result = await useCases.confirmMerge(challengeId, userA.id, userA.id);
+
+  assert.deepEqual(result, { ok: false, code: "MERGE_CREATOR_CONFLICT" });
+  assert.ok(state.users.has(userA.id));
+  assert.ok(state.users.has(userB.id));
+  assert.equal(state.scores.length, 2);
+  assert.equal(state.challenges.get(challengeId)?.consumedAt, null);
+});
+
+test("conflict-free Creator ownership transfers with review and audit identity intact", async () => {
+  const { state, useCases, userA, userB, challengeId } = await setupTwoAccounts();
+  state.creatorProfileOwner = userB.id;
+  state.creatorSettings.set(userA.id, "primary presentation");
+  state.creatorSettings.set(userB.id, "secondary presentation");
+  state.creatorReviewJobAccountIds.push(7001);
+  state.creatorAuditAccountIds.push(7001);
+
+  const result = await useCases.confirmMerge(challengeId, userA.id, userA.id);
+
+  assert.equal(result.ok, true);
+  assert.equal(state.creatorProfileOwner, userA.id);
+  assert.equal(state.creatorSettings.get(userA.id), "primary presentation");
+  assert.equal(state.creatorSettings.has(userB.id), false);
+  assert.deepEqual(state.creatorReviewJobAccountIds, [7001]);
+  assert.deepEqual(state.creatorAuditAccountIds, [7001]);
 });
 
 test("confirmMerge challenge is consumed after a successful merge", async () => {

@@ -4,11 +4,7 @@ import type {
   DiscordGuildVisibility,
   DiscordCandidateGuild,
 } from "../ports/repositories.js";
-import {
-  hasGuildManagementPermission,
-  slugifyGuildName,
-  validateVanitySlug,
-} from "../domain/discordGuildPolicy.js";
+import { slugifyGuildName, validateVanitySlug } from "../domain/discordGuildPolicy.js";
 
 export class DiscordGuildRegistrationUseCases {
   constructor(private readonly guildRepo: DiscordGuildRepository) {}

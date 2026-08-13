@@ -98,20 +98,50 @@ export class D1AccountMergeRepository implements AccountMergeRepository {
     return this.mapRow(row);
   }
 
-  async consumeMergeChallenge(id: string): Promise<void> {
-    await this.db
-      .prepare(`UPDATE account_merge_challenges SET consumed_at = datetime('now') WHERE id = ?`)
-      .bind(id)
-      .run();
+  async findMergeIntegrityConflict(
+    primaryId: number,
+    secondaryId: number,
+  ): Promise<"CREATOR_PLATFORM_CONFLICT" | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT 1
+         FROM creator_platform_accounts secondary_account
+         JOIN creator_profiles secondary_profile
+           ON secondary_profile.id = secondary_account.creator_id
+         JOIN creator_platform_accounts primary_account
+           ON primary_account.platform = secondary_account.platform
+         JOIN creator_profiles primary_profile
+           ON primary_profile.id = primary_account.creator_id
+         WHERE primary_profile.user_id = ?
+           AND secondary_profile.user_id = ?
+         LIMIT 1`,
+      )
+      .bind(primaryId, secondaryId)
+      .first();
+
+    return row ? "CREATOR_PLATFORM_CONFLICT" : null;
   }
 
-  async mergeAccounts(primaryId: number, secondaryId: number): Promise<void> {
+  async mergeAccounts(primaryId: number, secondaryId: number, challengeId: string): Promise<void> {
+    const integrityConflict = await this.findMergeIntegrityConflict(primaryId, secondaryId);
+    if (integrityConflict) {
+      throw new Error(integrityConflict);
+    }
+
     // Primary-Wins atomic merge. D1 batch runs all statements as a single transaction:
     // secondary gameplay/personalization/progression/sessions are deleted (never unioned
-    // into primary — this includes XP events and achievement unlocks, so no ghost XP or
-    // duplicated achievements survive the merge), secondary OAuth identities are
-    // transferred to the primary, then the secondary user is deleted.
+    // into primary), identity-like Discord/Creator relationships are remapped safely,
+    // secondary OAuth identities are transferred to the primary, and the secondary user is
+    // deleted. The derived Discord guild ledger is explicitly removed before its source XP
+    // events so the invariant does not depend only on a database FK pragma being enabled.
     const statements = [
+      this.db
+        .prepare(
+          `DELETE FROM discord_guild_xp_events
+           WHERE user_id = ?
+              OR source_xp_event_id IN (SELECT id FROM xp_events WHERE user_id = ?)`,
+        )
+        .bind(secondaryId, secondaryId),
       this.db.prepare(`DELETE FROM scores WHERE user_id = ?`).bind(secondaryId),
       this.db.prepare(`DELETE FROM user_favorites WHERE user_id = ?`).bind(secondaryId),
       this.db.prepare(`DELETE FROM user_recent_plays WHERE user_id = ?`).bind(secondaryId),
@@ -120,10 +150,66 @@ export class D1AccountMergeRepository implements AccountMergeRepository {
       this.db.prepare(`DELETE FROM user_achievements WHERE user_id = ?`).bind(secondaryId),
       this.db.prepare(`DELETE FROM sessions WHERE user_id = ?`).bind(secondaryId),
       this.db
+        .prepare(
+          `UPDATE discord_guilds SET registered_by_user_id = ? WHERE registered_by_user_id = ?`,
+        )
+        .bind(primaryId, secondaryId),
+      this.db
+        .prepare(
+          `INSERT OR IGNORE INTO discord_guild_managers
+             (guild_id, user_id, role, created_at, updated_at)
+           SELECT guild_id, ?, role, created_at, updated_at
+           FROM discord_guild_managers WHERE user_id = ?`,
+        )
+        .bind(primaryId, secondaryId),
+      this.db.prepare(`DELETE FROM discord_guild_managers WHERE user_id = ?`).bind(secondaryId),
+      this.db
+        .prepare(`UPDATE discord_server_registration_challenges SET user_id = ? WHERE user_id = ?`)
+        .bind(primaryId, secondaryId),
+      this.db
+        .prepare(`UPDATE discord_play_contexts SET user_id = ? WHERE user_id = ?`)
+        .bind(primaryId, secondaryId),
+      // If Primary already has a Creator profile, keep its presentation/settings row and
+      // move Secondary's platform accounts. Review jobs and audit rows retain their account
+      // IDs, so their history remains coherent. If Primary has no profile, transfer the
+      // Secondary profile row itself instead.
+      this.db
+        .prepare(
+          `UPDATE creator_platform_accounts
+           SET creator_id = (SELECT id FROM creator_profiles WHERE user_id = ?)
+           WHERE creator_id = (SELECT id FROM creator_profiles WHERE user_id = ?)
+             AND EXISTS (SELECT 1 FROM creator_profiles WHERE user_id = ?)`,
+        )
+        .bind(primaryId, secondaryId, primaryId),
+      this.db
+        .prepare(
+          `DELETE FROM creator_profiles
+           WHERE user_id = ?
+             AND EXISTS (SELECT 1 FROM creator_profiles WHERE user_id = ?)`,
+        )
+        .bind(secondaryId, primaryId),
+      this.db
+        .prepare(
+          `UPDATE creator_profiles
+           SET user_id = ?
+           WHERE user_id = ?
+             AND NOT EXISTS (SELECT 1 FROM creator_profiles WHERE user_id = ?)`,
+        )
+        .bind(primaryId, secondaryId, primaryId),
+      this.db
         .prepare(`UPDATE oauth_accounts SET user_id = ? WHERE user_id = ?`)
         .bind(primaryId, secondaryId),
-      this.db.prepare(`DELETE FROM users WHERE id = ?`).bind(secondaryId),
     ];
+    statements.push(
+      this.db
+        .prepare(
+          `UPDATE account_merge_challenges
+           SET consumed_at = datetime('now')
+           WHERE id = ? AND consumed_at IS NULL`,
+        )
+        .bind(challengeId),
+    );
+    statements.push(this.db.prepare(`DELETE FROM users WHERE id = ?`).bind(secondaryId));
     await this.db.batch(statements);
   }
 

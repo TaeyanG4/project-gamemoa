@@ -165,3 +165,17 @@ test("POST /api/auth/merge/confirm requires authentication", async () => {
   });
   assert.equal(res.status, 401);
 });
+
+test("public query endpoints reject invalid values instead of silently defaulting", async () => {
+  const progression = await app.request("/api/progression/leaderboard?limit=not-a-number");
+  assert.equal(progression.status, 400);
+
+  const creators = await app.request("/api/creators/rankings?gameId=not-a-real-game");
+  assert.equal(creators.status, 400);
+
+  const guilds = await app.request("/api/discord/guilds/ranking?period=monthly");
+  assert.equal(guilds.status, 400);
+
+  const scores = await app.request("/api/scores/not-a-real-game");
+  assert.equal(scores.status, 400);
+});

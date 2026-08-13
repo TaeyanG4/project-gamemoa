@@ -358,14 +358,18 @@ export class D1CreatorRepository implements CreatorRepository {
       `;
 
       if (selectedGameId) {
-        query += ` AND s.game_id = '${selectedGameId}'`;
+        query += ` AND s.game_id = ?`;
       }
 
       query += ` ORDER BY s.score ${orderClause}, s.created_at ASC LIMIT 200`;
 
       const stmt = options.platform
-        ? this.db.prepare(query).bind(options.platform)
-        : this.db.prepare(query);
+        ? selectedGameId
+          ? this.db.prepare(query).bind(options.platform, selectedGameId)
+          : this.db.prepare(query).bind(options.platform)
+        : selectedGameId
+          ? this.db.prepare(query).bind(selectedGameId)
+          : this.db.prepare(query);
 
       const res = await stmt.all<Record<string, unknown>>();
 
