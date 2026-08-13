@@ -13,6 +13,7 @@ gamemoa/
 │   └── api/                     # Hono API 백엔드 (Cloudflare Workers / Node.js portable)
 │       ├── src/container.ts     # API Composition Root (의존성 주입 컨테이너)
 │       ├── src/auth/admin.ts    # 명시적 ADMIN_USER_IDS 서버 권한 가드
+│       ├── src/routes/admin.ts  # 관리자 상태/운영 요약 Thin Controller
 │       ├── src/routes/adminCreators.ts # 보호된 Creator 수동 심사 Thin Controller
 │       └── src/infrastructure/discord/ # Discord HTTP Interactions (Ed25519 서명 검증, 명령어 정의/핸들러) — Gateway 없음
 ├── games/
@@ -60,6 +61,7 @@ API Composition Root (apps/api/src/container.ts)
 ```
 
 - `apps/api/src/routes`는 세션 인증과 `ADMIN_USER_IDS` 서버 설정을 통과한 뒤에만 Creator 수동 심사 자료를 조회하거나 결정할 수 있습니다.
+- `/api/admin/*`는 매 요청 세션과 안정적인 GAMEMOA 사용자 ID를 재검증하며, 상태 변경 요청에는 허용된 Origin과 `Cache-Control: no-store`를 적용합니다.
 - `apps/api/src/index.ts`의 단일 Cron 핸들러는 6시간 취득 심사와 14일 Featured 재검증을 별도 repository query와 bounded batch로 실행합니다.
 - `creator_review_audit_log`는 일반 API에서 UPDATE/DELETE하지 않는 append-only 감사 원장입니다.
 

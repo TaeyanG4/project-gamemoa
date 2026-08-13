@@ -16,6 +16,7 @@ export function meta() {
   return [
     { title: "Creator 수동 심사 | gamemoa" },
     { name: "description", content: "GAMEMOA Featured Creator 수동 심사" },
+    { name: "robots", content: "noindex,nofollow" },
   ];
 }
 
@@ -24,6 +25,7 @@ export default function AdminCreatorsRoute() {
   const [data, setData] = useState<CreatorManualReviewQueueResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [reasons, setReasons] = useState<Record<number, string>>({});
   const [busyJobId, setBusyJobId] = useState<number | null>(null);
 
@@ -33,7 +35,8 @@ export default function AdminCreatorsRoute() {
     try {
       setData(await fetchManualCreatorReviewsApi());
     } catch (err) {
-      if (err instanceof ApiClientError && err.status === 403) {
+      if (err instanceof ApiClientError && (err.status === 401 || err.status === 403)) {
+        setAccessDenied(true);
         setError("이 페이지는 지정된 GAMEMOA 관리자만 사용할 수 있습니다.");
       } else {
         setError(err instanceof Error ? err.message : "수동 심사 큐를 불러올 수 없습니다.");
@@ -81,6 +84,23 @@ export default function AdminCreatorsRoute() {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <PageMessage>
+        <h1 className="text-lg font-black text-text-primary">접근 권한이 없습니다</h1>
+        <p className="mt-2 text-sm text-text-muted">
+          지정된 GAMEMOA 관리자 계정만 Creator 심사를 진행할 수 있습니다.
+        </p>
+        <Link
+          to="/admin"
+          className="mt-6 inline-flex rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light focus:outline-none focus:ring-2 focus:ring-brand"
+        >
+          관리자 센터로 돌아가기
+        </Link>
+      </PageMessage>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 md:px-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -97,7 +117,7 @@ export default function AdminCreatorsRoute() {
         <button
           type="button"
           onClick={() => void loadQueue()}
-          className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
         >
           새로고침
         </button>
@@ -194,7 +214,7 @@ export default function AdminCreatorsRoute() {
                         maxLength={1000}
                         rows={2}
                         placeholder="공식 지표와 소유권 확인 결과를 근거로 입력하세요."
-                        className="w-full resize-y rounded-xl border border-border bg-surface px-3 py-2 text-xs text-text-primary outline-none focus:border-brand"
+                        className="w-full resize-y rounded-xl border border-border bg-surface px-3 py-2 text-xs text-text-primary outline-none focus:border-brand focus:ring-1 focus:ring-brand"
                       />
                       <div className="flex flex-wrap gap-2">
                         <ActionButton
@@ -306,7 +326,7 @@ function ActionButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold transition-colors focus:outline-none focus:ring-2 focus:ring-brand disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
     >
       {icon}
       {label}

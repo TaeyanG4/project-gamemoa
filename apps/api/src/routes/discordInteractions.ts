@@ -12,9 +12,31 @@ import {
 
 export const discordRouter = new Hono<ApiEnv>();
 
+function getSafeInstallUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" || url.hostname !== "discord.com") return null;
+    if (url.pathname !== "/oauth2/authorize") return null;
+    if (
+      url.username ||
+      url.password ||
+      [...url.searchParams.keys()].some((key) => /secret|token/i.test(key))
+    ) {
+      return null;
+    }
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 // GET /api/discord/status — non-secret readiness check, mirrors /api/auth/providers.
 discordRouter.get("/status", (c) => {
-  return c.json({ configured: Boolean(c.env?.DISCORD_PUBLIC_KEY) });
+  return c.json({
+    configured: Boolean(c.env?.DISCORD_PUBLIC_KEY),
+    installUrl: getSafeInstallUrl(c.env?.DISCORD_INSTALL_URL),
+  });
 });
 
 // POST /api/discord/interactions — called directly by Discord's servers, not by our own

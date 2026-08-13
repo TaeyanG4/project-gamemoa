@@ -14,18 +14,18 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 
 ## 🎯 1. 진행 중인 대형 스프린트 — 플레이어 플랫폼 확장
 
-| Phase | 내용                                                                        | 상태                                                                           |
-| ----- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)                      | ✅ 완료                                                                        |
-| C     | My Page(내 프로필/기록 탭) / 닉네임·국가 변경 UI / 즐겨찾기·최근 플레이     | ✅ 완료 (공개 프로필 `/profile/:id`, `/me`·`/account` 완전 라우트 분리는 보류) |
-| D     | XP 랭킹 UI, Creator 모델 기초                                               | ✅ 완료                                                                        |
-| E1    | Creator 채널 소유권 검증 (YouTube, CHZZK, SOOP, Twitch 공식 OAuth/API)      | ✅ 완료                                                                        |
-| E2A   | Creator Featured 심사 엔진 (자격 정책, 6시간 자동 재심사 스케줄러, 잡 모델) | ✅ 완료                                                                        |
-| E2B   | Featured 수동 심사(운영진 리뷰), 14일 재검증/하이스테리시스, 관리 도구      | ✅ 완료                                                                        |
-| F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어                | ✅ 완료                                                                        |
-| H1    | Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`                           | ✅ 완료                                                                        |
-| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`)  | ✅ 완료                                                                        |
-| I     | 계정 통합 회귀 테스트, 플랫폼 무결성, 최종 문서화 및 프로덕션 검증          | 예정                                                                           |
+| Phase | 내용                                                                              | 상태                                                                           |
+| ----- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| B     | 진행도 파운데이션 (XP/레벨/도전과제, 닉네임·국가 정책)                            | ✅ 완료                                                                        |
+| C     | My Page(내 프로필/기록 탭) / 닉네임·국가 변경 UI / 즐겨찾기·최근 플레이           | ✅ 완료 (공개 프로필 `/profile/:id`, `/me`·`/account` 완전 라우트 분리는 보류) |
+| D     | XP 랭킹 UI, Creator 모델 기초                                                     | ✅ 완료                                                                        |
+| E1    | Creator 채널 소유권 검증 (YouTube, CHZZK, SOOP, Twitch 공식 OAuth/API)            | ✅ 완료                                                                        |
+| E2A   | Creator Featured 심사 엔진 (자격 정책, 6시간 자동 재심사 스케줄러, 잡 모델)       | ✅ 완료                                                                        |
+| E2B   | Featured 수동 심사(운영진 리뷰), 14일 재검증/하이스테리시스, 관리 도구            | ✅ 완료                                                                        |
+| F     | Discord HTTP Interactions, 서명 검증, 계정 연결, 기본 명령어                      | ✅ 완료                                                                        |
+| H1    | Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`                                 | ✅ 완료                                                                        |
+| H2    | Discord 서버 랭킹 UI 및 슬래시 커맨드 (`/gamemoa rank/leaderboard/server`)        | ✅ 완료                                                                        |
+| I     | 계정 통합 회귀 테스트, 플랫폼 무결성, Admin Center, Discord 안내 및 프로덕션 검증 | 구현 완료, 원격 검증 중                                                        |
 
 세부 정책(XP 지급/상한/멱등성, 레벨 공식, 도전과제 목록)은 `docs/PROGRESSION.md`를 참고하세요.
 
@@ -37,6 +37,7 @@ GAMEMOA는 높은 모듈성과 플러그 앤 플레이(Plug-and-Play) 게임 아
 - **구현된 명령어**: `/gamemoa link`, `/gamemoa profile`, `/gamemoa games`, `/gamemoa play`, `/gamemoa rank`, `/gamemoa leaderboard`, `/gamemoa server`.
 - **서버 랭킹 정책**: 서버 랭킹은 **"해당 Discord 서버에서 GAMEMOA와 연결된 사용자들"**의 랭킹으로 제한합니다. 모든 서버 멤버를 대상으로 하지 않아 권한 서버 멤버 인텐트(Server Member Intent) 없이 구현 가능합니다.
 - **외부 설정 대기**: `DISCORD_PUBLIC_KEY` GitHub Actions Variable 등록, Developer Portal Interactions Endpoint URL 설정, `pnpm discord:commands:register` 실행 — 전부 사용자의 Discord Developer Portal 접근이 필요해 이 저장소만으로는 완결되지 않습니다. 정확한 절차는 `docs/DISCORD_INTEGRATION.md` §8 참고.
+- **운영 안내**: Discord 사용자/운영자 가이드는 `docs/DISCORD_BOT_GUIDE.md`, 웹 사용 가이드는 `/discord/guide`, 관리자 운영 가이드는 `docs/ADMIN_GUIDE.md`입니다.
 
 ---
 

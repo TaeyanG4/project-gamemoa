@@ -74,6 +74,13 @@ export default function DiscordHubRoute() {
             >
               ⚡ 내 서버 등록 (관리자 권한)
             </a>
+            <Link
+              to="/discord/guide"
+              id="discord-hub-guide-cta"
+              className="inline-flex items-center justify-center rounded-xl border border-indigo-300/20 bg-indigo-300/10 px-6 py-3 text-sm font-semibold text-indigo-100 transition-all hover:bg-indigo-300/20 active:scale-95"
+            >
+              📖 Discord 이용 가이드
+            </Link>
           </div>
         </div>
       </div>
@@ -282,6 +289,12 @@ export default function DiscordHubRoute() {
               className="block w-full rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-4 py-2.5 text-center text-xs font-semibold text-indigo-300 hover:bg-indigo-500/20 hover:text-white transition-all"
             >
               계정 연동 페이지 이동
+            </Link>
+            <Link
+              to="/discord/guide"
+              className="block w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-center text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-all"
+            >
+              Discord 사용 방법 보기
             </Link>
           </div>
         </div>

@@ -118,3 +118,46 @@ Discord 서버 기능은 다음 웹 전용 라우트에 위치합니다:
 | `DISCORD_APPLICATION_ID` | 공개 | CLI 명령어 등록 스크립트                                          |
 | `DISCORD_PUBLIC_KEY`     | 공개 | Worker Interaction Ed25519 서명 검증                              |
 | `DISCORD_BOT_TOKEN`      | 비밀 | 로컬 명령어 등록 스크립트 전용 (`pnpm discord:commands:register`) |
+
+추가 OAuth 및 운영 설정은 다음과 같습니다.
+
+| 변수                    | 종류      | 용도                                                                 |
+| ----------------------- | --------- | -------------------------------------------------------------------- |
+| `DISCORD_CLIENT_ID`     | 공개      | Discord LOGIN/LINK/서버 등록 OAuth client ID 및 명령어 등록 fallback |
+| `DISCORD_CLIENT_SECRET` | 비밀      | authorization code 교환                                              |
+| `DISCORD_REDIRECT_URI`  | 공개      | LOGIN과 LINK가 공유하는 `/api/auth/discord/callback`                 |
+| `FRONTEND_URL`          | 공개      | 웹 redirect와 Play/명령어 링크 생성                                  |
+| `DISCORD_INSTALL_URL`   | 선택 공개 | Portal에서 실제 구성한 설치 링크. 없으면 URL을 추정하지 않음         |
+
+## 7. 설치와 GAMEMOA 서버 등록의 분리
+
+Discord 앱 설치는 Discord에서 앱/명령어를 사용할 준비를 하는 단계이며, GAMEMOA 서버 등록은 웹에서
+별도로 수행하는 데이터 등록 단계입니다. 앱 설치만으로 서버가 `PUBLIC` 디렉토리에 게시되지 않습니다.
+
+관리자는 `/discord/servers`에서 GAMEMOA 로그인 → Discord OAuth `identify guilds` 승인 → 관리 가능한
+길드 선택 → slug/설명/`PUBLIC`·`UNLISTED`·`PRIVATE` 선택 → 등록 확정 순서를 수행합니다. 서버 등록 OAuth는
+공식 `/users/@me/guilds` 응답에서 소유자 또는 `MANAGE_GUILD`/`ADMINISTRATOR` 권한이 있는 길드만 후보로
+사용하고, access token을 저장하지 않습니다.
+
+일반 사용자는 Discord에서 `/gamemoa link`를 실행한 뒤 1회용 웹 링크에서 GAMEMOA 로그인과 연결 확인을
+수행합니다. 자세한 명령어 표와 사용자 안내는 `docs/DISCORD_BOT_GUIDE.md`, 공개 웹 안내는
+`/discord/guide`를 참고합니다.
+
+## 8. 현재 운영 설정 확인
+
+Developer Portal의 Interactions Endpoint URL은 다음 API 경로를 사용합니다.
+
+```text
+https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions
+```
+
+Redirect URI는 LOGIN과 LINK에 공통으로 다음 하나를 사용합니다.
+
+```text
+https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback
+```
+
+`DISCORD_PUBLIC_KEY` 전달, Portal endpoint 등록, `pnpm discord:commands:register` 실행과 실제 설치 링크
+구성은 Discord Developer Portal 접근이 필요하므로 **외부 설정 대기**로 별도 확인합니다. 공식 설치 scope와
+permissions는 Portal의 Installation 설정 및 현재 Discord 공식 문서를 기준으로 확인하며, 코드나 문서에서
+임의 숫자를 조합하지 않습니다.

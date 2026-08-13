@@ -50,9 +50,10 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
 3. **OAuth2 > General** 메뉴 이동
 4. **Client ID** 복사
 5. **Client Secret** 생성 후 안전한 장소에 복사 (절대 공개 금지)
-6. **Redirects** 항목에 로그인/연결 카카오/디스코드 인증 콜백 URI 추가 (로그인과 연결은 서로 다른 경로 사용):
-   - 로그인: `http://localhost:8787/api/auth/discord/callback` / 프로덕션: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
-   - 연결(LINK): `http://localhost:8787/api/auth/link/discord/callback` / 프로덕션: `https://gamemoa-api.gamemoa.workers.dev/api/auth/link/discord/callback`
+6. **Redirects** 항목에 아래 공용 callback URI를 등록합니다. LOGIN과 LINK가 같은 callback을 사용하고
+   state 쿠키로 흐름을 구분합니다.
+   - 개발: `http://localhost:8787/api/auth/discord/callback`
+   - 프로덕션: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
    - 계정 연결/연결해제 및 통합 절차는 `docs/runbooks/account-linking.md`를 참조하세요.
 
 ### B. 환경 변수 및 Worker Secret 설정
@@ -61,11 +62,17 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
   - `DISCORD_CLIENT_ID`: 생성된 Discord Application Client ID
   - `DISCORD_REDIRECT_URI`: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
   - `FRONTEND_URL`: `https://gamemoa-web.gamemoa.workers.dev`
+  - `DISCORD_PUBLIC_KEY`: Developer Portal General Information의 Public Key
+  - `DISCORD_INSTALL_URL`: 선택 사항. Developer Portal에서 실제로 구성한 HTTPS 설치 URL을 사용할 때만 등록
 - **Worker Secret 등록 (Command Line)**:
   ```bash
   pnpm --filter @gamemoa/api exec wrangler secret put DISCORD_CLIENT_SECRET
   ```
   명령어 실행 후 복사한 Client Secret 입력.
+
+명령어 등록이 필요한 경우 `DISCORD_BOT_TOKEN`은 Worker가 아닌 명령어 등록 실행 환경에만 일시적으로
+주입합니다. 현재 저장소는 `pnpm discord:commands:register`에서 `DISCORD_APPLICATION_ID`를 우선 사용하고,
+없으면 `DISCORD_CLIENT_ID`를 사용합니다. 토큰을 로그나 커밋에 남기지 않습니다.
 
 ---
 
@@ -94,3 +101,6 @@ GAMEMOA 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 �
 4. `/api/auth/me` 응답이 `authenticated: true` 및 사용자 프로필 데이터 반환 확인
 5. 상단 프로필 유저 정보 표시 및 프로필 페이지 접근 확인
 6. 로그아웃 클릭 후 세션 정상 파기 확인
+
+Discord HTTP Interactions의 endpoint URL, Public Key, 설치 설정과 명령어 등록은 Discord Developer Portal
+접근이 필요한 **외부 설정 대기** 항목입니다. 저장소 코드만으로 완료를 주장하지 않습니다.

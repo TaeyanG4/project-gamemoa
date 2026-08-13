@@ -24,6 +24,22 @@ test("GET /api/discord/status reports non-secret readiness", async () => {
   assert.equal(typeof data.configured, "boolean");
 });
 
+test("GET /api/discord/status only exposes an explicitly configured Discord install URL", async () => {
+  const safe = await app.request("http://localhost/api/discord/status", {}, {
+    DISCORD_INSTALL_URL:
+      "https://discord.com/oauth2/authorize?client_id=123&scope=applications.commands",
+  } as any);
+  assert.equal(
+    (await safe.json()).installUrl,
+    "https://discord.com/oauth2/authorize?client_id=123&scope=applications.commands",
+  );
+
+  const unsafe = await app.request("http://localhost/api/discord/status", {}, {
+    DISCORD_INSTALL_URL: "https://example.com/install?token=secret",
+  } as any);
+  assert.equal((await unsafe.json()).installUrl, null);
+});
+
 test("POST /api/discord/interactions returns 500 when DISCORD_PUBLIC_KEY is not configured", async () => {
   const res = await app.request("http://localhost/api/discord/interactions", {
     method: "POST",

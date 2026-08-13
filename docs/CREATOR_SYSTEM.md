@@ -204,3 +204,13 @@
 - Creator 화면에는 `✓ Creator`, `★ Featured Creator`, `자동 심사 대기`, `추가 확인 필요`, `기준 미달` 상태만 안전한 공개 사유와 함께 표시합니다.
 - 운영진이 입력한 내부 심사 사유는 Creator API/UI로 전달하지 않습니다.
 - Featured는 표시·필터링 전용이며 게임 점수, XP, 게임 랭킹 계산에는 절대 사용하지 않습니다.
+
+## 8. 계정 통합과 Creator 소유권
+
+Primary Account Wins 계정 통합에서 Primary Creator profile의 presentation/settings가 우선합니다.
+
+- Primary에 없는 플랫폼의 Secondary 검증 채널은 동일한 `(platform, platform_user_id)` 중복 없이 Primary Creator profile로 이전합니다.
+- 두 계정이 같은 플랫폼의 서로 다른 외부 채널을 보유하면 안전한 선택이 불가능하므로 통합을 차단합니다.
+- 이전되는 platform account의 ID를 유지하므로 연결된 `creator_review_jobs`와 append-only `creator_review_audit_log`의 역사적 연결을 보존합니다.
+- Secondary의 XP, score, 진행도는 Creator profile이나 Creator 랭킹에 합산되지 않습니다.
+- Featured 상태는 통합 여부와 무관하게 score/XP/ranking 계산에 영향을 주지 않습니다.

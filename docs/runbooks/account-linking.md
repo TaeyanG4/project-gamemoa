@@ -29,19 +29,18 @@ GAMEMOA 계정 식별 모델, OAuth 공급자 연결/연결 해제, 그리고 Pr
   GAMEMOA 계정 또는 신규 별도 GAMEMOA 계정 생성.
 - **LINK**: 이미 인증된 GAMEMOA 계정 + 새로 인증된 두 번째 공급자를 현재 계정에 추가.
   - `POST /api/auth/link/google` (GIS 자격증명 검증 후 연결)
-  - `GET /api/auth/link/discord` + `GET /api/auth/link/discord/callback` (LINK 전용 OAuth 흐름)
+  - `GET /api/auth/link/discord` 후 공용 `GET /api/auth/discord/callback` (state 쿠키로 LINK 흐름 식별)
 
 LINK 흐름의 Discord OAuth `state`는 인증된 세션과 연결 계정에 바인딩되며, 콜백에서 현재
 세션을 재검증합니다.
 
 ### Discord Developer Portal — LINK 콜백 URI 등록
 
-로그인과 LINK는 서로 다른 콜백 경로를 사용하므로 두 URI를 모두 Discord Redirects에 등록해야
-합니다.
+로그인과 LINK는 하나의 콜백 경로를 공유합니다. Discord Developer Portal에는 현재 아래 URI 하나만
+등록합니다.
 
-- 로그인: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
-- 연결: `https://gamemoa-api.gamemoa.workers.dev/api/auth/link/discord/callback` (개발 환경:
-  `http://localhost:8787/api/auth/link/discord/callback`)
+- 로그인 및 연결: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
+- 개발 환경 예시: `http://localhost:8787/api/auth/discord/callback`
 
 ---
 
@@ -71,6 +70,12 @@ LINK 흐름의 Discord OAuth `state`는 인증된 세션과 연결 계정에 바
   - 베스트 스코어 합집합, 즐겨찾기 합집합, 최근 플레이 합집합을 수행하지 않습니다.
 - Secondary 계정의 Google/Discord 로그인 수단 → **Primary 계정으로 이전**.
 - Secondary 계정 사용자 행은 공급자 이전 후 **삭제**.
+- Secondary의 `xp_events`, `user_progress`, `user_achievements`는 합산하지 않고 삭제합니다.
+- Secondary에서 파생된 `discord_guild_xp_events`는 XP 원장 삭제 전에 명시적으로 삭제합니다.
+- Discord guild manager, 등록자, 대기 중 서버 등록/Play Context는 Primary로 안전하게 재지정합니다.
+- Creator profile이 충돌 없이 이전 가능한 외부 채널은 계정 행과 심사 잡을 보존한 채 Primary profile로 이전합니다.
+- 두 계정에 같은 플랫폼의 서로 다른 Creator 채널이 있으면 병합하지 않습니다.
+- `creator_review_audit_log`는 병합을 위해 수정하거나 삭제하지 않습니다.
 
 이 정책은 랭킹 모호성, 멀티 계정 점수 패밍, 중복 데이터 정책 복잡성을 회피합니다. UI는 이
 사실을 한국어로 명확히 안내합니다.
@@ -88,14 +93,14 @@ LINK 흐름의 Discord OAuth `state`는 인증된 세션과 연결 계정에 바
 
 통합은 D1 `batch` 단일 트랜잭션으로 all-or-nothing 처리됩니다.
 
-1. Secondary 점수 삭제
-2. Secondary 즐겨찾기 삭제
-3. Secondary 최근 플레이 삭제
-4. Secondary 세션 무효화
-5. Secondary `oauth_accounts` → Primary로 이전
-6. Primary `oauth_accounts` 보존
-7. Secondary 사용자 삭제
-8. `mergeChallenge` 소비
+1. Creator 플랫폼 충돌 및 동일 provider 충돌 사전 확인
+2. Secondary에서 파생된 Discord Guild XP 삭제
+3. Secondary 점수, 즐겨찾기, 최근 플레이 삭제
+4. Secondary XP 원장, 진행도 집계, 도전과제와 세션 삭제
+5. Discord identity-like 관계와 대기 컨텍스트를 Primary로 재지정
+6. 충돌 없는 Creator 외부 채널 계정과 심사 잡 보존
+7. Secondary `oauth_accounts`를 Primary로 이전하고 Primary 계정 데이터 보존
+8. merge challenge 소비와 Secondary 사용자 삭제
 
 ---
 
@@ -126,7 +131,7 @@ Primary = A(예: Google) + B(Discord)→ A 통합 후:
 | `GET`    | `/api/auth/accounts`                 | 현재 계정의 연결된 공급자 목록 |
 | `POST`   | `/api/auth/link/google`              | Google 공급자 연결             |
 | `GET`    | `/api/auth/link/discord`             | Discord LINK OAuth 시작        |
-| `GET`    | `/api/auth/link/discord/callback`    | Discord LINK OAuth 콜백        |
+| `GET`    | `/api/auth/discord/callback`         | Discord LOGIN/LINK 공용 콜백   |
 | `DELETE` | `/api/auth/link/:provider`           | 공급자 연결 해제               |
 | `POST`   | `/api/auth/merge/challenge`          | 기존 대기중 통합 챌린지 조회   |
 | `GET`    | `/api/auth/merge/preview?challenge=` | 양 계정 안전 요약              |

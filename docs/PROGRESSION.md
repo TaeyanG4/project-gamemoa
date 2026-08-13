@@ -1,8 +1,7 @@
 # GAMEMOA 경험치 / 레벨 / 도전과제 (PROGRESSION)
 
 이 문서는 GAMEMOA 플랫폼 확장 스프린트("Player Platform / My Page / Creator Ranking / Discord Community")의
-**Phase B: 진행도(Progression) 파운데이션**을 설명합니다. My Page UI, Creator, Discord 연동은 이 파운데이션 위에서
-후속 세션이 구축합니다.
+**Phase B: 진행도(Progression) 파운데이션**과 현재 Creator/Discord 연동과의 경계를 설명합니다.
 
 ---
 
@@ -159,12 +158,23 @@ API: `POST /api/profile/nickname`, `POST /api/profile/country` (둘 다 인증 �
 
 Secondary 계정의 `xp_events`, `user_progress`, `user_achievements`는 병합 시 **Primary로 합산되지 않고 삭제**됩니다
 (`D1AccountMergeRepository.mergeAccounts`). 이는 기존 scores/favorites/recent_plays 삭제와 동일한 원칙이며,
-고스트(ghost) 진행도 데이터가 남지 않도록 보장합니다.
+고스트 진행도 데이터가 남지 않도록 보장합니다.
+
+Discord 길드 XP는 `discord_guild_xp_events.source_xp_event_id`로 글로벌 `xp_events`에 연결됩니다. 병합 트랜잭션은
+Secondary 사용자 행과 Secondary XP 원장을 삭제하기 전에 해당 파생 Guild XP 행을 명시적으로 삭제합니다. 따라서
+Secondary의 개인 XP가 Primary나 어느 Guild에도 복사되지 않고, Guild A와 Guild B의 기존 Primary 귀속은 유지됩니다.
+
+Creator 외부 채널은 활동 데이터가 아닌 identity-like ownership 데이터로 처리합니다. Primary와 Secondary가 같은
+플랫폼의 서로 다른 외부 채널을 가지고 있으면 병합을 차단합니다. 충돌이 없으면 Secondary의 플랫폼 계정 행과
+연결된 심사 잡 ID를 유지한 채 Primary Creator profile로 옮기며, Primary profile 설정이 우선합니다. 감사 원장은
+수정하거나 삭제하지 않습니다.
 
 ---
 
-## 11. 다음 단계 (이번 세션 범위 밖)
+## 11. 현재 연동 범위
 
-- My Page(`/me`) UI에서 이 API들을 소비하는 대시보드 구성.
-- Creator XP 랭킹, Discord 길드-로컬 XP는 이 원장(ledger) 패턴을 그대로 재사용할 예정입니다
-  (Discord는 `source_type`이 다른 별도 원장을 두어 길드 귀속을 분리 — 아직 미구현).
+- My Page(`/profile`)는 이 API를 사용해 XP, 레벨, 도전과제와 개인 기록을 표시합니다.
+- Creator XP 랭킹은 Primary 사용자에 속한 `user_progress`만 사용하며 Featured 상태를 점수나 XP에 반영하지 않습니다.
+- Discord Guild 귀속은 별도 `discord_guild_xp_events` 원장과 1회용 Play Context를 사용합니다.
+- 계정 통합·Creator·Discord의 상세 운영 절차는 `docs/runbooks/account-linking.md`, `docs/CREATOR_SYSTEM.md`,
+  `docs/DISCORD_BOT_GUIDE.md`를 참고합니다.

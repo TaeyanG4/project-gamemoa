@@ -3,6 +3,8 @@ import {
   ConfirmDiscordLinkResponseSchema,
   type DiscordLinkPreviewResponse,
   type ConfirmDiscordLinkResponse,
+  DiscordBotStatusResponseSchema,
+  type DiscordBotStatusResponse,
 } from "@gamemoa/contracts";
 import { apiFetch } from "../../lib/api";
 
@@ -20,4 +22,8 @@ export async function confirmDiscordLinkApi(token: string): Promise<ConfirmDisco
     method: "POST",
     body: JSON.stringify({ token }),
   });
+}
+
+export async function fetchDiscordBotStatusApi(): Promise<DiscordBotStatusResponse> {
+  return await apiFetch("/api/discord/status", DiscordBotStatusResponseSchema);
 }

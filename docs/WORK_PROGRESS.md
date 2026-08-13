@@ -8,6 +8,8 @@
 **Phase H1(Discord 길드 XP 귀속 파운데이션 & `/gamemoa play`)**, **Phase H2(Discord 서버 리더보드 & 커맨드)**,
 **Phase E1(Creator 채널 소유권 검증)**, **Phase E2A(Featured Creator 자격 심사 엔진)**,
 **Phase E2B(Featured 수동 심사·재검증·관리자 안전)**를 완수했습니다.
+현재 **Phase I 계정 통합 회귀·플랫폼 무결성·Admin Center·Discord 가이드 구현**을 완료하고
+통합 품질 게이트와 원격 배포 검증을 진행 중입니다.
 전체 스프린트 단계 구조는 `docs/ROADMAP.md` §1, 상세 설계는 `docs/PROGRESSION.md`(진행도),
 `docs/DISCORD_INTEGRATION.md`(Discord), `docs/CREATOR_SYSTEM.md`(Creator)를 참고하세요.
 
@@ -85,17 +87,30 @@
 - [x] **계정 원칙 준수 & 계층적 아키텍처 수호**
 - [x] **랭킹 & 통합 정보 구조 (IA) 완성 (`/ranking`)**
 
+### Phase I 구현: 계정 통합·관리자 센터·Discord 안내
+
+- [x] **Primary Account Wins 전체 무결성**:
+  - Primary score/Favorites/Recent Plays/profile/XP/progression/achievements는 유지하고 Secondary 경쟁·활동 데이터는 합산하지 않고 삭제.
+  - Secondary `xp_events`에서 파생된 `discord_guild_xp_events`를 XP 삭제 전에 명시적으로 제거하여 Guild XP ghost 방지.
+  - Discord guild manager/등록자/대기 등록 challenge/Play Context는 안전하게 Primary로 재지정하고 Guild XP는 복사하지 않음.
+  - Creator 충돌 없는 외부 채널은 account ID와 심사 잡을 보존한 채 Primary profile로 이전하며, 같은 플랫폼의 서로 다른 채널 충돌은 병합 차단.
+  - `creator_review_audit_log`는 수정·삭제하지 않으며 동일 provider 충돌, challenge 재사용, 실패 원자성 회귀를 유지.
+- [x] **전용 Admin Center**: `/admin`, `/admin/creators`, `/api/admin/me`, `/api/admin/overview` 추가. HttpOnly 세션과 명시적 `ADMIN_USER_IDS`만 서버 권한 근거로 사용하고 기본 거부.
+- [x] **관리자 보안**: 관리자 변경 Origin 검증, 엄격한 Zod payload/query 검증, `Cache-Control: no-store`, noindex, 민감값·내부 오류 비노출.
+- [x] **Discord 사용자/운영자 안내**: `docs/ADMIN_GUIDE.md`, `docs/DISCORD_BOT_GUIDE.md`, `/discord/guide` 추가 및 Discord Hub 연결. 실제 구현된 7개 명령어와 글로벌/Guild XP 분리 정책을 반영.
+- [x] **쿼리 무결성**: invalid query 자동 기본값 제거, game ID 검증, Creator 랭킹 SQL parameter binding, 공개 검색 wildcard escape, PRIVATE Guild 일반 응답 비노출.
+
 ---
 
 ## 남은 작업
 
-`docs/ROADMAP.md` §1 단계 순서대로 진행:
-
-1. **Phase I — Account Merge Regression, Platform Integrity & Final Sprint Verification**
-   - 계정 통합 회귀 테스트, 플랫폼·Creator 무결성 점검, 최종 문서화 및 프로덕션 검증.
+1. 로컬 `pnpm verify`와 D1 migration/registry 검증
+2. 커밋·푸시 후 GitHub Actions CI 및 Cloudflare Deploy GREEN 확인
+3. `/api/health`, `/version.json`, `pnpm smoke:prod`의 최종 SHA provenance 확인
+4. 외부 설정 항목(Discord Portal endpoint/명령어 등록, `ADMIN_USER_IDS`, 선택적 설치 링크)의 실제 설정 여부 확인
 
 ---
 
 ## 다음 작업 (Next Action)
 
-`Phase I — Account Merge Regression, Platform Integrity & Final Sprint Verification`
+`Phase I 로컬 품질 게이트 완료 후 커밋·원격 CI/Deploy·Provenance·프로덕션 smoke 검증`

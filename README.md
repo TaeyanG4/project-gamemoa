@@ -32,8 +32,10 @@ CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만�
 - 📊 **My Page ("내 프로필 & 기록")**: `/profile`의 "내 프로필"(사용자 정보, 레벨/XP, 닉네임·국가/지역 변경, 즐겨찾기, 최근 플레이, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록) 탭 분리. 게임 기록 카드는 실제 썸네일 기반으로 재구성.
 - 🎥 **Creator & Featured 시스템**: YouTube/CHZZK/SOOP/Twitch 공식 소유권 검증, Featured 자격 자동 심사, 14일 보수적 재검증, 지정된 `ADMIN_USER_IDS` 관리자 전용 수동 심사 큐와 append-only 감사 원장. Featured는 게임 점수·XP·랭킹에 영향을 주지 않습니다. 상세 정책은 `docs/CREATOR_SYSTEM.md` 참고.
 - 🤖 **Discord HTTP Interactions & 커뮤니티 Hub**:
-  - `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/gamemoa link|profile|games`).
+  - `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/gamemoa games|link|profile|play|rank|leaderboard|server`).
   - **Discord 서버 시스템 & Hub 페이지**: OAuth `guilds` 1회용 인증으로 `MANAGE_GUILD`/`ADMINISTRATOR` 권한 검증 후 서버 등록, 1회용 해시 챌린지 기반 access_token 미저장 보안, 공개 디렉토리 검색(`/discord/servers`), 공개 서버 페이지(`/discord/servers/:slug`), 가시성(`PUBLIC`/`UNLISTED`/`PRIVATE`), 서버 관리 페이지. 일반 GAMEMOA 게임 랭킹과 Discord 서버 공간은 명확히 분리되어 동작합니다. 자세한 내용은 `docs/DISCORD_INTEGRATION.md` 참고.
+  - **Discord 사용 안내**: `/discord/guide` 공개 사용 가이드와 `docs/DISCORD_BOT_GUIDE.md` 운영 가이드 제공. 앱 설치와 GAMEMOA 서버 등록은 별도 단계이며 기존 글로벌 XP는 새 Guild로 복사되지 않습니다.
+- 🛡️ **보안 Admin Center**: `/admin`은 HttpOnly 세션과 서버의 `ADMIN_USER_IDS`만으로 권한을 판단하며, Creator 수동 심사(`/admin/creators`)와 감사 요약을 통합합니다. 관리자 페이지는 검색 색인에서 제외됩니다. 설정 절차는 `docs/ADMIN_GUIDE.md` 참고.
 
 - 🧩 **Game Plugin Architecture**:
   - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
@@ -172,6 +174,8 @@ gamemoa/
     ├── ROADMAP.md             # 플랫폼 향후 로드맵
     ├── PROGRESSION.md         # XP/레벨/도전과제 진행도 시스템 설계
     ├── DISCORD_INTEGRATION.md # Discord HTTP Interactions 아키텍처 및 설정 가이드
+    ├── DISCORD_BOT_GUIDE.md   # Discord 서버 관리자/사용자/운영자 실무 가이드
+    ├── ADMIN_GUIDE.md         # Admin Center 권한 및 운영 가이드
     ├── AGENTS.md              # AI Agent 개발 규칙 명세서
     └── runbooks/
         ├── oauth-setup.md        # 소셜 로그인 설정 런북

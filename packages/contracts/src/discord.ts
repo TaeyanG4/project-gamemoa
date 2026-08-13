@@ -27,5 +27,6 @@ export type ConfirmDiscordLinkResponse = z.infer<typeof ConfirmDiscordLinkRespon
 
 export const DiscordBotStatusResponseSchema = z.object({
   configured: z.boolean(),
+  installUrl: z.string().url().nullable().optional(),
 });
 export type DiscordBotStatusResponse = z.infer<typeof DiscordBotStatusResponseSchema>;
