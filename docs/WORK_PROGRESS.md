@@ -3,21 +3,60 @@
 # 현재 목표
 
 **Admin/Streamer/Discord/Wiki/i18n 대형 스프린트 (Phase K)**. 실행 순서 A→F 중
-**A(Admin)~E(i18n 기반+일부 화면)까지 이번/이전 세션에 걸쳐 완료**했습니다. Phase F(전체
-회귀·프로덕션 검증)는 이번 세션 마지막에 함께 수행하고 결과를 아래에 기록합니다.
+**A(Admin)~E(i18n 기반+화면 번역 확장)까지 여러 세션에 걸쳐 완료**했습니다. Phase F(전체
+회귀·프로덕션 검증)는 매 세션 마지막에 함께 수행하고 결과를 아래에 기록합니다.
 
 ```
-A. Admin Login Recovery & Managed Admin Accounts     ← 완료 (이전 세션)
-B. Streamer Ranking Semantics & Platform Icons        ← 완료 (이번 세션)
-C. Discord Onboarding / Command Automation            ← 완료 (이번 세션)
-D. Public Wiki                                        ← 완료 (이번 세션)
-E. Four-Language i18n Foundation & Rollout             ← 기반 완료, 화면 번역은 부분 (이번 세션)
-F. Full Regression / Production Verification           ← 이번 세션에 수행
+A. Admin Login Recovery & Managed Admin Accounts     ← 완료
+B. Streamer Ranking Semantics & Platform Icons        ← 완료
+C. Discord Onboarding / Command Automation            ← 완료
+D. Public Wiki                                        ← 완료
+E. Four-Language i18n Foundation & Rollout             ← 기반 완료, 화면 번역 확장 중 (진행형)
+F. Full Regression / Production Verification           ← 매 세션 수행
 ```
 
 ---
 
-## 완료 (이번 세션 — Phase B~E)
+## 완료 (최신 세션 — 보안 정리, Admin 외부 설정, i18n 확장)
+
+### GitGuardian 오탐 정리
+
+`apps/api/test/adminAuthFlow.test.ts`, `apps/api/test/adminAccounts.test.ts`의 테스트 픽스처
+문자열(`"bootstrap-admin"`/`"temporary-bootstrap-pw"` 등)이 GitGuardian에 "Username Password"
+패턴으로 오탐 신고되었습니다. **실제 자격 증명이 아니며**(로컬 SQLite 전용 테스트 픽스처, 실제
+배포에 전혀 사용되지 않음), 운영자가 이전에 요청했던 임시 bootstrap 자격 증명과도 무관함을
+재확인했습니다(그 값 자체는 이 문서를 포함해 저장소 어디에도 기록하지 않습니다). 향후 오탐을
+막기 위해 흩어진 리터럴을 `BOOTSTRAP_TEST_USERNAME` 등 이름 있는 상수로 교체했습니다.
+
+### Admin 최초 bootstrap 외부 설정 — repository 쪽 차단 요인 해소
+
+- [x] 운영자 승인 하에, 이미 인증되어 있던 `wrangler`(taeyang95@naver.com)로 프로덕션 D1을
+      **읽기 전용**으로 조회해 운영자의 GAMEMOA 사용자 ID(`1`, "Taeyang (G4)", Google·Discord
+      모두 연결됨)를 확인했습니다.
+- [x] GitHub Actions Variable `ADMIN_USER_IDS=1`을 설정했습니다(`gh variable set`). 같은 세션의
+      배포로 즉시 반영 확인.
+- [ ] **최초 SUPERADMIN bootstrap 자체는 여전히 운영자가 직접 완료해야 합니다** — 서버가 아니라
+      운영자 브라우저에서 `/admin` 방문 → Google 본인 확인(실제 클릭) → "초기 관리자 설정" 폼에
+      원하는 아이디/비밀번호 직접 입력. 코딩 세션은 비밀번호를 절대 입력하거나 저장하지
+      않습니다. (다음 세션 시작 시 `admin_accounts` 행 존재 여부로 완료 확인 가능.)
+
+### i18n 화면 번역 확장
+
+- [x] `dict.loginModal`(제목/부제/닫기/Google·Discord 버튼/로딩/미설정 문구) — `LoginModal.tsx`
+      전체 연결.
+- [x] `dict.games`(eyebrow/제목/게임 수 문구/검색창 placeholder/빈 상태 2종) — `/games` 전체 연결.
+- [x] `dict.ranking`(3개 메인 탭, 전체 종목/전체 플랫폼 필터, 점수/XP 모드 전환, 테이블 헤더 전체,
+      로딩/에러/재시도, 3개 탭 각각의 빈 상태) — `/ranking` 대부분 연결(1/2/3위 배지 텍스트는
+      아직 미번역, `docs/I18N.md` §6에 기록).
+- [x] `docs/I18N.md` §6 커버리지 목록 갱신.
+
+### 검증
+
+- [x] `pnpm verify` 전체 GREEN(로그인 모달/게임/랭킹 사전 확장 포함).
+
+---
+
+## 완료 (Phase B~E — Admin/Streamer/Discord/Wiki/i18n 기반)
 
 ### Phase B: 스트리머 랭킹 정책 & 플랫폼 아이콘
 
@@ -151,12 +190,13 @@ Actions 기록이 원본입니다.
 
 ## 남은 작업 (다음 세션에서 이어서 진행)
 
-1. **i18n 화면 번역 확장**: 로그인 모달, 게임 카탈로그, 랭킹, 프로필, 계정 관리, Discord
-   Hub/설정/가이드/서버, Wiki 본문, Admin 흐름, 공통 로딩/에러/빈 상태를 `dict`에 연결. `common`
-   사전 섹션은 이미 준비되어 있음. 라우트 `meta()` 로케일화 방식 검토.
+1. **i18n 화면 번역 확장 (계속)**: 프로필/내 정보, 계정 관리, Discord Hub/설정/가이드/서버, Wiki
+   본문, Admin 흐름, 순위 배지("1위" 등 서수 표기)를 `dict`에 연결. `common` 사전 섹션은 이미
+   준비되어 있음. 라우트 `meta()` 로케일화 방식 검토.
 2. **외부 설정 대기**(repository만으로 완결 불가):
-   - Admin 최초 bootstrap: 운영자가 `ADMIN_USER_IDS`에 본인 ID 등록 후 `/admin`에서 직접 bootstrap
-     완료 필요(Phase A부터 계속 대기 중).
+   - Admin 최초 bootstrap: `ADMIN_USER_IDS`는 이번 세션에 설정 완료. **운영자가 `/admin`에서
+     Google 본인 확인 + "초기 관리자 설정" 폼을 직접 완료해야** 실제로 로그인 가능해집니다(다음
+     세션 시작 시 프로덕션 `admin_accounts` 테이블에 행이 있는지로 완료 여부 확인 가능).
    - Discord 명령어 자동 동기화를 원하면 `DISCORD_COMMAND_SYNC_ENABLED=true` +
      `DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`/`DISCORD_TEST_GUILD_ID`(선택) 등록. 미설정이어도
      배포에는 영향 없음.
@@ -165,12 +205,10 @@ Actions 기록이 원본입니다.
 
 ## 다음 작업 (Next Action)
 
-외부 설정(Admin bootstrap, Discord 자동 동기화 자격 증명)이 남아있고 i18n 화면 번역이 부분
-적용이므로:
+Admin bootstrap 완료 여부(운영자 조작 필요)를 먼저 확인한 뒤:
 
-`External Integration Activation & Real-Account E2E Acceptance` (Admin bootstrap 완료, Discord
-자동 동기화 자격 증명 등록 여부 확인, 4개 언어 실사용 확인) → 이후 i18n 화면 번역 확장 마무리 → 필요
-시 `Post-Sprint UX / SEO / Production Readiness QA`.
+`i18n 화면 번역 확장 마무리`(프로필/Discord/Wiki/Admin/순위 배지) → `Discord 자동 동기화
+자격 증명 등록 여부 확인` → 필요 시 `Post-Sprint UX / SEO / Production Readiness QA`.
 
 시작 시 `git log`, `git status`, 이 문서의 "완료" 섹션으로 현재 상태를 재확인한 뒤 처음부터 다시
 설계하지 말고 이어서 진행하세요.

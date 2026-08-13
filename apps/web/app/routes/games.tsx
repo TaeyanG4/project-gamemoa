@@ -6,6 +6,7 @@ import { GameCard } from "../components/ui/GameCard";
 import { CategoryChips } from "../components/ui/CategoryChips";
 import { usePersonalization } from "../features/personalization";
 import { useAuth } from "../features/auth";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
@@ -24,6 +25,7 @@ export default function Games() {
 
   const { favoriteGameIds } = usePersonalization();
   const { isAuthenticated, openLoginModal } = useAuth();
+  const { dict } = useI18n();
 
   const handleSelectCategory = (categoryId: string) => {
     if (categoryId === "favorites" && !isAuthenticated) {
@@ -58,11 +60,12 @@ export default function Games() {
         <div>
           <div className="flex items-center gap-2 text-brand font-bold text-xs uppercase tracking-wider mb-1">
             <Gamepad2 className="w-4 h-4" />
-            <span>Game Collection</span>
+            <span>{dict.games.eyebrow}</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-text-primary">전체 미니게임</h1>
+          <h1 className="text-3xl md:text-4xl font-black text-text-primary">{dict.games.title}</h1>
           <p className="text-sm text-text-secondary mt-1">
-            총 {filteredGames.length}개의 가벼운 미니게임이 준비되어 있습니다.
+            {filteredGames.length}
+            {dict.games.countSuffix}
           </p>
         </div>
 
@@ -73,7 +76,7 @@ export default function Games() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="게임 검색..."
+            placeholder={dict.games.searchPlaceholder}
             className="w-full bg-surface-raised text-text-primary placeholder:text-text-muted text-sm rounded-xl pl-10 pr-4 py-2.5 border border-border/80 focus:outline-none focus:border-brand transition-all"
           />
         </div>
@@ -90,9 +93,7 @@ export default function Games() {
 
         {filteredGames.length === 0 && (
           <div className="col-span-full py-20 text-center text-text-muted bg-surface-raised rounded-3xl border border-border border-dashed">
-            {selectedCategory === "favorites"
-              ? "아직 즐겨찾기한 게임이 없습니다."
-              : "검색 결과와 일치하는 게임이 없습니다."}
+            {selectedCategory === "favorites" ? dict.games.emptyFavorites : dict.games.emptySearch}
           </div>
         )}
       </div>

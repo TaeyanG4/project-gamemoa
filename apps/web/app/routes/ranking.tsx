@@ -9,6 +9,7 @@ import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@gam
 import { levelForTotalXp } from "@gamemoa/core";
 
 import { gameManifests } from "../features/catalog/registry";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
@@ -21,6 +22,7 @@ type MainTab = "game" | "xp" | "creator";
 type LeaderboardState = "loading" | "success" | "error";
 
 export default function Ranking() {
+  const { dict } = useI18n();
   const [mainTab, setMainTab] = useState<MainTab>("game");
 
   // Game Score Ranking state
@@ -61,10 +63,10 @@ export default function Ranking() {
       setStatus("success");
     } catch (err) {
       console.error("Failed to load leaderboard:", err);
-      setErrorMsg("랭킹 정보를 불러오지 못했습니다.");
+      setErrorMsg(dict.common.error);
       setStatus("error");
     }
-  }, [mainTab, selectedGameId, creatorMode, selectedPlatform]);
+  }, [mainTab, selectedGameId, creatorMode, selectedPlatform, dict.common.error]);
 
   useEffect(() => {
     void loadData();
@@ -77,12 +79,12 @@ export default function Ranking() {
         <div>
           <div className="flex items-center gap-2 text-accent-yellow font-bold text-xs uppercase tracking-wider mb-1">
             <Trophy className="w-4 h-4" />
-            <span>Leaderboard & Community Hall of Fame</span>
+            <span>{dict.ranking.eyebrow}</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-text-primary">명예의 전당</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            최고 기록, 유저 활동 레벨, 그리고 검증된 스트리머 랭킹입니다.
-          </p>
+          <h1 className="text-3xl md:text-4xl font-black text-text-primary">
+            {dict.ranking.title}
+          </h1>
+          <p className="text-sm text-text-secondary mt-1">{dict.ranking.subtitle}</p>
         </div>
 
         {/* Top-Level Mode Tabs */}
@@ -96,7 +98,7 @@ export default function Ranking() {
             }`}
           >
             <Gamepad2 className="w-4 h-4" />
-            <span>게임 랭킹</span>
+            <span>{dict.ranking.gameTab}</span>
           </button>
 
           <button
@@ -108,7 +110,7 @@ export default function Ranking() {
             }`}
           >
             <Zap className="w-4 h-4 text-accent-yellow" />
-            <span>경험치 랭킹</span>
+            <span>{dict.ranking.xpTab}</span>
           </button>
 
           <button
@@ -120,7 +122,7 @@ export default function Ranking() {
             }`}
           >
             <Video className="w-4 h-4 text-purple-300" />
-            <span>스트리머 랭킹</span>
+            <span>{dict.ranking.creatorTab}</span>
           </button>
         </div>
       </div>
@@ -136,7 +138,7 @@ export default function Ranking() {
                 : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary"
             }`}
           >
-            🏆 전체 종목
+            🏆 {dict.ranking.allCategories}
           </button>
 
           {gameManifests.map((game) => (
@@ -162,7 +164,7 @@ export default function Ranking() {
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
               {(
                 [
-                  { id: "ALL", label: "전체 플랫폼" },
+                  { id: "ALL", label: dict.ranking.allPlatforms },
                   { id: "YOUTUBE", label: "YouTube" },
                   { id: "CHZZK", label: "치지직 (CHZZK)" },
                   { id: "SOOP", label: "SOOP (아프리카)" },
@@ -198,7 +200,7 @@ export default function Ranking() {
                     : "text-text-muted hover:text-text-primary"
                 }`}
               >
-                🎮 게임 점수
+                🎮 {dict.ranking.scoreMode}
               </button>
               <button
                 onClick={() => setCreatorMode("xp")}
@@ -208,7 +210,7 @@ export default function Ranking() {
                     : "text-text-muted hover:text-text-primary"
                 }`}
               >
-                ⚡ 경험치 (XP)
+                ⚡ {dict.ranking.xpMode}
               </button>
             </div>
           </div>
@@ -224,7 +226,7 @@ export default function Ranking() {
                     : "bg-surface-raised text-text-muted border-border/60 hover:text-text-primary"
                 }`}
               >
-                전체 종목
+                {dict.ranking.allCategories}
               </button>
               {gameManifests.map((game) => (
                 <button
@@ -250,28 +252,32 @@ export default function Ranking() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-sidebar border-b border-border text-xs font-extrabold text-text-muted uppercase tracking-wider">
-                <th className="py-4 px-6">순위</th>
-                <th className="py-4 px-6">{mainTab === "creator" ? "스트리머" : "플레이어"}</th>
+                <th className="py-4 px-6">{dict.ranking.rankHeader}</th>
+                <th className="py-4 px-6">
+                  {mainTab === "creator" ? dict.ranking.streamerHeader : dict.ranking.playerHeader}
+                </th>
                 {mainTab === "game" && (
                   <>
-                    <th className="py-4 px-6">종목</th>
-                    <th className="py-4 px-6">기록</th>
-                    <th className="py-4 px-6">달성일</th>
+                    <th className="py-4 px-6">{dict.ranking.categoryHeader}</th>
+                    <th className="py-4 px-6">{dict.ranking.recordHeader}</th>
+                    <th className="py-4 px-6">{dict.ranking.dateHeader}</th>
                   </>
                 )}
                 {mainTab === "xp" && (
                   <>
-                    <th className="py-4 px-6">레벨</th>
-                    <th className="py-4 px-6">총 경험치</th>
+                    <th className="py-4 px-6">{dict.ranking.levelHeader}</th>
+                    <th className="py-4 px-6">{dict.ranking.totalXpHeader}</th>
                   </>
                 )}
                 {mainTab === "creator" && (
                   <>
                     <th className="py-4 px-6">
-                      {creatorMode === "score" ? "기록 / 종목" : "활동 레벨 (XP)"}
+                      {creatorMode === "score"
+                        ? dict.ranking.recordOrCategory
+                        : dict.ranking.activityLevel}
                     </th>
-                    <th className="py-4 px-6">뱃지</th>
-                    <th className="py-4 px-6 text-right">플랫폼</th>
+                    <th className="py-4 px-6">{dict.ranking.badgeHeader}</th>
+                    <th className="py-4 px-6 text-right">{dict.ranking.platformHeader}</th>
                   </>
                 )}
               </tr>
@@ -280,7 +286,7 @@ export default function Ranking() {
               {status === "loading" && (
                 <tr>
                   <td colSpan={6} className="py-16 text-center text-text-muted animate-pulse">
-                    랭킹 정보를 불러오는 중...
+                    {dict.common.loading}
                   </td>
                 </tr>
               )}
@@ -296,7 +302,7 @@ export default function Ranking() {
                         className="inline-flex items-center gap-2 px-4 py-2 bg-surface-raised border border-border rounded-xl text-xs font-bold hover:bg-surface-overlay transition-colors cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
-                        다시 시도
+                        {dict.ranking.retryButton}
                       </button>
                     </div>
                   </td>
@@ -309,7 +315,7 @@ export default function Ranking() {
                   {gameRecords.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="py-16 text-center text-text-muted">
-                        아직 등록된 기록이 없습니다. 첫 기록의 주인공이 되어보세요.
+                        {dict.ranking.emptyGames}
                       </td>
                     </tr>
                   ) : (
@@ -381,7 +387,7 @@ export default function Ranking() {
                   {xpRecords.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="py-16 text-center text-text-muted">
-                        아직 활동 내역이 있는 유저가 없습니다.
+                        {dict.ranking.emptyXp}
                       </td>
                     </tr>
                   ) : (
@@ -450,11 +456,10 @@ export default function Ranking() {
                       <td colSpan={5} className="py-16 text-center space-y-3">
                         <div className="text-3xl">🎥</div>
                         <p className="text-sm font-semibold text-text-secondary">
-                          아직 검증된 스트리머 기록이 없습니다
+                          {dict.ranking.emptyCreatorTitle}
                         </p>
                         <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">
-                          GAMEMOA 크리에이터 채널 소유권 인증 서비스가 준비 중입니다. 인증된
-                          크리에이터의 게임 최고 기록과 활동 XP가 여기에 게시됩니다.
+                          {dict.ranking.emptyCreatorBody}
                         </p>
                       </td>
                     </tr>
