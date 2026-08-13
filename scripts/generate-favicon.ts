@@ -9,20 +9,17 @@ import { Buffer } from "node:buffer";
 // Canonical source: apps/web/public/favicon.svg (hand-authored).
 // This script rasterises the SAME design — OwOGG's brand mark, the literal
 // word "OwO" (two round "O"s + a "w" built from the same line-art convention
-// as Lucide icons) tilted diagonally, no background tile — into transparent
-// PNG / ICO fallbacks and writes a web manifest. No external
-// image-processing/SVG-rasterisation dependency is required: PNGs are
-// encoded with the built-in zlib + a hand-written CRC32; pixels are produced
-// by supersampling a distance-to-stroke test against the letterform's shapes
-// (circles tested exactly — distance to center vs. radius; the "w"'s
-// straight segments via distanceToSegment), with the whole letterform
-// rotated by a fixed angle before the distance test so every downstream
-// primitive (AABBs, distance functions) just works in already-rotated
-// coordinates. Stroke color is the same brand gradient the old background
-// tile used (bg-gradient-to-tr from-brand to-accent-purple), now painted
-// along the letters themselves instead of behind them; everything else is
-// fully transparent (alpha 0), composited with premultiplied-alpha
-// supersampling to avoid dark fringing at the stroke edges.
+// as Lucide icons) tilted diagonally, stroked in white on a brand-gradient
+// rounded hub (bg-gradient-to-tr from-brand to-accent-purple), the same
+// background treatment the original gamemoa icon used — into PNG / ICO
+// fallbacks and writes a web manifest. No external image-processing/SVG-
+// rasterisation dependency is required: PNGs are encoded with the built-in
+// zlib + a hand-written CRC32; pixels are produced by supersampling a
+// distance-to-stroke test against the letterform's shapes (circles tested
+// exactly — distance to center vs. radius; the "w"'s straight segments via
+// distanceToSegment), with the whole letterform rotated by a fixed angle
+// before the distance test so every downstream primitive (AABBs, distance
+// functions) just works in already-rotated coordinates.
 // ---------------------------------------------------------------------------
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -32,7 +29,9 @@ const SVG_PATH = resolve(OUT_DIR, "favicon.svg");
 // Brand palette (must match favicon.svg and apps/web/app/app.css)
 const BRAND = [99, 102, 241] as const; // --color-brand #6366f1
 const ACCENT_PURPLE = [168, 85, 247] as const; // --color-accent-purple #a855f7
+const ICON_WHITE = [255, 255, 255] as const; // matches Header's text-white
 const VIEWBOX = 512;
+const BG_RX = 112; // rounded-square background corner radius, in canvas units
 
 // ---------------------------------------------------------------------------
 // OwOGG's brand mark — the word "OwO" as three letterforms in a row, each
@@ -104,9 +103,9 @@ const ICON_BBOX = {
     ...ROTATED_W_LINES.flatMap((l) => [l.a[1], l.b[1]]),
   ),
 };
-// Fit the rotated letterform into the 512 canvas, centered, filling most of
-// the frame now that there's no background tile framing it.
-const ICON_SCALE = 460 / (ICON_BBOX.x1 - ICON_BBOX.x0);
+// Fit the rotated letterform into the 512 canvas, centered, with margins
+// matching the header badge's visual proportions against its background tile.
+const ICON_SCALE = 320 / (ICON_BBOX.x1 - ICON_BBOX.x0);
 const ICON_CENTER: IconPoint = [
   (ICON_BBOX.x0 + ICON_BBOX.x1) / 2,
   (ICON_BBOX.y0 + ICON_BBOX.y1) / 2,
@@ -193,53 +192,68 @@ function lerp(
   ] as const;
 }
 
-/** RGBA at a canvas pixel: opaque brand-gradient color on the stroke, fully transparent
- * everywhere else (no background tile). The gradient is keyed to canvas position — the same
- * bg-gradient-to-tr direction the old background tile used — so the stroke itself carries the
- * brand gradient now that nothing sits behind it. */
-function colorAt(px: number, py: number): readonly [number, number, number, number] {
-  if (px < ICON_AABB.minX || px > ICON_AABB.maxX || py < ICON_AABB.minY || py > ICON_AABB.maxY) {
-    return [0, 0, 0, 0];
-  }
+/** Whether a canvas point falls inside the rounded-square background. Standard rounded-rect
+ * point test: clamp the point onto the "inner core rect" (whose corners are the arc centers),
+ * then check the distance from that clamped point against the radius — correct for both the
+ * flat edges and the corner arcs, for any point within the canvas. Keeps the PNG faithful to
+ * favicon.svg's `rx="112"` rounded rect instead of a hard square. */
+function insideRoundedSquare(px: number, py: number): boolean {
+  const rx = BG_RX;
+  const cx = Math.min(Math.max(px, rx), VIEWBOX - rx);
+  const cy = Math.min(Math.max(py, rx), VIEWBOX - rx);
+  const dx = px - cx;
+  const dy = py - cy;
+  return dx * dx + dy * dy <= rx * rx;
+}
 
+function colorAt(px: number, py: number): readonly [number, number, number] {
+  // bg-gradient-to-tr: bottom-left (brand) -> top-right (accent-purple).
   const t = Math.min(1, Math.max(0, (px + (VIEWBOX - py)) / (VIEWBOX * 2)));
-  const strokeColor = lerp(BRAND, ACCENT_PURPLE, t);
+  const bg = lerp(BRAND, ACCENT_PURPLE, t);
 
-  for (const circle of CANVAS_CIRCLES) {
-    if (px < circle.minX || px > circle.maxX || py < circle.minY || py > circle.maxY) continue;
-    if (distanceToCircleOutline(px, py, circle.cx, circle.cy, circle.r) <= STROKE_HALF_WIDTH) {
-      return [...strokeColor, 255];
+  // Whole-icon AABB reject — skips the shape loop entirely for the majority of pixels (pure
+  // background), which is the bulk of the win.
+  if (
+    px >= ICON_AABB.minX &&
+    px <= ICON_AABB.maxX &&
+    py >= ICON_AABB.minY &&
+    py <= ICON_AABB.maxY
+  ) {
+    for (const circle of CANVAS_CIRCLES) {
+      if (px < circle.minX || px > circle.maxX || py < circle.minY || py > circle.maxY) continue;
+      if (distanceToCircleOutline(px, py, circle.cx, circle.cy, circle.r) <= STROKE_HALF_WIDTH) {
+        return ICON_WHITE;
+      }
+    }
+    for (const seg of CANVAS_LINES) {
+      if (px < seg.minX || px > seg.maxX || py < seg.minY || py > seg.maxY) continue;
+      if (distanceToSegment(px, py, seg.a, seg.b) <= STROKE_HALF_WIDTH) {
+        return ICON_WHITE;
+      }
     }
   }
-
-  for (const seg of CANVAS_LINES) {
-    if (px < seg.minX || px > seg.maxX || py < seg.minY || py > seg.maxY) continue;
-    if (distanceToSegment(px, py, seg.a, seg.b) <= STROKE_HALF_WIDTH) {
-      return [...strokeColor, 255];
-    }
-  }
-  return [0, 0, 0, 0];
+  return bg;
 }
 
 function rasterize(size: number, ss = 4): Buffer {
   const pixels = Buffer.alloc(size * size * 4);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      // Premultiplied-alpha accumulation: color is weighted by its own sample's alpha before
-      // summing, so fully-transparent samples don't drag opaque-edge pixels toward black —
-      // avoiding a dark halo around the stroke where supersamples straddle the edge.
-      let ra = 0;
-      let ga = 0;
-      let ba = 0;
+      let r = 0;
+      let g = 0;
+      let b = 0;
       let aSum = 0;
       const sample = (yy: number, xx: number) => {
         const px = (xx / size) * VIEWBOX;
         const py = (yy / size) * VIEWBOX;
-        const [r, g, b, a] = colorAt(px, py);
-        ra += r * a;
-        ga += g * a;
-        ba += b * a;
-        aSum += a;
+        const inside = insideRoundedSquare(px, py);
+        if (inside) {
+          const c = colorAt(px, py);
+          r += c[0];
+          g += c[1];
+          b += c[2];
+          aSum += 255;
+        }
       };
       let count = 0;
       for (let sy = 0; sy < ss; sy++) {
@@ -250,11 +264,11 @@ function rasterize(size: number, ss = 4): Buffer {
       }
       const idx = (y * size + x) * 4;
       if (aSum > 0) {
-        pixels[idx] = Math.round(ra / aSum);
-        pixels[idx + 1] = Math.round(ga / aSum);
-        pixels[idx + 2] = Math.round(ba / aSum);
+        pixels[idx] = Math.round(r / (aSum / 255));
+        pixels[idx + 1] = Math.round(g / (aSum / 255));
+        pixels[idx + 2] = Math.round(b / (aSum / 255));
       }
-      pixels[idx + 3] = Math.round(aSum / count); // average alpha (each sample is 0 or 255)
+      pixels[idx + 3] = Math.round(aSum / count);
     }
   }
   return encodePng(size, size, pixels);
