@@ -60,6 +60,7 @@ const MANUAL_REVIEW_SELECT = `
     cpa.verification_status AS review_verification_status,
     cpa.verified_at AS review_verified_at,
     cpa.audience_count AS review_audience_count,
+    cpa.audience_count_known AS review_audience_count_known,
     cpa.channel_created_at AS review_channel_created_at,
     cpa.metrics_synced_at AS review_metrics_synced_at,
     cpa.created_at AS review_account_created_at,
@@ -89,10 +90,11 @@ function mapManualReviewRow(row: Record<string, unknown>): CreatorManualReviewIt
       avatarUrl: row.review_avatar_url ? String(row.review_avatar_url) : null,
       verificationStatus: String(row.review_verification_status),
       verifiedAt: row.review_verified_at ? String(row.review_verified_at) : null,
+      // audience_count_known distinguishes "official API confirmed zero" from "never obtained".
       audienceCount:
-        row.review_audience_count !== null && row.review_audience_count !== undefined
-          ? Number(row.review_audience_count)
-          : 0,
+        Number(row.review_audience_count_known) === 1
+          ? Number(row.review_audience_count ?? 0)
+          : null,
       channelCreatedAt: row.review_channel_created_at
         ? String(row.review_channel_created_at)
         : null,

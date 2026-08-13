@@ -20,7 +20,8 @@ export const CreatorPlatformAccountDtoSchema = z.object({
   avatarUrl: z.string().nullable(),
   verificationStatus: z.string(),
   verifiedAt: z.string().nullable(),
-  audienceCount: z.number(),
+  /** null = 공식 API로 확인되지 않은 미지(UNKNOWN) 값. 0은 공식 API가 확정한 실제 0명. */
+  audienceCount: z.number().nullable(),
   channelCreatedAt: z.string().nullable(),
   metricsSyncedAt: z.string().nullable(),
   createdAt: z.string(),

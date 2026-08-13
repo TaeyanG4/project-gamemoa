@@ -96,7 +96,12 @@ export class YouTubeCreatorProvider implements CreatorProviderAdapter {
     const title = item.snippet?.title || "YouTube Channel";
     const customUrl = item.snippet?.customUrl || null;
     const avatarUrl = item.snippet?.thumbnails?.default?.url || null;
-    const subCount = item.statistics?.subscriberCount ? Number(item.statistics.subscriberCount) : 0;
+    // YouTube omits `statistics.subscriberCount` entirely when the channel owner hides its
+    // subscriber count — that must be persisted as UNKNOWN, never coerced to a known zero.
+    const subCount =
+      item.statistics?.subscriberCount !== undefined
+        ? Number(item.statistics.subscriberCount)
+        : undefined;
 
     const result: CreatorChannelInfo = {
       platform: "YOUTUBE",
@@ -107,7 +112,7 @@ export class YouTubeCreatorProvider implements CreatorProviderAdapter {
         ? `https://www.youtube.com/${customUrl}`
         : `https://www.youtube.com/channel/${channelId}`,
       avatarUrl,
-      audienceCount: subCount,
+      ...(subCount !== undefined && !Number.isNaN(subCount) ? { audienceCount: subCount } : {}),
     };
 
     if (item.snippet?.publishedAt) {

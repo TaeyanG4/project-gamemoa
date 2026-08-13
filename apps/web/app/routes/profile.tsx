@@ -866,15 +866,16 @@ export default function ProfilePage() {
                         <p className="text-[10px] text-text-muted">
                           ✓ GAMEMOA가 해당 사용자의 채널 소유권을 공식 API로 확인했습니다.
                         </p>
-                        {verifiedAcc.audienceCount !== undefined &&
-                          verifiedAcc.audienceCount > 0 && (
-                            <p className="text-[10px] text-text-muted">
-                              구독자/팔로워 {verifiedAcc.audienceCount.toLocaleString()}명
-                              {verifiedAcc.metricsSyncedAt
-                                ? ` · 지표 동기화 ${verifiedAcc.metricsSyncedAt.split("T")[0]}`
-                                : ""}
-                            </p>
-                          )}
+                        {/* audienceCount === null means UNKNOWN (never obtained via official
+                            API) — never rendered as 0명; the line is simply omitted. */}
+                        {verifiedAcc.audienceCount !== null && (
+                          <p className="text-[10px] text-text-muted">
+                            구독자/팔로워 {verifiedAcc.audienceCount.toLocaleString()}명
+                            {verifiedAcc.metricsSyncedAt
+                              ? ` · 지표 동기화 ${verifiedAcc.metricsSyncedAt.split("T")[0]}`
+                              : ""}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <div className="flex items-center justify-between gap-2 mt-1">

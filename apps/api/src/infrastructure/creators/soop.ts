@@ -84,7 +84,10 @@ export class SoopCreatorProvider implements CreatorProviderAdapter {
       channelHandle: `@${userId}`,
       channelUrl: `https://www.sooplive.co.kr/${userId}`,
       avatarUrl: userData.profile_image || null,
-      audienceCount: userData.fan_count || 0,
+      // Absent/non-numeric fan_count must persist as UNKNOWN, not a known zero.
+      ...(typeof userData.fan_count === "number" && !Number.isNaN(userData.fan_count)
+        ? { audienceCount: userData.fan_count }
+        : {}),
     };
   }
 

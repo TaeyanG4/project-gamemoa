@@ -89,7 +89,10 @@ export class ChzzkCreatorProvider implements CreatorProviderAdapter {
       channelHandle: null,
       channelUrl: `https://chzzk.naver.com/${channelId}`,
       avatarUrl: content.channelImageUrl || null,
-      audienceCount: content.followerCount || 0,
+      // Absent/non-numeric followerCount must persist as UNKNOWN, not a known zero.
+      ...(typeof content.followerCount === "number" && !Number.isNaN(content.followerCount)
+        ? { audienceCount: content.followerCount }
+        : {}),
     };
   }
 

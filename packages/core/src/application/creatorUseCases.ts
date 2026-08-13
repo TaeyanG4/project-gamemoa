@@ -219,7 +219,9 @@ export class CreatorUseCases {
       status: "VERIFIED",
     });
 
-    // 3. Upsert platform account for this creator with canonical ID
+    // 3. Upsert platform account for this creator with canonical ID.
+    // Absent audienceCount in the provider snapshot = UNKNOWN, never a known zero — the
+    // property is omitted entirely rather than passed as `undefined` (exactOptionalPropertyTypes).
     const platformAccount = await this.creatorRepo.upsertPlatformAccount({
       creatorId: profile.id,
       platform: channelInfo.platform,
@@ -229,7 +231,9 @@ export class CreatorUseCases {
       channelUrl: channelInfo.channelUrl,
       avatarUrl: channelInfo.avatarUrl,
       verificationStatus: "VERIFIED",
-      audienceCount: channelInfo.audienceCount ?? 0,
+      ...(channelInfo.audienceCount !== undefined
+        ? { audienceCount: channelInfo.audienceCount }
+        : {}),
       channelCreatedAt: channelInfo.channelCreatedAt ?? null,
     });
 

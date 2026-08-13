@@ -22,6 +22,7 @@ function createAdminDb(options: { userId: number; verified?: boolean } = { userI
     verification_status: verified ? "VERIFIED" : "PENDING",
     verified_at: verified ? "2026-01-01T00:00:00.000Z" : null,
     audience_count: 11500,
+    audience_count_known: 1,
     channel_created_at: "2024-01-01T00:00:00.000Z",
     metrics_synced_at: "2026-08-01T00:00:00.000Z",
     created_at: "2026-01-01T00:00:00.000Z",
@@ -73,6 +74,7 @@ function createAdminDb(options: { userId: number; verified?: boolean } = { userI
     review_verification_status: accountRow.verification_status,
     review_verified_at: accountRow.verified_at,
     review_audience_count: accountRow.audience_count,
+    review_audience_count_known: accountRow.audience_count_known,
     review_channel_created_at: accountRow.channel_created_at,
     review_metrics_synced_at: accountRow.metrics_synced_at,
     review_account_created_at: accountRow.created_at,
@@ -211,7 +213,7 @@ test("manual approval — requires verified ownership and explicit reason", asyn
       },
       body: JSON.stringify({ action: "APPROVE_FEATURED", reason: "" }),
     },
-    { DB: unverified.db, ADMIN_USER_IDS: "1" } as any,
+    { DB: unverified.db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
   );
   assert.equal(missingReason.status, 400);
 
@@ -226,7 +228,7 @@ test("manual approval — requires verified ownership and explicit reason", asyn
       },
       body: JSON.stringify({ action: "APPROVE_FEATURED", reason: "소유권 확인 필요" }),
     },
-    { DB: unverified.db, ADMIN_USER_IDS: "1" } as any,
+    { DB: unverified.db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
   );
   assert.equal(rejectedApproval.status, 409);
   assert.equal(unverified.state.batchCount, 0);
@@ -249,6 +251,7 @@ test("manual approval — transitions once, creates audit row, and replay is saf
   const first = await app.request("/api/admin/creators/reviews/21/action", request, {
     DB: mock.db,
     ADMIN_USER_IDS: "1",
+    FRONTEND_URL: "http://localhost:5173",
   } as any);
   assert.equal(first.status, 200);
   assert.equal((await first.json()).applied, true);
@@ -257,6 +260,7 @@ test("manual approval — transitions once, creates audit row, and replay is saf
   const replay = await app.request("/api/admin/creators/reviews/21/action", request, {
     DB: mock.db,
     ADMIN_USER_IDS: "1",
+    FRONTEND_URL: "http://localhost:5173",
   } as any);
   assert.equal(replay.status, 200);
   assert.equal((await replay.json()).applied, false);
@@ -279,7 +283,7 @@ test("manual rejection — transitions manual review to NOT_ELIGIBLE", async () 
         reason: "최소 유지 기준을 충족하지 못했습니다.",
       }),
     },
-    { DB: mock.db, ADMIN_USER_IDS: "1" } as any,
+    { DB: mock.db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
   );
   assert.equal(res.status, 200);
   const body = (await res.json()) as { applied: boolean; newStatus: string };

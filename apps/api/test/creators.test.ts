@@ -208,6 +208,7 @@ test("GET /api/creators/me returns featuredReview and platform account metrics w
                         verification_status: "VERIFIED",
                         verified_at: new Date().toISOString(),
                         audience_count: 25000,
+                        audience_count_known: 1,
                         channel_created_at: "2023-01-01T00:00:00.000Z",
                         metrics_synced_at: new Date().toISOString(),
                         created_at: new Date().toISOString(),

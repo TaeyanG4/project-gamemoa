@@ -474,7 +474,8 @@ export interface CreatorPlatformAccount {
   avatarUrl: string | null;
   verificationStatus: string;
   verifiedAt: string | null;
-  audienceCount?: number;
+  /** null = UNKNOWN (official value never obtained/confirmed), not "zero". */
+  audienceCount: number | null;
   channelCreatedAt?: string | null;
   metricsSyncedAt?: string | null;
   createdAt: string;

@@ -180,7 +180,11 @@ export default function AdminCreatorsRoute() {
                       />
                       <DataPoint
                         label="구독자/팔로워"
-                        value={`${(item.platformAccount.audienceCount ?? 0).toLocaleString()}명`}
+                        value={
+                          item.platformAccount.audienceCount === null
+                            ? "확인 불가"
+                            : `${item.platformAccount.audienceCount.toLocaleString()}명`
+                        }
                       />
                       <DataPoint
                         label="채널 생성일"
