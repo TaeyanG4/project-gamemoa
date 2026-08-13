@@ -7,15 +7,17 @@ import { Buffer } from "node:buffer";
 // OwOGG favicon generator — deterministic, dependency-free.
 //
 // Canonical source: apps/web/public/favicon.svg (hand-authored).
-// This script rasterises the SAME design — lucide-react's actual Gamepad2 icon
-// path data (the exact icon live-rendered by Header/Sidebar/Footer, not an
+// This script rasterises the SAME design — OwOGG's brand mark, an "OwO" face
+// (two round eyes + a "w" mouth) drawn in Lucide's line-art convention (the
+// exact shape live-rendered by Header/Footer's <OwoFaceIcon>, not an
 // approximation of it) stroked in white on a brand-gradient rounded hub
 // (bg-gradient-to-tr from-brand to-accent-purple) — into PNG / ICO fallbacks and
 // writes a web manifest. No external image-processing/SVG-rasterisation
 // dependency is required: PNGs are encoded with the built-in zlib + a
 // hand-written CRC32; pixels are produced by supersampling a distance-to-stroke
-// test against the icon's path flattened into line segments (cubic Béziers and
-// arcs subdivided analytically — see flattenCubic/flattenArc below).
+// test against the icon's shapes — circles tested exactly (distance to center
+// vs. radius), the mouth's straight segments flattened directly (see
+// distanceToSegment/distanceToCircleOutline below).
 // ---------------------------------------------------------------------------
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -30,167 +32,44 @@ const VIEWBOX = 512;
 const BG_RX = 112;
 
 // ---------------------------------------------------------------------------
-// lucide-react's Gamepad2 icon, transcribed exactly from
-// node_modules/lucide-react/dist/esm/icons/gamepad-2.js (24x24 viewBox,
-// stroke-width 2, fill: none — every Lucide icon is line art, never filled).
-// Body outline path — M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101
-// -.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414
-// -1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3
-// 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0
-// 0 17.32 5z — plus 4 <line> elements (D-pad cross, two round-capped "dot"
-// buttons). Resolved to absolute coordinates below so this generator never
-// needs a general SVG path parser for a shape this static.
+// OwOGG's brand mark, transcribed exactly from
+// apps/web/app/components/ui/OwoFaceIcon.tsx (24x24 viewBox, stroke-width 2,
+// fill: none, round caps/joins — Lucide's own line-art convention). Two round
+// eyes (<circle cx="7" cy="10" r="4"/>, <circle cx="17" cy="10" r="4"/>) and a
+// "w" mouth (<path d="M8 16l2 3 2-3 2 3 2-3"/>, four straight segments).
 // ---------------------------------------------------------------------------
 type IconPoint = readonly [number, number];
-type IconSegment =
-  | { kind: "line"; from: IconPoint; to: IconPoint }
-  | { kind: "cubic"; from: IconPoint; c1: IconPoint; c2: IconPoint; to: IconPoint }
-  | {
-      kind: "arc";
-      from: IconPoint;
-      rx: number;
-      ry: number;
-      largeArc: 0 | 1;
-      sweep: 0 | 1;
-      to: IconPoint;
-    };
+type IconSegment = { kind: "line"; from: IconPoint; to: IconPoint };
+type IconCircle = { cx: number; cy: number; r: number };
 
-const BODY_OUTLINE: IconSegment[] = [
-  { kind: "line", from: [17.32, 5], to: [6.68, 5] },
-  { kind: "arc", from: [6.68, 5], rx: 4, ry: 4, largeArc: 0, sweep: 0, to: [2.702, 8.59] },
-  {
-    kind: "cubic",
-    from: [2.702, 8.59],
-    c1: [2.696, 8.642],
-    c2: [2.692, 8.691],
-    to: [2.685, 8.742],
-  },
-  { kind: "cubic", from: [2.685, 8.742], c1: [2.604, 9.416], c2: [2, 14.456], to: [2, 16] },
-  { kind: "arc", from: [2, 16], rx: 3, ry: 3, largeArc: 0, sweep: 0, to: [5, 19] },
-  { kind: "cubic", from: [5, 19], c1: [6, 19], c2: [6.5, 18.5], to: [7, 18] },
-  { kind: "line", from: [7, 18], to: [8.414, 16.586] },
-  { kind: "arc", from: [8.414, 16.586], rx: 2, ry: 2, largeArc: 0, sweep: 1, to: [9.828, 16] },
-  { kind: "line", from: [9.828, 16], to: [14.172, 16] },
-  { kind: "arc", from: [14.172, 16], rx: 2, ry: 2, largeArc: 0, sweep: 1, to: [15.586, 16.586] },
-  { kind: "line", from: [15.586, 16.586], to: [17, 18] },
-  { kind: "cubic", from: [17, 18], c1: [17.5, 18.5], c2: [18, 19], to: [19, 19] },
-  { kind: "arc", from: [19, 19], rx: 3, ry: 3, largeArc: 0, sweep: 0, to: [22, 16] },
-  {
-    kind: "cubic",
-    from: [22, 16],
-    c1: [22, 14.455],
-    c2: [21.396, 9.416],
-    to: [21.315, 8.742],
-  },
-  {
-    kind: "cubic",
-    from: [21.315, 8.742],
-    c1: [21.308, 8.692],
-    c2: [21.304, 8.642],
-    to: [21.298, 8.591],
-  },
-  { kind: "arc", from: [21.298, 8.591], rx: 4, ry: 4, largeArc: 0, sweep: 0, to: [17.32, 5] },
+const EYE_CIRCLES: IconCircle[] = [
+  { cx: 7, cy: 10, r: 4 },
+  { cx: 17, cy: 10, r: 4 },
 ];
 
-const DECORATION_LINES: IconSegment[] = [
-  { kind: "line", from: [6, 11], to: [10, 11] }, // D-pad horizontal bar
-  { kind: "line", from: [8, 9], to: [8, 13] }, // D-pad vertical bar
-  { kind: "line", from: [15, 12], to: [15.01, 12] }, // face button (round-capped dot)
-  { kind: "line", from: [18, 10], to: [18.01, 10] }, // face button (round-capped dot)
+// "M8 16l2 3 2-3 2 3 2-3" as four absolute line segments.
+const MOUTH_LINES: IconSegment[] = [
+  { kind: "line", from: [8, 16], to: [10, 19] },
+  { kind: "line", from: [10, 19], to: [12, 16] },
+  { kind: "line", from: [12, 16], to: [14, 19] },
+  { kind: "line", from: [14, 19], to: [16, 16] },
 ];
 
-const ICON_STROKE_WIDTH = 2; // lucide-react default stroke-width, in 24x24 icon units
+const ICON_STROKE_WIDTH = 2; // OwoFaceIcon's stroke-width, in 24x24 icon units
 
-/** Cubic Bézier flattened by direct parametric sampling (De Casteljau-equivalent). */
-function flattenCubic(from: IconPoint, c1: IconPoint, c2: IconPoint, to: IconPoint, n: number) {
-  const pts: IconPoint[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = i / n;
-    const mt = 1 - t;
-    const x =
-      mt * mt * mt * from[0] + 3 * mt * mt * t * c1[0] + 3 * mt * t * t * c2[0] + t * t * t * to[0];
-    const y =
-      mt * mt * mt * from[1] + 3 * mt * mt * t * c1[1] + 3 * mt * t * t * c2[1] + t * t * t * to[1];
-    pts.push([x, y]);
-  }
-  return pts;
-}
-
-/** SVG elliptical-arc-to-points, per the SVG 1.1 spec's endpoint-to-center conversion
- * (Appendix F.6). Simplified for x-axis-rotation = 0, which covers every arc in this
- * icon — the only rotation value it ever uses. */
-function flattenArc(
-  from: IconPoint,
-  rx: number,
-  ry: number,
-  largeArc: 0 | 1,
-  sweep: 0 | 1,
-  to: IconPoint,
-  n: number,
-) {
-  const [x1, y1] = from;
-  const [x2, y2] = to;
-  const dx2 = (x1 - x2) / 2;
-  const dy2 = (y1 - y2) / 2;
-  let rxAdj = rx;
-  let ryAdj = ry;
-  const lambda = (dx2 * dx2) / (rx * rx) + (dy2 * dy2) / (ry * ry);
-  if (lambda > 1) {
-    const s = Math.sqrt(lambda);
-    rxAdj = rx * s;
-    ryAdj = ry * s;
-  }
-  const sign = largeArc !== sweep ? 1 : -1;
-  const num = rxAdj * rxAdj * ryAdj * ryAdj - rxAdj * rxAdj * dy2 * dy2 - ryAdj * ryAdj * dx2 * dx2;
-  const den = rxAdj * rxAdj * dy2 * dy2 + ryAdj * ryAdj * dx2 * dx2;
-  const co = sign * Math.sqrt(Math.max(0, num / den));
-  const cxp = (co * rxAdj * dy2) / ryAdj;
-  const cyp = (-co * ryAdj * dx2) / rxAdj;
-  const cx = cxp + (x1 + x2) / 2;
-  const cy = cyp + (y1 + y2) / 2;
-
-  const angle = (ux: number, uy: number, vx: number, vy: number) => {
-    const dot = ux * vx + uy * vy;
-    const len = Math.sqrt(ux * ux + uy * uy) * Math.sqrt(vx * vx + vy * vy);
-    let a = Math.acos(Math.min(1, Math.max(-1, dot / len)));
-    if (ux * vy - uy * vx < 0) a = -a;
-    return a;
-  };
-  const theta1 = angle(1, 0, (x1 - cx) / rxAdj, (y1 - cy) / ryAdj);
-  let dtheta = angle((x1 - cx) / rxAdj, (y1 - cy) / ryAdj, (x2 - cx) / rxAdj, (y2 - cy) / ryAdj);
-  if (!sweep && dtheta > 0) dtheta -= 2 * Math.PI;
-  if (sweep && dtheta < 0) dtheta += 2 * Math.PI;
-
-  const pts: IconPoint[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = theta1 + (dtheta * i) / n;
-    pts.push([cx + rxAdj * Math.cos(t), cy + ryAdj * Math.sin(t)]);
-  }
-  return pts;
-}
-
-/** Every segment of the icon (body outline + decorations), flattened to short line
- * segments in the icon's native 24x24 coordinate space. Curves are subdivided finely
- * enough that the polyline is visually indistinguishable from the true curve even at
- * 512px+ output. */
+/** Every straight segment of the icon (currently just the mouth — the eyes are perfect
+ * circles, tested exactly by distanceToCircle instead of being flattened into a polygon)
+ * in the icon's native 24x24 coordinate space. */
 function flattenIconToLines(): { a: IconPoint; b: IconPoint }[] {
-  const lines: { a: IconPoint; b: IconPoint }[] = [];
-  const addPolyline = (pts: IconPoint[]) => {
-    for (let i = 0; i < pts.length - 1; i++) lines.push({ a: pts[i]!, b: pts[i + 1]! });
-  };
-  for (const seg of [...BODY_OUTLINE, ...DECORATION_LINES]) {
-    if (seg.kind === "line") lines.push({ a: seg.from, b: seg.to });
-    else if (seg.kind === "cubic") addPolyline(flattenCubic(seg.from, seg.c1, seg.c2, seg.to, 24));
-    else addPolyline(flattenArc(seg.from, seg.rx, seg.ry, seg.largeArc, seg.sweep, seg.to, 24));
-  }
-  return lines;
+  return MOUTH_LINES.map((seg) => ({ a: seg.from, b: seg.to }));
 }
 
 const ICON_LINES = flattenIconToLines();
 
-// Fit the icon's 24x24 (bbox ~20x14) coordinate space into the 512 canvas, centered,
-// with margins matching the header badge's visual proportions (icon ~5/9 of its box).
-const ICON_BBOX = { x0: 2, y0: 5, x1: 22, y1: 19 };
+// Fit the icon's 24x24 (bbox ~18x13: eyes span x 3-21/y 6-14, mouth spans x 8-16/y 16-19)
+// coordinate space into the 512 canvas, centered, with margins matching the header badge's
+// visual proportions (icon ~5/9 of its box).
+const ICON_BBOX = { x0: 3, y0: 6, x1: 21, y1: 19 };
 const ICON_SCALE = 320 / (ICON_BBOX.x1 - ICON_BBOX.x0);
 const ICON_CENTER: IconPoint = [
   (ICON_BBOX.x0 + ICON_BBOX.x1) / 2,
@@ -206,12 +85,10 @@ function toCanvas([x, y]: IconPoint): IconPoint {
   ];
 }
 
-// Precomputed per-segment AABB (expanded by the stroke half-width) so `colorAt` — called
-// once per supersample, i.e. millions of times for the larger raster sizes — can reject
-// most segments with four comparisons instead of a sqrt. Combined with the whole-icon AABB
-// reject below, this cuts a 1024px render from minutes to well under a second: the icon
-// only covers a fraction of the canvas, and most on-icon pixels are only near 1-2 of the
-// ~130 flattened segments at a time.
+// Precomputed per-shape AABB (expanded by the stroke half-width) so `colorAt` — called once
+// per supersample, i.e. millions of times for the larger raster sizes — can reject most
+// shapes with four comparisons instead of a sqrt. Combined with the whole-icon AABB reject
+// below, this keeps even the 1024px render well under a second.
 const CANVAS_LINES = ICON_LINES.map(({ a, b }) => {
   const ca = toCanvas(a);
   const cb = toCanvas(b);
@@ -224,11 +101,24 @@ const CANVAS_LINES = ICON_LINES.map(({ a, b }) => {
     maxY: Math.max(ca[1], cb[1]) + STROKE_HALF_WIDTH,
   };
 });
+const CANVAS_CIRCLES = EYE_CIRCLES.map(({ cx, cy, r }) => {
+  const [ccx, ccy] = toCanvas([cx, cy]);
+  const cr = r * ICON_SCALE;
+  return {
+    cx: ccx,
+    cy: ccy,
+    r: cr,
+    minX: ccx - cr - STROKE_HALF_WIDTH,
+    maxX: ccx + cr + STROKE_HALF_WIDTH,
+    minY: ccy - cr - STROKE_HALF_WIDTH,
+    maxY: ccy + cr + STROKE_HALF_WIDTH,
+  };
+});
 const ICON_AABB = {
-  minX: Math.min(...CANVAS_LINES.map((l) => l.minX)),
-  maxX: Math.max(...CANVAS_LINES.map((l) => l.maxX)),
-  minY: Math.min(...CANVAS_LINES.map((l) => l.minY)),
-  maxY: Math.max(...CANVAS_LINES.map((l) => l.maxY)),
+  minX: Math.min(...CANVAS_LINES.map((l) => l.minX), ...CANVAS_CIRCLES.map((c) => c.minX)),
+  maxX: Math.max(...CANVAS_LINES.map((l) => l.maxX), ...CANVAS_CIRCLES.map((c) => c.maxX)),
+  minY: Math.min(...CANVAS_LINES.map((l) => l.minY), ...CANVAS_CIRCLES.map((c) => c.minY)),
+  maxY: Math.max(...CANVAS_LINES.map((l) => l.maxY), ...CANVAS_CIRCLES.map((c) => c.maxY)),
 };
 
 function distanceToSegment(px: number, py: number, a: IconPoint, b: IconPoint): number {
@@ -244,6 +134,15 @@ function distanceToSegment(px: number, py: number, a: IconPoint, b: IconPoint): 
   const dx = px - cx;
   const dy = py - cy;
   return Math.sqrt(dx * dx + dy * dy);
+}
+
+/** Exact distance from a point to a circle's *outline* (not its filled disc) — the eyes are
+ * stroked circles (fill="none"), so a point is "on the stroke" when its distance to the
+ * center is within STROKE_HALF_WIDTH of the radius, not merely inside the disc. */
+function distanceToCircleOutline(px: number, py: number, cx: number, cy: number, r: number) {
+  const dx = px - cx;
+  const dy = py - cy;
+  return Math.abs(Math.sqrt(dx * dx + dy * dy) - r);
 }
 
 function lerp(
@@ -267,6 +166,13 @@ function colorAt(px: number, py: number): readonly [number, number, number] {
   // (pure background), which is the bulk of the win.
   if (px < ICON_AABB.minX || px > ICON_AABB.maxX || py < ICON_AABB.minY || py > ICON_AABB.maxY) {
     return bg;
+  }
+
+  for (const circle of CANVAS_CIRCLES) {
+    if (px < circle.minX || px > circle.maxX || py < circle.minY || py > circle.maxY) continue;
+    if (distanceToCircleOutline(px, py, circle.cx, circle.cy, circle.r) <= STROKE_HALF_WIDTH) {
+      return ICON_WHITE;
+    }
   }
 
   for (const seg of CANVAS_LINES) {

@@ -1,9 +1,10 @@
 import { Link, useNavigate } from "react-router";
-import { Search, Menu, Gamepad2, Bookmark, User, Command, LogOut, Trophy } from "lucide-react";
+import { Search, Menu, Bookmark, User, Command, LogOut, Trophy } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { LanguageSelector } from "../ui/LanguageSelector";
+import { OwoFaceIcon } from "../ui/OwoFaceIcon";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -38,7 +39,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="p-2 rounded-xl bg-gradient-to-tr from-brand to-accent-purple shadow-md shadow-brand/20 group-hover:scale-105 transition-transform duration-200">
-              <Gamepad2 className="w-5 h-5 text-white" />
+              <OwoFaceIcon className="w-5 h-5 text-white" />
             </div>
             <span className="font-extrabold text-xl tracking-tight text-text-primary">
               OwO

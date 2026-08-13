@@ -1,6 +1,6 @@
 import { Link } from "react-router";
-import { Gamepad2 } from "lucide-react";
 import { useI18n } from "../../features/i18n/I18nContext";
+import { OwoFaceIcon } from "../ui/OwoFaceIcon";
 
 export function Footer() {
   const { dict } = useI18n();
@@ -11,7 +11,7 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row justify-between items-center gap-6">
         <div className="flex flex-col items-center md:items-start gap-2">
           <Link to="/" className="flex items-center gap-2 group">
-            <Gamepad2 className="w-5 h-5 text-brand" />
+            <OwoFaceIcon className="w-5 h-5 text-brand" />
             <span className="font-bold text-lg tracking-tight text-text-primary">
               OwO<span className="text-brand">GG</span>
             </span>
