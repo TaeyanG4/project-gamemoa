@@ -27,7 +27,7 @@ OwOGG 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 설�
 4. 애플리케이션 유형: `웹 애플리케이션` (Web Application)
 5. **승인된 JavaScript 원본 (Authorized JavaScript origins)**:
    - 개발 환경: `http://localhost:5173`, `http://localhost:3000`
-   - 프로덕션: `https://gamemoa-web.gamemoa.workers.dev`
+   - 프로덕션: `https://owogg.com`
 6. **승인된 리디렉션 URI (Authorized redirect URIs)**:
    - 프로덕션 frontend 도메인 등록
 7. 생성된 **Web Client ID** 복사 (예: `123456789-xxx.apps.googleusercontent.com`)
@@ -53,15 +53,15 @@ OwOGG 미니게임 플랫폼의 **Google** 및 **Discord** 소셜 로그인 설�
 6. **Redirects** 항목에 아래 공용 callback URI를 등록합니다. LOGIN과 LINK가 같은 callback을 사용하고
    state 쿠키로 흐름을 구분합니다.
    - 개발: `http://localhost:8787/api/auth/discord/callback`
-   - 프로덕션: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
+   - 프로덕션: `https://api.owogg.com/api/auth/discord/callback`
    - 계정 연결/연결해제 및 통합 절차는 `docs/runbooks/account-linking.md`를 참조하세요.
 
 ### B. 환경 변수 및 Worker Secret 설정
 
 - **API Worker Settings**:
   - `DISCORD_CLIENT_ID`: 생성된 Discord Application Client ID
-  - `DISCORD_REDIRECT_URI`: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
-  - `FRONTEND_URL`: `https://gamemoa-web.gamemoa.workers.dev`
+  - `DISCORD_REDIRECT_URI`: `https://api.owogg.com/api/auth/discord/callback`
+  - `FRONTEND_URL`: `https://owogg.com`
   - `DISCORD_PUBLIC_KEY`: Developer Portal General Information의 Public Key
   - `DISCORD_INSTALL_URL`: 선택 사항. Developer Portal에서 실제로 구성한 HTTPS 설치 URL을 사용할 때만 등록
 - **Worker Secret 등록 (Command Line)**:

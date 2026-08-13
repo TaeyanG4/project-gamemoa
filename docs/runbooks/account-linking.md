@@ -39,7 +39,7 @@ LINK 흐름의 Discord OAuth `state`는 인증된 세션과 연결 계정에 바
 로그인과 LINK는 하나의 콜백 경로를 공유합니다. Discord Developer Portal에는 현재 아래 URI 하나만
 등록합니다.
 
-- 로그인 및 연결: `https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback`
+- 로그인 및 연결: `https://api.owogg.com/api/auth/discord/callback`
 - 개발 환경 예시: `http://localhost:8787/api/auth/discord/callback`
 
 ---

@@ -2,21 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { isAdminUserId, isTrustedAdminOrigin } from "../src/auth/admin.js";
 
-const PROD_FRONTEND = "https://gamemoa-web.gamemoa.workers.dev";
+const PROD_FRONTEND = "https://owogg.com";
 
 test("isTrustedAdminOrigin: exact production origin is allowed", () => {
   assert.equal(isTrustedAdminOrigin(PROD_FRONTEND, PROD_FRONTEND), true);
 });
 
 test("isTrustedAdminOrigin: evil lookalike host is denied (no startsWith/prefix match)", () => {
-  assert.equal(
-    isTrustedAdminOrigin("https://gamemoa-web.gamemoa.workers.dev.evil.example", PROD_FRONTEND),
-    false,
-  );
-  assert.equal(
-    isTrustedAdminOrigin("https://evil.example/gamemoa-web.gamemoa.workers.dev", PROD_FRONTEND),
-    false,
-  );
+  assert.equal(isTrustedAdminOrigin("https://owogg.com.evil.example", PROD_FRONTEND), false);
+  assert.equal(isTrustedAdminOrigin("https://evil.example/owogg.com", PROD_FRONTEND), false);
 });
 
 test("isTrustedAdminOrigin: localhost is denied when FRONTEND_URL is production", () => {
@@ -41,10 +35,7 @@ test("isTrustedAdminOrigin: malformed Origin is denied", () => {
 });
 
 test("isTrustedAdminOrigin: differing scheme/port on an otherwise-matching host is denied", () => {
-  assert.equal(
-    isTrustedAdminOrigin("http://gamemoa-web.gamemoa.workers.dev", PROD_FRONTEND),
-    false,
-  );
+  assert.equal(isTrustedAdminOrigin("http://owogg.com", PROD_FRONTEND), false);
   assert.equal(isTrustedAdminOrigin(`${PROD_FRONTEND}:8443`, PROD_FRONTEND), false);
 });
 

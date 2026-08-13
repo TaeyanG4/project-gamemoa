@@ -10,7 +10,7 @@ export function isAdminUserId(userId: number, configuredIds?: string): boolean {
   });
 }
 
-const DEFAULT_FRONTEND_URL = "https://gamemoa-web.gamemoa.workers.dev";
+const DEFAULT_FRONTEND_URL = "https://owogg.com";
 
 /** Returns the normalized `scheme://host:port` origin, or null if `value` is not a valid URL. */
 function safeOrigin(value: string): string | null {
@@ -39,7 +39,7 @@ function isLocalhostOrigin(value: string): boolean {
  *
  * Comparison is always an exact origin match (`new URL(origin).origin === new URL(FRONTEND_URL).origin`)
  * — never `startsWith`/prefix matching, which a lookalike host (e.g.
- * `https://gamemoa-web.gamemoa.workers.dev.evil.example`) could otherwise satisfy.
+ * `https://owogg.com.evil.example`) could otherwise satisfy.
  *
  * localhost/127.0.0.1 origins are only ever trusted when the configured `FRONTEND_URL` itself
  * is a localhost/127.0.0.1 development origin — production configuration never grants a

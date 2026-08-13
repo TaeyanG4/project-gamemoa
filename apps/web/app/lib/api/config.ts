@@ -7,7 +7,7 @@ export function getApiUrl(): string {
       return "http://localhost:8787";
     }
   }
-  return "https://gamemoa-api.gamemoa.workers.dev";
+  return "https://api.owogg.com";
 }
 
 export const API_URL = getApiUrl();

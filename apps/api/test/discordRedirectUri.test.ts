@@ -14,18 +14,18 @@ function fakeContext(env: Partial<ApiEnv["Bindings"]>, url: string): Context<Api
 // rejected outright for any account whose first login was Google.
 test("getDiscordRedirectUri returns the configured DISCORD_REDIRECT_URI regardless of request path", () => {
   const env = {
-    DISCORD_REDIRECT_URI: "https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback",
+    DISCORD_REDIRECT_URI: "https://api.owogg.com/api/auth/discord/callback",
   };
 
   const loginUri = getDiscordRedirectUri(
-    fakeContext(env, "https://gamemoa-api.gamemoa.workers.dev/api/auth/discord"),
+    fakeContext(env, "https://api.owogg.com/api/auth/discord"),
   );
   const linkUri = getDiscordRedirectUri(
-    fakeContext(env, "https://gamemoa-api.gamemoa.workers.dev/api/auth/link/discord"),
+    fakeContext(env, "https://api.owogg.com/api/auth/link/discord"),
   );
 
   assert.equal(loginUri, linkUri);
-  assert.equal(loginUri, "https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback");
+  assert.equal(loginUri, "https://api.owogg.com/api/auth/discord/callback");
 });
 
 test("getDiscordRedirectUri falls back to the request origin + /api/auth/discord/callback when unconfigured", () => {

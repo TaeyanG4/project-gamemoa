@@ -154,13 +154,13 @@ Creator provider 자격 증명은 저장소 코드에 이미 완전히 배선되
 | 이름                        | 예시 값                                                                                                               |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `YOUTUBE_CLIENT_ID`         | Google Cloud Console OAuth Client ID                                                                                  |
-| `YOUTUBE_REDIRECT_URI`      | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/youtube/callback`                                        |
+| `YOUTUBE_REDIRECT_URI`      | `https://api.owogg.com/api/creators/verify/youtube/callback`                                                          |
 | `TWITCH_CLIENT_ID`          | Twitch Developer Console Client ID                                                                                    |
-| `TWITCH_REDIRECT_URI`       | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/twitch/callback`                                         |
+| `TWITCH_REDIRECT_URI`       | `https://api.owogg.com/api/creators/verify/twitch/callback`                                                           |
 | `CHZZK_CLIENT_ID`           | Naver/Chzzk Open API Client ID                                                                                        |
-| `CHZZK_REDIRECT_URI`        | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/chzzk/callback`                                          |
+| `CHZZK_REDIRECT_URI`        | `https://api.owogg.com/api/creators/verify/chzzk/callback`                                                            |
 | `SOOP_CLIENT_ID`            | SOOP Developers Client ID                                                                                             |
-| `SOOP_REDIRECT_URI`         | `https://gamemoa-api.gamemoa.workers.dev/api/creators/verify/soop/callback`                                           |
+| `SOOP_REDIRECT_URI`         | `https://api.owogg.com/api/creators/verify/soop/callback`                                                             |
 | `CREATOR_ENABLED_PROVIDERS` | 이 배포에서 필수로 기대하는 provider 목록 (예: `YOUTUBE,TWITCH`). 미설정 시 모든 provider가 선택 사항으로 취급됩니다. |
 
 ### GitHub Secrets (`Settings` → `Secrets and variables` → `Actions` → `Secrets`)

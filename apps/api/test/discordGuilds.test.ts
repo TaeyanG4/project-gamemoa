@@ -84,7 +84,7 @@ test("POST /api/discord/guilds/register requires authentication", async () => {
 
 test("GET /api/auth/discord/register-server redirects unauthenticated users to login/status", async () => {
   const mockEnv = {
-    FRONTEND_URL: "https://gamemoa-web.gamemoa.workers.dev",
+    FRONTEND_URL: "https://owogg.com",
     DB: {
       prepare() {
         return {

@@ -226,7 +226,7 @@ are not supported (requested 210000).
 요청 자체가 로그에 단 한 번도 찍히지 않음** — 즉 Discord가 애초에 우리 서버로 요청을 보낸 적이
 없었습니다. `DISCORD_PUBLIC_KEY`가 서버에 설정된 것과, Developer Portal의 "Interactions Endpoint
 URL" 필드에 실제 주소를 입력해 저장하는 것은 별개의 단계인데 후자가 누락되어 있었습니다.
-운영자에게 `https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions`를 General
+운영자에게 `https://api.owogg.com/api/discord/interactions`를 General
 Information → Interactions Endpoint URL에 저장하도록 안내(저장 시 Discord가 즉시 PING
 검증을 하므로, PUBLIC_KEY가 이미 올바르면 바로 통과함) — **다음 세션 시작 시 실제로 명령어가
 동작하는지 확인 필요** (이 문서 작성 시점에는 아직 운영자의 재시도 결과 확인 전).
@@ -498,8 +498,8 @@ Actions 기록이 원본입니다.
    없음.
    - [x] ToS/Privacy Policy 페이지 — `/terms`, `/privacy` 라우트 신설(Footer에도 링크 추가).
          **다음 세션 시작 시**: 배포 후 Discord Developer Portal → General Information에
-         `https://gamemoa-web.gamemoa.workers.dev/terms`,
-         `https://gamemoa-web.gamemoa.workers.dev/privacy`를 등록했는지 확인.
+         `https://owogg.com/terms`,
+         `https://owogg.com/privacy`를 등록했는지 확인.
    - [ ] "앱은 팀에 속해 있어야 해요" — Developer Portal에서 Team 생성 후 앱을 이전하는 건 순수
          Discord 쪽 조작이라 운영자가 직접 해야 함. 코딩 세션이 할 수 있는 일 없음.
 5. **외부 설정**: Discord 설치 링크/Bot Token/Interactions Endpoint URL/명령어 등록까지 이번

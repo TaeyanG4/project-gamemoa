@@ -124,7 +124,7 @@ jobs:
         env:
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://gamemoa-api.gamemoa.workers.dev' }}
+          VITE_API_URL: ${{ vars.VITE_API_URL || 'https://api.owogg.com' }}
 
       - name: Deploy Web Frontend
         uses: cloudflare/wrangler-action@v3

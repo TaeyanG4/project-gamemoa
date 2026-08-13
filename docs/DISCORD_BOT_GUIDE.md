@@ -167,14 +167,14 @@ Guild B = 0
 4. Interactions Endpoint URL에 다음 주소를 등록합니다.
 
 ```text
-https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions
+https://api.owogg.com/api/discord/interactions
 ```
 
 5. General Information의 Public Key를 `DISCORD_PUBLIC_KEY`로 배포 설정에 전달합니다.
 6. OAuth2 Redirects에는 다음 단일 콜백을 등록합니다.
 
 ```text
-https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback
+https://api.owogg.com/api/auth/discord/callback
 ```
 
 개발 환경에서는 실제 개발 Worker 주소와 현재 `DISCORD_REDIRECT_URI` 값을 사용합니다. 로그인과 LINK를 서로 다른 callback path로 등록하지 않습니다. 현재 코드는 두 흐름을 하나의 callback에서 state 쿠키로 구분합니다.

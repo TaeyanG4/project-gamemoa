@@ -1,7 +1,7 @@
 import process from "node:process";
 
-const API_URL = "https://gamemoa-api.gamemoa.workers.dev";
-const WEB_URL = "https://gamemoa-web.gamemoa.workers.dev";
+const API_URL = "https://api.owogg.com";
+const WEB_URL = "https://owogg.com";
 
 const FETCH_TIMEOUT_MS = 5000;
 const RETRY_INTERVAL_MS = 3000;

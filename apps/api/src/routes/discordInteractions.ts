@@ -88,7 +88,7 @@ discordRouter.post("/interactions", async (c) => {
     }
 
     const container = createContainer(c.env.DB);
-    const frontendUrl = c.env.FRONTEND_URL || "https://gamemoa-web.gamemoa.workers.dev";
+    const frontendUrl = c.env.FRONTEND_URL || "https://owogg.com";
     const response = await handleOwoggCommand(container, interaction, frontendUrl);
     return c.json(response);
   }

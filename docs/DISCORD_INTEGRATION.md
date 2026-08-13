@@ -150,7 +150,7 @@ Discord 앱 설치는 Discord에서 앱/명령어를 사용할 준비를 하는 
 Developer Portal의 Interactions Endpoint URL은 다음 API 경로를 사용합니다.
 
 ```text
-https://gamemoa-api.gamemoa.workers.dev/api/discord/interactions
+https://api.owogg.com/api/discord/interactions
 ```
 
 ## 9. 온보딩 & 명령어 자동화 (Phase C)
@@ -207,7 +207,7 @@ Interactions Endpoint URL, 로컬 `/owogg` 서브커맨드 목록. Bot Token/Cli
 Redirect URI는 LOGIN과 LINK에 공통으로 다음 하나를 사용합니다.
 
 ```text
-https://gamemoa-api.gamemoa.workers.dev/api/auth/discord/callback
+https://api.owogg.com/api/auth/discord/callback
 ```
 
 `DISCORD_PUBLIC_KEY` 전달, Portal endpoint 등록, `pnpm discord:commands:register` 실행과 실제 설치 링크

@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 
-const API_BASE = "https://gamemoa-api.gamemoa.workers.dev";
+const API_BASE = "https://api.owogg.com";
 const TIMEOUT_MS = 10000;
 
 async function checkAuthReadiness() {

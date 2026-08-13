@@ -6,7 +6,7 @@ import { DISCORD_INTERACTION_TYPE } from "../src/infrastructure/discord/types.js
 import type { DiscordInteraction } from "../src/infrastructure/discord/types.js";
 import type { OAuthAccount, User } from "@owogg/core";
 
-const FRONTEND_URL = "https://gamemoa-web.gamemoa.workers.dev";
+const FRONTEND_URL = "https://owogg.com";
 
 function fakeContainer(overrides: {
   findOAuthAccount?: (provider: string, id: string) => Promise<OAuthAccount | null>;
