@@ -13,7 +13,13 @@ function fakeContainer(overrides: {
   findByOAuth?: (provider: string, id: string) => Promise<User | null>;
   createLinkChallenge?: () => Promise<{ token: string; expiresAt: string }>;
   getProgressionSummary?: () => Promise<{
-    summary: { level: number; totalXp: number };
+    summary: {
+      level: number;
+      totalXp: number;
+      currentLevelProgressXp: number;
+      currentLevelSpanXp: number;
+      progressPercent: number;
+    };
     eligibleCompletions: number;
   }>;
   getGuildByGuildId?: () => Promise<{
@@ -56,7 +62,16 @@ function fakeContainer(overrides: {
     progressionUseCases: {
       getProgressionSummary:
         overrides.getProgressionSummary ??
-        (async () => ({ summary: { level: 3, totalXp: 450 }, eligibleCompletions: 12 })),
+        (async () => ({
+          summary: {
+            level: 3,
+            totalXp: 450,
+            currentLevelProgressXp: 50,
+            currentLevelSpanXp: 200,
+            progressPercent: 25,
+          },
+          eligibleCompletions: 12,
+        })),
     },
     discordGuildDirectoryUseCases: {
       getGuildByGuildId:
@@ -187,7 +202,13 @@ test("/gamemoa profile shows nickname/level/XP for a linked Discord user", async
       providers: ["discord"],
     }),
     getProgressionSummary: async () => ({
-      summary: { level: 5, totalXp: 1650 },
+      summary: {
+        level: 5,
+        totalXp: 1650,
+        currentLevelProgressXp: 150,
+        currentLevelSpanXp: 500,
+        progressPercent: 30,
+      },
       eligibleCompletions: 30,
     }),
   });
@@ -197,6 +218,7 @@ test("/gamemoa profile shows nickname/level/XP for a linked Discord user", async
   assert.match(embed?.title ?? "", /Taeyang/);
   const fieldsText = (embed?.fields ?? []).map((f) => `${f.name}:${f.value}`).join(" ");
   assert.match(fieldsText, /5/);
+  assert.match(fieldsText, /▰/); // progress bar rendered
   assert.match(fieldsText, /1,650/);
 });
 

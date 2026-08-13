@@ -23,6 +23,15 @@ function gamemoaFooter(frontendUrl: string): DiscordEmbedFooter {
   return { text: "GAMEMOA", icon_url: `${frontendUrl}/favicon-192x192.png` };
 }
 
+/** Renders a fixed-width block-character progress bar (Arcane-style rank-card progress
+ * indicator, adapted to plain text since embeds can't run canvas/image generation) —
+ * e.g. `▰▰▰▰▰▰▱▱▱▱ 62%`. */
+function progressBar(percent: number, length = 12): string {
+  const clamped = Math.min(100, Math.max(0, percent));
+  const filled = Math.round((clamped / 100) * length);
+  return "▰".repeat(filled) + "▱".repeat(length - filled) + ` ${Math.round(clamped)}%`;
+}
+
 /** Neutralizes Discord markdown syntax in user-controlled strings (GAMEMOA nicknames, Discord
  * guild names, Discord display names) before they're interpolated into an embed. Unlike plain
  * message `content`, embed `description`/`field.value` fully render `[text](url)` masked
@@ -190,6 +199,11 @@ async function handleProfileCommand(
     fields: [
       { name: "레벨", value: `${summary.level}`, inline: true },
       { name: "총 XP", value: `${summary.totalXp.toLocaleString()} XP`, inline: true },
+      {
+        name: `다음 레벨까지 (${summary.currentLevelProgressXp.toLocaleString()} / ${summary.currentLevelSpanXp.toLocaleString()} XP)`,
+        value: progressBar(summary.progressPercent),
+        inline: false,
+      },
     ],
     footer,
   });
