@@ -39,7 +39,12 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
           <Link to="/" className="flex items-center gap-2 group">
             <OwoWordmarkIcon className="h-9 w-9 group-hover:scale-105 transition-transform duration-200" />
-            <span className="font-extrabold text-xl tracking-tight text-text-primary">OwOGG</span>
+            <span className="font-extrabold text-xl tracking-tight text-text-primary">
+              OwO
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-light to-accent-purple">
+                GG
+              </span>
+            </span>
           </Link>
         </div>
 

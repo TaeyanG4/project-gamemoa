@@ -12,7 +12,9 @@ export function Footer() {
         <div className="flex flex-col items-center md:items-start gap-2">
           <Link to="/" className="flex items-center gap-1.5 group">
             <OwoWordmarkIcon className="h-7 w-7" />
-            <span className="font-bold text-lg tracking-tight text-text-primary">OwOGG</span>
+            <span className="font-bold text-lg tracking-tight text-text-primary">
+              OwO<span className="text-brand">GG</span>
+            </span>
           </Link>
           <p className="text-xs text-text-muted">{dict.footer.tagline}</p>
           <p className="text-xs text-text-muted">
