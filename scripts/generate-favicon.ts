@@ -36,12 +36,16 @@ const BG_RX = 112; // rounded-square background corner radius, in canvas units
 // ---------------------------------------------------------------------------
 // OwOGG's brand mark — the word "OwO" as three letterforms in a row, each
 // built the same way apps/web/app/components/ui/OwoWordmarkIcon.tsx builds a
-// round "O"/"w": circles for the O's, a 4-segment zigzag for the w. Defined
-// here in unrotated "letter space"; ROTATION_DEG below tilts the whole word
+// round "O"/"w": circles for the O's, a "w" made of two smooth cubic-Bézier
+// "U" bumps (softer/cuter than a sharp zigzag — no pointy corners, reads more
+// like a friendly mascot mark than a geometric wordmark). Defined here in
+// unrotated "letter space"; ROTATION_DEG below tilts the whole word
 // diagonally, matching the reference OwO wordmark logo.
 // ---------------------------------------------------------------------------
 type IconPoint = readonly [number, number];
-type IconSegment = { kind: "line"; from: IconPoint; to: IconPoint };
+type IconSegment =
+  | { kind: "line"; from: IconPoint; to: IconPoint }
+  | { kind: "cubic"; from: IconPoint; c1: IconPoint; c2: IconPoint; to: IconPoint };
 type IconCircle = { cx: number; cy: number; r: number };
 
 const LETTER_CIRCLES: IconCircle[] = [
@@ -49,12 +53,15 @@ const LETTER_CIRCLES: IconCircle[] = [
   { cx: 40, cy: 8, r: 7 }, // "O"
 ];
 
-// "w", as four absolute line segments between the two O's.
-const LETTER_W_LINES: IconSegment[] = [
-  { kind: "line", from: [17, 3], to: [20.5, 13] },
-  { kind: "line", from: [20.5, 13], to: [24, 5] },
-  { kind: "line", from: [24, 5], to: [27.5, 13] },
-  { kind: "line", from: [27.5, 13], to: [31, 3] },
+// "w", as two cubic-Bézier "U" bumps between the two O's. Each cubic's control
+// points are pulled straight down from its endpoints to the same depth
+// (y=16), which — by the cubic Bézier midpoint formula — makes the curve
+// pass exactly through the intended valley point at t=0.5 (20.5,13 for the
+// first bump, 27.5,13 for the second), same coordinates the old straight-
+// line zigzag used, just smoothed into a rounded "U" instead of a sharp "V".
+const LETTER_W_CURVES: IconSegment[] = [
+  { kind: "cubic", from: [17, 3], c1: [17, 16], c2: [24, 16], to: [24, 5] },
+  { kind: "cubic", from: [24, 5], c1: [24, 16], c2: [31, 16], to: [31, 3] },
 ];
 
 const ICON_STROKE_WIDTH = 3; // in letter-space units — bold, matching the reference wordmark
@@ -73,14 +80,47 @@ function rotatePoint([x, y]: IconPoint, degrees: number, [px, py]: IconPoint): I
   return [px + dx * cos - dy * sin, py + dx * sin + dy * cos];
 }
 
+/** Cubic Bézier flattened by direct parametric sampling (De Casteljau-equivalent). n=24 is
+ * finely subdivided enough that the polyline is visually indistinguishable from the true curve
+ * even at the 1024px output. */
+function flattenCubic(
+  from: IconPoint,
+  c1: IconPoint,
+  c2: IconPoint,
+  to: IconPoint,
+  n: number,
+): IconPoint[] {
+  const pts: IconPoint[] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const mt = 1 - t;
+    const x =
+      mt * mt * mt * from[0] + 3 * mt * mt * t * c1[0] + 3 * mt * t * t * c2[0] + t * t * t * to[0];
+    const y =
+      mt * mt * mt * from[1] + 3 * mt * mt * t * c1[1] + 3 * mt * t * t * c2[1] + t * t * t * to[1];
+    pts.push([x, y]);
+  }
+  return pts;
+}
+
 const ROTATED_CIRCLES: IconCircle[] = LETTER_CIRCLES.map(({ cx, cy, r }) => {
   const [rx, ry] = rotatePoint([cx, cy], ROTATION_DEG, LETTER_PIVOT);
   return { cx: rx, cy: ry, r };
 });
-const ROTATED_W_LINES: { a: IconPoint; b: IconPoint }[] = LETTER_W_LINES.map((seg) => ({
-  a: rotatePoint(seg.from, ROTATION_DEG, LETTER_PIVOT),
-  b: rotatePoint(seg.to, ROTATION_DEG, LETTER_PIVOT),
-}));
+// Rotate each cubic's four defining points, then flatten the rotated curve into short line
+// segments for the distance test (rotation is rigid, so flattening after rotating gives the
+// exact same polyline as rotating a pre-flattened polyline would — just less work).
+const ROTATED_W_LINES: { a: IconPoint; b: IconPoint }[] = LETTER_W_CURVES.flatMap((seg) => {
+  if (seg.kind !== "cubic") return [];
+  const from = rotatePoint(seg.from, ROTATION_DEG, LETTER_PIVOT);
+  const c1 = rotatePoint(seg.c1, ROTATION_DEG, LETTER_PIVOT);
+  const c2 = rotatePoint(seg.c2, ROTATION_DEG, LETTER_PIVOT);
+  const to = rotatePoint(seg.to, ROTATION_DEG, LETTER_PIVOT);
+  const pts = flattenCubic(from, c1, c2, to, 24);
+  const lines: { a: IconPoint; b: IconPoint }[] = [];
+  for (let i = 0; i < pts.length - 1; i++) lines.push({ a: pts[i]!, b: pts[i + 1]! });
+  return lines;
+});
 
 // Bounding box of the ROTATED letterform: a circle's bbox is always
 // [cx-r,cx+r]x[cy-r,cy+r] regardless of rotation (rotating a circle around any
@@ -105,7 +145,7 @@ const ICON_BBOX = {
 };
 // Fit the rotated letterform into the 512 canvas, centered, with margins
 // matching the header badge's visual proportions against its background tile.
-const ICON_SCALE = 320 / (ICON_BBOX.x1 - ICON_BBOX.x0);
+const ICON_SCALE = 400 / (ICON_BBOX.x1 - ICON_BBOX.x0);
 const ICON_CENTER: IconPoint = [
   (ICON_BBOX.x0 + ICON_BBOX.x1) / 2,
   (ICON_BBOX.y0 + ICON_BBOX.y1) / 2,

@@ -15,7 +15,7 @@
        letterform into this 512 canvas — same order scripts/generate-favicon.ts computes in
        code (rotate first in letter-space, then center/scale the rotated bounding box). -->
   <g
-    transform="translate(256,256) scale(7.4415404468312305) translate(-24,-8) rotate(-25,24,8)"
+    transform="translate(256,256) scale(9.301925558539038) translate(-24,-8) rotate(-25,24,8)"
     fill="none"
     stroke="#ffffff"
     stroke-width="3"
@@ -24,6 +24,6 @@
   >
     <circle cx="8" cy="8" r="7" />
     <circle cx="40" cy="8" r="7" />
-    <path d="M17 3l3.5 10 3.5-8 3.5 8 3.5-10" />
+    <path d="M17 3C17 16 24 16 24 5C24 16 31 16 31 3" />
   </g>
 </svg>

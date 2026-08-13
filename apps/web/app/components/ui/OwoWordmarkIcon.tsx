@@ -18,7 +18,7 @@ export function OwoWordmarkIcon({ className }: { className?: string }) {
       </defs>
       <rect x="0" y="0" width="48" height="48" rx="10.5" ry="10.5" fill={`url(#${gradientId})`} />
       <g
-        transform="translate(24,24) scale(0.6976444168904279) translate(-24,-8) rotate(-25,24,8)"
+        transform="translate(24,24) scale(0.8720555211130349) translate(-24,-8) rotate(-25,24,8)"
         fill="none"
         stroke="#ffffff"
         strokeWidth="3"
@@ -27,7 +27,7 @@ export function OwoWordmarkIcon({ className }: { className?: string }) {
       >
         <circle cx="8" cy="8" r="7" />
         <circle cx="40" cy="8" r="7" />
-        <path d="M17 3l3.5 10 3.5-8 3.5 8 3.5-10" />
+        <path d="M17 3C17 16 24 16 24 5C24 16 31 16 31 3" />
       </g>
     </svg>
   );
