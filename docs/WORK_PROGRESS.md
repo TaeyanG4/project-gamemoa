@@ -47,9 +47,10 @@ F. Full Regression / Production Verification           ← 매 세션 수행
 - [x] `dict.games`(eyebrow/제목/게임 수 문구/검색창 placeholder/빈 상태 2종) — `/games` 전체 연결.
 - [x] `dict.ranking`(3개 메인 탭, 전체 종목/전체 플랫폼 필터, 점수/XP 모드 전환, 테이블 헤더 전체,
       로딩/에러/재시도, 3개 탭 각각의 빈 상태, 1/2/3위 배지 텍스트) — `/ranking` 전체 연결.
-- [x] `dict.profile`(탭 전환, 가입일, 로그아웃, 즐겨찾기/최근 플레이/도전과제 섹션 제목·빈 상태)
-      — `/profile` 구조적 텍스트 연결(닉네임/국가 편집 폼, 연동 계정 표시, Creator 채널 인증 등
-      세부 마이크로카피는 스코프 밖으로 유보).
+- [x] `dict.profile`(탭 전환, 가입일, 로그아웃, 레벨/XP, 즐겨찾기/최근 플레이/도전과제/게임별 기록
+      섹션, 닉네임·국가 편집 폼과 쿨다운 에러, 연동 계정 연결/해제, Creator 채널 소유권 인증 및
+      Featured 심사 상태 — `/profile` 전체 화면 텍스트 연결 완료). `COUNTRY_OPTIONS` 국가명은
+      여전히 한국어 고정(스코프 밖).
 - [x] `dict.discord` / `dict.discordSetup` / `dict.discordGuide` / `dict.discordServers` /
       `dict.discordServerSlug` / `dict.discordServerManage` / `dict.discordLink` — Discord 6개
       라우트(Hub/설치 가이드/이용 가이드/서버 디렉토리/서버 공개 페이지/서버 관리/계정 연동) 전체
@@ -197,11 +198,11 @@ Actions 기록이 원본입니다.
 
 ## 남은 작업 (다음 세션에서 이어서 진행)
 
-1. **i18n 화면 번역 확장 (계속)**: 프로필의 닉네임/국가 편집 폼·연동 계정 표시·Creator 채널 인증
-   등 세부 마이크로카피, Wiki 본문(18개 서브 라우트), Admin 로그인 흐름/센터를 `dict`에 연결.
-   `common` 사전 섹션은 이미 준비되어 있음. 라우트 `meta()` 로케일화 방식 검토(현재 스코프 밖).
-   Discord 6개 라우트(Hub/설치 가이드/이용 가이드/서버 디렉토리/서버 공개 페이지/서버 관리/계정
-   연동)는 이번 세션에 전체 완료.
+1. **i18n 화면 번역 확장 (계속)**: Wiki 본문(18개 서브 라우트), Admin 로그인 흐름/센터를 `dict`에
+   연결. `COUNTRY_OPTIONS` 국가명 다국어화(현재 한국어 고정). `common` 사전 섹션은 이미 준비되어
+   있음. 라우트 `meta()` 로케일화 방식 검토(현재 스코프 밖). Discord 6개 라우트(Hub/설치 가이드/
+   이용 가이드/서버 디렉토리/서버 공개 페이지/서버 관리/계정 연동)와 프로필(`/profile`) 전체는
+   이번 세션에 완료.
 2. **Admin bootstrap 관련 작업은 운영자가 직접 진행하기로 함**(2026-08-13 지시: "admin은 추후
    내가 테스트 해볼게") — 코딩 세션은 admin 로그인/bootstrap 플로우를 더 이상 건드리거나
    검증하지 않습니다. `ADMIN_USER_IDS`는 이전 세션에 이미 설정 완료된 상태이며, 나머지는 운영자의

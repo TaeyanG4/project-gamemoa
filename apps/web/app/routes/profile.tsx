@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { useAuth } from "../features/auth";
 import { useI18n } from "../features/i18n/I18nContext";
+import type { Dictionary } from "../features/i18n/dictionary";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   User,
@@ -110,6 +111,7 @@ function GameRecordCard({
   serverBest: number | null;
   localBest: number | null;
 }) {
+  const { dict } = useI18n();
   const hasRecord = serverBest !== null || localBest !== null;
 
   return (
@@ -118,16 +120,18 @@ function GameRecordCard({
         <div className="flex items-center gap-2 mt-1 flex-wrap">
           <span className="flex items-center gap-1 text-sm font-black text-brand-light">
             <Trophy className="w-3.5 h-3.5 text-accent-yellow shrink-0" />
-            {serverBest !== null ? formatScore(serverBest, game.scoreConfig) : "계정 기록 없음"}
+            {serverBest !== null
+              ? formatScore(serverBest, game.scoreConfig)
+              : dict.profile.noRecordLabel}
           </span>
           {localBest !== null && (
             <span className="text-[10px] text-text-muted font-semibold">
-              기기 기록: {formatScore(localBest, game.scoreConfig)}
+              {dict.profile.deviceRecordLabel}: {formatScore(localBest, game.scoreConfig)}
             </span>
           )}
         </div>
       ) : (
-        <p className="text-xs text-text-muted mt-1">아직 기록이 없어요 — 지금 도전해보세요!</p>
+        <p className="text-xs text-text-muted mt-1">{dict.profile.noRecordYetHint}</p>
       )}
     </GameLinkCard>
   );
@@ -141,25 +145,26 @@ function GameFavoriteCard({ game }: { game: GameManifest }) {
   );
 }
 
-function formatRelativeTimeKo(iso: string): string {
+function formatRelativeTime(iso: string, dict: Dictionary["profile"]): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const diffMin = Math.floor((Date.now() - then) / 60000);
-  if (diffMin < 1) return "방금 전";
-  if (diffMin < 60) return `${diffMin}분 전`;
+  if (diffMin < 1) return dict.justNow;
+  if (diffMin < 60) return `${diffMin}${dict.minutesAgoSuffix}`;
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}시간 전`;
+  if (diffHour < 24) return `${diffHour}${dict.hoursAgoSuffix}`;
   const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}일 전`;
+  if (diffDay < 7) return `${diffDay}${dict.daysAgoSuffix}`;
   return iso.split("T")[0] ?? iso;
 }
 
 function GameActivityCard({ game, lastPlayedAt }: { game: GameManifest; lastPlayedAt: string }) {
+  const { dict } = useI18n();
   return (
     <GameLinkCard game={game}>
       <p className="flex items-center gap-1 text-xs text-text-muted mt-1">
         <Clock className="w-3 h-3 shrink-0" />
-        {formatRelativeTimeKo(lastPlayedAt)}
+        {formatRelativeTime(lastPlayedAt, dict.profile)}
       </p>
     </GameLinkCard>
   );
@@ -279,14 +284,14 @@ export default function ProfilePage() {
 
     if (linkStatus) {
       if (linkStatus === "success") {
-        setStatusMessage("로그인 수단이 연결되었습니다.");
+        setStatusMessage(dict.profile.linkSuccess);
         void refreshConnected();
       } else if (linkStatus === "already") {
-        setStatusMessage("이미 연결된 계정입니다.");
+        setStatusMessage(dict.profile.alreadyLinkedAccount);
       } else if (linkStatus === "conflict" && challenge) {
         setMergeChallengeId(challenge);
       } else if (linkStatus === "error") {
-        setStatusMessage("로그인 수단 연결 중 오류가 발생했습니다.");
+        setStatusMessage(dict.profile.linkError);
       }
       setActiveTab("profile");
       setSearchParams({}, { replace: true });
@@ -297,24 +302,24 @@ export default function ProfilePage() {
       const channelName = searchParams.get("channel");
       if (creatorVerify === "success") {
         setStatusMessage(
-          `크리에이터 채널 소유권 인증이 완료되었습니다.${
+          `${dict.profile.creatorVerifySuccess}${
             channelName ? ` (${decodeURIComponent(channelName)})` : ""
           }`,
         );
         void refreshCreatorProfile();
       } else if (creatorVerify === "conflict") {
-        setStatusMessage("이 채널은 이미 다른 GAMEMOA 크리에이터 계정에 연동되어 있습니다.");
+        setStatusMessage(dict.profile.creatorVerifyConflict);
       } else if (creatorVerify === "unconfigured") {
-        setStatusMessage("현재 해당 플랫폼 인증을 사용할 수 없습니다.");
+        setStatusMessage(dict.profile.creatorVerifyUnconfigured);
       } else if (creatorVerify === "unauthorized") {
-        setStatusMessage("로그인이 만료되었습니다. 다시 로그인 해주세요.");
+        setStatusMessage(dict.profile.creatorVerifyUnauthorized);
       } else if (creatorVerify === "error") {
-        setStatusMessage("크리에이터 채널 인증 중 오류가 발생했습니다.");
+        setStatusMessage(dict.profile.creatorVerifyError);
       }
       setActiveTab("profile");
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, refreshConnected, refreshCreatorProfile, setSearchParams]);
+  }, [searchParams, refreshConnected, refreshCreatorProfile, setSearchParams, dict.profile]);
 
   const isConnected = (provider: SocialProvider) => connected.some((p) => p.provider === provider);
 
@@ -322,7 +327,7 @@ export default function ProfilePage() {
     if (busyProvider) return;
     const clientId = providerStatus.google.clientId;
     if (!clientId || !providerStatus.google.configured || !window.google?.accounts?.id) {
-      setStatusMessage("Google 로그인 스크립트가 준비되지 않았습니다.");
+      setStatusMessage(dict.profile.googleScriptNotReady);
       return;
     }
     setBusyProvider("google");
@@ -332,7 +337,7 @@ export default function ProfilePage() {
       callback: async (response: { credential: string }) => {
         try {
           await linkGoogleProvider(response.credential);
-          setStatusMessage("Google 로그인이 연결되었습니다.");
+          setStatusMessage(dict.profile.googleLinkSuccess);
           await refreshConnected();
         } catch (err: unknown) {
           const code = err instanceof ApiClientError ? err.code : undefined;
@@ -343,12 +348,12 @@ export default function ProfilePage() {
             if (merge?.challengeId) {
               setMergeChallengeId(merge.challengeId);
             } else {
-              setStatusMessage("이 Google 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다.");
+              setStatusMessage(dict.profile.googleAccountInUse);
             }
           } else if (code === "PROVIDER_ALREADY_LINKED") {
-            setStatusMessage("이 계정에는 이미 Google 로그인이 연결되어 있습니다.");
+            setStatusMessage(dict.profile.googleAlreadyLinked);
           } else {
-            setStatusMessage(err instanceof Error ? err.message : "Google 연결에 실패했습니다.");
+            setStatusMessage(err instanceof Error ? err.message : dict.profile.googleLinkFailed);
           }
         } finally {
           setBusyProvider(null);
@@ -381,14 +386,14 @@ export default function ProfilePage() {
     setBusyProvider(provider);
     try {
       await unlinkProvider(provider);
-      setStatusMessage(`${providerLabel(provider)} 연결이 해제되었습니다.`);
+      setStatusMessage(`${providerLabel(provider)} ${dict.profile.unlinkSuccessSuffix}`);
       await refreshConnected();
     } catch (err: unknown) {
       const code = err instanceof ApiClientError ? err.code : undefined;
       if (code === "LAST_AUTH_PROVIDER") {
-        setStatusMessage("마지막 로그인 수단은 해제할 수 없습니다.");
+        setStatusMessage(dict.profile.lastAuthProviderError);
       } else {
-        setStatusMessage(err instanceof Error ? err.message : "연결 해제에 실패했습니다.");
+        setStatusMessage(err instanceof Error ? err.message : dict.profile.unlinkFailed);
       }
     } finally {
       setBusyProvider(null);
@@ -397,7 +402,7 @@ export default function ProfilePage() {
 
   const handleMerged = async () => {
     setMergeChallengeId(null);
-    setStatusMessage("계정 통합이 완료되었습니다.");
+    setStatusMessage(dict.profile.mergeCompleted);
     // The current session may now resolve to the primary account or be invalidated (reverse merge).
     await refreshUser();
     await refreshConnected();
@@ -416,19 +421,19 @@ export default function ProfilePage() {
     try {
       await updateNicknameApi(trimmed);
       await refreshUser();
-      setStatusMessage("닉네임이 변경되었습니다.");
+      setStatusMessage(dict.profile.nicknameUpdated);
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
         const data = err.data as { nextAllowedAt?: string } | undefined;
         if (err.code === "NICKNAME_COOLDOWN_ACTIVE" && data?.nextAllowedAt) {
           setNicknameError(
-            `닉네임은 ${data.nextAllowedAt.split("T")[0]} 이후 다시 변경할 수 있습니다.`,
+            `${dict.profile.nicknameCooldownPrefix} ${data.nextAllowedAt.split("T")[0]} ${dict.profile.nicknameCooldownSuffix}`,
           );
         } else {
-          setNicknameError(err.detail || "닉네임 변경에 실패했습니다.");
+          setNicknameError(err.detail || dict.profile.nicknameUpdateFailed);
         }
       } else {
-        setNicknameError("닉네임 변경에 실패했습니다.");
+        setNicknameError(dict.profile.nicknameUpdateFailed);
       }
     } finally {
       setNicknameBusy(false);
@@ -445,19 +450,19 @@ export default function ProfilePage() {
     try {
       await updateCountryApi(nextCountry);
       await refreshUser();
-      setStatusMessage("국가/지역이 변경되었습니다.");
+      setStatusMessage(dict.profile.countryUpdated);
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
         const data = err.data as { nextAllowedAt?: string } | undefined;
         if (err.code === "COUNTRY_COOLDOWN_ACTIVE" && data?.nextAllowedAt) {
           setCountryError(
-            `국가/지역은 ${data.nextAllowedAt.split("T")[0]} 이후 다시 변경할 수 있습니다.`,
+            `${dict.profile.countryCooldownPrefix} ${data.nextAllowedAt.split("T")[0]} ${dict.profile.countryCooldownSuffix}`,
           );
         } else {
-          setCountryError(err.detail || "국가/지역 변경에 실패했습니다.");
+          setCountryError(err.detail || dict.profile.countryUpdateFailed);
         }
       } else {
-        setCountryError("국가/지역 변경에 실패했습니다.");
+        setCountryError(dict.profile.countryUpdateFailed);
       }
     } finally {
       setCountryBusy(false);
@@ -470,15 +475,13 @@ export default function ProfilePage() {
         <div className="w-16 h-16 rounded-full bg-brand/10 text-brand flex items-center justify-center">
           <User className="w-8 h-8" />
         </div>
-        <h2 className="text-2xl font-black text-text-primary">로그인이 필요한 페이지입니다</h2>
-        <p className="text-sm text-text-secondary max-w-sm">
-          구글 또는 디스코드 계정으로 로그인하고 내 게임 기록을 관리하세요.
-        </p>
+        <h2 className="text-2xl font-black text-text-primary">{dict.profile.loginRequiredTitle}</h2>
+        <p className="text-sm text-text-secondary max-w-sm">{dict.profile.loginRequiredBody}</p>
         <button
           onClick={openLoginModal}
           className="px-8 py-3.5 bg-brand text-white font-extrabold rounded-2xl shadow-xl shadow-brand/30 hover:scale-105 transition-all cursor-pointer"
         >
-          로그인하기
+          {dict.profile.loginRequiredCta}
         </button>
       </div>
     );
@@ -503,7 +506,7 @@ export default function ProfilePage() {
         className="flex items-center gap-2 text-xs font-bold text-text-muted hover:text-text-primary transition-colors cursor-pointer w-fit"
       >
         <ArrowLeft className="w-4 h-4" />
-        <span>이전으로 돌아가기</span>
+        <span>{dict.profile.backButton}</span>
       </button>
 
       {/* Tab Switcher */}
@@ -596,12 +599,13 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-2">
                   <Zap className="w-5 h-5 text-accent-yellow" />
                   <h2 className="text-xl font-bold text-text-primary">
-                    레벨 {progress.summary.level}
+                    {dict.profile.levelLabel} {progress.summary.level}
                   </h2>
                 </div>
                 {progress.globalRank !== null && (
                   <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-brand/10 text-brand border border-brand/20">
-                    전체 XP 랭킹 #{progress.globalRank}
+                    {dict.profile.globalXpRankPrefix}
+                    {progress.globalRank}
                   </span>
                 )}
               </div>
@@ -618,7 +622,10 @@ export default function ProfilePage() {
                     {progress.summary.currentLevelProgressXp.toLocaleString()} /{" "}
                     {progress.summary.currentLevelSpanXp.toLocaleString()} XP
                   </span>
-                  <span>총 {progress.summary.totalXp.toLocaleString()} XP</span>
+                  <span>
+                    {dict.profile.totalXpPrefix}
+                    {progress.summary.totalXp.toLocaleString()} XP
+                  </span>
                 </div>
               </div>
             </div>
@@ -628,12 +635,12 @@ export default function ProfilePage() {
           <div className="w-full bg-surface-raised rounded-3xl border border-border p-6 md:p-8 flex flex-col gap-6 shadow-xl">
             <div className="flex items-center gap-2">
               <Settings className="w-5 h-5 text-brand" />
-              <h2 className="text-xl font-bold text-text-primary">프로필 설정</h2>
+              <h2 className="text-xl font-bold text-text-primary">{dict.profile.settingsTitle}</h2>
             </div>
 
             <div className="flex flex-col gap-2">
               <label htmlFor="nickname-input" className="text-xs font-bold text-text-muted">
-                닉네임
+                {dict.profile.nicknameLabel}
               </label>
               <div className="flex gap-2">
                 <input
@@ -643,7 +650,7 @@ export default function ProfilePage() {
                   onChange={(e) => setNicknameInput(e.target.value)}
                   maxLength={20}
                   className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-surface border border-border text-sm text-text-primary focus:outline-none focus:border-brand/50"
-                  placeholder="닉네임을 입력하세요"
+                  placeholder={dict.profile.nicknamePlaceholder}
                 />
                 <button
                   type="button"
@@ -653,7 +660,11 @@ export default function ProfilePage() {
                   }
                   className="flex items-center justify-center px-4 py-2.5 bg-brand text-white border border-brand rounded-xl font-bold text-xs hover:bg-brand-dark transition-all cursor-pointer disabled:opacity-50 shrink-0 min-w-16"
                 >
-                  {nicknameBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "변경"}
+                  {nicknameBusy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    dict.profile.changeButton
+                  )}
                 </button>
               </div>
               {nicknameError && (
@@ -663,10 +674,8 @@ export default function ProfilePage() {
 
             <div className="flex flex-col gap-2">
               <label htmlFor="country-input" className="text-xs font-bold text-text-muted">
-                국가/지역{" "}
-                <span className="font-normal text-text-muted">
-                  (선택, 자기 신고 정보이며 국적 인증이 아닙니다)
-                </span>
+                {dict.profile.countryLabel}{" "}
+                <span className="font-normal text-text-muted">{dict.profile.countryHint}</span>
               </label>
               <div className="flex gap-2">
                 <select
@@ -675,7 +684,7 @@ export default function ProfilePage() {
                   onChange={(e) => setCountryInput(e.target.value)}
                   className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-surface border border-border text-sm text-text-primary focus:outline-none focus:border-brand/50"
                 >
-                  <option value="">설정 안 함</option>
+                  <option value="">{dict.profile.countryNotSet}</option>
                   {COUNTRY_OPTIONS.map((c) => (
                     <option key={c.code} value={c.code}>
                       {c.labelKo}
@@ -688,7 +697,11 @@ export default function ProfilePage() {
                   disabled={countryBusy || countryInput === (user.country ?? "")}
                   className="flex items-center justify-center px-4 py-2.5 bg-brand text-white border border-brand rounded-xl font-bold text-xs hover:bg-brand-dark transition-all cursor-pointer disabled:opacity-50 shrink-0 min-w-16"
                 >
-                  {countryBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : "변경"}
+                  {countryBusy ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    dict.profile.changeButton
+                  )}
                 </button>
               </div>
               {countryError && (
@@ -706,7 +719,10 @@ export default function ProfilePage() {
                   {dict.profile.favoritesTitle}
                 </h2>
               </div>
-              <span className="text-xs font-bold text-text-muted">{favoriteGames.length}개</span>
+              <span className="text-xs font-bold text-text-muted">
+                {favoriteGames.length}
+                {dict.profile.itemsCountSuffix}
+              </span>
             </div>
 
             {favoriteGames.length === 0 ? (
@@ -734,12 +750,15 @@ export default function ProfilePage() {
                   {dict.profile.recentPlaysTitle}
                 </h2>
               </div>
-              <span className="text-xs font-bold text-text-muted">{recentGames.length}개</span>
+              <span className="text-xs font-bold text-text-muted">
+                {recentGames.length}
+                {dict.profile.itemsCountSuffix}
+              </span>
             </div>
 
             {recentGames.length === 0 ? (
               <div className="p-5 rounded-2xl bg-surface-raised border border-border text-xs text-text-muted">
-                아직 플레이 기록이 없습니다. 게임을 플레이하면 여기에 표시돼요.
+                {dict.profile.emptyRecentPlays}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -754,7 +773,9 @@ export default function ProfilePage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <Link2 className="w-5 h-5 text-brand" />
-              <h2 className="text-xl font-bold text-text-primary">연결된 로그인 계정</h2>
+              <h2 className="text-xl font-bold text-text-primary">
+                {dict.profile.connectedAccountsTitle}
+              </h2>
             </div>
             <div className="flex flex-col gap-3">
               {ALL_PROVIDERS.map((provider) => {
@@ -775,7 +796,7 @@ export default function ProfilePage() {
                             : "bg-surface text-text-muted border-border"
                         }`}
                       >
-                        {linked ? "연결됨" : "연결 안 됨"}
+                        {linked ? dict.profile.linkedStatus : dict.profile.notLinkedStatus}
                       </span>
                     </div>
                     {linked ? (
@@ -790,7 +811,7 @@ export default function ProfilePage() {
                         ) : (
                           <Unlink className="w-3.5 h-3.5" />
                         )}
-                        <span>연결 해제</span>
+                        <span>{dict.profile.unlinkButton}</span>
                       </button>
                     ) : (
                       <button
@@ -808,7 +829,7 @@ export default function ProfilePage() {
                         ) : (
                           <Link2 className="w-3.5 h-3.5" />
                         )}
-                        <span>연결</span>
+                        <span>{dict.profile.linkButton}</span>
                       </button>
                     )}
                   </div>
@@ -822,12 +843,11 @@ export default function ProfilePage() {
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <Video className="w-5 h-5 text-brand" />
-                <h2 className="text-xl font-bold text-text-primary">크리에이터 채널 소유권 인증</h2>
+                <h2 className="text-xl font-bold text-text-primary">
+                  {dict.profile.creatorVerificationTitle}
+                </h2>
               </div>
-              <p className="text-xs text-text-muted">
-                공식 OAuth / API를 통해 해당 채널을 직접 소유하고 있음을 검증합니다. (셀프 텍스트
-                입력 및 웹 스크래핑 금지)
-              </p>
+              <p className="text-xs text-text-muted">{dict.profile.creatorVerificationSubtitle}</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -848,11 +868,11 @@ export default function ProfilePage() {
                         {verifiedAcc ? (
                           <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-accent-green/10 text-accent-green border border-accent-green/30">
                             <CheckCircle2 className="w-3 h-3 text-accent-green" />
-                            소유권 인증됨
+                            {dict.profile.ownershipVerified}
                           </span>
                         ) : (
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-surface text-text-muted border border-border">
-                            미인증
+                            {dict.profile.unverified}
                           </span>
                         )}
                       </div>
@@ -870,15 +890,17 @@ export default function ProfilePage() {
                           {verifiedAcc.channelHandle ? `(${verifiedAcc.channelHandle})` : ""}
                         </a>
                         <p className="text-[10px] text-text-muted">
-                          ✓ GAMEMOA가 해당 사용자의 채널 소유권을 공식 API로 확인했습니다.
+                          {dict.profile.verifiedConfirmedText}
                         </p>
                         {/* audienceCount === null means UNKNOWN (never obtained via official
-                            API) — never rendered as 0명; the line is simply omitted. */}
+                            API) — never rendered as 0; the line is simply omitted. */}
                         {verifiedAcc.audienceCount !== null && (
                           <p className="text-[10px] text-text-muted">
-                            구독자/팔로워 {verifiedAcc.audienceCount.toLocaleString()}명
+                            {dict.profile.audienceCountLabel}{" "}
+                            {verifiedAcc.audienceCount.toLocaleString()}
+                            {dict.profile.audienceUnit}
                             {verifiedAcc.metricsSyncedAt
-                              ? ` · 지표 동기화 ${verifiedAcc.metricsSyncedAt.split("T")[0]}`
+                              ? ` ${dict.profile.metricsSyncedPrefix} ${verifiedAcc.metricsSyncedAt.split("T")[0]}`
                               : ""}
                           </p>
                         )}
@@ -891,11 +913,11 @@ export default function ProfilePage() {
                             className="flex items-center justify-center gap-1.5 w-full py-2 bg-brand text-white border border-brand rounded-xl font-bold text-xs hover:bg-brand-dark transition-all cursor-pointer shadow-md"
                           >
                             <Video className="w-3.5 h-3.5" />
-                            <span>채널 소유권 인증</span>
+                            <span>{dict.profile.verifyChannelCta}</span>
                           </a>
                         ) : (
                           <div className="w-full py-2 bg-surface text-text-muted border border-border rounded-xl font-bold text-xs text-center">
-                            현재 인증을 사용할 수 없습니다
+                            {dict.profile.verifyUnavailable}
                           </div>
                         )}
                       </div>
@@ -910,22 +932,21 @@ export default function ProfilePage() {
               <div className="flex flex-col gap-1 p-4 rounded-2xl bg-surface-raised border border-border shadow-md">
                 <div className="flex items-center gap-2">
                   <Award className="w-4 h-4 text-accent-yellow" />
-                  <h3 className="text-sm font-bold text-text-primary">Featured 심사 상태</h3>
+                  <h3 className="text-sm font-bold text-text-primary">
+                    {dict.profile.featuredReviewStatusTitle}
+                  </h3>
                 </div>
                 {creatorProfile.featuredStatus === "FEATURED" ? (
                   <p className="text-xs font-bold text-accent-yellow">
-                    ★ Featured Creator
+                    {dict.profile.featuredCreatorLabel}
                     {creatorProfile.featuredSince
-                      ? ` (${creatorProfile.featuredSince.split("T")[0]} 선정)`
+                      ? ` (${creatorProfile.featuredSince.split("T")[0]} ${dict.profile.featuredSelectedSuffix})`
                       : ""}
                   </p>
                 ) : (
                   <FeaturedReviewStatusLine profile={creatorProfile} />
                 )}
-                <p className="text-[10px] text-text-muted">
-                  Featured는 공식 채널 지표 기반 자격(구독자/팔로워 12,000+ · 채널 120일+)이며 게임
-                  점수·XP·랭킹 순위에는 영향을 주지 않습니다.
-                </p>
+                <p className="text-[10px] text-text-muted">{dict.profile.featuredHint}</p>
               </div>
             )}
           </div>
@@ -943,7 +964,8 @@ export default function ProfilePage() {
               </div>
               {achievements && (
                 <span className="text-xs font-bold text-text-muted">
-                  {achievements.unlockedCodes.length} / {achievements.totalAchievements} 달성
+                  {achievements.unlockedCodes.length} / {achievements.totalAchievements}{" "}
+                  {dict.profile.achievedSuffix}
                 </span>
               )}
             </div>
@@ -976,14 +998,16 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-accent-yellow" />
-                <h2 className="text-xl font-bold text-text-primary">내 게임별 최고 기록</h2>
+                <h2 className="text-xl font-bold text-text-primary">
+                  {dict.profile.myGameRecordsTitle}
+                </h2>
                 <span className="text-xs font-bold text-text-muted">
-                  {recordedGameCount} / {gameManifests.length} 도전
+                  {recordedGameCount} / {gameManifests.length} {dict.profile.challengeSuffix}
                 </span>
               </div>
 
               <Link to="/ranking" className="text-xs font-bold text-brand-light hover:underline">
-                전체 랭킹 보기 →
+                {dict.profile.viewFullRankingArrow}
               </Link>
             </div>
 
@@ -1005,42 +1029,45 @@ export default function ProfilePage() {
 }
 
 function FeaturedReviewStatusLine({ profile }: { profile: CreatorProfileDto }) {
+  const { dict } = useI18n();
   const review = profile.featuredReview;
   const reason = profile.featuredReason;
 
   if (!review) {
-    return (
-      <p className="text-xs font-bold text-text-muted">
-        채널 소유권 인증 완료 후 자동 심사가 시작됩니다. (약 6시간 후 첫 심사)
-      </p>
-    );
+    return <p className="text-xs font-bold text-text-muted">{dict.profile.reviewNotStarted}</p>;
   }
 
   switch (review.status) {
     case "AUTO_REVIEW_PENDING":
       return (
         <p className="text-xs font-bold text-accent-yellow">
-          자동 심사 대기 중
-          {review.nextCheckAt ? ` (다음 심사 ${review.nextCheckAt.split("T")[0]})` : ""}
+          {dict.profile.autoReviewPending}
+          {review.nextCheckAt
+            ? ` ${dict.profile.nextReviewPrefix} ${review.nextCheckAt.split("T")[0]})`
+            : ""}
         </p>
       );
     case "NOT_ELIGIBLE":
       return (
         <p className="text-xs font-bold text-text-muted">
-          현재 기준 미달{reason ? ` — ${reason}` : ""}
+          {dict.profile.notEligible}
+          {reason ? ` — ${reason}` : ""}
         </p>
       );
     case "MANUAL_REVIEW":
       return (
         <p className="text-xs font-bold text-text-muted">
-          추가 확인 필요{reason ? ` — ${reason}` : ""}
+          {dict.profile.manualReviewNeeded}
+          {reason ? ` — ${reason}` : ""}
         </p>
       );
     case "FAILED_RETRYABLE":
       return (
         <p className="text-xs font-bold text-accent-yellow">
-          자동 심사 일시 실패 (재시도 대기)
-          {review.nextCheckAt ? ` — 다음 재시도 ${review.nextCheckAt.split("T")[0]}` : ""}
+          {dict.profile.autoReviewFailed}
+          {review.nextCheckAt
+            ? ` ${dict.profile.nextRetryPrefix} ${review.nextCheckAt.split("T")[0]}`
+            : ""}
         </p>
       );
     default:

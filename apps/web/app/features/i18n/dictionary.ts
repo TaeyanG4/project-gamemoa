@@ -105,6 +105,84 @@ export interface Dictionary {
     recentPlaysTitle: string;
     achievementsTitle: string;
     emptyAchievements: string;
+    noRecordLabel: string;
+    deviceRecordLabel: string;
+    noRecordYetHint: string;
+    justNow: string;
+    minutesAgoSuffix: string;
+    hoursAgoSuffix: string;
+    daysAgoSuffix: string;
+    linkSuccess: string;
+    alreadyLinkedAccount: string;
+    linkError: string;
+    creatorVerifySuccess: string;
+    creatorVerifyConflict: string;
+    creatorVerifyUnconfigured: string;
+    creatorVerifyUnauthorized: string;
+    creatorVerifyError: string;
+    googleScriptNotReady: string;
+    googleLinkSuccess: string;
+    googleAccountInUse: string;
+    googleAlreadyLinked: string;
+    googleLinkFailed: string;
+    unlinkSuccessSuffix: string;
+    lastAuthProviderError: string;
+    unlinkFailed: string;
+    mergeCompleted: string;
+    nicknameUpdated: string;
+    nicknameCooldownPrefix: string;
+    nicknameCooldownSuffix: string;
+    nicknameUpdateFailed: string;
+    countryUpdated: string;
+    countryCooldownPrefix: string;
+    countryCooldownSuffix: string;
+    countryUpdateFailed: string;
+    loginRequiredTitle: string;
+    loginRequiredBody: string;
+    loginRequiredCta: string;
+    backButton: string;
+    levelLabel: string;
+    globalXpRankPrefix: string;
+    totalXpPrefix: string;
+    settingsTitle: string;
+    nicknameLabel: string;
+    nicknamePlaceholder: string;
+    changeButton: string;
+    countryLabel: string;
+    countryHint: string;
+    countryNotSet: string;
+    itemsCountSuffix: string;
+    emptyRecentPlays: string;
+    connectedAccountsTitle: string;
+    linkedStatus: string;
+    notLinkedStatus: string;
+    unlinkButton: string;
+    linkButton: string;
+    creatorVerificationTitle: string;
+    creatorVerificationSubtitle: string;
+    ownershipVerified: string;
+    unverified: string;
+    verifiedConfirmedText: string;
+    audienceCountLabel: string;
+    audienceUnit: string;
+    metricsSyncedPrefix: string;
+    verifyChannelCta: string;
+    verifyUnavailable: string;
+    featuredReviewStatusTitle: string;
+    featuredCreatorLabel: string;
+    featuredSelectedSuffix: string;
+    featuredHint: string;
+    achievedSuffix: string;
+    myGameRecordsTitle: string;
+    challengeSuffix: string;
+    viewFullRankingArrow: string;
+    reviewNotStarted: string;
+    autoReviewPending: string;
+    nextReviewPrefix: string;
+    notEligible: string;
+    manualReviewNeeded: string;
+    autoReviewFailed: string;
+    nextRetryPrefix: string;
   };
   discord: {
     heroTitle1: string;
@@ -460,6 +538,86 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       achievementsTitle: "도전과제",
       emptyAchievements:
         "아직 달성한 도전과제가 없습니다. 게임을 플레이하고 즐겨찾기를 추가해보세요!",
+      noRecordLabel: "계정 기록 없음",
+      deviceRecordLabel: "기기 기록",
+      noRecordYetHint: "아직 기록이 없어요 — 지금 도전해보세요!",
+      justNow: "방금 전",
+      minutesAgoSuffix: "분 전",
+      hoursAgoSuffix: "시간 전",
+      daysAgoSuffix: "일 전",
+      linkSuccess: "로그인 수단이 연결되었습니다.",
+      alreadyLinkedAccount: "이미 연결된 계정입니다.",
+      linkError: "로그인 수단 연결 중 오류가 발생했습니다.",
+      creatorVerifySuccess: "크리에이터 채널 소유권 인증이 완료되었습니다.",
+      creatorVerifyConflict: "이 채널은 이미 다른 GAMEMOA 크리에이터 계정에 연동되어 있습니다.",
+      creatorVerifyUnconfigured: "현재 해당 플랫폼 인증을 사용할 수 없습니다.",
+      creatorVerifyUnauthorized: "로그인이 만료되었습니다. 다시 로그인 해주세요.",
+      creatorVerifyError: "크리에이터 채널 인증 중 오류가 발생했습니다.",
+      googleScriptNotReady: "Google 로그인 스크립트가 준비되지 않았습니다.",
+      googleLinkSuccess: "Google 로그인이 연결되었습니다.",
+      googleAccountInUse: "이 Google 계정은 이미 다른 GAMEMOA 계정으로 사용 중입니다.",
+      googleAlreadyLinked: "이 계정에는 이미 Google 로그인이 연결되어 있습니다.",
+      googleLinkFailed: "Google 연결에 실패했습니다.",
+      unlinkSuccessSuffix: "연결이 해제되었습니다.",
+      lastAuthProviderError: "마지막 로그인 수단은 해제할 수 없습니다.",
+      unlinkFailed: "연결 해제에 실패했습니다.",
+      mergeCompleted: "계정 통합이 완료되었습니다.",
+      nicknameUpdated: "닉네임이 변경되었습니다.",
+      nicknameCooldownPrefix: "닉네임은",
+      nicknameCooldownSuffix: "이후 다시 변경할 수 있습니다.",
+      nicknameUpdateFailed: "닉네임 변경에 실패했습니다.",
+      countryUpdated: "국가/지역이 변경되었습니다.",
+      countryCooldownPrefix: "국가/지역은",
+      countryCooldownSuffix: "이후 다시 변경할 수 있습니다.",
+      countryUpdateFailed: "국가/지역 변경에 실패했습니다.",
+      loginRequiredTitle: "로그인이 필요한 페이지입니다",
+      loginRequiredBody: "구글 또는 디스코드 계정으로 로그인하고 내 게임 기록을 관리하세요.",
+      loginRequiredCta: "로그인하기",
+      backButton: "이전으로 돌아가기",
+      levelLabel: "레벨",
+      globalXpRankPrefix: "전체 XP 랭킹 #",
+      totalXpPrefix: "총 ",
+      settingsTitle: "프로필 설정",
+      nicknameLabel: "닉네임",
+      nicknamePlaceholder: "닉네임을 입력하세요",
+      changeButton: "변경",
+      countryLabel: "국가/지역",
+      countryHint: "(선택, 자기 신고 정보이며 국적 인증이 아닙니다)",
+      countryNotSet: "설정 안 함",
+      itemsCountSuffix: "개",
+      emptyRecentPlays: "아직 플레이 기록이 없습니다. 게임을 플레이하면 여기에 표시돼요.",
+      connectedAccountsTitle: "연결된 로그인 계정",
+      linkedStatus: "연결됨",
+      notLinkedStatus: "연결 안 됨",
+      unlinkButton: "연결 해제",
+      linkButton: "연결",
+      creatorVerificationTitle: "크리에이터 채널 소유권 인증",
+      creatorVerificationSubtitle:
+        "공식 OAuth / API를 통해 해당 채널을 직접 소유하고 있음을 검증합니다. (셀프 텍스트 입력 및 웹 스크래핑 금지)",
+      ownershipVerified: "소유권 인증됨",
+      unverified: "미인증",
+      verifiedConfirmedText: "✓ GAMEMOA가 해당 사용자의 채널 소유권을 공식 API로 확인했습니다.",
+      audienceCountLabel: "구독자/팔로워",
+      audienceUnit: "명",
+      metricsSyncedPrefix: "· 지표 동기화",
+      verifyChannelCta: "채널 소유권 인증",
+      verifyUnavailable: "현재 인증을 사용할 수 없습니다",
+      featuredReviewStatusTitle: "Featured 심사 상태",
+      featuredCreatorLabel: "★ Featured Creator",
+      featuredSelectedSuffix: "선정",
+      featuredHint:
+        "Featured는 공식 채널 지표 기반 자격(구독자/팔로워 12,000+ · 채널 120일+)이며 게임 점수·XP·랭킹 순위에는 영향을 주지 않습니다.",
+      achievedSuffix: "달성",
+      myGameRecordsTitle: "내 게임별 최고 기록",
+      challengeSuffix: "도전",
+      viewFullRankingArrow: "전체 랭킹 보기 →",
+      reviewNotStarted: "채널 소유권 인증 완료 후 자동 심사가 시작됩니다. (약 6시간 후 첫 심사)",
+      autoReviewPending: "자동 심사 대기 중",
+      nextReviewPrefix: "(다음 심사",
+      notEligible: "현재 기준 미달",
+      manualReviewNeeded: "추가 확인 필요",
+      autoReviewFailed: "자동 심사 일시 실패 (재시도 대기)",
+      nextRetryPrefix: "— 다음 재시도",
     },
     discord: {
       heroTitle1: "친구들과 게임 기록을",
@@ -839,6 +997,89 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       recentPlaysTitle: "Recently Played",
       achievementsTitle: "Achievements",
       emptyAchievements: "No achievements yet. Play games and add favorites to unlock some!",
+      noRecordLabel: "No record on this account",
+      deviceRecordLabel: "Device record",
+      noRecordYetHint: "No record yet — give it a try now!",
+      justNow: "just now",
+      minutesAgoSuffix: "m ago",
+      hoursAgoSuffix: "h ago",
+      daysAgoSuffix: "d ago",
+      linkSuccess: "Your login method has been linked.",
+      alreadyLinkedAccount: "This account is already linked.",
+      linkError: "An error occurred while linking your login method.",
+      creatorVerifySuccess: "Creator channel ownership verification is complete.",
+      creatorVerifyConflict:
+        "This channel is already linked to a different GAMEMOA creator account.",
+      creatorVerifyUnconfigured: "Verification for this platform isn't available right now.",
+      creatorVerifyUnauthorized: "Your login has expired. Please log in again.",
+      creatorVerifyError: "An error occurred while verifying your creator channel.",
+      googleScriptNotReady: "The Google login script isn't ready yet.",
+      googleLinkSuccess: "Your Google login has been linked.",
+      googleAccountInUse: "This Google account is already in use by a different GAMEMOA account.",
+      googleAlreadyLinked: "This account already has Google login linked.",
+      googleLinkFailed: "Failed to link your Google account.",
+      unlinkSuccessSuffix: "has been unlinked.",
+      lastAuthProviderError: "You can't unlink your last remaining login method.",
+      unlinkFailed: "Failed to unlink.",
+      mergeCompleted: "Account merge is complete.",
+      nicknameUpdated: "Your nickname has been changed.",
+      nicknameCooldownPrefix: "You can change your nickname again after",
+      nicknameCooldownSuffix: ".",
+      nicknameUpdateFailed: "Failed to change your nickname.",
+      countryUpdated: "Your country/region has been changed.",
+      countryCooldownPrefix: "You can change your country/region again after",
+      countryCooldownSuffix: ".",
+      countryUpdateFailed: "Failed to change your country/region.",
+      loginRequiredTitle: "You need to log in to view this page",
+      loginRequiredBody: "Log in with Google or Discord to manage your game records.",
+      loginRequiredCta: "Log in",
+      backButton: "Go back",
+      levelLabel: "Level",
+      globalXpRankPrefix: "Global XP rank #",
+      totalXpPrefix: "Total ",
+      settingsTitle: "Profile Settings",
+      nicknameLabel: "Nickname",
+      nicknamePlaceholder: "Enter a nickname",
+      changeButton: "Change",
+      countryLabel: "Country/Region",
+      countryHint: "(optional, self-reported — not identity verification)",
+      countryNotSet: "Not set",
+      itemsCountSuffix: "",
+      emptyRecentPlays: "No plays recorded yet. They'll show up here once you play a game.",
+      connectedAccountsTitle: "Connected Login Accounts",
+      linkedStatus: "Linked",
+      notLinkedStatus: "Not linked",
+      unlinkButton: "Unlink",
+      linkButton: "Link",
+      creatorVerificationTitle: "Creator Channel Ownership Verification",
+      creatorVerificationSubtitle:
+        "Verified directly via official OAuth/API that you own the channel. (No self-reported text entry or web scraping.)",
+      ownershipVerified: "Ownership verified",
+      unverified: "Unverified",
+      verifiedConfirmedText:
+        "✓ GAMEMOA confirmed this user's channel ownership via the official API.",
+      audienceCountLabel: "Subscribers/Followers",
+      audienceUnit: "",
+      metricsSyncedPrefix: "· Metrics synced",
+      verifyChannelCta: "Verify channel ownership",
+      verifyUnavailable: "Verification isn't available right now",
+      featuredReviewStatusTitle: "Featured Review Status",
+      featuredCreatorLabel: "★ Featured Creator",
+      featuredSelectedSuffix: "selected",
+      featuredHint:
+        "Featured status is based on official channel metrics (12,000+ subscribers/followers · channel 120+ days old) and has no effect on game scores, XP, or ranking.",
+      achievedSuffix: "unlocked",
+      myGameRecordsTitle: "My Best Records by Game",
+      challengeSuffix: "attempted",
+      viewFullRankingArrow: "View full ranking →",
+      reviewNotStarted:
+        "Automatic review begins once channel ownership verification is complete. (First review in about 6 hours)",
+      autoReviewPending: "Automatic review pending",
+      nextReviewPrefix: "(next review",
+      notEligible: "Not currently eligible",
+      manualReviewNeeded: "Manual review needed",
+      autoReviewFailed: "Automatic review temporarily failed (waiting to retry)",
+      nextRetryPrefix: "— next retry",
     },
     discord: {
       heroTitle1: "Compete and connect with",
@@ -1222,6 +1463,89 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       achievementsTitle: "実績",
       emptyAchievements:
         "まだ達成した実績がありません。ゲームをプレイしてお気に入りを追加してみましょう！",
+      noRecordLabel: "アカウント記録なし",
+      deviceRecordLabel: "端末記録",
+      noRecordYetHint: "まだ記録がありません — 今すぐ挑戦してみましょう！",
+      justNow: "たった今",
+      minutesAgoSuffix: "分前",
+      hoursAgoSuffix: "時間前",
+      daysAgoSuffix: "日前",
+      linkSuccess: "ログイン方法が連携されました。",
+      alreadyLinkedAccount: "すでに連携済みのアカウントです。",
+      linkError: "ログイン方法の連携中にエラーが発生しました。",
+      creatorVerifySuccess: "クリエイターチャンネルの所有権認証が完了しました。",
+      creatorVerifyConflict:
+        "このチャンネルはすでに別のGAMEMOAクリエイターアカウントに連携されています。",
+      creatorVerifyUnconfigured: "現在このプラットフォームの認証は利用できません。",
+      creatorVerifyUnauthorized: "ログインの有効期限が切れました。再度ログインしてください。",
+      creatorVerifyError: "クリエイターチャンネル認証中にエラーが発生しました。",
+      googleScriptNotReady: "Googleログインスクリプトの準備ができていません。",
+      googleLinkSuccess: "Googleログインが連携されました。",
+      googleAccountInUse: "このGoogleアカウントはすでに別のGAMEMOAアカウントで使用されています。",
+      googleAlreadyLinked: "このアカウントにはすでにGoogleログインが連携されています。",
+      googleLinkFailed: "Google連携に失敗しました。",
+      unlinkSuccessSuffix: "の連携が解除されました。",
+      lastAuthProviderError: "最後のログイン方法は解除できません。",
+      unlinkFailed: "連携解除に失敗しました。",
+      mergeCompleted: "アカウント統合が完了しました。",
+      nicknameUpdated: "ニックネームが変更されました。",
+      nicknameCooldownPrefix: "ニックネームは",
+      nicknameCooldownSuffix: "以降に再度変更できます。",
+      nicknameUpdateFailed: "ニックネームの変更に失敗しました。",
+      countryUpdated: "国/地域が変更されました。",
+      countryCooldownPrefix: "国/地域は",
+      countryCooldownSuffix: "以降に再度変更できます。",
+      countryUpdateFailed: "国/地域の変更に失敗しました。",
+      loginRequiredTitle: "ログインが必要なページです",
+      loginRequiredBody: "GoogleまたはDiscordアカウントでログインしてゲーム記録を管理しましょう。",
+      loginRequiredCta: "ログインする",
+      backButton: "前のページに戻る",
+      levelLabel: "レベル",
+      globalXpRankPrefix: "全体XPランキング #",
+      totalXpPrefix: "合計 ",
+      settingsTitle: "プロフィール設定",
+      nicknameLabel: "ニックネーム",
+      nicknamePlaceholder: "ニックネームを入力してください",
+      changeButton: "変更",
+      countryLabel: "国/地域",
+      countryHint: "（任意、自己申告情報であり国籍認証ではありません）",
+      countryNotSet: "設定しない",
+      itemsCountSuffix: "件",
+      emptyRecentPlays: "まだプレイ記録がありません。ゲームをプレイするとここに表示されます。",
+      connectedAccountsTitle: "連携中のログインアカウント",
+      linkedStatus: "連携済み",
+      notLinkedStatus: "未連携",
+      unlinkButton: "連携解除",
+      linkButton: "連携する",
+      creatorVerificationTitle: "クリエイターチャンネル所有権認証",
+      creatorVerificationSubtitle:
+        "公式OAuth/APIを通じて、当該チャンネルを直接所有していることを検証します。（自己申告のテキスト入力やWebスクレイピングは禁止）",
+      ownershipVerified: "所有権認証済み",
+      unverified: "未認証",
+      verifiedConfirmedText:
+        "✓ GAMEMOAが公式APIを通じてこのユーザーのチャンネル所有権を確認しました。",
+      audienceCountLabel: "登録者/フォロワー",
+      audienceUnit: "人",
+      metricsSyncedPrefix: "・指標同期",
+      verifyChannelCta: "チャンネル所有権認証",
+      verifyUnavailable: "現在認証を利用できません",
+      featuredReviewStatusTitle: "Featured審査状況",
+      featuredCreatorLabel: "★ Featured Creator",
+      featuredSelectedSuffix: "選定",
+      featuredHint:
+        "Featuredは公式チャンネル指標に基づく資格（登録者/フォロワー12,000人以上・チャンネル開設120日以上）であり、ゲームスコア・XP・ランキング順位には影響しません。",
+      achievedSuffix: "達成",
+      myGameRecordsTitle: "自分のゲーム別最高記録",
+      challengeSuffix: "挑戦",
+      viewFullRankingArrow: "全体ランキングを見る →",
+      reviewNotStarted:
+        "チャンネル所有権認証完了後、自動審査が開始されます。（約6時間後に初回審査）",
+      autoReviewPending: "自動審査待機中",
+      nextReviewPrefix: "（次回審査",
+      notEligible: "現在基準未達",
+      manualReviewNeeded: "追加確認が必要",
+      autoReviewFailed: "自動審査が一時的に失敗しました（再試行待ち）",
+      nextRetryPrefix: "— 次回再試行",
     },
     discord: {
       heroTitle1: "友達とゲーム記録を",
@@ -1603,6 +1927,86 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       recentPlaysTitle: "最近玩过",
       achievementsTitle: "成就",
       emptyAchievements: "还没有解锁的成就。快去玩游戏并添加收藏吧！",
+      noRecordLabel: "该账户暂无记录",
+      deviceRecordLabel: "设备记录",
+      noRecordYetHint: "还没有记录 — 现在就去挑战吧！",
+      justNow: "刚刚",
+      minutesAgoSuffix: "分钟前",
+      hoursAgoSuffix: "小时前",
+      daysAgoSuffix: "天前",
+      linkSuccess: "登录方式已关联。",
+      alreadyLinkedAccount: "该账户已经关联。",
+      linkError: "关联登录方式时发生错误。",
+      creatorVerifySuccess: "创作者频道所有权认证已完成。",
+      creatorVerifyConflict: "该频道已关联到另一个 GAMEMOA 创作者账户。",
+      creatorVerifyUnconfigured: "当前该平台的认证暂不可用。",
+      creatorVerifyUnauthorized: "登录已过期，请重新登录。",
+      creatorVerifyError: "创作者频道认证过程中发生错误。",
+      googleScriptNotReady: "Google 登录脚本尚未准备就绪。",
+      googleLinkSuccess: "Google 登录已关联。",
+      googleAccountInUse: "该 Google 账户已被另一个 GAMEMOA 账户使用。",
+      googleAlreadyLinked: "该账户已经关联了 Google 登录。",
+      googleLinkFailed: "关联 Google 账户失败。",
+      unlinkSuccessSuffix: "的关联已解除。",
+      lastAuthProviderError: "无法解除最后一个登录方式的关联。",
+      unlinkFailed: "解除关联失败。",
+      mergeCompleted: "账户合并已完成。",
+      nicknameUpdated: "昵称已修改。",
+      nicknameCooldownPrefix: "昵称需在",
+      nicknameCooldownSuffix: "之后才能再次修改。",
+      nicknameUpdateFailed: "修改昵称失败。",
+      countryUpdated: "国家/地区已修改。",
+      countryCooldownPrefix: "国家/地区需在",
+      countryCooldownSuffix: "之后才能再次修改。",
+      countryUpdateFailed: "修改国家/地区失败。",
+      loginRequiredTitle: "此页面需要登录",
+      loginRequiredBody: "使用 Google 或 Discord 账户登录，管理你的游戏记录。",
+      loginRequiredCta: "去登录",
+      backButton: "返回上一页",
+      levelLabel: "等级",
+      globalXpRankPrefix: "全局 XP 排名 #",
+      totalXpPrefix: "共 ",
+      settingsTitle: "个人资料设置",
+      nicknameLabel: "昵称",
+      nicknamePlaceholder: "请输入昵称",
+      changeButton: "修改",
+      countryLabel: "国家/地区",
+      countryHint: "（可选，为自行填写信息，并非国籍认证）",
+      countryNotSet: "未设置",
+      itemsCountSuffix: " 个",
+      emptyRecentPlays: "暂无游玩记录。游玩游戏后会显示在这里。",
+      connectedAccountsTitle: "已关联的登录账户",
+      linkedStatus: "已关联",
+      notLinkedStatus: "未关联",
+      unlinkButton: "解除关联",
+      linkButton: "关联",
+      creatorVerificationTitle: "创作者频道所有权认证",
+      creatorVerificationSubtitle:
+        "通过官方 OAuth / API 验证你直接拥有该频道。（禁止自行填写文本或网页抓取）",
+      ownershipVerified: "已认证所有权",
+      unverified: "未认证",
+      verifiedConfirmedText: "✓ GAMEMOA 已通过官方 API 确认该用户的频道所有权。",
+      audienceCountLabel: "订阅者/关注者",
+      audienceUnit: " 人",
+      metricsSyncedPrefix: "· 数据同步于",
+      verifyChannelCta: "认证频道所有权",
+      verifyUnavailable: "当前无法使用认证功能",
+      featuredReviewStatusTitle: "Featured 审核状态",
+      featuredCreatorLabel: "★ Featured Creator",
+      featuredSelectedSuffix: "入选",
+      featuredHint:
+        "Featured 基于官方频道数据资格（订阅者/关注者 12,000+ · 频道运营 120 天以上），不会影响游戏分数、XP 或排行榜排名。",
+      achievedSuffix: "已达成",
+      myGameRecordsTitle: "我的各游戏最高记录",
+      challengeSuffix: "已挑战",
+      viewFullRankingArrow: "查看完整排行榜 →",
+      reviewNotStarted: "频道所有权认证完成后将开始自动审核。（约 6 小时后进行首次审核）",
+      autoReviewPending: "自动审核等待中",
+      nextReviewPrefix: "（下次审核",
+      notEligible: "当前未达标准",
+      manualReviewNeeded: "需要进一步确认",
+      autoReviewFailed: "自动审核暂时失败（等待重试）",
+      nextRetryPrefix: "— 下次重试",
     },
     discord: {
       heroTitle1: "与朋友一起",
