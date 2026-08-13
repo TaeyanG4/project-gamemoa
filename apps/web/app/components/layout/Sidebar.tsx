@@ -21,7 +21,12 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   return (
     <>
       {/* Desktop Sidebar (CrazyGames style: compact w-16 or expanded w-56) */}
-      <aside className="hidden lg:flex flex-col w-16 hover:w-56 transition-all duration-300 ease-in-out bg-surface-sidebar border-r border-border h-[calc(100vh-4rem)] sticky top-16 z-40 group shadow-2xl overflow-hidden shrink-0 select-none">
+      {/* z-30: strictly below Header's z-40. Both are `sticky` and Header is h-16 (Sidebar's
+          `top-16` sticky offset matches exactly), so they shouldn't normally overlap — but
+          they previously shared the same z-40, meaning any transient overlap (e.g. mid-scroll,
+          or the sidebar's own shadow-2xl bleeding upward) let the sidebar's later DOM position
+          paint over the header instead of under it, hiding the logo. Header must always win. */}
+      <aside className="hidden lg:flex flex-col w-16 hover:w-56 transition-all duration-300 ease-in-out bg-surface-sidebar border-r border-border h-[calc(100vh-4rem)] sticky top-16 z-30 group shadow-2xl overflow-hidden shrink-0 select-none">
         <div className="flex flex-col justify-between h-full p-2">
           {/* Main Nav */}
           <div className="flex flex-col gap-1.5">

@@ -259,6 +259,10 @@ function main() {
   const png180 = rasterize(180);
   const png192 = rasterize(192);
   const png512 = rasterize(512);
+  // 1024x1024 isn't consumed by the web app itself — no <link>/manifest entry references it —
+  // but third-party surfaces (Discord Developer Portal's App Icon field recommends 1024x1024,
+  // future app-store-style listings) want a higher-resolution source than 512 provides.
+  const png1024 = rasterize(1024);
 
   writeOut("favicon-16x16.png", png16);
   writeOut("favicon-32x32.png", png32);
@@ -266,6 +270,7 @@ function main() {
   writeOut("favicon-180x180.png", png180);
   writeOut("favicon-192x192.png", png192);
   writeOut("favicon-512x512.png", png512);
+  writeOut("favicon-1024x1024.png", png1024);
   writeOut("apple-touch-icon.png", png180);
   writeOut(
     "favicon.ico",
