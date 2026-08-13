@@ -205,17 +205,25 @@ Creator provider는 선택적 통합입니다. 일부 또는 전체가 미설정
 
 순수 도메인 정책으로 모든 기준이 단일 파일에 상수로 문서화되어 있습니다 (`FEATURED_POLICY`).
 
-| 상수                                    | 값      | 의미                                                             |
-| :-------------------------------------- | :------ | :--------------------------------------------------------------- |
-| `ACQUISITION_AUDIENCE_MIN`              | 10,000  | 이 미만 → `NOT_ELIGIBLE`                                         |
-| `ACQUISITION_AUDIENCE_AUTO`             | 12,000  | 이 이상 → 자동 심사 후보                                         |
-| `ACQUISITION_CHANNEL_AGE_MIN_DAYS`      | 90일    | 이 미만 → `NOT_ELIGIBLE`                                         |
-| `ACQUISITION_CHANNEL_AGE_AUTO_DAYS`     | 120일   | 이 이상 → 자동 심사 후보                                         |
-| `RETENTION_AUDIENCE_FLOOR`              | 8,000   | E2B 재검증 하이스테리시스용 문서화 기준 (E2A에서 배지 제거 없음) |
-| `REVIEW_INTERVAL_MS`                    | 6시간   | 1차 심사 주기                                                    |
-| `RETRY_INTERVAL_MS`                     | 6시간   | 실패 재시도 주기                                                 |
-| `MAX_ATTEMPTS`                          | 5회     | 초과 시 `MANUAL_REVIEW` 종결                                     |
-| `MAX_BATCH_SIZE` / `DEFAULT_BATCH_SIZE` | 50 / 20 | 스케줄 배치 상한 (unbounded scan 금지)                           |
+> **TEMPORARY (운영자 지시, 2026-08-14)**: `ACQUISITION_AUDIENCE_MIN` /
+> `ACQUISITION_CHANNEL_AGE_MIN_DAYS` / `RETENTION_AUDIENCE_FLOOR`는 운영자 본인의 소규모
+> YouTube/CHZZK/SOOP/Twitch 테스트 계정으로 소유권 인증 → 관리자 수동 심사(승인/미승인) 전체
+> 플로우를 끝까지 검증할 수 있도록 현재 0으로 낮춰져 있습니다(정상 값은 각각 10,000 / 90일 /
+> 8,000 — 아래 표의 괄호 값). `ACQUISITION_AUDIENCE_AUTO` / `ACQUISITION_CHANNEL_AGE_AUTO_DAYS`는
+> 그대로이므로, 이 기간에도 소규모 계정이 자동으로 FEATURED가 되지는 않고 항상 관리자 수동 심사
+> 큐(`/admin/creators`)로 들어갑니다. 실사용자 트래픽이 늘어나면 원래 값으로 복원해야 합니다.
+
+| 상수                                    | 값                | 의미                                                             |
+| :-------------------------------------- | :---------------- | :--------------------------------------------------------------- |
+| `ACQUISITION_AUDIENCE_MIN`              | 0 (정상값 10,000) | 이 미만 → `NOT_ELIGIBLE`                                         |
+| `ACQUISITION_AUDIENCE_AUTO`             | 12,000            | 이 이상 → 자동 심사 후보                                         |
+| `ACQUISITION_CHANNEL_AGE_MIN_DAYS`      | 0 (정상값 90일)   | 이 미만 → `NOT_ELIGIBLE`                                         |
+| `ACQUISITION_CHANNEL_AGE_AUTO_DAYS`     | 120일             | 이 이상 → 자동 심사 후보                                         |
+| `RETENTION_AUDIENCE_FLOOR`              | 0 (정상값 8,000)  | E2B 재검증 하이스테리시스용 문서화 기준 (E2A에서 배지 제거 없음) |
+| `REVIEW_INTERVAL_MS`                    | 6시간             | 1차 심사 주기                                                    |
+| `RETRY_INTERVAL_MS`                     | 6시간             | 실패 재시도 주기                                                 |
+| `MAX_ATTEMPTS`                          | 5회               | 초과 시 `MANUAL_REVIEW` 종결                                     |
+| `MAX_BATCH_SIZE` / `DEFAULT_BATCH_SIZE` | 50 / 20           | 스케줄 배치 상한 (unbounded scan 금지)                           |
 
 **의사 결정 규칙**:
 

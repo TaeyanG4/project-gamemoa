@@ -29,6 +29,26 @@ export default function WikiCreatorVerificationRoute() {
       </section>
 
       <section>
+        <h2 className="text-lg font-black text-text-primary">인증 조건</h2>
+        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-text-secondary">
+          <li>
+            위 4개 플랫폼(YouTube · CHZZK · SOOP · Twitch) 중{" "}
+            <b className="text-text-primary">단 하나만</b> 인증에 성공하면 GAMEMOA Creator로
+            인정되며, 4개를 모두 인증할 필요는 없습니다.
+          </li>
+          <li>
+            현재 구독자/팔로워 수나 채널 개설 기간에 대한 최소 기준은 요구하지 않습니다. 채널
+            소유권만 공식 OAuth로 확인되면 됩니다.
+          </li>
+          <li>
+            소유권 인증은 항상 각 플랫폼의 공식 OAuth 로그인 화면을 통해서만 이루어지며, 채널
+            URL이나 닉네임을 직접 입력하는 방식은 지원하지 않습니다.
+          </li>
+          <li>하나의 외부 채널은 한 GAMEMOA 계정에만 연동할 수 있습니다(1채널 = 1계정).</li>
+        </ul>
+      </section>
+
+      <section>
         <h2 className="text-lg font-black text-text-primary">인증 방법</h2>
         <div className="mt-3">
           <WikiSteps

@@ -44,6 +44,12 @@ export default function WikiCreatorFeaturedRoute() {
         노출됩니다.
       </WikiCallout>
 
+      <WikiCallout tone="warning">
+        현재는 서비스 검증 단계라 Featured가 자동으로 부여되지 않고, 채널 소유권이 인증된 모든
+        Creator가 운영진 수동 심사 대기 상태를 거칩니다. 스트리머 랭킹에는 Featured 여부와 무관하게
+        동일하게 노출되며, Featured 배지도 아직 공개적으로 표시하지 않습니다.
+      </WikiCallout>
+
       <p className="text-xs text-text-muted">
         운영진의 심사 기준과 절차는 내부 운영 문서로 별도 관리되며, 특정 수치를 공개하지 않습니다 —
         심사는 항상 공식 API로 확인 가능한 지표만 사용합니다.

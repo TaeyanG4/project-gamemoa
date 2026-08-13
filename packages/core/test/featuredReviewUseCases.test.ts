@@ -512,7 +512,10 @@ test("runDueFeaturedReviews — qualified recheck promotes profile to FEATURED a
   );
 });
 
-test("runDueFeaturedReviews — audience drop below minimum → NOT_ELIGIBLE and badge not granted", async () => {
+// ACQUISITION_AUDIENCE_MIN / ACQUISITION_CHANNEL_AGE_MIN_DAYS are TEMPORARILY 0 (see
+// featuredPolicy.ts, 운영자 지시 2026-08-14), so a below-auto-threshold audience now routes to
+// MANUAL_REVIEW instead of NOT_ELIGIBLE — nobody is silently rejected during the testing phase.
+test("runDueFeaturedReviews — audience below auto threshold → MANUAL_REVIEW, badge not granted", async () => {
   const repo = new MemoryCreatorRepo();
   const reviewRepo = new MemoryReviewRepo();
   const { useCases, account } = await setupVerifiedAccount(repo, reviewRepo, 8);
@@ -530,9 +533,9 @@ test("runDueFeaturedReviews — audience drop below minimum → NOT_ELIGIBLE and
 
   const profile = await repo.findProfileByUserId(8);
   assert.equal(profile?.featuredStatus, "NONE");
-  assert.match(profile?.featuredReason ?? "", /기준 미달/);
+  assert.match(profile?.featuredReason ?? "", /추가 확인/);
   const job = await reviewRepo.findLatestJobByAccountIds([account.id]);
-  assert.equal(job?.status, "NOT_ELIGIBLE");
+  assert.equal(job?.status, "MANUAL_REVIEW");
 });
 
 test("runDueFeaturedReviews — missing metrics → MANUAL_REVIEW without guessing", async () => {
@@ -752,7 +755,10 @@ test("runDueFeaturedRevalidations — fresh audience >= 8,000 retains Featured a
   );
 });
 
-test("runDueFeaturedRevalidations — fresh audience below 8,000 revokes Featured", async () => {
+// RETENTION_AUDIENCE_FLOOR is TEMPORARILY 0 (see featuredPolicy.ts, 운영자 지시 2026-08-14), so a
+// manually-approved low-subscriber test account is retained rather than auto-revoked at the
+// 14-day revalidation checkpoint.
+test("runDueFeaturedRevalidations — fresh audience below normal 8,000 floor still retains Featured (floor temporarily 0)", async () => {
   const { repo, useCases } = await setupFeaturedForRevalidation(31);
   const summary = await useCases.runDueFeaturedRevalidations({
     adapters: makeAdapters({
@@ -766,10 +772,9 @@ test("runDueFeaturedRevalidations — fresh audience below 8,000 revokes Feature
     batchSize: 10,
   });
 
-  assert.equal(summary.revoked, 1);
+  assert.equal(summary.retained, 1);
   const profile = await repo.findProfileByUserId(31);
-  assert.equal(profile?.featuredStatus, "NONE");
-  assert.equal(profile?.featuredSince, null);
+  assert.equal(profile?.featuredStatus, "FEATURED");
 });
 
 test("runDueFeaturedRevalidations — temporary provider error preserves Featured and retries", async () => {

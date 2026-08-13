@@ -520,20 +520,13 @@ export default function Ranking() {
                         </td>
 
                         <td className="py-4 px-6 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                              record.featuredStatus === "PARTNER"
-                                ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
-                                : record.featuredStatus === "FEATURED"
-                                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                                  : "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
-                            }`}
-                          >
-                            {record.featuredStatus === "PARTNER"
-                              ? "PARTNER CREATOR"
-                              : record.featuredStatus === "FEATURED"
-                                ? "FEATURED CREATOR"
-                                : "VERIFIED CREATOR"}
+                          {/* Featured/Partner 배지는 현재 공개 노출하지 않습니다 — 심사 최소 기준을
+                              임시로 낮춘 테스트 단계라, 관리자가 실제로 승인하기 전까지는 모든
+                              검증된 크리에이터를 동일하게 "CREATOR"로만 표시합니다. 실제
+                              featuredStatus는 계속 계산/저장되며 관리자 화면(/admin/creators)에서만
+                              확인할 수 있습니다. */}
+                          <span className="inline-flex items-center rounded-full border border-indigo-500/30 bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-300">
+                            CREATOR
                           </span>
                         </td>
 

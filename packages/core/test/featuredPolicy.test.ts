@@ -31,25 +31,30 @@ test("evaluateFeaturedInitial — ownership not verified → NOT_ELIGIBLE", () =
   assert.match(d.reason, /소유권/);
 });
 
-test("evaluateFeaturedInitial — audience below min → NOT_ELIGIBLE", () => {
+// NOTE: ACQUISITION_AUDIENCE_MIN / ACQUISITION_CHANNEL_AGE_MIN_DAYS are TEMPORARILY 0
+// (see featuredPolicy.ts comment, 운영자 지시 2026-08-14) so a small/new test channel can
+// never be silently NOT_ELIGIBLE — it always lands in MANUAL_REVIEW instead, where an admin
+// can act on it. The tests below document that behavior; the ACQUISITION_AUDIENCE_AUTO /
+// ACQUISITION_CHANNEL_AGE_AUTO_DAYS thresholds (unchanged) still gate automatic promotion.
+test("evaluateFeaturedInitial — tiny audience & brand-new channel → MANUAL_REVIEW, never NOT_ELIGIBLE (temporary no-minimum policy)", () => {
   const d = evaluateFeaturedInitial({
     ownershipVerified: true,
-    audienceCount: 9999,
-    channelCreatedAt: isoDaysAgo(500),
+    audienceCount: 5,
+    channelCreatedAt: isoDaysAgo(1),
     nowMs: NOW_MS,
   });
-  assert.equal(d.status, "NOT_ELIGIBLE");
-  assert.match(d.reason, /기준 미달/);
+  assert.equal(d.status, "MANUAL_REVIEW");
+  assert.match(d.reason, /추가 확인/);
 });
 
-test("evaluateFeaturedInitial — channel younger than 90 days → NOT_ELIGIBLE", () => {
+test("evaluateFeaturedInitial — channel younger than 90 days but large audience → MANUAL_REVIEW (auto-age threshold unchanged)", () => {
   const d = evaluateFeaturedInitial({
     ownershipVerified: true,
     audienceCount: 50000,
     channelCreatedAt: isoDaysAgo(89),
     nowMs: NOW_MS,
   });
-  assert.equal(d.status, "NOT_ELIGIBLE");
+  assert.equal(d.status, "MANUAL_REVIEW");
 });
 
 test("evaluateFeaturedInitial — 10,000+ audience & 90d+ but below auto threshold → MANUAL_REVIEW", () => {
@@ -111,22 +116,22 @@ test("evaluateFeaturedRecheck — qualified metrics → FEATURED", () => {
   assert.equal(d.status, "FEATURED");
 });
 
-test("evaluateFeaturedRecheck — audience drops below min → NOT_ELIGIBLE", () => {
+test("evaluateFeaturedRecheck — audience below acquisition-auto threshold → MANUAL_REVIEW, never NOT_ELIGIBLE (temporary no-minimum policy)", () => {
   const d = evaluateFeaturedRecheck({
     audienceCount: 9999,
     channelCreatedAt: isoDaysAgo(500),
     nowMs: NOW_MS,
   });
-  assert.equal(d.status, "NOT_ELIGIBLE");
+  assert.equal(d.status, "MANUAL_REVIEW");
 });
 
-test("evaluateFeaturedRecheck — 9,000 between retention floor and acquisition min → NOT_ELIGIBLE (E2B hysteresis not active in E2A)", () => {
+test("evaluateFeaturedRecheck — 9,000 (below acquisition-auto threshold) → MANUAL_REVIEW", () => {
   const d = evaluateFeaturedRecheck({
     audienceCount: 9000,
     channelCreatedAt: isoDaysAgo(500),
     nowMs: NOW_MS,
   });
-  assert.equal(d.status, "NOT_ELIGIBLE");
+  assert.equal(d.status, "MANUAL_REVIEW");
 });
 
 test("evaluateFeaturedRecheck — missing metrics → MANUAL_REVIEW", () => {
@@ -139,11 +144,14 @@ test("evaluateFeaturedRecheck — missing metrics → MANUAL_REVIEW", () => {
 });
 
 test("FEATURED_POLICY — thresholds are explicit and documented", () => {
-  assert.equal(FEATURED_POLICY.ACQUISITION_AUDIENCE_MIN, 10000);
+  // ACQUISITION_AUDIENCE_MIN / ACQUISITION_CHANNEL_AGE_MIN_DAYS / RETENTION_AUDIENCE_FLOOR are
+  // TEMPORARILY 0 (운영자 지시, 2026-08-14) — normal values are 10000 / 90 / 8000, see the
+  // comment in featuredPolicy.ts for the restore plan.
+  assert.equal(FEATURED_POLICY.ACQUISITION_AUDIENCE_MIN, 0);
   assert.equal(FEATURED_POLICY.ACQUISITION_AUDIENCE_AUTO, 12000);
-  assert.equal(FEATURED_POLICY.ACQUISITION_CHANNEL_AGE_MIN_DAYS, 90);
+  assert.equal(FEATURED_POLICY.ACQUISITION_CHANNEL_AGE_MIN_DAYS, 0);
   assert.equal(FEATURED_POLICY.ACQUISITION_CHANNEL_AGE_AUTO_DAYS, 120);
-  assert.equal(FEATURED_POLICY.RETENTION_AUDIENCE_FLOOR, 8000);
+  assert.equal(FEATURED_POLICY.RETENTION_AUDIENCE_FLOOR, 0);
   assert.equal(FEATURED_POLICY.REVIEW_INTERVAL_MS, 6 * 60 * 60 * 1000);
   assert.equal(FEATURED_POLICY.RETRY_INTERVAL_MS, 6 * 60 * 60 * 1000);
   assert.equal(FEATURED_POLICY.MAX_ATTEMPTS, 5);
@@ -153,15 +161,10 @@ test("FEATURED_POLICY — thresholds are explicit and documented", () => {
   assert.equal(FEATURED_POLICY.REVALIDATION_RETRY_INTERVAL_MS, 6 * 60 * 60 * 1000);
 });
 
-test("evaluateFeaturedRevalidation — audience at or above 8,000 retains Featured", () => {
+test("evaluateFeaturedRevalidation — any known non-negative audience retains Featured (RETENTION_AUDIENCE_FLOOR temporarily 0)", () => {
+  assert.equal(evaluateFeaturedRevalidation({ audienceCount: 0 }).status, "RETAIN_FEATURED");
   assert.equal(evaluateFeaturedRevalidation({ audienceCount: 8000 }).status, "RETAIN_FEATURED");
   assert.equal(evaluateFeaturedRevalidation({ audienceCount: 12000 }).status, "RETAIN_FEATURED");
-});
-
-test("evaluateFeaturedRevalidation — audience below 8,000 revokes Featured", () => {
-  const decision = evaluateFeaturedRevalidation({ audienceCount: 7999 });
-  assert.equal(decision.status, "REVOKE_FEATURED");
-  assert.match(decision.reason, /유지 기준 미달/);
 });
 
 test("evaluateFeaturedRevalidation — temporary or unavailable metrics preserve badge via manual review", () => {

@@ -19,21 +19,37 @@ export type FeaturedRevalidationDecision = "RETAIN_FEATURED" | "REVOKE_FEATURED"
 export type CreatorChannelState = "ACTIVE" | "NOT_FOUND" | "REVOKED";
 
 export const FEATURED_POLICY = {
-  /** 자격 미달 기준 (audience < 이 값 → NOT_ELIGIBLE) */
-  ACQUISITION_AUDIENCE_MIN: 10_000,
+  /**
+   * 자격 미달 기준 (audience < 이 값 → NOT_ELIGIBLE).
+   *
+   * TEMPORARY (운영자 지시, 2026-08-14): 실사용 검증 단계 — 운영자 본인의 소규모
+   * YouTube/CHZZK/SOOP/Twitch 테스트 계정으로 소유권 인증 → 관리자 수동 심사(승인/미승인)
+   * 전체 플로우를 끝까지 검증하기 위해 0으로 낮췄습니다. 정상 값은 10,000이며, 실사용자
+   * 트래픽이 늘어나면 10_000으로 복원해야 합니다. `ACQUISITION_AUDIENCE_AUTO`(자동 승인
+   * 후보 기준)는 그대로 유지되므로 — 이 값을 0으로 낮춰도 소규모 계정이 자동으로
+   * FEATURED가 되지는 않고, 여전히 관리자 수동 심사 큐로만 들어갑니다.
+   */
+  ACQUISITION_AUDIENCE_MIN: 0,
   /** 자동 심사 후보 기준 (audience >= 이 값 → AUTO_REVIEW_PENDING 후보) */
   ACQUISITION_AUDIENCE_AUTO: 12_000,
-  /** 자격 미달 기준 (채널 나이 < 이 값(일) → NOT_ELIGIBLE) */
-  ACQUISITION_CHANNEL_AGE_MIN_DAYS: 90,
+  /**
+   * 자격 미달 기준 (채널 나이 < 이 값(일) → NOT_ELIGIBLE).
+   * TEMPORARY (운영자 지시, 2026-08-14) — 위 `ACQUISITION_AUDIENCE_MIN`과 동일한 사유로 0.
+   * 정상 값은 90일.
+   */
+  ACQUISITION_CHANNEL_AGE_MIN_DAYS: 0,
   /** 자동 심사 후보 기준 (채널 나이 >= 이 값(일)) */
   ACQUISITION_CHANNEL_AGE_AUTO_DAYS: 120,
   /**
    * 향후 E2B 재검증(revalidation) 하이스테리시스 기반:
-   * - 획득 기준(acquisition baseline): 10,000
+   * - 획득 기준(acquisition baseline): 10,000 (현재 임시로 0)
    * - 유지 기준(suggested retention audience): 8,000
    * 이번 단계(E2A)에서는 배지 제거(aggressive badge removal)를 수행하지 않습니다.
+   *
+   * TEMPORARY (운영자 지시, 2026-08-14) — 관리자가 수동 승인한 소규모 테스트 계정이
+   * 14일 재검증 때 구독자 수만으로 자동 철회되지 않도록 0으로 낮췄습니다. 정상 값은 8,000.
    */
-  RETENTION_AUDIENCE_FLOOR: 8_000,
+  RETENTION_AUDIENCE_FLOOR: 0,
   /** AUTO_REVIEW_PENDING 1차 심사 주기 (약 6시간) */
   REVIEW_INTERVAL_MS: 6 * 60 * 60 * 1000,
   /** FAILED_RETRYABLE 재시도 주기 (약 6시간) */
