@@ -166,8 +166,8 @@ export default function Ranking() {
                 [
                   { id: "ALL", label: dict.ranking.allPlatforms },
                   { id: "YOUTUBE", label: "YouTube" },
-                  { id: "CHZZK", label: "치지직 (CHZZK)" },
-                  { id: "SOOP", label: "SOOP (아프리카)" },
+                  { id: "CHZZK", label: dict.ranking.platformChzzk },
+                  { id: "SOOP", label: dict.ranking.platformSoop },
                   { id: "TWITCH", label: "Twitch" },
                 ] as const
               ).map((p) => (

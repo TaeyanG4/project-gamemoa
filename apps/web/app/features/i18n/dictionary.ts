@@ -72,6 +72,8 @@ export interface Dictionary {
     creatorTab: string;
     allCategories: string;
     allPlatforms: string;
+    platformChzzk: string;
+    platformSoop: string;
     scoreMode: string;
     xpMode: string;
     rankHeader: string;
@@ -468,6 +470,12 @@ export interface Dictionary {
     catGamesDesc: string;
     catCreatorDesc: string;
   };
+  platformIcon: {
+    chzzkLabel: string;
+    soopLabel: string;
+    channelSuffix: string;
+    verifiedPlatforms: string;
+  };
 }
 
 export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
@@ -533,6 +541,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorTab: "스트리머 랭킹",
       allCategories: "전체 종목",
       allPlatforms: "전체 플랫폼",
+      platformChzzk: "치지직 (CHZZK)",
+      platformSoop: "SOOP (아프리카)",
       scoreMode: "게임 점수",
       xpMode: "경험치 (XP)",
       rankHeader: "순위",
@@ -963,6 +973,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       catGamesDesc: "게임 카탈로그, 순위 계산 방식, 경험치(XP)와 레벨.",
       catCreatorDesc: "채널 소유권 인증, 스트리머 랭킹 자격, Featured Creator 기준.",
     },
+    platformIcon: {
+      chzzkLabel: "CHZZK (치지직)",
+      soopLabel: "SOOP (아프리카)",
+      channelSuffix: "채널",
+      verifiedPlatforms: "검증된 플랫폼",
+    },
   },
   "en-US": {
     common: {
@@ -1026,6 +1042,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorTab: "Streamer Ranking",
       allCategories: "All Games",
       allPlatforms: "All Platforms",
+      platformChzzk: "CHZZK",
+      platformSoop: "SOOP",
       scoreMode: "Game Score",
       xpMode: "Experience (XP)",
       rankHeader: "Rank",
@@ -1461,6 +1479,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       catCreatorDesc:
         "Channel ownership verification, streamer ranking eligibility, and Featured Creator criteria.",
     },
+    platformIcon: {
+      chzzkLabel: "CHZZK",
+      soopLabel: "SOOP",
+      channelSuffix: "channel",
+      verifiedPlatforms: "Verified platforms",
+    },
   },
   "ja-JP": {
     common: {
@@ -1524,6 +1548,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorTab: "ストリーマーランキング",
       allCategories: "全種目",
       allPlatforms: "全プラットフォーム",
+      platformChzzk: "CHZZK",
+      platformSoop: "SOOP",
       scoreMode: "ゲームスコア",
       xpMode: "経験値 (XP)",
       rankHeader: "順位",
@@ -1961,6 +1987,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       catGamesDesc: "ゲームカタログ、順位の計算方法、経験値（XP）とレベル。",
       catCreatorDesc: "チャンネル所有権認証、ストリーマーランキング資格、Featured Creator基準。",
     },
+    platformIcon: {
+      chzzkLabel: "CHZZK",
+      soopLabel: "SOOP",
+      channelSuffix: "チャンネル",
+      verifiedPlatforms: "認証済みプラットフォーム",
+    },
   },
   "zh-CN": {
     common: {
@@ -2024,6 +2056,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorTab: "主播排行",
       allCategories: "全部项目",
       allPlatforms: "全部平台",
+      platformChzzk: "CHZZK",
+      platformSoop: "SOOP",
       scoreMode: "游戏分数",
       xpMode: "经验值 (XP)",
       rankHeader: "排名",
@@ -2435,6 +2469,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       catAccountDesc: "登录方式、个人资料设置，以及将多个账户合并为一个的账户合并功能。",
       catGamesDesc: "游戏目录、排名计算方式、经验值（XP）与等级。",
       catCreatorDesc: "频道所有权认证、主播排行榜资格、Featured Creator 标准。",
+    },
+    platformIcon: {
+      chzzkLabel: "CHZZK",
+      soopLabel: "SOOP",
+      channelSuffix: "频道",
+      verifiedPlatforms: "已验证平台",
     },
   },
 };

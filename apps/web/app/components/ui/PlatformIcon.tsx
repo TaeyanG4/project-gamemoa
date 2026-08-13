@@ -1,4 +1,6 @@
 import type { CreatorPlatform } from "@gamemoa/contracts";
+import { useI18n } from "../../features/i18n/I18nContext";
+import type { Dictionary } from "../../features/i18n/dictionary";
 
 /**
  * Lightweight local SVG badges for the four supported Creator platforms — deliberately not
@@ -6,12 +8,16 @@ import type { CreatorPlatform } from "@gamemoa/contracts";
  * circle with a simple glyph; it is not a pixel-accurate trademark reproduction, just a
  * compact, distinguishable, accessible indicator.
  */
-const PLATFORM_META: Record<CreatorPlatform, { label: string; bg: string; fg: string }> = {
-  YOUTUBE: { label: "YouTube", bg: "#FF0000", fg: "#ffffff" },
-  CHZZK: { label: "CHZZK (치지직)", bg: "#1ECB4F", fg: "#0b1b0f" },
-  SOOP: { label: "SOOP (아프리카)", bg: "#1B78FF", fg: "#ffffff" },
-  TWITCH: { label: "Twitch", bg: "#9146FF", fg: "#ffffff" },
-};
+function platformMeta(
+  dict: Dictionary["platformIcon"],
+): Record<CreatorPlatform, { label: string; bg: string; fg: string }> {
+  return {
+    YOUTUBE: { label: "YouTube", bg: "#FF0000", fg: "#ffffff" },
+    CHZZK: { label: dict.chzzkLabel, bg: "#1ECB4F", fg: "#0b1b0f" },
+    SOOP: { label: dict.soopLabel, bg: "#1B78FF", fg: "#ffffff" },
+    TWITCH: { label: "Twitch", bg: "#9146FF", fg: "#ffffff" },
+  };
+}
 
 function PlatformGlyph({ platform }: { platform: CreatorPlatform }) {
   if (platform === "YOUTUBE") {
@@ -57,8 +63,9 @@ export function PlatformIcon({
   href?: string;
   className?: string;
 }) {
-  const meta = PLATFORM_META[platform];
-  const label = `${meta.label} 채널`;
+  const { dict } = useI18n();
+  const meta = platformMeta(dict.platformIcon)[platform];
+  const label = `${meta.label} ${dict.platformIcon.channelSuffix}`;
 
   const badge = (
     <span
@@ -97,6 +104,7 @@ export function PlatformIconRow({
   accounts: Array<{ platform: CreatorPlatform; channelUrl: string }>;
   size?: number;
 }) {
+  const { dict } = useI18n();
   const order: CreatorPlatform[] = ["YOUTUBE", "CHZZK", "SOOP", "TWITCH"];
   const byPlatform = new Map(accounts.map((a) => [a.platform, a] as const));
 
@@ -107,7 +115,7 @@ export function PlatformIconRow({
     );
 
   return (
-    <div className="flex items-center gap-1.5" aria-label="검증된 플랫폼">
+    <div className="flex items-center gap-1.5" aria-label={dict.platformIcon.verifiedPlatforms}>
       {verified.map((account) => (
         <PlatformIcon
           key={account.platform}

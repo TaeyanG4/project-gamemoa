@@ -11,8 +11,9 @@ A. Admin Login Recovery & Managed Admin Accounts     ← 완료
 B. Streamer Ranking Semantics & Platform Icons        ← 완료
 C. Discord Onboarding / Command Automation            ← 완료
 D. Public Wiki                                        ← 완료
-E. Four-Language i18n Foundation & Rollout             ← 기반 완료, 화면 번역 확장 중 (진행형)
+E. Four-Language i18n Foundation & Rollout             ← 기반+주요 화면 완료, 나머지는 운영자 지시로 일시 보류
 F. Full Regression / Production Verification           ← 매 세션 수행
+G. Discord Bot UX/기능 고도화 (신규, 현재 진행 중)      ← Embed 전환 완료, 후속 기능 확장 대기
 ```
 
 ---
@@ -66,6 +67,53 @@ F. Full Regression / Production Verification           ← 매 세션 수행
 ### 검증
 
 - [x] `pnpm verify` 전체 GREEN(로그인 모달/게임/랭킹 사전 확장 포함).
+
+---
+
+## 완료 (같은 세션 후반 — 번역 작업 일시 보류, Discord 봇 기능/완성도 보완)
+
+운영자 지시(2026-08-13): "번역은 나중에 완성도가 높아지면 실행하자 순서를 조정해서 디스코드 봇으로써
+기능과 완성도를 보완하자" — Wiki 본문 번역 등 남은 i18n 작업은 보류하고, Discord 봇 메시지 UX
+고도화(Embed 전환)로 전환.
+
+### `/gamemoa` 봇 응답 전체 Discord Embed 전환
+
+- [x] `games`/`link`/`profile`/`play`/`rank`/`leaderboard`/`server` 및 모든 에러/폴백 경로를
+      평문 `content`에서 Discord Embed로 전환. GAMEMOA 브랜드 팔레트(`apps/web/app/app.css`)를
+      그대로 사용(브랜드 인디고/XP 앰버/서버 퍼플/성공 그린/에러 레드).
+- [x] 썸네일 추가: `/profile`은 호출한 Discord 유저 본인 아바타, `/rank`·`/leaderboard`·`/server`는
+      등록된 길드 아이콘.
+- [x] `types.ts`에 `DiscordEmbed`/`DiscordEmbedField`/`DiscordEmbedFooter`/`DiscordEmbedThumbnail`
+      최소 스키마 추가.
+- [x] `discordInteractionHandlers.test.ts`: 기존 games/link/profile/unknown 테스트를 embed 구조
+      검증으로 갱신 + play/rank/leaderboard/server(이전에는 테스트 커버리지가 전혀 없었음) 신규
+      테스트 7건 추가.
+
+### 리뷰 패스에서 발견/수정한 실제 버그 (같은 세션, 사용자 요청: "문제 없는지 점검 및 검토")
+
+- [x] **마크다운 마스킹 링크 취약점**: Embed의 `description`/`field.value`는 평문 `content`와
+      달리 `[텍스트](url)` 마스킹 링크를 완전히 렌더링합니다. GAMEMOA 닉네임은 마크다운 특수문자
+      제한이 없어(`validateNickname`은 길이/제어문자만 검사), 악의적 사용자가 닉네임을
+      `[Free Nitro](evil.example)` 형태로 설정하면 **공개** `/gamemoa leaderboard` 임베드에
+      클릭 가능한 피싱 링크가 그대로 노출될 수 있었습니다. `escapeMarkdown()` 헬퍼를 추가해
+      Discord 길드 이름·GAMEMOA 닉네임 등 사용자 제어 문자열을 모든 임베드 삽입 지점에서
+      이스케이프 처리. 회귀 테스트 2건 추가(공개 리더보드/서버 임베드 각각 마스킹 링크 무력화
+      검증).
+- [x] `ranking.tsx` Creator 탭의 플랫폼 필터 pill에 하드코딩된 한국어 `"치지직 (CHZZK)"`/
+      `"SOOP (아프리카)"` 발견 — `dict.ranking.platformChzzk`/`platformSoop`로 이관.
+- [x] 공용 `PlatformIcon.tsx`(랭킹/Wiki Creator 인증 페이지 등에서 재사용)의 `aria-label`/`title`에
+      동일한 하드코딩 한국어("...채널", "검증된 플랫폼") 발견 — `dict.platformIcon`으로 이관,
+      `useI18n()` 연결.
+- [x] `docs/WORK_PROGRESS.md`에 Discord embed 커밋(직전 세션 턴) 기록이 누락되어 있던 것을 발견,
+      이번에 보완 기록.
+- [x] 저장소 전체 `pnpm verify`를 turbo 캐시 무시(`--force`)로 재실행하여 실제로 전부 그린인지
+      재확인(47/47 태스크, 0 캐시 히트).
+
+### 검증
+
+- [x] `pnpm --filter @gamemoa/api` 전체 테스트 GREEN(15/15 discord 핸들러 테스트 포함, 신규 보안
+      회귀 테스트 2건 포함).
+- [x] `pnpm verify` 전체 GREEN.
 
 ---
 
@@ -203,31 +251,40 @@ Actions 기록이 원본입니다.
 
 ## 남은 작업 (다음 세션에서 이어서 진행)
 
-1. **i18n 화면 번역 확장 (계속)**: Wiki 본문 17개 상세 라우트(장문 설명·단계별 가이드·FAQ, 약
-   1,300줄 — 셸/내비게이션은 이번 세션에 완료)를 `dict`에 연결. `COUNTRY_OPTIONS` 국가명
-   다국어화(현재 한국어 고정). `common` 사전 섹션은 이미 준비되어 있음. 라우트 `meta()` 로케일화
-   방식 검토(현재 스코프 밖). Discord 6개 라우트, 프로필(`/profile`) 전체, Wiki 셸/홈은 이번
-   세션에 완료.
-2. **Admin bootstrap 관련 작업은 운영자가 직접 진행하기로 함**(2026-08-13 지시: "admin은 추후
+1. **i18n 번역은 운영자 지시로 일시 보류 상태**(2026-08-13: "번역은 나중에 완성도가 높아지면
+   실행하자") — Wiki 본문 17개 상세 라우트(장문 설명·단계별 가이드·FAQ, 약 1,300줄 — 셸/내비게이션
+   은 완료), `COUNTRY_OPTIONS` 국가명 다국어화 모두 **운영자가 다시 번역을 진행하자고 명시적으로
+   말하기 전까지 착수하지 마세요.** 현재 우선순위는 아래 2번(Discord 봇 기능/완성도).
+2. **Discord 봇 기능/완성도 보완 (진행 중, 현재 우선순위)** — 운영자가 메시지 UX 고도화(Embed
+   전환)를 1순위로 선택. `/gamemoa` 전체 응답의 Embed 전환은 완료했고, 리뷰 패스에서 마크다운
+   마스킹 링크 취약점을 발견해 함께 수정했습니다(위 섹션 참고). 운영자가 물어봤던 다른 선택지
+   (신규 명령어/옵션 확장, 게임 선택 Autocomplete)는 아직 착수 전 — 다음에 이어서 진행할 후보:
+   - `/gamemoa leaderboard`에 주간(weekly) 옵션 추가(`getGuildLeaderboard`는 이미 `period`
+     파라미터를 지원하므로 커맨드 옵션만 추가하면 됨).
+   - `/gamemoa help` 명령어 신설.
+   - `/gamemoa achievements`(도전과제 확인) 신설.
+   - `/gamemoa play game:` 옵션을 정적 `choices`에서 Discord Autocomplete 상호작용으로 전환(게임
+     추가 시 명령어 재등록 없이 자동 반영).
+3. **Admin bootstrap 관련 작업은 운영자가 직접 진행하기로 함**(2026-08-13 지시: "admin은 추후
    내가 테스트 해볼게") — 코딩 세션은 admin 로그인/bootstrap 플로우를 더 이상 건드리거나
    검증하지 않습니다. `ADMIN_USER_IDS`는 이전 세션에 이미 설정 완료된 상태이며, 나머지는 운영자의
-   `/admin` 브라우저 조작이 필요합니다. **이 세션에서는 admin i18n 번역(표시 문자열만이라도)조차
-   의도적으로 보류했습니다** — 운영자의 진행 중인 검증을 방해하지 않기 위함이며, 인증/보안 로직은
-   물론 UI 텍스트도 변경하지 않았습니다. 운영자가 admin 테스트를 완료했다고 알려주면 그때 admin UI
-   텍스트(표시 문자열만, 로직 불변)의 i18n 연결을 진행하세요.
-3. **외부 설정 대기**(repository만으로 완결 불가, 선택 사항): Discord 명령어 자동 동기화를 원하면
+   `/admin` 브라우저 조작이 필요합니다. admin i18n 번역(표시 문자열만이라도)도 의도적으로
+   보류했습니다 — 운영자가 admin 테스트를 완료했다고 알려주면 그때(그리고 번역 작업을 다시
+   시작하기로 한 뒤) admin UI 텍스트(표시 문자열만, 로직 불변)의 i18n 연결을 진행하세요.
+4. **외부 설정 대기**(repository만으로 완결 불가, 선택 사항): Discord 명령어 자동 동기화를 원하면
    `DISCORD_COMMAND_SYNC_ENABLED=true` + `DISCORD_APPLICATION_ID`/`DISCORD_BOT_TOKEN`/
    `DISCORD_TEST_GUILD_ID`(선택) 등록. 미설정이어도 배포에는 영향 없음.
-4. **실사용자 E2E 인수 테스트**: 실제 Discord 서버 설치/등록, Creator 플랫폼 인증, 4개 언어 실환경
+5. **실사용자 E2E 인수 테스트**: 실제 Discord 서버 설치/등록, Creator 플랫폼 인증, 4개 언어 실환경
    확인은 운영자의 실계정 조작이 필요해 이 세션에서 완결할 수 없었습니다.
 
 ## 다음 작업 (Next Action)
 
-`i18n 화면 번역 확장 마무리`(Wiki 본문 17개 상세 라우트 → `COUNTRY_OPTIONS` 다국어화) → 운영자의
-admin 테스트 완료 확인 후 Admin 흐름 UI 텍스트(표시 문자열만, 인증/보안 로직 불변) → 필요 시
-`Post-Sprint UX / SEO / Production Readiness QA`. Admin bootstrap/로그인 자체는 운영자가 직접
-진행하므로 다음 세션에서 먼저 확인하거나 손댈 필요 없음 — 운영자가 먼저 언급하지 않는 한 admin
-관련 파일은 (i18n 포함) 건드리지 마세요.
+Discord 봇 기능/완성도 보완을 계속 진행(위 2번 후보 중 운영자에게 우선순위 확인 후 착수) →
+i18n 번역 재개는 운영자가 명시적으로 요청할 때까지 대기 → 운영자의 admin 테스트 완료 확인 후
+Admin 흐름 UI 텍스트(표시 문자열만, 인증/보안 로직 불변) → 필요 시 `Post-Sprint UX / SEO /
+Production Readiness QA`. Admin bootstrap/로그인 자체는 운영자가 직접 진행하므로 다음 세션에서
+먼저 확인하거나 손댈 필요 없음 — 운영자가 먼저 언급하지 않는 한 admin 관련 파일은 (i18n 포함)
+건드리지 마세요.
 
 시작 시 `git log`, `git status`, 이 문서의 "완료" 섹션으로 현재 상태를 재확인한 뒤 처음부터 다시
 설계하지 말고 이어서 진행하세요.

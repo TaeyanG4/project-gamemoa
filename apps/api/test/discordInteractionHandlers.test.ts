@@ -302,6 +302,39 @@ test("/gamemoa server shows a public embed with XP/participant fields", async ()
   assert.match(fieldsText, /15명/);
 });
 
+test("/gamemoa leaderboard escapes markdown in nicknames so a crafted nickname can't render a masked phishing link in the public embed", async () => {
+  const container = fakeContainer({
+    getGuildLeaderboard: async () => ({
+      entries: [{ rank: 1, nickname: "[Free Nitro](https://evil.example)", xp: 100 }],
+      total: 1,
+    }),
+  });
+  const response = await handleGamemoaCommand(
+    container,
+    guildInteraction("leaderboard"),
+    FRONTEND_URL,
+  );
+  const description = response.data?.embeds?.[0]?.description ?? "";
+  // The brackets must be backslash-escaped so Discord's markdown parser renders them as
+  // literal text instead of parsing `[label](url)` into a clickable masked link.
+  assert.match(description, /\\\[Free Nitro\\\]\(https:\/\/evil\.example\)/);
+});
+
+test("/gamemoa server and /gamemoa rank escape markdown in the Discord guild name", async () => {
+  const container = fakeContainer({
+    getGuildByGuildId: async () => ({
+      guild_id: "g1",
+      name: "**[Click me](https://evil.example)**",
+      slug: "test-guild",
+      icon_url: null,
+      registration_status: "ACTIVE",
+    }),
+  });
+  const response = await handleGamemoaCommand(container, guildInteraction("server"), FRONTEND_URL);
+  const title = response.data?.embeds?.[0]?.title ?? "";
+  assert.match(title, /\\\[Click me\\\]\(https:\/\/evil\.example\)/);
+});
+
 test("guild-scoped commands reject an unregistered/inactive server", async () => {
   const container = fakeContainer({ getGuildByGuildId: async () => null });
   const response = await handleGamemoaCommand(container, guildInteraction("server"), FRONTEND_URL);

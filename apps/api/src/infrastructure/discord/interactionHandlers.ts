@@ -23,6 +23,23 @@ function gamemoaFooter(frontendUrl: string): DiscordEmbedFooter {
   return { text: "GAMEMOA", icon_url: `${frontendUrl}/favicon-192x192.png` };
 }
 
+/** Neutralizes Discord markdown syntax in user-controlled strings (GAMEMOA nicknames, Discord
+ * guild names, Discord display names) before they're interpolated into an embed. Unlike plain
+ * message `content`, embed `description`/`field.value` fully render `[text](url)` masked
+ * links — without this, a nickname like `[Free Nitro](evil.example)` would render as a
+ * clickable phishing link in the public `/gamemoa leaderboard` embed. */
+function escapeMarkdown(text: string): string {
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/\*/g, "\\*")
+    .replace(/_/g, "\\_")
+    .replace(/~/g, "\\~")
+    .replace(/`/g, "\\`")
+    .replace(/\|/g, "\\|")
+    .replace(/\[/g, "\\[")
+    .replace(/\]/g, "\\]");
+}
+
 /** Discord's default (no custom avatar set) avatar, computed the same way Discord's own
  * clients do for the modern username system (no legacy discriminator). */
 function discordAvatarUrl(user: DiscordInteractionUser): string {
@@ -166,7 +183,7 @@ async function handleProfileCommand(
 
   const { summary } = await container.progressionUseCases.getProgressionSummary(user.id);
   return ephemeralEmbed({
-    title: `👤 ${user.nickname}`,
+    title: `👤 ${escapeMarkdown(user.nickname)}`,
     url: `${frontendUrl}/profile`,
     color: COLOR_XP,
     thumbnail: { url: discordAvatarUrl(discordUser) },
@@ -212,7 +229,7 @@ async function handlePlayCommand(
         : "게임 선택";
 
     return ephemeralEmbed({
-      title: `🎮 ${playCtx.guildName} 플레이 링크 발급`,
+      title: `🎮 ${escapeMarkdown(playCtx.guildName)} 플레이 링크 발급`,
       description: "아래 링크를 통해 게임을 플레이하면 이 서버에 XP가 기여됩니다.",
       color: COLOR_BRAND,
       fields: [{ name: gameTitle, value: `[플레이하기](${playUrl})` }],
@@ -259,10 +276,11 @@ async function handleRankCommand(
   );
 
   const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
+  const guildName = escapeMarkdown(guild.name);
 
   if (!rankSummary.rank || rankSummary.totalXp <= 0) {
     return ephemeralEmbed({
-      title: `🏆 ${guild.name}`,
+      title: `🏆 ${guildName}`,
       description:
         "아직 이 서버에 기여한 XP가 없습니다. `/gamemoa play` 명령어로 게임을 플레이해보세요!",
       color: COLOR_BRAND,
@@ -273,11 +291,11 @@ async function handleRankCommand(
 
   const nickname = rankSummary.nickname || discordUser.global_name || discordUser.username;
   return ephemeralEmbed({
-    title: `🏆 ${guild.name} 활동 현황`,
+    title: `🏆 ${guildName} 활동 현황`,
     color: COLOR_XP,
     ...(thumbnail ? { thumbnail } : {}),
     fields: [
-      { name: "닉네임", value: nickname, inline: true },
+      { name: "닉네임", value: escapeMarkdown(nickname), inline: true },
       { name: "서버 기여 XP", value: `${rankSummary.totalXp.toLocaleString()} XP`, inline: true },
       { name: "서버 순위", value: `#${rankSummary.rank}`, inline: true },
     ],
@@ -313,10 +331,11 @@ async function handleLeaderboardCommand(
 
   const serverUrl = `${frontendUrl}/discord/servers/${guild.slug}`;
   const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
+  const guildName = escapeMarkdown(guild.name);
 
   if (leaderboard.entries.length === 0) {
     return publicEmbed({
-      title: `📊 ${guild.name} 서버 XP 리더보드`,
+      title: `📊 ${guildName} 서버 XP 리더보드`,
       description: "아직 등록된 활동 XP가 없습니다. `/gamemoa play`로 첫 기여를 시작해보세요!",
       color: COLOR_BRAND,
       ...(thumbnail ? { thumbnail } : {}),
@@ -326,11 +345,11 @@ async function handleLeaderboardCommand(
   }
 
   const lines = leaderboard.entries.map(
-    (e) => `${e.rank}. **${e.nickname}** — ${e.xp.toLocaleString()} XP`,
+    (e) => `${e.rank}. **${escapeMarkdown(e.nickname)}** — ${e.xp.toLocaleString()} XP`,
   );
 
   return publicEmbed({
-    title: `📊 ${guild.name} 서버 XP 리더보드 (Top 10)`,
+    title: `📊 ${guildName} 서버 XP 리더보드 (Top 10)`,
     description: lines.join("\n"),
     color: COLOR_XP,
     ...(thumbnail ? { thumbnail } : {}),
@@ -363,7 +382,7 @@ async function handleServerCommand(
   const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
 
   return publicEmbed({
-    title: `🏰 ${guild.name}`,
+    title: `🏰 ${escapeMarkdown(guild.name)}`,
     url: serverUrl,
     color: COLOR_SERVER,
     ...(thumbnail ? { thumbnail } : {}),
