@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, type ComponentType } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef, type ComponentType } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { loadGame, gameManifests } from "../features/catalog/registry";
 import { useIsGameDisabled } from "../features/catalog/gameAvailability";
@@ -20,6 +20,8 @@ import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 import { localizedDifficultyLabel } from "../features/catalog/difficultyLabels";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
+import { XIcon } from "../components/ui/XIcon";
+import { DiscordIcon } from "../components/ui/DiscordIcon";
 import type { Dictionary } from "../features/i18n/dictionary";
 import type { LeaderRecord } from "@owogg/contracts";
 import {
@@ -28,7 +30,7 @@ import {
   RefreshCw,
   CheckCircle2,
   UserCheck,
-  Share2,
+  Camera,
   Trophy,
 } from "lucide-react";
 
@@ -201,32 +203,70 @@ export default function GamePlay() {
     };
   }, [result, manifest, slug, selectedDifficultyId]);
 
-  // Share Result (Web Share API where available, clipboard copy as fallback)
-  const [shareCopied, setShareCopied] = useState(false);
-  const handleShareResult = useCallback(async () => {
-    if (!result || !manifest) return;
-    const shareUrl = `${window.location.origin}/games/${slug}`;
+  // Share Result — scoped to X (official web intent), Discord (no web intent exists, so this
+  // copies formatted text to paste manually), and a screenshot-copy of the result card. Web
+  // Share API / Instagram / TikTok deliberately dropped from this pass (operator decision).
+  const shareCardRef = useRef<HTMLDivElement>(null);
+  const [discordCopied, setDiscordCopied] = useState(false);
+  const [screenshotState, setScreenshotState] = useState<
+    "idle" | "copying" | "copied" | "downloaded" | "error"
+  >("idle");
+
+  const buildShareText = useCallback(() => {
+    if (!result || !manifest) return null;
     const scoreText = formatScore(result.score, manifest.scoreConfig);
     const title = getLocalizedGameContent(dict, manifest).title;
-    const shareText = dict.gamePlay.shareText
-      .replace("{title}", title)
-      .replace("{score}", scoreText);
+    return dict.gamePlay.shareText.replace("{title}", title).replace("{score}", scoreText);
+  }, [result, manifest, dict]);
 
-    if (typeof navigator.share === "function") {
-      try {
-        await navigator.share({ title, text: shareText, url: shareUrl });
-      } catch {
-        // User cancelled the native share sheet — not an error, nothing to do.
+  const handleShareX = useCallback(() => {
+    const shareText = buildShareText();
+    if (!shareText) return;
+    const shareUrl = `${window.location.origin}/games/${slug}`;
+    const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    window.open(intentUrl, "_blank", "noopener,noreferrer");
+  }, [buildShareText, slug]);
+
+  const handleShareDiscord = useCallback(async () => {
+    const shareText = buildShareText();
+    if (!shareText || !navigator.clipboard) return;
+    const shareUrl = `${window.location.origin}/games/${slug}`;
+    await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+    setDiscordCopied(true);
+    setTimeout(() => setDiscordCopied(false), 2000);
+  }, [buildShareText, slug]);
+
+  const handleCopyScreenshot = useCallback(async () => {
+    if (!shareCardRef.current) return;
+    setScreenshotState("copying");
+    try {
+      const { toBlob } = await import("html-to-image");
+      const blob = await toBlob(shareCardRef.current, { pixelRatio: 2 });
+      if (!blob) throw new Error("html-to-image returned no blob");
+
+      if (navigator.clipboard && typeof window.ClipboardItem !== "undefined") {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        setScreenshotState("copied");
+      } else {
+        // Clipboard image writes aren't universally supported (older browsers, some mobile
+        // in-app browsers) — fall back to a plain download instead of failing silently.
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `owogg-${slug}-result.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        setScreenshotState("downloaded");
       }
-      return;
+    } catch (err) {
+      console.error("Screenshot copy failed:", err);
+      setScreenshotState("error");
+    } finally {
+      setTimeout(() => setScreenshotState("idle"), 2500);
     }
-
-    if (navigator.clipboard) {
-      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2000);
-    }
-  }, [result, manifest, slug, dict]);
+  }, [slug]);
 
   const { recordRecentPlay } = usePersonalization();
 
@@ -406,33 +446,54 @@ export default function GamePlay() {
                   {dict.gamePlay.resultTitle}
                 </h3>
                 <div className="mb-6 p-6 bg-surface-raised rounded-2xl border border-border w-full max-w-md">
-                  <p className="text-text-secondary text-sm mb-1">
-                    {rankingEligible
-                      ? dict.gamePlay.finalScoreLabel
-                      : dict.gamePlay.deviceBestLabel}
-                  </p>
-                  <p className="text-5xl font-black text-brand mb-4">
-                    {formatScore(result.score, manifest?.scoreConfig)}
-                  </p>
-
-                  {/* Metadata Formatters */}
-                  {result.metadata && Object.keys(result.metadata).length > 0 && (
-                    <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/80">
-                      {Object.entries(result.metadata).map(([key, value]) => (
-                        <div
-                          key={key}
-                          className="bg-surface/50 p-2.5 rounded-xl border border-border/40"
-                        >
-                          <p className="text-xs text-text-muted font-bold mb-0.5">
-                            {formatMetadataKey(key, dict.gamePlay)}
-                          </p>
-                          <p className="font-extrabold text-text-primary text-sm">
-                            {formatMetadataValue(key, value)}
-                          </p>
-                        </div>
-                      ))}
+                  {/* Everything inside this ref is what handleCopyScreenshot captures — kept
+                      self-contained (branding + game + score) since a screenshot has to make
+                      sense on its own outside the app, unlike the interactive elements below it. */}
+                  <div ref={shareCardRef} className="bg-surface-raised">
+                    <div className="mb-3 flex items-center justify-center gap-2">
+                      <GameThumbnail
+                        thumbnail={manifest?.thumbnail ?? ""}
+                        title={localizedTitle ?? ""}
+                        accent={manifest?.accent}
+                        className="h-6 w-6"
+                        rounded="rounded-md"
+                      />
+                      <span className="text-sm font-bold text-text-secondary">
+                        {localizedTitle}
+                      </span>
                     </div>
-                  )}
+                    <p className="text-text-secondary text-sm mb-1">
+                      {rankingEligible
+                        ? dict.gamePlay.finalScoreLabel
+                        : dict.gamePlay.deviceBestLabel}
+                    </p>
+                    <p className="text-5xl font-black text-brand mb-4">
+                      {formatScore(result.score, manifest?.scoreConfig)}
+                    </p>
+
+                    {/* Metadata Formatters */}
+                    {result.metadata && Object.keys(result.metadata).length > 0 && (
+                      <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/80">
+                        {Object.entries(result.metadata).map(([key, value]) => (
+                          <div
+                            key={key}
+                            className="bg-surface/50 p-2.5 rounded-xl border border-border/40"
+                          >
+                            <p className="text-xs text-text-muted font-bold mb-0.5">
+                              {formatMetadataKey(key, dict.gamePlay)}
+                            </p>
+                            <p className="font-extrabold text-text-primary text-sm">
+                              {formatMetadataValue(key, value)}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="mt-6 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+                      owogg.com
+                    </p>
+                  </div>
 
                   {/* Score Submission Status Indicator */}
                   <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-center">
@@ -530,14 +591,49 @@ export default function GamePlay() {
                     </div>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={() => void handleShareResult()}
-                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
-                  >
-                    <Share2 className="h-3.5 w-3.5" />
-                    {shareCopied ? dict.gamePlay.shareCopiedFeedback : dict.gamePlay.shareCta}
-                  </button>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleShareX}
+                      className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface px-2 py-2.5 text-[10px] font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                      <span className="truncate">{dict.gamePlay.shareXCta}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleShareDiscord()}
+                      className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface px-2 py-2.5 text-[10px] font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+                    >
+                      <DiscordIcon className="h-3.5 w-3.5" />
+                      <span className="truncate">
+                        {discordCopied
+                          ? dict.gamePlay.shareDiscordCopiedFeedback
+                          : dict.gamePlay.shareDiscordCta}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleCopyScreenshot()}
+                      disabled={screenshotState === "copying"}
+                      className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface px-2 py-2.5 text-[10px] font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer disabled:opacity-50"
+                    >
+                      {screenshotState === "copying" ? (
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Camera className="h-3.5 w-3.5" />
+                      )}
+                      <span className="truncate">
+                        {screenshotState === "copied"
+                          ? dict.gamePlay.screenshotCopiedFeedback
+                          : screenshotState === "downloaded"
+                            ? dict.gamePlay.screenshotDownloadedFeedback
+                            : screenshotState === "error"
+                              ? dict.gamePlay.screenshotErrorFeedback
+                              : dict.gamePlay.screenshotCopyCta}
+                      </span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex gap-4">

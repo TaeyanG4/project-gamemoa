@@ -950,7 +950,6 @@ export interface Dictionary {
     retrySubmitCta: string;
     retryGameCta: string;
     backToListResult: string;
-    shareCta: string;
     /** Generic difficulty tier labels, reused across every difficulty-supporting game (rather
      * than per-game localized content) since "normal"/"hard" are the same concept everywhere. */
     difficultyNormal: string;
@@ -960,7 +959,21 @@ export interface Dictionary {
      * score-before-title ("I scored X in Game") while Korean wants title-before-score
      * ("Game에서 X 기록"), so each locale needs to control the full word order itself. */
     shareText: string;
-    shareCopiedFeedback: string;
+    /** X has an official web share intent (twitter.com/intent/tweet) — opens directly, no
+     * clipboard step needed. */
+    shareXCta: string;
+    /** Discord has no equivalent web intent — this copies shareText+url to the clipboard so the
+     * user can paste it into a Discord channel/DM themselves. */
+    shareDiscordCta: string;
+    shareDiscordCopiedFeedback: string;
+    /** Captures the result card (see game-slug.tsx's shareCardRef) as a PNG and copies it to the
+     * clipboard via the Clipboard API, so it can be pasted directly into Discord/X/anywhere that
+     * accepts pasted images — falls back to a file download when Clipboard image writes aren't
+     * supported. */
+    screenshotCopyCta: string;
+    screenshotCopiedFeedback: string;
+    screenshotDownloadedFeedback: string;
+    screenshotErrorFeedback: string;
     /** Shown on the result overlay only when the game's manifest has supportsLeaderboard: true —
      * casual games where rank doesn't mean much can opt out by setting that flag false. */
     leaderboardTitle: string;
@@ -2157,11 +2170,16 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "점수 다시 제출",
       retryGameCta: "🔄 다시 하기",
       backToListResult: "목록으로",
-      shareCta: "공유하기",
       difficultyNormal: "보통",
       difficultyHard: "어려움",
       shareText: "{title}에서 {score} 기록! 나도 도전해보기 🎮",
-      shareCopiedFeedback: "링크가 복사되었습니다!",
+      shareXCta: "X에 공유",
+      shareDiscordCta: "Discord용 복사",
+      shareDiscordCopiedFeedback: "복사 완료! Discord에 붙여넣으세요",
+      screenshotCopyCta: "스크린샷 복사",
+      screenshotCopiedFeedback: "이미지가 복사되었습니다!",
+      screenshotDownloadedFeedback: "이미지를 다운로드했습니다",
+      screenshotErrorFeedback: "스크린샷 생성에 실패했습니다",
       leaderboardTitle: "리더보드",
       leaderboardEmpty: "아직 등록된 기록이 없습니다.",
       viewFullRanking: "전체 순위 보기 →",
@@ -3363,11 +3381,16 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "Resubmit score",
       retryGameCta: "🔄 Play again",
       backToListResult: "Back to list",
-      shareCta: "Share",
       difficultyNormal: "Normal",
       difficultyHard: "Hard",
       shareText: "I scored {score} in {title}! Can you beat it? 🎮",
-      shareCopiedFeedback: "Link copied!",
+      shareXCta: "Share on X",
+      shareDiscordCta: "Copy for Discord",
+      shareDiscordCopiedFeedback: "Copied! Paste it into Discord",
+      screenshotCopyCta: "Copy screenshot",
+      screenshotCopiedFeedback: "Image copied!",
+      screenshotDownloadedFeedback: "Image downloaded",
+      screenshotErrorFeedback: "Couldn't create the screenshot",
       leaderboardTitle: "Leaderboard",
       leaderboardEmpty: "No records yet.",
       viewFullRanking: "View full ranking →",
@@ -4568,11 +4591,16 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "スコアを再送信",
       retryGameCta: "🔄 もう一度プレイ",
       backToListResult: "リストに戻る",
-      shareCta: "シェア",
       difficultyNormal: "ノーマル",
       difficultyHard: "ハード",
       shareText: "{title}で{score}を記録しました！挑戦してみて 🎮",
-      shareCopiedFeedback: "リンクをコピーしました！",
+      shareXCta: "Xでシェア",
+      shareDiscordCta: "Discord用にコピー",
+      shareDiscordCopiedFeedback: "コピーしました！Discordに貼り付けてください",
+      screenshotCopyCta: "スクリーンショットをコピー",
+      screenshotCopiedFeedback: "画像をコピーしました！",
+      screenshotDownloadedFeedback: "画像をダウンロードしました",
+      screenshotErrorFeedback: "スクリーンショットの作成に失敗しました",
       leaderboardTitle: "リーダーボード",
       leaderboardEmpty: "まだ記録がありません。",
       viewFullRanking: "全体ランキングを見る →",
@@ -5718,11 +5746,16 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "重新提交分数",
       retryGameCta: "🔄 再玩一次",
       backToListResult: "返回列表",
-      shareCta: "分享",
       difficultyNormal: "普通",
       difficultyHard: "困难",
       shareText: "我在{title}中获得了{score}！来挑战一下吧 🎮",
-      shareCopiedFeedback: "链接已复制！",
+      shareXCta: "分享到 X",
+      shareDiscordCta: "复制 Discord 用文本",
+      shareDiscordCopiedFeedback: "已复制！请粘贴到 Discord",
+      screenshotCopyCta: "复制截图",
+      screenshotCopiedFeedback: "图片已复制！",
+      screenshotDownloadedFeedback: "图片已下载",
+      screenshotErrorFeedback: "生成截图失败",
       leaderboardTitle: "排行榜",
       leaderboardEmpty: "暂无记录。",
       viewFullRanking: "查看完整排行榜 →",
