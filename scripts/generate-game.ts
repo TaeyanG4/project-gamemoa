@@ -95,7 +95,7 @@ export const manifest: GameManifest = {
   title: "${titleName}",
   shortDescription: "${titleName} 미니게임에 도전하세요!",
   description: "${titleName} 게임입니다. 최고 기록에 도전해보세요.",
-  modes: ["single"] as const,
+  modes: ["single"],
   status: "published",
   categories: ["action", "popular"],
   tags: ["${slug}", "게임"],
@@ -106,6 +106,9 @@ export const manifest: GameManifest = {
   estimatedRoundSeconds: 30,
   requiresAuth: false,
   supportsLeaderboard: true,
+  // TODO: list every input the game actually responds to (see InputMethod in game-sdk).
+  inputMethods: ["mouse", "touch"],
+  supportsReplay: false,
   version: "0.0.1",
   scoreConfig: {
     unit: "ms",

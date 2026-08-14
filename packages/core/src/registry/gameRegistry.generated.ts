@@ -20,6 +20,8 @@ export const GAME_MANIFESTS: GameManifest[] = [
     estimatedRoundSeconds: 30,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["mouse", "touch"],
+    supportsReplay: false,
     version: "0.0.1",
     scoreConfig: {
       unit: "ms",
@@ -47,6 +49,8 @@ export const GAME_MANIFESTS: GameManifest[] = [
     estimatedRoundSeconds: 45,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["mouse", "touch"],
+    supportsReplay: false,
     version: "0.0.1",
     scoreConfig: {
       unit: "Level",
@@ -74,6 +78,8 @@ export const GAME_MANIFESTS: GameManifest[] = [
     estimatedRoundSeconds: 30,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["mouse", "touch"],
+    supportsReplay: false,
     version: "0.1.0",
     scoreConfig: {
       unit: "ms",
@@ -102,6 +108,8 @@ export const GAME_MANIFESTS: GameManifest[] = [
     estimatedRoundSeconds: 60,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["keyboard"],
+    supportsReplay: false,
     version: "0.1.0",
     scoreConfig: {
       unit: "WPM",
@@ -132,6 +140,8 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
     estimatedRoundSeconds: 30,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["mouse", "touch"],
+    supportsReplay: false,
     version: "0.0.1",
     scoreConfig: {
       unit: "ms",
@@ -159,6 +169,8 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
     estimatedRoundSeconds: 45,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["mouse", "touch"],
+    supportsReplay: false,
     version: "0.0.1",
     scoreConfig: {
       unit: "Level",
@@ -186,6 +198,8 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
     estimatedRoundSeconds: 30,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["mouse", "touch"],
+    supportsReplay: false,
     version: "0.1.0",
     scoreConfig: {
       unit: "ms",
@@ -214,6 +228,8 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
     estimatedRoundSeconds: 60,
     requiresAuth: false,
     supportsLeaderboard: true,
+    inputMethods: ["keyboard"],
+    supportsReplay: false,
     version: "0.1.0",
     scoreConfig: {
       unit: "WPM",

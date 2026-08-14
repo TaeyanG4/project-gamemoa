@@ -6,7 +6,7 @@ export const manifest: GameManifest = {
   title: "반응속도 테스트",
   shortDescription: "화면이 바뀌면 최대한 빨리 클릭하세요!",
   description: "초록색 화면이 나타나는 순간 최대한 빨리 클릭하세요. 당신의 반응속도를 측정합니다.",
-  modes: ["single"] as const,
+  modes: ["single"],
   status: "published",
   categories: ["reaction", "popular"],
   tags: ["반응속도", "클릭", "타이밍"],
@@ -17,6 +17,8 @@ export const manifest: GameManifest = {
   estimatedRoundSeconds: 30,
   requiresAuth: false,
   supportsLeaderboard: true,
+  inputMethods: ["mouse", "touch"],
+  supportsReplay: false,
   version: "0.1.0",
   scoreConfig: {
     unit: "ms",

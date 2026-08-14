@@ -18,6 +18,8 @@ export const memoryTestManifest: GameManifest = {
   estimatedRoundSeconds: 45,
   requiresAuth: false,
   supportsLeaderboard: true,
+  inputMethods: ["mouse", "touch"],
+  supportsReplay: false,
   version: "0.0.1",
   scoreConfig: {
     unit: "Level",
