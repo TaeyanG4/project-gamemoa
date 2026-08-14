@@ -18,6 +18,11 @@ export interface User {
   current_streak?: number;
   longest_streak?: number;
   last_active_date?: string | null;
+  /** Whether favorites/recent-plays (already stored server-side regardless) are disclosed on
+   * the PUBLIC profile (/users/:id) to viewers other than the account owner. Both default to
+   * false — see migration 0021_profile_visibility.sql for why. */
+  show_favorites?: boolean;
+  show_recent_plays?: boolean;
 }
 
 export interface OAuthAccount {
@@ -77,6 +82,12 @@ export interface UserRepository {
   updateNickname(userId: number, nickname: string, updatedAt: string): Promise<User>;
   updateCountry(userId: number, country: string | null, updatedAt: string): Promise<User>;
   updateLocale(userId: number, locale: string, updatedAt: string): Promise<User>;
+  updateVisibility(
+    userId: number,
+    showFavorites: boolean,
+    showRecentPlays: boolean,
+    updatedAt: string,
+  ): Promise<User>;
 }
 
 export interface SessionRepository {

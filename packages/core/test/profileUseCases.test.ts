@@ -51,6 +51,24 @@ class FakeUserRepository implements UserRepository {
     this.users.set(userId, updated);
     return updated;
   }
+
+  async updateVisibility(
+    userId: number,
+    showFavorites: boolean,
+    showRecentPlays: boolean,
+    updatedAt: string,
+  ): Promise<User> {
+    const user = this.users.get(userId);
+    if (!user) throw new Error("user not found");
+    const updated: User = {
+      ...user,
+      show_favorites: showFavorites,
+      show_recent_plays: showRecentPlays,
+      updated_at: updatedAt,
+    };
+    this.users.set(userId, updated);
+    return updated;
+  }
 }
 
 function baseUser(overrides: Partial<User> = {}): User {
@@ -209,6 +227,28 @@ test("updateLocale reports USER_NOT_FOUND for a missing user", async () => {
   const useCases = new ProfileUseCases(repo);
 
   const result = await useCases.updateLocale(999, "en-US");
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "USER_NOT_FOUND");
+});
+
+test("updateVisibility sets both flags independently, defaults false", async () => {
+  const repo = new FakeUserRepository();
+  repo.seed(baseUser());
+  const useCases = new ProfileUseCases(repo);
+
+  const result = await useCases.updateVisibility(1, true, false);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.user.show_favorites, true);
+    assert.equal(result.user.show_recent_plays, false);
+  }
+});
+
+test("updateVisibility reports USER_NOT_FOUND for a missing user", async () => {
+  const repo = new FakeUserRepository();
+  const useCases = new ProfileUseCases(repo);
+
+  const result = await useCases.updateVisibility(999, true, true);
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.code, "USER_NOT_FOUND");
 });

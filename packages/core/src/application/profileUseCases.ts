@@ -25,6 +25,9 @@ export type UpdateLocaleResult =
   | { ok: false; code: "INVALID_LOCALE" }
   | { ok: false; code: "USER_NOT_FOUND" };
 
+export type UpdateVisibilityResult =
+  { ok: true; user: User } | { ok: false; code: "USER_NOT_FOUND" };
+
 export class ProfileUseCases {
   constructor(private userRepo: UserRepository) {}
 
@@ -82,6 +85,25 @@ export class ProfileUseCases {
     }
 
     const updated = await this.userRepo.updateLocale(userId, rawLocale, new Date().toISOString());
+    return { ok: true, user: updated };
+  }
+
+  /** No validation beyond boolean coercion, no cooldown — this only controls disclosure of
+   * data already stored server-side, not the data itself, so there's nothing to rate-limit. */
+  async updateVisibility(
+    userId: number,
+    showFavorites: boolean,
+    showRecentPlays: boolean,
+  ): Promise<UpdateVisibilityResult> {
+    const user = await this.userRepo.findById(userId);
+    if (!user) return { ok: false, code: "USER_NOT_FOUND" };
+
+    const updated = await this.userRepo.updateVisibility(
+      userId,
+      showFavorites,
+      showRecentPlays,
+      new Date().toISOString(),
+    );
     return { ok: true, user: updated };
   }
 }

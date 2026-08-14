@@ -3,9 +3,12 @@ import {
   UpdateNicknameResponseSchema,
   UpdateCountryRequestSchema,
   UpdateCountryResponseSchema,
+  UpdateVisibilityRequestSchema,
+  UpdateVisibilityResponseSchema,
   PublicProfileResponseSchema,
   type UpdateNicknameResponse,
   type UpdateCountryResponse,
+  type UpdateVisibilityResponse,
   type PublicProfileResponse,
 } from "@owogg/contracts";
 import { apiFetch } from "../../lib/api";
@@ -27,7 +30,22 @@ export async function updateCountryApi(country: string | null): Promise<UpdateCo
   });
 }
 
-/** Public profile page data (no auth). Throws ApiClientError with status 404 if unknown userId. */
+/** Controls whether favorites/recent-plays show on the PUBLIC profile to other viewers — both
+ * are already stored server-side either way; this only changes disclosure. */
+export async function updateVisibilityApi(
+  showFavorites: boolean,
+  showRecentPlays: boolean,
+): Promise<UpdateVisibilityResponse> {
+  const body = UpdateVisibilityRequestSchema.parse({ showFavorites, showRecentPlays });
+  return await apiFetch("/api/profile/visibility", UpdateVisibilityResponseSchema, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+/** Public profile page data (no auth, but sends credentials so an authenticated owner viewing
+ * their own profile gets their private favorites/recent-plays + visibilitySettings back too —
+ * see getPublicProfileData's viewerId param). Throws ApiClientError (404) if unknown userId. */
 export async function fetchPublicProfileApi(
   userId: number | string,
 ): Promise<PublicProfileResponse> {

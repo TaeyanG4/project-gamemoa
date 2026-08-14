@@ -41,6 +41,8 @@ export class D1UserRepository implements UserRepository {
       current_streak: Number(row.current_streak ?? 0),
       longest_streak: Number(row.longest_streak ?? 0),
       last_active_date: row.last_active_date ? String(row.last_active_date) : null,
+      show_favorites: Boolean(Number(row.show_favorites ?? 0)),
+      show_recent_plays: Boolean(Number(row.show_recent_plays ?? 0)),
     };
   }
 
@@ -76,6 +78,8 @@ export class D1UserRepository implements UserRepository {
       current_streak: Number(oauthRow.current_streak ?? 0),
       longest_streak: Number(oauthRow.longest_streak ?? 0),
       last_active_date: oauthRow.last_active_date ? String(oauthRow.last_active_date) : null,
+      show_favorites: Boolean(Number(oauthRow.show_favorites ?? 0)),
+      show_recent_plays: Boolean(Number(oauthRow.show_recent_plays ?? 0)),
     };
   }
 
@@ -153,6 +157,8 @@ export class D1UserRepository implements UserRepository {
       current_streak: 0,
       longest_streak: 0,
       last_active_date: null,
+      show_favorites: false,
+      show_recent_plays: false,
     };
   }
 
@@ -265,6 +271,26 @@ export class D1UserRepository implements UserRepository {
     const updated = await this.findById(userId);
     if (!updated) {
       throw new Error(`User ${userId} not found after locale update`);
+    }
+    return updated;
+  }
+
+  async updateVisibility(
+    userId: number,
+    showFavorites: boolean,
+    showRecentPlays: boolean,
+    updatedAt: string,
+  ): Promise<User> {
+    await this.db
+      .prepare(
+        `UPDATE users SET show_favorites = ?, show_recent_plays = ?, updated_at = ? WHERE id = ?`,
+      )
+      .bind(showFavorites ? 1 : 0, showRecentPlays ? 1 : 0, updatedAt, userId)
+      .run();
+
+    const updated = await this.findById(userId);
+    if (!updated) {
+      throw new Error(`User ${userId} not found after visibility update`);
     }
     return updated;
   }

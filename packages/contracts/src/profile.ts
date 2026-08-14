@@ -5,6 +5,7 @@ export const ProfileErrorCodeSchema = z.enum([
   "NICKNAME_COOLDOWN_ACTIVE",
   "INVALID_COUNTRY",
   "COUNTRY_COOLDOWN_ACTIVE",
+  "INVALID_VISIBILITY",
   "USER_NOT_FOUND",
 ]);
 export type ProfileErrorCode = z.infer<typeof ProfileErrorCodeSchema>;
@@ -33,3 +34,19 @@ export const UpdateCountryResponseSchema = z.object({
   countryUpdatedAt: z.string(),
 });
 export type UpdateCountryResponse = z.infer<typeof UpdateCountryResponseSchema>;
+
+// Controls disclosure of favorites/recent-plays on the PUBLIC profile — both are already
+// stored server-side regardless of these flags; this only decides whether other viewers see
+// them. No cooldown (see ProfileUseCases.updateVisibility).
+export const UpdateVisibilityRequestSchema = z.object({
+  showFavorites: z.boolean(),
+  showRecentPlays: z.boolean(),
+});
+export type UpdateVisibilityRequest = z.infer<typeof UpdateVisibilityRequestSchema>;
+
+export const UpdateVisibilityResponseSchema = z.object({
+  success: z.literal(true),
+  showFavorites: z.boolean(),
+  showRecentPlays: z.boolean(),
+});
+export type UpdateVisibilityResponse = z.infer<typeof UpdateVisibilityResponseSchema>;

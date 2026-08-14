@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { ProgressionSummarySchema, AchievementCodeSchema } from "./progression.js";
 import { CreatorPlatformSchema } from "./creator.js";
+import { RecentPlaySchema } from "./personalization.js";
 
 // Public-facing profile ("/users/:id"). A strict subset of what /api/profile/* and
 // /api/progression/* expose to the account owner — never includes email, linked-provider
@@ -36,5 +37,16 @@ export const PublicProfileResponseSchema = z.object({
   totalAchievements: z.number().int().min(0),
   gameBests: z.array(PublicGameBestSchema),
   creatorBadges: z.array(PublicCreatorBadgeSchema),
+  /** null = hidden from this viewer — either the owner set it private and the viewer isn't the
+   * owner, or (when the viewer IS the owner) there's nothing special here: owners always see
+   * their own lists regardless of the privacy flag, so null only ever means "hidden from you". */
+  favoriteGameIds: z.array(z.string()).nullable(),
+  recentPlays: z.array(RecentPlaySchema).nullable(),
+  /** The owner's OWN current visibility settings — only ever non-null when the viewer IS the
+   * owner (so /settings and the profile page itself can reflect the current toggle state
+   * without a second request). Always null for other viewers. */
+  visibilitySettings: z
+    .object({ showFavorites: z.boolean(), showRecentPlays: z.boolean() })
+    .nullable(),
 });
 export type PublicProfileResponse = z.infer<typeof PublicProfileResponseSchema>;

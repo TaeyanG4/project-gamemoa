@@ -5,6 +5,7 @@ import {
   UpdateNicknameRequestSchema,
   UpdateCountryRequestSchema,
   UpdateLocaleRequestSchema,
+  UpdateVisibilityRequestSchema,
   PublicProfileResponseSchema,
 } from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
@@ -24,7 +25,8 @@ profileRouter.get("/public/:userId", async (c) => {
   }
 
   const container = createContainer(c.env.DB);
-  const data = await getPublicProfileData(container, userId);
+  const viewerId = await getAuthUserId(c);
+  const data = await getPublicProfileData(container, userId, viewerId);
   if (!data) {
     return profileError(c, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.", 404);
   }
@@ -175,4 +177,43 @@ profileRouter.post("/locale", async (c) => {
   }
 
   return c.json({ success: true, locale: result.user.locale ?? parsed.data.locale }, 200);
+});
+
+// PATCH /api/profile/visibility — controls whether favorites/recent-plays (already stored
+// server-side either way) are disclosed to OTHER viewers on the public profile. No cooldown —
+// this only changes disclosure, not any stored data.
+profileRouter.patch("/visibility", async (c) => {
+  const userId = await getAuthUserId(c);
+  if (!userId) {
+    return profileError(c, "UNAUTHORIZED", "Unauthenticated", 401);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = UpdateVisibilityRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return profileError(c, "INVALID_VISIBILITY", "잘못된 요청입니다.", 400);
+  }
+
+  const { profileUseCases } = createContainer(c.env.DB);
+  const result = await profileUseCases.updateVisibility(
+    userId,
+    parsed.data.showFavorites,
+    parsed.data.showRecentPlays,
+  );
+
+  if (!result.ok) {
+    return profileError(c, result.code, "계정을 찾을 수 없습니다.", 404);
+  }
+
+  return c.json(
+    {
+      success: true,
+      showFavorites: result.user.show_favorites ?? false,
+      showRecentPlays: result.user.show_recent_plays ?? false,
+    },
+    200,
+  );
 });

@@ -187,6 +187,11 @@ export async function evaluateAchievementsForUser(
 export async function getPublicProfileData(
   container: AppContainer,
   userId: number,
+  /** The currently-authenticated viewer's user id, if any — null for guests. Used only to
+   * decide (a) whether to bypass the owner's own favorites/recent-plays privacy flags (owners
+   * always see their own lists) and (b) whether to include visibilitySettings at all (only
+   * ever returned to the owner). Never affects any other field. */
+  viewerId: number | null,
 ): Promise<{
   id: number;
   nickname: string;
@@ -206,17 +211,29 @@ export async function getPublicProfileData(
     channelUrl: string;
     channelHandle: string | null;
   }>;
+  favoriteGameIds: string[] | null;
+  recentPlays: Array<{ gameId: string; lastPlayedAt: string }> | null;
+  visibilitySettings: { showFavorites: boolean; showRecentPlays: boolean } | null;
 } | null> {
   const user = await container.userRepo.findById(userId);
   if (!user) return null;
 
-  const [progress, globalRank, achievements, gameBests, creatorProfile] = await Promise.all([
-    container.progressionUseCases.getProgressionSummary(userId),
-    container.progressionUseCases.getGlobalXpRank(userId),
-    container.achievementUseCases.getSummary(userId),
-    container.scoreUseCases.getUserBestsFormatted(userId),
-    container.creatorUseCases.getCreatorProfileByUserId(userId),
-  ]);
+  const isOwner = viewerId !== null && viewerId === userId;
+  const showFavorites = user.show_favorites ?? false;
+  const showRecentPlays = user.show_recent_plays ?? false;
+  const needsPersonalization = isOwner || showFavorites || showRecentPlays;
+
+  const [progress, globalRank, achievements, gameBests, creatorProfile, personalization] =
+    await Promise.all([
+      container.progressionUseCases.getProgressionSummary(userId),
+      container.progressionUseCases.getGlobalXpRank(userId),
+      container.achievementUseCases.getSummary(userId),
+      container.scoreUseCases.getUserBestsFormatted(userId),
+      container.creatorUseCases.getCreatorProfileByUserId(userId),
+      needsPersonalization
+        ? container.personalizationUseCases.getPersonalizationState(userId)
+        : null,
+    ]);
 
   const creatorBadges = (creatorProfile?.platformAccounts ?? [])
     .filter((a) => a.verificationStatus === "VERIFIED")
@@ -241,5 +258,8 @@ export async function getPublicProfileData(
     totalAchievements: achievements.totalAchievements,
     gameBests,
     creatorBadges,
+    favoriteGameIds: isOwner || showFavorites ? (personalization?.favoriteGameIds ?? []) : null,
+    recentPlays: isOwner || showRecentPlays ? (personalization?.recentPlays ?? []) : null,
+    visibilitySettings: isOwner ? { showFavorites, showRecentPlays } : null,
   };
 }
