@@ -2,9 +2,10 @@ import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { Gamepad2, Search } from "lucide-react";
 import { gameManifests } from "../features/catalog/registry";
-import { GameCard } from "../components/ui/GameCard";
+import { GameGrid } from "../components/ui/GameGrid";
+import { GridColumnSwitcher } from "../components/ui/GridColumnSwitcher";
 import { CategoryChips } from "../components/ui/CategoryChips";
-import { usePersonalization } from "../features/personalization";
+import { usePersonalization, useGridColumns } from "../features/personalization";
 import { useAuth } from "../features/auth";
 import { useI18n } from "../features/i18n/I18nContext";
 
@@ -22,6 +23,7 @@ export default function Games() {
 
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [columns, setColumns] = useGridColumns();
 
   const { favoriteGameIds } = usePersonalization();
   const { isAuthenticated, openLoginModal } = useAuth();
@@ -82,21 +84,23 @@ export default function Games() {
         </div>
       </div>
 
-      {/* Category Chips Bar */}
-      <CategoryChips selectedCategory={selectedCategory} onSelectCategory={handleSelectCategory} />
+      {/* Category Chips Bar & Grid Density Switcher */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+        <CategoryChips
+          selectedCategory={selectedCategory}
+          onSelectCategory={handleSelectCategory}
+        />
+        <GridColumnSwitcher columns={columns} onChange={setColumns} />
+      </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredGames.map((game) => (
-          <GameCard key={game.slug} {...game} />
-        ))}
-
-        {filteredGames.length === 0 && (
-          <div className="col-span-full py-20 text-center text-text-muted bg-surface-raised rounded-3xl border border-border border-dashed">
-            {selectedCategory === "favorites" ? dict.games.emptyFavorites : dict.games.emptySearch}
-          </div>
-        )}
-      </div>
+      <GameGrid
+        games={filteredGames}
+        columns={columns}
+        emptyMessage={
+          selectedCategory === "favorites" ? dict.games.emptyFavorites : dict.games.emptySearch
+        }
+      />
     </div>
   );
 }

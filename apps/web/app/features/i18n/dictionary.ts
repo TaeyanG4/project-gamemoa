@@ -36,6 +36,16 @@ export interface Dictionary {
     heroSubtitle: string;
     browseGames: string;
     lineupTitle: string;
+    itemsCountSuffix: string;
+    popularTitle: string;
+    recentPlaysTitle: string;
+    favoritesTitle: string;
+    emptyCategory: string;
+    gridColumnsAriaPrefix: string;
+    gridColumnsAriaSuffix: string;
+    teaserTitle: string;
+    teaserBody: string;
+    teaserCta: string;
   };
   language: {
     label: string;
@@ -71,6 +81,10 @@ export interface Dictionary {
       typing: string;
       favorites: string;
     };
+    addFavoriteAriaPrefix: string;
+    addFavoriteAriaSuffix: string;
+    removeFavoriteAriaPrefix: string;
+    removeFavoriteAriaSuffix: string;
   };
   ranking: {
     eyebrow: string;
@@ -905,6 +919,17 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       heroSubtitle: "가벼운 웹 미니게임을 모아 즐기고, 친구들과 기록을 겨뤄보세요.",
       browseGames: "게임 둘러보기",
       lineupTitle: "미니게임 라인업",
+      itemsCountSuffix: "개",
+      popularTitle: "인기 게임",
+      recentPlaysTitle: "최근 플레이",
+      favoritesTitle: "내 즐겨찾기",
+      emptyCategory: "해당 카테고리에 준비된 게임이 없습니다.",
+      gridColumnsAriaPrefix: "",
+      gridColumnsAriaSuffix: "열로 보기",
+      teaserTitle: "실시간 랭킹 & 멀티플레이어 업데이트 예정",
+      teaserBody:
+        "친구와 링크 하나로 접속해 함께 실시간 대결을 펼칠 수 있는 멀티 모드가 곧 출시됩니다.",
+      teaserCta: "게임 미리보기",
     },
     language: { label: "언어", ko: "한국어", en: "English", ja: "日本語", zh: "简体中文" },
     loginModal: {
@@ -934,6 +959,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         typing: "타자",
         favorites: "즐겨찾기",
       },
+      addFavoriteAriaPrefix: "",
+      addFavoriteAriaSuffix: " 즐겨찾기 추가",
+      removeFavoriteAriaPrefix: "",
+      removeFavoriteAriaSuffix: " 즐겨찾기 해제",
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",
@@ -1943,6 +1972,17 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       heroSubtitle: "Play light web mini-games and compete for the best record with friends.",
       browseGames: "Browse games",
       lineupTitle: "Mini-Game Lineup",
+      itemsCountSuffix: "",
+      popularTitle: "Popular Games",
+      recentPlaysTitle: "Recently Played",
+      favoritesTitle: "My Favorites",
+      emptyCategory: "No games available in this category yet.",
+      gridColumnsAriaPrefix: "View in ",
+      gridColumnsAriaSuffix: " columns",
+      teaserTitle: "Real-Time Rankings & Multiplayer Coming Soon",
+      teaserBody:
+        "A multiplayer mode where you and your friends can join with a single link and compete in real time is coming soon.",
+      teaserCta: "Preview games",
     },
     language: { label: "Language", ko: "한국어", en: "English", ja: "日本語", zh: "简体中文" },
     loginModal: {
@@ -1972,6 +2012,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         typing: "Typing",
         favorites: "Favorites",
       },
+      addFavoriteAriaPrefix: "Add ",
+      addFavoriteAriaSuffix: " to favorites",
+      removeFavoriteAriaPrefix: "Remove ",
+      removeFavoriteAriaSuffix: " from favorites",
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",
@@ -3000,6 +3044,17 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       heroSubtitle: "軽量なWebミニゲームを集めて楽しみ、友達と記録を競いましょう。",
       browseGames: "ゲームを見る",
       lineupTitle: "ミニゲームラインナップ",
+      itemsCountSuffix: "個",
+      popularTitle: "人気ゲーム",
+      recentPlaysTitle: "最近プレイ",
+      favoritesTitle: "お気に入り",
+      emptyCategory: "このカテゴリにはまだ用意されたゲームがありません。",
+      gridColumnsAriaPrefix: "",
+      gridColumnsAriaSuffix: "列で表示",
+      teaserTitle: "リアルタイムランキング＆マルチプレイヤーアップデート予定",
+      teaserBody:
+        "友達と1つのリンクで参加し、リアルタイムで対戦できるマルチプレイヤーモードが近日公開予定です。",
+      teaserCta: "ゲームをプレビュー",
     },
     language: { label: "言語", ko: "한국어", en: "English", ja: "日本語", zh: "简体中文" },
     loginModal: {
@@ -3029,6 +3084,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         typing: "タイピング",
         favorites: "お気に入り",
       },
+      addFavoriteAriaPrefix: "",
+      addFavoriteAriaSuffix: "をお気に入りに追加",
+      removeFavoriteAriaPrefix: "",
+      removeFavoriteAriaSuffix: "のお気に入りを解除",
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",
@@ -4055,6 +4114,16 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       heroSubtitle: "畅玩轻量网页小游戏，与好友一较高下。",
       browseGames: "浏览游戏",
       lineupTitle: "小游戏阵容",
+      itemsCountSuffix: "个",
+      popularTitle: "热门游戏",
+      recentPlaysTitle: "最近游玩",
+      favoritesTitle: "我的收藏",
+      emptyCategory: "该分类下暂无游戏。",
+      gridColumnsAriaPrefix: "以",
+      gridColumnsAriaSuffix: "列显示",
+      teaserTitle: "实时排行榜与多人模式即将上线",
+      teaserBody: "即将推出多人模式，你和朋友只需一个链接即可加入，实时展开对决。",
+      teaserCta: "预览游戏",
     },
     language: { label: "语言", ko: "한국어", en: "English", ja: "日本語", zh: "简体中文" },
     loginModal: {
@@ -4084,6 +4153,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         typing: "打字",
         favorites: "收藏",
       },
+      addFavoriteAriaPrefix: "将",
+      addFavoriteAriaSuffix: "加入收藏",
+      removeFavoriteAriaPrefix: "将",
+      removeFavoriteAriaSuffix: "移出收藏",
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",

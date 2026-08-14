@@ -20,7 +20,7 @@ export function WikiLayout({
   const { dict } = useI18n();
   const location = useLocation();
   const currentPath = location.pathname;
-  const wikiSections = buildWikiSections(dict.wiki);
+  const wikiSections = buildWikiSections(dict);
   const { prev, next } = findAdjacentWikiPages(wikiSections, currentPath);
 
   return (
