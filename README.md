@@ -1,207 +1,181 @@
-# OwOGG 🎮
+# OwOGG
 
-> **설치 없이 웹 브라우저에서 바로 즐기는 가벼운 웹 미니게임 모음 플랫폼**
->
-> 프로덕션: **[owogg.com](https://owogg.com)** · API: `api.owogg.com`
+설치 없이 웹 브라우저에서 바로 즐기는 가벼운 미니게임 모음 플랫폼입니다.
 
-OwOGG는 **Game Plugin Architecture** 및 **Clean Layered Monorepo Architecture** 기반으로 설계된 미니게임 플랫폼입니다.  
-CrazyGames와 MiniGame.com의 검증된 UI/UX 패턴을 결합하여, 1초 만에 플레이 가능한 비주얼 스포트라이트와 고밀도 게임 카탈로그를 제공합니다.
+- 프로덕션: [owogg.com](https://owogg.com)
+- API: `api.owogg.com`
 
----
-
-## ✨ 핵심 특징 (Key Features)
-
-- ⚡ **1초 무설치 시작**: 회원가입이나 다운로드 없이 브라우저에서 즉시 실행
-- 🎨 **CrazyGames & MiniGame.com UI/UX 결합**:
-  - **좌측 접이식 아이콘 사이드바**: 빠르게 카테고리(홈, 인기, 순발력, 두뇌, 랭킹)를 탐색
-  - **오늘의 추천 게임 스포트라이트**: 대형 비주얼 카드와 1-클릭 실행 버튼
-  - **카테고리 칩 필터 바**: 페이지 전환 없는 실시간 1-클릭 라이브 필터링
-  - **16:10 고밀도 게이밍 카드**: 호버 플레이 오버레이 및 소요 시간 안내
-- 🎮 **게이머 필수 테스트 미니게임 컬렉션**:
-  - ⏱️ **반응속도 테스트 (Reaction Time)**: 밀리초(ms) 단위 반응속도 측정 및 S~F 등급 판정
-  - 🧠 **순서 기억력 테스트 (Memory Test)**: 패턴 시퀀스 암기 및 최고 레벨 도전
-  - 🎯 **에임 테스트 (Aim Test)**: 31개 무작위 타겟 정밀 타격 반응속도 측정 (반응형 아레나 지원)
-  - ⌨️ **타자 속도 테스트 (Typing Test)**: 60초간 연속 문장 입력 및 WPM/CPM/정확도 실시간 측정
-- ⭐️ **사용자 맞춤화 레이어 (Personalization & Account Foundation)**:
-  - 📜 **최근 플레이 (Recent Plays)**: 실제 게임 시작 시점(`game_started`)에 타임스탬프 자동 기록 및 최근 플레이 탭 제공
-  - ⭐ **즐겨찾기 (Favorites, 로그인 전용)**: 게임 카드 북마크, 카테고리 칩 필터링 및 홈 화면 전용 섹션 — 게스트는 즐겨찾기 클릭 시 로그인 유도(게스트 즐겨찾기 미저장). 레거시 v1 게스트 즐겨찾기는 안전한 v2 마이그레이션으로 폐기되며 최근 플레이만 보존됨
-  - 🔐 **계정 식별/통합 (Account Identity & Merge)**: Google/Discord 로그인은 기본적으로 별도 OwOGG 계정(이메일 자동 병합 금지). 사용자 명시 요청 시 **Primary Account Wins** 계정 통합(Primary 데이터 유지, Secondary 데이터 삭제, Secondary 로그인 수단은 Primary로 이전). D1 원자 트랜잭션 기반
-  - 🔗 **연결된 로그인 계정 관리**: 프로필에서 Google/Discord 연결/연결해제 및 충돌 시 계정 통합 UI 제공
-  - 🔒 **SHA-256 세션 보안 & Google ID Token JWT/JWKS 검증**: 세션 토큰 해싱 저장 및 Google OpenID JWKS 기반 RS256 서명/iss/aud/exp/sub 검증(`tokeninfo` 비의존)
-  - 💾 **게스트 로컬스토리지 & 계정 D1 동기화**: 로그인 없이 최근 플레이를 로컬스토리지에 보존하며, 로그인 시 계정 D1로 안전한 1-Way 최근 플레이 통합(게스트 즐겨찾기는 미통합)
-- 🎨 **OwOGG 브랜드 파비콘**: 대각선 "OwO" 워드마크(브랜드 그라디언트 배경 + 흰색 라인아트)의 캐노니컬 `favicon.svg` + 결정론적 생성 PNG/ICO/애플터치아이콘/`site.webmanifest`. 헤더/푸터의 `<OwoWordmarkIcon>`과 동일한 도형을 공유합니다.
-- 🏆 **진행도 시스템 (XP / 레벨 / 도전과제)**: 서버 권위 XP(인증된 게임 완료 1회당 +10, 사용자×게임×UTC일 기준 최대 10회 상한), `xp_events` 원장 기반 멱등 지급, 결정론적 레벨 공식(`100×(L-1)²`), 7종 초기 도전과제(FIRST_PLAY/PLAY_10/PLAY_100/FIRST_FAVORITE/LEVEL_5/LEVEL_10/ALL_GAMES), 글로벌 XP 리더보드. 게임 점수(실력)와 XP(활동)는 항상 분리되어 랭킹 무결성을 해치지 않습니다. 자세한 내용은 `docs/PROGRESSION.md` 참고.
-- 📊 **My Page ("내 프로필 & 기록")**: `/profile`의 "내 프로필"(사용자 정보, 레벨/XP, 닉네임·국가/지역 변경, 즐겨찾기, 최근 플레이, 연결된 로그인 계정) / "기록"(도전과제, 게임별 최고 기록) 탭 분리. 게임 기록 카드는 실제 썸네일 기반으로 재구성.
-- 🎥 **Creator & Featured 시스템**: YouTube/CHZZK/SOOP/Twitch 공식 소유권 검증, Featured 자격 자동 심사, 14일 보수적 재검증, 지정된 `ADMIN_USER_IDS` 관리자 전용 수동 심사 큐와 append-only 감사 원장. Featured는 게임 점수·XP·랭킹에 영향을 주지 않습니다. 상세 정책은 `docs/CREATOR_SYSTEM.md` 참고.
-- 🤖 **Discord HTTP Interactions & 커뮤니티 Hub**:
-  - `discord.js` Gateway/봇 데몬 없이 서명(Ed25519) 검증 기반 슬래시 커맨드(`/owogg games|link|profile|play|rank|leaderboard|server`).
-  - **Discord 서버 시스템 & Hub 페이지**: OAuth `guilds` 1회용 인증으로 `MANAGE_GUILD`/`ADMINISTRATOR` 권한 검증 후 서버 등록, 1회용 해시 챌린지 기반 access_token 미저장 보안, 공개 디렉토리 검색(`/discord/servers`), 공개 서버 페이지(`/discord/servers/:slug`), 가시성(`PUBLIC`/`UNLISTED`/`PRIVATE`), 서버 관리 페이지. 일반 OwOGG 게임 랭킹과 Discord 서버 공간은 명확히 분리되어 동작합니다. 자세한 내용은 `docs/DISCORD_INTEGRATION.md` 참고.
-  - **Discord 사용 안내**: `/discord/guide` 공개 사용 가이드와 `docs/DISCORD_BOT_GUIDE.md` 운영 가이드 제공. 앱 설치와 OwOGG 서버 등록은 별도 단계이며 기존 글로벌 XP는 새 Guild로 복사되지 않습니다.
-- 🛡️ **다층 방어 Admin Center**: `/admin`은 `ADMIN_USER_IDS`(근본 자격) + 신선한 Google Step-Up 본인 확인(canonical `sub` 허용 목록, 5분 이내 발급) + 관리자 전용 아이디/PBKDF2 비밀번호 로그인을 모두 통과해야 30분 수명의 별도 관리자 세션이 발급되는 다층 인증 구조입니다. 관리자 로그인 실패는 15분 rate limit으로 보호되며, Creator 수동 심사(`/admin/creators`)와 감사 요약은 GET을 포함해 관리자 세션을 요구합니다. 관리자 페이지는 검색 색인에서 제외됩니다. 설정 절차는 `docs/ADMIN_GUIDE.md`, 외부 설정 체크리스트는 `docs/PRODUCTION_INTEGRATIONS.md` 참고.
-
-- 🧩 **Game Plugin Architecture**:
-  - 빌드 타임 이중 레지스트리 자동 생성기 (`pnpm generate:registry`)를 통해 새 미니게임 추가 시 중앙 웹/백엔드 로더 코드 수정 0회 달성
-- 🛡️ **Clean Monorepo & Architecture Guard**:
-  - `packages/core` (Domain, Application, Ports), `packages/db` (Cloudflare D1 Persistence), `@owogg/contracts` (Single Source of Truth Schemas)
-  - CI 자동화 Architecture Guard (`pnpm verify`, `pnpm architecture:check`, `pnpm registry:check`)로 레이어 위반 및 생성 파일 이탈 자동 차단
-- ☁️ **Cloudflare Free Tier Production Architecture**:
-  - **Hono + Cloudflare Workers**: 고성능 서버리스 API 백엔드
-  - **Cloudflare D1**: 글로벌 에지 데이터베이스 (유저, 세션, 게임 점수, 랭킹, 개인화 데이터)
-  - **Google & Discord OAuth**: HttpOnly 세션 기반 보안 인증 (코드/서버 완료, 외부 프로바이더 설정 가이드 `docs/runbooks/oauth-setup.md` 제공)
-- 🔄 **Cloudflare 이탈 전략 (Exit Strategy)**: Hono 이식 가능 웹 표준 아키텍처와 Repository Abstraction을 통해 Node.js + Docker + PostgreSQL 구조로의 용이한 전환 고려
+Game Plugin Architecture와 Clean Layered Monorepo Architecture를 기반으로 설계되었으며, CrazyGames·MiniGame.com류의 UI/UX 패턴(접이식 사이드바, 카테고리 필터, 고밀도 카드 그리드)을 결합해 1초 만에 플레이 가능한 카탈로그를 제공합니다.
 
 ---
 
-## 🚀 로컬 실행 방법 (Quick Start)
+## 핵심 기능
 
-### 1. 사전 준비 (Prerequisites)
+**게임 컬렉션 (4종)**
 
-- **Node.js**: v22 LTS 이상
-- **pnpm**: v9 이상
+- 반응속도 테스트 — 밀리초 단위 반응속도 측정, S~F 등급 판정
+- 순서 기억력 테스트 — 패턴 시퀀스 암기 및 최고 레벨 도전
+- 에임 테스트 — 무작위 타겟 정밀 타격, normal/hard 난이도 지원
+- 타자 속도 테스트 — 60초 연속 입력, WPM/CPM/정확도 실시간 측정
 
-```bash
-npm install -g pnpm
-```
+게임별 메타데이터(지원 입력 방식, 리플레이 지원 여부, 난이도 구성)는 `GameManifest` 계약으로 표준화되어 있으며, 난이도가 있는 게임은 서버 리더보드가 난이도별로 분리됩니다. 자세한 내용은 `docs/GAME_CREATION_GUIDE.md` 참고.
 
-### 2. 의존성 설치 (Install Dependencies)
+**계정 & 개인화**
+
+- Google / Discord OAuth 로그인 — 기본적으로 별도 계정 유지, 사용자 명시 요청 시에만 Primary Account Wins 방식으로 계정 통합
+- 즐겨찾기 · 최근 플레이 — 로그인 계정은 서버(D1)에 저장, 게스트는 로컬스토리지에 보존 후 로그인 시 1-way 동기화
+- 프로필(`/users/:id`)에서 즐겨찾기·최근 플레이를 각각 공개/비공개로 설정 가능 — 기본값은 비공개
+- 설정(`/settings`)에서 닉네임/국가·지역 변경, 연결된 로그인 계정 관리, 크리에이터 채널 인증
+
+**진행도 시스템 (XP / 레벨 / 도전과제)**
+
+서버 권위 XP(인증된 게임 완료 1회당 +10, 유저×게임×UTC일 기준 최대 10회 상한), 원장(`xp_events`) 기반 멱등 지급, 결정론적 레벨 공식(`100×(L-1)²`), 7종 초기 도전과제, 글로벌 XP 리더보드. 게임 점수(실력)와 XP(활동)는 항상 분리되어 랭킹 무결성을 해치지 않습니다. 자세한 내용은 `docs/PROGRESSION.md` 참고.
+
+**게임 결과 공유**
+
+X(트위터) 인텐트 공유, Discord용 서식 텍스트 클립보드 복사, 결과 카드 스크린샷을 PNG로 캡처해 클립보드에 복사(미지원 브라우저는 파일 다운로드로 대체).
+
+**Discord 통합**
+
+- HTTP Interactions 기반 슬래시 커맨드(`/owogg games|link|profile|play|rank|leaderboard|server|help|achievements`) — 상시 구동 봇 데몬 없이 Ed25519 서명 검증만으로 동작
+- Arcane 스타일 랭크 카드 이미지 렌더링(satori + resvg, Cloudflare Workers에서 실행) — `/owogg profile`, `/owogg rank` 임베드에 첨부
+- 서버 등록 시스템 — `MANAGE_GUILD` 권한 검증 후 등록, 공개 디렉토리(`/discord/servers`) 및 서버별 페이지 제공, 길드 단위 XP는 글로벌 XP와 분리
+- 자세한 내용은 `docs/DISCORD_INTEGRATION.md`, `docs/DISCORD_BOT_GUIDE.md` 참고
+
+**크리에이터 & Featured**
+
+YouTube/CHZZK/SOOP/Twitch 공식 소유권 검증, Featured 자격 자동 심사 및 14일 재검증, 관리자 수동 심사 큐. Featured는 게임 점수·XP·랭킹에 영향을 주지 않습니다. 자세한 내용은 `docs/CREATOR_SYSTEM.md` 참고.
+
+**Admin Center**
+
+`ADMIN_USER_IDS`(근본 자격) + Google Step-Up 본인 확인 + 관리자 전용 로그인을 모두 통과해야 별도 관리자 세션이 발급되는 다층 인증 구조. 로그인 실패는 rate limit으로 보호되며, 관리자 페이지는 검색 색인에서 제외됩니다. 설정 절차는 `docs/ADMIN_GUIDE.md` 참고.
+
+**아키텍처**
+
+- Game Plugin Architecture — 빌드 타임 이중 레지스트리 자동 생성(`pnpm generate:registry`)으로 새 게임 추가 시 중앙 로더 코드 수정 0회
+- Clean Layered Monorepo — `packages/core`(Domain/Application/Ports), `packages/db`(Cloudflare D1 Persistence), `@owogg/contracts`(Zod 스키마 Single Source of Truth)
+- CI Architecture Guard(`pnpm architecture:check`, `pnpm registry:check`)로 레이어 위반과 생성 파일 이탈을 자동 차단
+- Cloudflare Free Tier 위에서 동작 — Hono + Workers(API), D1(DB), Workers Static Assets(웹). Repository Abstraction을 통해 Node.js + Docker + PostgreSQL로의 이관 경로도 고려되어 있습니다.
+
+---
+
+## 로컬 실행
+
+### 사전 준비
+
+- Node.js v22 LTS 이상
+- pnpm v9 이상 (`npm install -g pnpm`)
+
+### 설치 및 실행
 
 ```bash
 pnpm install
-```
-
-### 3. 개발 서버 실행 (Run Dev Server)
-
-```bash
 pnpm dev
 ```
 
-웹 앱 전용 실행:
+특정 앱만 실행하려면:
 
 ```bash
-pnpm --filter @owogg/web dev
+pnpm --filter @owogg/web dev   # 웹 프론트엔드
+pnpm --filter @owogg/api dev   # API 백엔드
 ```
 
-API 백엔드 전용 실행:
-
-```bash
-pnpm --filter @owogg/api dev
-```
-
-### 4. 웹 페이지 접속 (Open Page)
-
-브라우저 주소창에 아래 주소를 입력하여 접속합니다:
-
-👉 **[http://localhost:5173](http://localhost:5173)**
+브라우저에서 [http://localhost:5173](http://localhost:5173) 접속.
 
 ---
 
-## 🛠️ 검증 및 빌드 스크립트 (Scripts)
+## 스크립트
 
 ```bash
-# 단일 통합 품질 게이트 (락파일, 포맷, 아키텍처, 레지스트리, 린트, 타입, 테스트, 빌드)
-pnpm verify
+pnpm verify              # 단일 통합 품질 게이트 (포맷/아키텍처/레지스트리/린트/타입/테스트/빌드)
+pnpm smoke:prod          # 프로덕션 상태 및 배포 SHA 검증
+pnpm auth:prod:check     # 프로덕션 소셜 로그인 설정 진단
 
-# 프로덕션 상태 및 SHA 검증 (시간 제한 & 무한 대기 방지 검사)
-pnpm smoke:prod
-
-# 프로덕션 소셜 로그인 설정 및 진단 상태 검사
-pnpm auth:prod:check
-
-# 코드 포맷 및 린트 검사
 pnpm format:check
 pnpm lint
-
-# 아키텍처 레이어 경계 검사 & 레지스트리 최신성 검사
-pnpm architecture:check
-pnpm registry:check
-
-# 게임 레지스트리 자동 생성 (Core Manifest Registry & Web Dynamic Loaders)
-pnpm generate:registry
-
-# OwOGG 파비콘/아이콘 자산 결정론적 생성 (favicon.svg -> favicon.ico/PNG/manifest)
-pnpm generate:favicon
-
-# 새 게임 스캐폴딩 생성
-pnpm generate:game <game-slug>
-
-# 관리자 비밀번호 PBKDF2 레코드 생성 (평문은 stdin으로만 입력, 절대 인자로 전달하지 않음)
-pnpm admin:password:hash
-
-# TypeScript 타입 검사 & 단위 테스트
 pnpm typecheck
 pnpm test
-
-# 전체 프로젝트 빌드 (Turbo build)
 pnpm build
+
+pnpm architecture:check  # 레이어 경계 검사
+pnpm registry:check      # 게임 레지스트리 최신성 검사
+pnpm generate:registry   # 게임 레지스트리 자동 생성
+pnpm generate:favicon    # 파비콘/아이콘 자산 결정론적 생성
+pnpm generate:game <slug>  # 새 게임 스캐폴딩 생성
+
+pnpm admin:password:hash # 관리자 비밀번호 PBKDF2 레코드 생성 (평문은 stdin으로만 입력)
 ```
 
 ---
 
-## 🏗️ 기술 스택 (Tech Stack)
+## 기술 스택
 
-| 영역                  | 기술 스택                                                      |
-| --------------------- | -------------------------------------------------------------- |
-| **Frontend**          | React 19, React Router v7 (SPA Mode), Tailwind CSS v4          |
-| **Backend**           | Hono, TypeScript, Zod Validation                               |
-| **Database**          | Cloudflare D1 (SQL) & Repository Abstraction Layer             |
-| **Auth**              | Google OAuth (GIS), Discord OAuth 2.0, HttpOnly Cookie Session |
-| **Runtime / Hosting** | Cloudflare Workers & Cloudflare Workers Static Assets          |
-| **CI/CD**             | GitHub Actions & Wrangler CLI                                  |
-| **Monorepo**          | pnpm workspaces, Turborepo                                     |
+| 영역        | 스택                                                           |
+| ----------- | -------------------------------------------------------------- |
+| Frontend    | React 19, React Router v7 (SPA Mode), Tailwind CSS v4          |
+| Backend     | Hono, TypeScript, Zod                                          |
+| Database    | Cloudflare D1 (Repository Abstraction Layer)                   |
+| Auth        | Google OAuth (GIS), Discord OAuth 2.0, HttpOnly Cookie Session |
+| 이미지 렌더 | satori + @resvg/resvg-wasm (Discord 랭크 카드)                 |
+| Runtime     | Cloudflare Workers, Workers Static Assets                      |
+| CI/CD       | GitHub Actions, Wrangler CLI                                   |
+| Monorepo    | pnpm workspaces, Turborepo                                     |
 
 ---
 
-## 📁 프로젝트 구조 (Project Structure)
+## 프로젝트 구조
 
 ```text
 owogg/
 ├── apps/
-│   ├── web/                   # React Router v7 SPA 웹 프론트엔드
-│   └── api/                   # Hono API Backend (Workers / Node.js portable)
+│   ├── web/                       # React Router v7 SPA 프론트엔드
+│   └── api/                       # Hono API 백엔드 (Workers / Node.js portable)
 ├── games/
-│   ├── reaction-time/         # 반응속도 테스트 게임 (@owogg/game-reaction-time)
-│   ├── memory-test/           # 순서 기억력 테스트 게임 (@owogg/game-memory-test)
-│   ├── aim-test/              # 에임 테스트 게임 (@owogg/game-aim-test)
-│   └── typing-test/           # 타자 속도 테스트 게임 (@owogg/game-typing-test)
+│   ├── reaction-time/             # @owogg/game-reaction-time
+│   ├── memory-test/                # @owogg/game-memory-test
+│   ├── aim-test/                   # @owogg/game-aim-test
+│   └── typing-test/                # @owogg/game-typing-test
 ├── packages/
-│   ├── contracts/             # Zod 요청/응답 스키마 & API Single Source of Truth
-│   ├── core/                  # Pure Domain, Application Use Cases & Ports (No Infra/Browser deps)
-│   ├── db/                    # Cloudflare D1 Repository 구현체 & SQL schema (Persistence Adapter)
-│   ├── game-sdk/              # 게임 모듈 공통 계약 & 스코어링 인터페이스
-│   ├── shared/                # Zod 공통 검증 스키마 & 타입
-│   └── ui/                    # 공통 UI 컴포넌트 & GameShell
-├── scripts/                   # Architecture Guard, Registry Generator & SPA Build 스크립트
-└── docs/                      # 아키텍처, 시스템 설계, 작업 진행 상황 & 로드맵
-    ├── ARCHITECTURE.md        # 레이어 의존성 & 플러그인 아키텍처 명세서
-    ├── OWOGG_BLUEPRINT.md   # 전체 시스템 블루프린트
-    ├── PROGRESS.md            # 기능별 구현 진행 현황
-    ├── WORK_PROGRESS.md       # CI/CD 및 작업 진행 상황
-    ├── ROADMAP.md             # 플랫폼 향후 로드맵
-    ├── PROGRESSION.md         # XP/레벨/도전과제 진행도 시스템 설계
-    ├── DISCORD_INTEGRATION.md # Discord HTTP Interactions 아키텍처 및 설정 가이드
-    ├── DISCORD_BOT_GUIDE.md   # Discord 서버 관리자/사용자/운영자 실무 가이드
-    ├── ADMIN_GUIDE.md         # Admin Center 다층 인증(Google Step-Up/비밀번호) 및 운영 가이드
-    ├── PRODUCTION_INTEGRATIONS.md # 외부 연동(Google/Discord/Creator/Admin) 운영 설정 체크리스트
-    ├── AGENTS.md              # AI Agent 개발 규칙 명세서
+│   ├── contracts/                 # Zod 요청/응답 스키마 (API Single Source of Truth)
+│   ├── core/                      # Domain, Application Use Cases, Ports
+│   ├── db/                        # Cloudflare D1 Repository 구현체 & SQL 스키마
+│   ├── game-sdk/                  # 게임 모듈 공통 계약 & 스코어링 인터페이스
+│   ├── shared/                    # 공통 Zod 검증 스키마 & 타입
+│   └── ui/                        # 공통 UI 컴포넌트 & GameShell
+├── scripts/                       # Architecture Guard, Registry Generator, 빌드 스크립트
+└── docs/
+    ├── ARCHITECTURE.md            # 레이어 의존성 & 플러그인 아키텍처
+    ├── OWOGG_BLUEPRINT.md         # 전체 시스템 블루프린트
+    ├── GAME_CREATION_GUIDE.md     # 게임 제작/등록 지침 및 메타데이터 규격
+    ├── PROGRESSION.md             # XP/레벨/도전과제 설계
+    ├── CREATOR_SYSTEM.md          # 크리에이터 인증 & Featured 정책
+    ├── DISCORD_INTEGRATION.md     # Discord HTTP Interactions 아키텍처
+    ├── DISCORD_BOT_GUIDE.md       # Discord 봇 실무 가이드
+    ├── ADMIN_GUIDE.md             # Admin Center 인증 및 운영 가이드
+    ├── PRODUCTION_INTEGRATIONS.md # 외부 연동 운영 설정 체크리스트
+    ├── I18N.md                    # 다국어(4개 언어) 콘텐츠 관리
+    ├── MULTIPLAYER_GAME_DESIGN.md # 1:1 실시간 대전 설계 (계획 단계)
+    ├── ROADMAP.md                 # 향후 로드맵
+    ├── AGENTS.md                  # AI Agent 개발 규칙
     └── runbooks/
-        ├── oauth-setup.md        # 소셜 로그인 설정 런북
-        └── account-linking.md    # 계정 연결/통합(Pimary Account Wins) 런북
+        ├── oauth-setup.md         # 소셜 로그인 설정 런북
+        └── account-linking.md     # 계정 연결/통합 런북
 ```
 
 ---
 
-## ☁️ 배포 파이프라인 (Deployment Pipeline)
-
-OwOGG는 **GitHub Actions**와 **Wrangler CLI**를 통해 Cloudflare Workers에 자동 배포됩니다:
+## 배포 파이프라인
 
 ```text
 git push origin main
-  └─► GitHub Actions CI (frozen install ➔ format ➔ lint ➔ architecture ➔ registry ➔ typecheck ➔ test ➔ build)
-        └─► GitHub Actions CD (D1 Migration ➔ API Worker 배포 ➔ API Health Check ➔ Web Worker 배포 ➔ Web Smoke Check ➔ Provenance Check)
+  └─ GitHub Actions CI  (frozen install → format → lint → architecture → registry → typecheck → test → build)
+        └─ GitHub Actions CD  (D1 Migration → API Worker 배포 → API Health Check → Web 배포 → Web Smoke Check → Provenance Check)
 ```
+
+GitHub Actions와 Wrangler CLI를 통해 Cloudflare Workers에 자동 배포됩니다.
 
 ---
 
-## 📜 라이선스 (License)
+## 라이선스
 
 MIT License
