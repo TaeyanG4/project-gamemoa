@@ -878,6 +878,20 @@ export interface Dictionary {
       section7BodySuffix: string;
     };
   };
+  /** Localized display text for the game catalog (title/shortDescription/description/tags),
+   * keyed by GameManifest.slug. Deliberately separate from GameManifest itself — that type is
+   * shared with apps/api (Discord embeds, score validation), which has no access to this
+   * client-side dictionary. See apps/web/app/features/catalog/localizedGameContent.ts for the
+   * fallback-to-Korean-manifest-text lookup helper used everywhere this is consumed. */
+  gameContent: Record<
+    string,
+    {
+      title: string;
+      shortDescription: string;
+      description: string;
+      tags: string[];
+    }
+  >;
   platformIcon: {
     chzzkLabel: string;
     soopLabel: string;
@@ -1931,6 +1945,37 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         section7BodyPrefix: "개인정보 관련 문의는 ",
         section7BodyEmail: "taeyang95@naver.com",
         section7BodySuffix: "으로 연락해 주세요.",
+      },
+    },
+    gameContent: {
+      "reaction-time": {
+        title: "반응속도 테스트",
+        shortDescription: "화면이 바뀌면 최대한 빨리 클릭하세요!",
+        description:
+          "초록색 화면이 나타나는 순간 최대한 빨리 클릭하세요. 당신의 반응속도를 측정합니다.",
+        tags: ["반응속도", "클릭", "타이밍"],
+      },
+      "memory-test": {
+        title: "순서 기억력 테스트",
+        shortDescription: "깜빡이는 색상 순서를 기억하고 순서대로 똑같이 누르세요!",
+        description:
+          "점점 길어지는 패턴을 완벽히 기억해보세요. 당신의 단기 기억력 한계는 어디까지일까요?",
+        tags: ["기억력", "두뇌", "패턴", "패밀리"],
+      },
+      "aim-test": {
+        title: "에임 테스트",
+        shortDescription: "화면에 나타나는 타겟을 빠른 속도로 조준하고 클릭하세요!",
+        description:
+          "무작위로 생성되는 31개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
+        tags: ["에임", "조준", "반응속도", "클릭"],
+      },
+      "typing-test": {
+        title: "타자 속도 테스트",
+        shortDescription:
+          "60초 동안 정해진 문장을 빠르고 정확하게 입력하여 WPM(분당 단어 수)과 정확도를 측정하세요!",
+        description:
+          "영문 단어를 입력하며 자신의 타자 속도(WPM)와 분당 타수(CPM), 정확도를 측정해보세요. 정교한 타자 타이핑 실력에 도전하세요.",
+        tags: ["타자", "WPM", "속도", "순발력", "두뇌"],
       },
     },
     platformIcon: {
@@ -3005,6 +3050,37 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         section7BodySuffix: ".",
       },
     },
+    gameContent: {
+      "reaction-time": {
+        title: "Reaction Time Test",
+        shortDescription: "Click as fast as you can when the screen changes!",
+        description:
+          "Click as quickly as possible the moment the screen turns green. Test your reaction speed.",
+        tags: ["Reaction Time", "Click", "Timing"],
+      },
+      "memory-test": {
+        title: "Sequence Memory Test",
+        shortDescription: "Remember the flashing color sequence and press them in the exact order!",
+        description:
+          "Try to perfectly memorize the increasingly long patterns. What are the limits of your short-term memory?",
+        tags: ["Memory", "Brain", "Pattern", "Family"],
+      },
+      "aim-test": {
+        title: "Aim Test",
+        shortDescription: "Aim and click on targets appearing on the screen quickly!",
+        description:
+          "Accurately and quickly aim and click 31 randomly generated targets. Measures your reaction speed and accuracy.",
+        tags: ["Aim", "Targeting", "Reaction Time", "Click"],
+      },
+      "typing-test": {
+        title: "Typing Speed Test",
+        shortDescription:
+          "Type the given sentences quickly and accurately for 60 seconds to measure your WPM (Words Per Minute) and accuracy!",
+        description:
+          "Test your typing speed (WPM), CPM (Characters Per Minute), and accuracy by typing English words. Challenge your precise typing skills.",
+        tags: ["Typing", "WPM", "Speed", "Reaction", "Brain"],
+      },
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -4075,6 +4151,37 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         section7BodySuffix: " までご連絡ください。",
       },
     },
+    gameContent: {
+      "reaction-time": {
+        title: "反射神経テスト",
+        shortDescription: "画面が変わったら、できるだけ早くクリックしてください！",
+        description:
+          "緑色の画面が表示された瞬間にできるだけ早くクリックしてください。あなたの反応速度を測定します。",
+        tags: ["反射神経", "クリック", "タイミング"],
+      },
+      "memory-test": {
+        title: "記憶力順序テスト",
+        shortDescription: "点滅する色の順序を覚えて、同じ順番で押してください！",
+        description:
+          "長くなるパターンを完璧に記憶してみましょう。あなたの短期記憶力の限界はどこまででしょうか？",
+        tags: ["記憶力", "頭脳", "パターン", "ファミリー"],
+      },
+      "aim-test": {
+        title: "エイムテスト",
+        shortDescription: "画面に表示されるターゲットを素早く狙ってクリックしてください！",
+        description:
+          "ランダムに生成される31個のターゲットを正確かつ迅速に狙ってクリックしてください。反応速度と正確性を測定します。",
+        tags: ["エイム", "照準", "反射神経", "クリック"],
+      },
+      "typing-test": {
+        title: "タイピング速度テスト",
+        shortDescription:
+          "60秒間、指定された文章を素早く正確に入力し、WPM（1分あたりの単語数）と正確性を測定しましょう！",
+        description:
+          "英単語を入力して、自分のタイピング速度（WPM）と1分あたりの打数（CPM）、正確性を測定してみましょう。精密なタイピングスキルに挑戦してください。",
+        tags: ["タイピング", "WPM", "速度", "反射神経", "頭脳"],
+      },
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -5094,6 +5201,33 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         section7BodyPrefix: "隐私相关的咨询，请发送邮件至 ",
         section7BodyEmail: "taeyang95@naver.com",
         section7BodySuffix: " 与我们联系。",
+      },
+    },
+    gameContent: {
+      "reaction-time": {
+        title: "反应速度测试",
+        shortDescription: "当屏幕颜色改变时，请尽快点击！",
+        description: "在绿色屏幕出现的瞬间，尽可能快地点击。测试您的反应速度。",
+        tags: ["反应速度", "点击", "时机"],
+      },
+      "memory-test": {
+        title: "顺序记忆力测试",
+        shortDescription: "记住闪烁颜色的顺序，并按相同顺序按下！",
+        description: "尝试完美记住越来越长的模式。您的短期记忆力极限在哪里？",
+        tags: ["记忆力", "益智", "模式", "家庭"],
+      },
+      "aim-test": {
+        title: "瞄准测试",
+        shortDescription: "快速瞄准并点击屏幕上出现的目标！",
+        description: "准确且快速地瞄准并点击随机生成的31个目标。测量您的反应速度和准确度。",
+        tags: ["瞄准", "对准", "反应速度", "点击"],
+      },
+      "typing-test": {
+        title: "打字速度测试",
+        shortDescription: "在60秒内快速准确地输入给定句子，以测量您的WPM（每分钟单词数）和准确度！",
+        description:
+          "通过输入英文单词来测试自己的打字速度（WPM）、每分钟击键数（CPM）和准确度。挑战您精湛的打字技巧。",
+        tags: ["打字", "WPM", "速度", "反应力", "益智"],
       },
     },
     platformIcon: {

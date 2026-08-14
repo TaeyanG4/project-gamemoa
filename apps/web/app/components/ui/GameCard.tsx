@@ -16,8 +16,8 @@ interface GameCardProps {
 
 export function GameCard({
   slug,
-  title,
-  shortDescription,
+  title: koTitle,
+  shortDescription: koShortDescription,
   modes,
   thumbnail,
   accent = "#6366f1",
@@ -26,6 +26,13 @@ export function GameCard({
   const { isFavorite, toggleFavorite } = usePersonalization();
   const { dict } = useI18n();
   const isFav = isFavorite(slug);
+
+  // GameManifest text is Korean-only (shared with apps/api, which has no i18n dictionary) — the
+  // localized display text for the web UI lives in dict.gameContent, falling back to the
+  // manifest's own Korean text if a slug has no entry yet.
+  const content = dict.gameContent[slug];
+  const title = content?.title ?? koTitle;
+  const shortDescription = content?.shortDescription ?? koShortDescription;
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();

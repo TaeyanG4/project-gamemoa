@@ -8,6 +8,7 @@ import { CategoryChips } from "../components/ui/CategoryChips";
 import { usePersonalization, useGridColumns } from "../features/personalization";
 import { useAuth } from "../features/auth";
 import { useI18n } from "../features/i18n/I18nContext";
+import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 
 export function meta() {
   return [
@@ -39,10 +40,11 @@ export default function Games() {
 
   const filteredGames = useMemo(() => {
     return gameManifests.filter((game) => {
+      const { title, shortDescription } = getLocalizedGameContent(dict, game);
       const matchesSearch =
         !searchQuery ||
-        game.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        game.shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
+        title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesCategory =
         selectedCategory === "all"
@@ -53,7 +55,7 @@ export default function Games() {
 
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory, favoriteGameIds]);
+  }, [searchQuery, selectedCategory, favoriteGameIds, dict]);
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-7xl mx-auto flex-1">

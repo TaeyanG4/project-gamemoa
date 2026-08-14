@@ -25,6 +25,7 @@ import type { GameManifest } from "@owogg/game-sdk";
 import { getLocalBestScore, fetchUserBestsApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
 import { usePersonalization } from "../features/personalization";
+import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 import {
   fetchConnectedProviders,
   linkGoogleProvider,
@@ -70,7 +71,9 @@ function providerLabel(provider: SocialProvider): string {
 
 /** Shared compact "game + info row" card used for records, favorites, and recent plays. */
 function GameLinkCard({ game, children }: { game: GameManifest; children: ReactNode }) {
+  const { dict } = useI18n();
   const accent = game.accent ?? "#6366f1";
+  const title = getLocalizedGameContent(dict, game).title;
 
   return (
     <Link
@@ -85,14 +88,14 @@ function GameLinkCard({ game, children }: { game: GameManifest; children: ReactN
       >
         <img
           src={game.thumbnail}
-          alt={game.title}
+          alt={title}
           className="w-9 h-9 object-contain transform group-hover:scale-110 transition-transform duration-300"
         />
       </div>
 
       <div className="flex-1 min-w-0">
         <h3 className="font-bold text-sm text-text-primary group-hover:text-brand transition-colors truncate">
-          {game.title}
+          {title}
         </h3>
         {children}
       </div>
@@ -138,9 +141,12 @@ function GameRecordCard({
 }
 
 function GameFavoriteCard({ game }: { game: GameManifest }) {
+  const { dict } = useI18n();
+  const shortDescription = getLocalizedGameContent(dict, game).shortDescription;
+
   return (
     <GameLinkCard game={game}>
-      <p className="text-xs text-text-secondary line-clamp-1 mt-1">{game.shortDescription}</p>
+      <p className="text-xs text-text-secondary line-clamp-1 mt-1">{shortDescription}</p>
     </GameLinkCard>
   );
 }

@@ -14,6 +14,8 @@ import {
 } from "../features/scores/api";
 import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
+import { useI18n } from "../features/i18n/I18nContext";
+import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck } from "lucide-react";
 
 type SubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
@@ -46,6 +48,7 @@ export default function GamePlay() {
   const navigate = useNavigate();
   const slug = params.slug ?? "";
   const { user, isAuthenticated, openLoginModal } = useAuth();
+  const { dict } = useI18n();
 
   const [GameComponent, setGameComponent] = useState<ComponentType<GameProps> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +63,7 @@ export default function GamePlay() {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
   const manifest = useMemo(() => gameManifests.find((m) => m.slug === slug), [slug]);
+  const localizedTitle = manifest ? getLocalizedGameContent(dict, manifest).title : undefined;
 
   // Load Game Module
   useEffect(() => {
@@ -216,7 +220,7 @@ export default function GamePlay() {
               className="w-6 h-6 rounded-md"
               style={{ backgroundColor: manifest?.accent ?? "#6366f1" }}
             />
-            <span className="font-bold">{manifest?.title ?? "게임 로딩중..."}</span>
+            <span className="font-bold">{localizedTitle ?? "게임 로딩중..."}</span>
           </div>
         </div>
       </div>

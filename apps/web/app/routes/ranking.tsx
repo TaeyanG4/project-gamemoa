@@ -10,6 +10,7 @@ import { levelForTotalXp } from "@owogg/core";
 
 import { gameManifests } from "../features/catalog/registry";
 import { useI18n } from "../features/i18n/I18nContext";
+import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 
 export function meta() {
   return [
@@ -151,7 +152,7 @@ export default function Ranking() {
                   : "bg-surface-raised text-text-secondary border-border/80 hover:text-text-primary"
               }`}
             >
-              {game.title}
+              {getLocalizedGameContent(dict, game).title}
             </button>
           ))}
         </div>
@@ -238,7 +239,7 @@ export default function Ranking() {
                       : "bg-surface-raised text-text-muted border-border/60 hover:text-text-primary"
                   }`}
                 >
-                  {game.title}
+                  {getLocalizedGameContent(dict, game).title}
                 </button>
               ))}
             </div>
