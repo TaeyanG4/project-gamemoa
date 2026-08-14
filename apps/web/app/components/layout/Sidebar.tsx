@@ -36,8 +36,14 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           they previously shared the same z-40, meaning any transient overlap (e.g. mid-scroll,
           or the sidebar's own shadow-2xl bleeding upward) let the sidebar's later DOM position
           paint over the header instead of under it, hiding the logo. Header must always win. */}
-      <aside className="hidden lg:flex flex-col w-16 hover:w-56 transition-all duration-300 ease-in-out bg-surface-sidebar border-r border-border h-[calc(100vh-4rem)] sticky top-16 z-30 group shadow-2xl overflow-hidden shrink-0 select-none">
-        <div className="flex flex-col justify-between h-full p-2">
+      {/* The <aside> itself stretches to the full height of the content row (default flex
+          `align-items: stretch`, no fixed height) so its background and right border run
+          unbroken all the way down to the footer. Only the inner panel is sticky/viewport-
+          tall — previously the aside itself was both sticky AND h-[calc(100vh-4rem)], so on
+          pages taller than the viewport its background simply stopped mid-page, leaving a
+          visible horizontal seam with the page background showing through below it. */}
+      <aside className="hidden lg:block w-16 hover:w-56 transition-all duration-300 ease-in-out bg-surface-sidebar border-r border-border z-30 group shadow-2xl overflow-hidden shrink-0 select-none">
+        <div className="sticky top-16 flex flex-col justify-between h-[calc(100vh-4rem)] p-2">
           {/* Main Nav */}
           <div className="flex flex-col gap-1.5">
             <div className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">

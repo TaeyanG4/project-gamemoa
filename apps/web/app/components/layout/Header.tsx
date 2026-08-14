@@ -109,14 +109,18 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
           {isAuthenticated && user ? (
             <div className="relative" ref={userDropdownRef}>
+              {/* The surrounding pill (background + border + nickname) only appears from md up,
+                  where the nickname it was drawn around is actually rendered. Below that the
+                  pill wrapped nothing but the avatar, reading as a stray box around a circle —
+                  so on phones the avatar stands alone as its own tap target. */}
               <button
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 p-1.5 pl-3 rounded-full bg-surface-raised border border-border hover:border-brand/50 transition-all cursor-pointer shadow-sm"
+                className="flex items-center gap-2 rounded-full transition-all cursor-pointer md:p-1.5 md:pl-3 md:bg-surface-raised md:border md:border-border md:hover:border-brand/50 md:shadow-sm"
               >
                 <span className="text-xs font-bold text-text-primary max-w-[100px] truncate hidden md:inline">
                   {user.nickname}
                 </span>
-                <div className="w-7 h-7 rounded-full bg-brand text-white font-black text-xs flex items-center justify-center overflow-hidden border border-brand/40">
+                <div className="w-8 h-8 md:w-7 md:h-7 rounded-full bg-brand text-white font-black text-xs flex items-center justify-center overflow-hidden border border-brand/40">
                   {user.avatar_url ? (
                     <img
                       src={user.avatar_url}
