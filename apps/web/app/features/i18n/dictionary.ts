@@ -968,6 +968,14 @@ export interface Dictionary {
     notSupported: string;
     notSupportedBody: string;
   };
+  /** Header icon that lists PUBLIC-visibility registered Discord servers (lives next to
+   * favorites/language selector) — fetched lazily on first open, not on every page load. */
+  registeredServers: {
+    ariaLabel: string;
+    title: string;
+    empty: string;
+    viewAll: string;
+  };
   /** /changelog — page chrome only. Individual entries (apps/web/app/features/changelog/entries.ts)
    * stay Korean-only for now per the "translation doesn't have to happen inline" policy
    * (docs/i18n-content/GUIDE.md) — this is fast-growing content, not a fixed page. */
@@ -2125,6 +2133,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       backToGame: "게임으로 돌아가기",
       notSupported: "이 게임은 순위를 지원하지 않습니다",
       notSupportedBody: "캐주얼 게임이라 등수 없이 즐기는 게임입니다.",
+    },
+    registeredServers: {
+      ariaLabel: "등록된 Discord 서버",
+      title: "등록된 서버",
+      empty: "아직 등록된 서버가 없습니다.",
+      viewAll: "전체 서버 보기 →",
     },
     changelog: {
       eyebrow: "Changelog",
@@ -3299,6 +3313,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       notSupported: "This game doesn't support ranking",
       notSupportedBody: "It's a casual game meant to be played without a scoreboard.",
     },
+    registeredServers: {
+      ariaLabel: "Registered Discord servers",
+      title: "Registered Servers",
+      empty: "No servers registered yet.",
+      viewAll: "View all servers →",
+    },
     changelog: {
       eyebrow: "Changelog",
       title: "Changelog",
@@ -4470,6 +4490,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       notSupported: "このゲームはランキングに対応していません",
       notSupportedBody: "順位なしで楽しむカジュアルゲームです。",
     },
+    registeredServers: {
+      ariaLabel: "登録済みDiscordサーバー",
+      title: "登録済みサーバー",
+      empty: "まだ登録されたサーバーがありません。",
+      viewAll: "すべてのサーバーを見る →",
+    },
     changelog: {
       eyebrow: "Changelog",
       title: "更新履歴",
@@ -5586,6 +5612,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       backToGame: "返回游戏",
       notSupported: "该游戏不支持排名",
       notSupportedBody: "这是一款无需排名、轻松享受的休闲游戏。",
+    },
+    registeredServers: {
+      ariaLabel: "已注册的 Discord 服务器",
+      title: "已注册的服务器",
+      empty: "暂无已注册的服务器。",
+      viewAll: "查看全部服务器 →",
     },
     changelog: {
       eyebrow: "Changelog",

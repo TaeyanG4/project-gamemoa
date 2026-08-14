@@ -5,6 +5,7 @@ import { useAuth } from "../../features/auth";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { LanguageSelector } from "../ui/LanguageSelector";
 import { OwoWordmarkIcon } from "../ui/OwoWordmarkIcon";
+import { RegisteredServersMenu } from "../ui/RegisteredServersMenu";
 import { useClickOutside } from "../../hooks/useClickOutside";
 
 interface HeaderProps {
@@ -90,6 +91,8 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           >
             <Bookmark className="w-5 h-5" />
           </Link>
+
+          <RegisteredServersMenu />
 
           <LanguageSelector />
 
