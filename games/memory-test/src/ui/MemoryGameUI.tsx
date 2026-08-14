@@ -228,8 +228,12 @@ export function MemoryGameUI({ runtime }: { runtime?: GameProps["runtime"] }) {
             )}
           </div>
 
-          {/* 3D Simon Arcade Pad Matrix */}
-          <div className="relative w-[300px] h-[300px] sm:w-[400px] sm:h-[400px] md:w-[460px] md:h-[460px] rounded-full bg-[#0a0a0c] border-[10px] border-[#18181b] shadow-[0_0_50px_rgba(0,0,0,0.9)] flex items-center justify-center p-3 select-none">
+          {/* 3D Simon Arcade Pad Matrix. Base size is viewport-relative (capped at 300px) rather
+              than a flat 300px — the game-play page shell (apps/web/routes/game-slug.tsx) nests
+              this inside ~128px of cumulative padding (page + card + this component's own p-6),
+              so a flat 300px overflows and gets clipped on real phone widths (320-412px). The
+              inner grid/pads are all %-based, so shrinking the outer circle doesn't break them. */}
+          <div className="relative w-[min(55vw,300px)] h-[min(55vw,300px)] sm:w-[400px] sm:h-[400px] md:w-[460px] md:h-[460px] rounded-full bg-[#0a0a0c] border-[10px] border-[#18181b] shadow-[0_0_50px_rgba(0,0,0,0.9)] flex items-center justify-center p-3 select-none">
             <div className="grid grid-cols-2 grid-rows-2 w-full h-full gap-3 bg-[#0a0a0c] rounded-full overflow-hidden">
               {/* RED PAD (Top Left) */}
               <button

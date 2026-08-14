@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Languages } from "lucide-react";
 import { SUPPORTED_LOCALES } from "@owogg/core";
 import type { SupportedLocale } from "@owogg/contracts";
 import { useI18n } from "../../features/i18n/I18nContext";
+import { useClickOutside } from "../../hooks/useClickOutside";
 
 const NATIVE_LABELS: Record<SupportedLocale, string> = {
   "ko-KR": "한국어",
@@ -17,9 +18,11 @@ const NATIVE_LABELS: Record<SupportedLocale, string> = {
 export function LanguageSelector({ className = "" }: { className?: string }) {
   const { locale, setLocale, dict } = useI18n();
   const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  useClickOutside(containerRef, () => setOpen(false), open);
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -37,7 +40,6 @@ export function LanguageSelector({ className = "" }: { className?: string }) {
           role="listbox"
           aria-label={dict.language.label}
           className="absolute right-0 mt-2 w-40 bg-surface-raised border border-border rounded-2xl shadow-2xl py-1.5 flex flex-col z-50 animate-in fade-in zoom-in-95 duration-150"
-          onMouseLeave={() => setOpen(false)}
         >
           {SUPPORTED_LOCALES.map((l) => {
             const active = l === locale;

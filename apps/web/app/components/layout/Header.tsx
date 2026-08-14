@@ -1,10 +1,11 @@
 import { Link, useNavigate } from "react-router";
 import { Search, Menu, Bookmark, User, Command, LogOut, Trophy } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { LanguageSelector } from "../ui/LanguageSelector";
 import { OwoWordmarkIcon } from "../ui/OwoWordmarkIcon";
+import { useClickOutside } from "../../hooks/useClickOutside";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
@@ -16,6 +17,8 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
   const navigate = useNavigate();
   const { user, isAuthenticated, openLoginModal, logout } = useAuth();
   const { dict } = useI18n();
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+  useClickOutside(userDropdownRef, () => setShowUserDropdown(false), showUserDropdown);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,7 +35,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           <button
             className="lg:hidden p-2 rounded-xl text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors cursor-pointer"
             onClick={onToggleMobileSidebar}
-            aria-label="메뉴 열기"
+            aria-label={dict.sidebar.openMenuAria}
           >
             <Menu className="w-6 h-6" />
           </button>
@@ -69,6 +72,17 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
         {/* Right: Quick Actions & Auth */}
         <div className="flex items-center gap-2.5">
+          {/* Search is a full input on sm+ (above); below that there's no room for it, so this
+              icon links to /games where the search input lives instead of hiding search entirely. */}
+          <Link
+            to="/games"
+            className="sm:hidden p-2.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors cursor-pointer"
+            title={dict.nav.searchPlaceholder}
+            aria-label={dict.nav.searchPlaceholder}
+          >
+            <Search className="w-5 h-5" />
+          </Link>
+
           <Link
             to="/games?category=favorites"
             className="p-2.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors relative cursor-pointer"
@@ -80,7 +94,7 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           <LanguageSelector />
 
           {isAuthenticated && user ? (
-            <div className="relative">
+            <div className="relative" ref={userDropdownRef}>
               <button
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
                 className="flex items-center gap-2 p-1.5 pl-3 rounded-full bg-surface-raised border border-border hover:border-brand/50 transition-all cursor-pointer shadow-sm"
@@ -116,7 +130,8 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                           key={p}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand border border-brand/20 capitalize"
                         >
-                          {p} 계정
+                          {p}
+                          {dict.nav.accountSuffix}
                         </span>
                       ))}
                     </div>

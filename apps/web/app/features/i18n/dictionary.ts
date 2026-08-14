@@ -21,6 +21,23 @@ export interface Dictionary {
     myProfile: string;
     ranking: string;
     wiki: string;
+    /** Appended after the provider name in the header's connected-providers badges, e.g.
+     * "google" + this = "google account". */
+    accountSuffix: string;
+  };
+  /** Left nav rail (desktop icon-strip that expands on hover) and its mobile drawer equivalent.
+   * The mobile drawer always shows full label text (unlike the desktop rail, which is icon-only
+   * until hovered), so these labels are on-screen by default for every mobile visitor. */
+  sidebar: {
+    openMenuAria: string;
+    navHeading: string;
+    mobileMenuTitle: string;
+    home: string;
+    allGames: string;
+    popularGames: string;
+    reactionBrain: string;
+    rankingRecords: string;
+    tagline: string;
   };
   footer: {
     tagline: string;
@@ -975,6 +992,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfile: "내 프로필 & 기록",
       ranking: "명예의 전당",
       wiki: "Wiki",
+      accountSuffix: " 계정",
+    },
+    sidebar: {
+      openMenuAria: "메뉴 열기",
+      navHeading: "탐색 메뉴",
+      mobileMenuTitle: "메뉴",
+      home: "홈",
+      allGames: "전체 게임",
+      popularGames: "인기 게임",
+      reactionBrain: "순발력 & 두뇌",
+      rankingRecords: "랭킹 & 기록",
+      tagline: "웹 게임 100% 무설치",
     },
     footer: {
       tagline: "설치 없이, 1초 만에 즐기는 미니게임",
@@ -2107,6 +2136,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfile: "My Profile & Records",
       ranking: "Hall of Fame",
       wiki: "Wiki",
+      accountSuffix: " account",
+    },
+    sidebar: {
+      openMenuAria: "Open menu",
+      navHeading: "Navigation",
+      mobileMenuTitle: "Menu",
+      home: "Home",
+      allGames: "All Games",
+      popularGames: "Popular Games",
+      reactionBrain: "Reaction & Brain",
+      rankingRecords: "Ranking & Records",
+      tagline: "100% no-install web games",
     },
     footer: {
       tagline: "No install, playable in a second",
@@ -3259,6 +3300,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfile: "マイプロフィール＆記録",
       ranking: "殿堂入り",
       wiki: "Wiki",
+      accountSuffix: "アカウント",
+    },
+    sidebar: {
+      openMenuAria: "メニューを開く",
+      navHeading: "ナビゲーション",
+      mobileMenuTitle: "メニュー",
+      home: "ホーム",
+      allGames: "全ゲーム",
+      popularGames: "人気ゲーム",
+      reactionBrain: "反射神経＆頭脳",
+      rankingRecords: "ランキング＆記録",
+      tagline: "インストール不要のWebゲーム100%",
     },
     footer: {
       tagline: "インストール不要、すぐに遊べるミニゲーム",
@@ -4409,6 +4462,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfile: "我的资料和记录",
       ranking: "名人堂",
       wiki: "Wiki",
+      accountSuffix: "账号",
+    },
+    sidebar: {
+      openMenuAria: "打开菜单",
+      navHeading: "导航菜单",
+      mobileMenuTitle: "菜单",
+      home: "首页",
+      allGames: "全部游戏",
+      popularGames: "热门游戏",
+      reactionBrain: "反应力和益智",
+      rankingRecords: "排行榜和记录",
+      tagline: "100% 免安装网页游戏",
     },
     footer: {
       tagline: "无需安装，一秒畅玩的小游戏",

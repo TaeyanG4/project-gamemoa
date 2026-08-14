@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router";
 import { Flame, Gamepad2, Zap, Trophy, Sparkles, Compass, X } from "lucide-react";
+import { useI18n } from "../../features/i18n/I18nContext";
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -9,13 +10,19 @@ interface SidebarProps {
 export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname;
+  const { dict } = useI18n();
 
   const navItems = [
-    { label: "홈", path: "/", icon: Flame, badge: "HOT" },
-    { label: "전체 게임", path: "/games", icon: Gamepad2 },
-    { label: "인기 게임", path: "/games?category=popular", icon: Sparkles },
-    { label: "순발력 & 두뇌", path: "/games?category=reaction", icon: Zap, badge: "NEW" },
-    { label: "랭킹 & 기록", path: "/ranking", icon: Trophy },
+    { label: dict.sidebar.home, path: "/", icon: Flame, badge: "HOT" },
+    { label: dict.sidebar.allGames, path: "/games", icon: Gamepad2 },
+    { label: dict.sidebar.popularGames, path: "/games?category=popular", icon: Sparkles },
+    {
+      label: dict.sidebar.reactionBrain,
+      path: "/games?category=reaction",
+      icon: Zap,
+      badge: "NEW",
+    },
+    { label: dict.sidebar.rankingRecords, path: "/ranking", icon: Trophy },
   ];
 
   return (
@@ -31,7 +38,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           {/* Main Nav */}
           <div className="flex flex-col gap-1.5">
             <div className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-              탐색 메뉴
+              {dict.sidebar.navHeading}
             </div>
 
             {navItems.map((item) => {
@@ -72,7 +79,7 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           <div className="p-2 border-t border-border/50 flex flex-col gap-2">
             <div className="flex items-center gap-3 px-2 py-1.5 text-xs text-text-muted opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
               <Compass className="w-4 h-4 text-brand-light" />
-              <span>웹 게임 100% 무설치</span>
+              <span>{dict.sidebar.tagline}</span>
             </div>
           </div>
         </div>
@@ -87,7 +94,9 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-border">
               <div className="flex items-center gap-2">
                 <Gamepad2 className="w-6 h-6 text-brand" />
-                <span className="font-bold text-lg text-text-primary">메뉴</span>
+                <span className="font-bold text-lg text-text-primary">
+                  {dict.sidebar.mobileMenuTitle}
+                </span>
               </div>
               <button
                 onClick={onMobileClose}
