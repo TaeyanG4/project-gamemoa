@@ -17,7 +17,7 @@ import { usePersonalization } from "../features/personalization";
 import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 import type { Dictionary } from "../features/i18n/dictionary";
-import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck } from "lucide-react";
+import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck, Share2 } from "lucide-react";
 
 type SubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
 
@@ -143,6 +143,33 @@ export default function GamePlay() {
     setSessionId(crypto.randomUUID());
     setAttemptKey((prev) => prev + 1);
   }, [isAuthenticated]);
+
+  // Share Result (Web Share API where available, clipboard copy as fallback)
+  const [shareCopied, setShareCopied] = useState(false);
+  const handleShareResult = useCallback(async () => {
+    if (!result || !manifest) return;
+    const shareUrl = `${window.location.origin}/games/${slug}`;
+    const scoreText = formatScore(result.score, manifest.scoreConfig);
+    const title = getLocalizedGameContent(dict, manifest).title;
+    const shareText = dict.gamePlay.shareText
+      .replace("{title}", title)
+      .replace("{score}", scoreText);
+
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title, text: shareText, url: shareUrl });
+      } catch {
+        // User cancelled the native share sheet — not an error, nothing to do.
+      }
+      return;
+    }
+
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    }
+  }, [result, manifest, slug, dict]);
 
   const { recordRecentPlay } = usePersonalization();
 
@@ -338,6 +365,15 @@ export default function GamePlay() {
                       </div>
                     )}
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleShareResult()}
+                    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 py-2 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                    {shareCopied ? dict.gamePlay.shareCopiedFeedback : dict.gamePlay.shareCta}
+                  </button>
                 </div>
 
                 <div className="flex gap-4">

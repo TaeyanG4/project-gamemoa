@@ -929,6 +929,13 @@ export interface Dictionary {
     retrySubmitCta: string;
     retryGameCta: string;
     backToListResult: string;
+    shareCta: string;
+    /** Contains literal "{title}" and "{score}" placeholders, filled in with plain .replace()
+     * calls (see game-slug.tsx) rather than a Prefix/Mid/Suffix split — English wants
+     * score-before-title ("I scored X in Game") while Korean wants title-before-score
+     * ("Game에서 X 기록"), so each locale needs to control the full word order itself. */
+    shareText: string;
+    shareCopiedFeedback: string;
   };
   /** /changelog — page chrome only. Individual entries (apps/web/app/features/changelog/entries.ts)
    * stay Korean-only for now per the "translation doesn't have to happen inline" policy
@@ -2063,6 +2070,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "점수 다시 제출",
       retryGameCta: "🔄 다시 하기",
       backToListResult: "목록으로",
+      shareCta: "공유하기",
+      shareText: "{title}에서 {score} 기록! 나도 도전해보기 🎮",
+      shareCopiedFeedback: "링크가 복사되었습니다!",
     },
     changelog: {
       eyebrow: "Changelog",
@@ -3212,6 +3222,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "Resubmit score",
       retryGameCta: "🔄 Play again",
       backToListResult: "Back to list",
+      shareCta: "Share",
+      shareText: "I scored {score} in {title}! Can you beat it? 🎮",
+      shareCopiedFeedback: "Link copied!",
     },
     changelog: {
       eyebrow: "Changelog",
@@ -4359,6 +4372,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "スコアを再送信",
       retryGameCta: "🔄 もう一度プレイ",
       backToListResult: "リストに戻る",
+      shareCta: "シェア",
+      shareText: "{title}で{score}を記録しました！挑戦してみて 🎮",
+      shareCopiedFeedback: "リンクをコピーしました！",
     },
     changelog: {
       eyebrow: "Changelog",
@@ -5452,6 +5468,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "重新提交分数",
       retryGameCta: "🔄 再玩一次",
       backToListResult: "返回列表",
+      shareCta: "分享",
+      shareText: "我在{title}中获得了{score}！来挑战一下吧 🎮",
+      shareCopiedFeedback: "链接已复制！",
     },
     changelog: {
       eyebrow: "Changelog",
