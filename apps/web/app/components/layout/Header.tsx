@@ -4,7 +4,6 @@ import {
   Menu,
   Bookmark,
   User,
-  Command,
   LogOut,
   Trophy,
   Settings as SettingsIcon,
@@ -72,12 +71,8 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={dict.nav.searchPlaceholder}
-            className="w-full bg-surface-raised text-text-primary placeholder:text-text-muted text-sm rounded-full pl-10 pr-12 py-2 border border-border/80 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all shadow-inner"
+            className="w-full bg-surface-raised text-text-primary placeholder:text-text-muted text-sm rounded-full pl-10 pr-4 py-2 border border-border/80 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand transition-all shadow-inner"
           />
-          <div className="absolute right-3 flex items-center gap-1 text-[10px] font-bold text-text-muted px-1.5 py-0.5 rounded bg-surface border border-border pointer-events-none">
-            <Command className="w-3 h-3" />
-            <span>K</span>
-          </div>
         </form>
 
         {/* Right: Quick Actions & Auth.
@@ -118,13 +113,12 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
           {isAuthenticated && user ? (
             <div className="relative" ref={userDropdownRef}>
-              {/* The surrounding pill (background + border + nickname) only appears from md up,
-                  where the nickname it was drawn around is actually rendered. Below that the
-                  pill wrapped nothing but the avatar, reading as a stray box around a circle —
-                  so on phones the avatar stands alone as its own tap target. */}
+              {/* No pill/box at any size — just the avatar (+ nickname from md up) with a subtle
+                  hover highlight, matching the rest of the header's plain icon buttons instead
+                  of standing out as a bordered card. */}
               <button
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 rounded-full transition-all cursor-pointer md:p-1.5 md:pl-3 md:bg-surface-raised md:border md:border-border md:hover:border-brand/50 md:shadow-sm"
+                className="flex items-center gap-2 rounded-full p-1 transition-colors cursor-pointer hover:bg-surface-raised"
               >
                 <span className="text-xs font-bold text-text-primary max-w-[100px] truncate hidden md:inline">
                   {user.nickname}

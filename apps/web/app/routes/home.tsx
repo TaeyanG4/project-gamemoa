@@ -69,17 +69,11 @@ export default function Home() {
           naturally as more games get the "popular" tag rather than needing curation of one pick. */}
       {popularGames.length > 0 && (
         <section className="flex flex-col gap-4 w-full">
-          <div className="flex items-center justify-between border-b border-border/40 pb-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-brand" />
-              <h3 className="text-xl font-black text-text-primary tracking-tight">
-                {dict.home.popularTitle}
-              </h3>
-            </div>
-            <span className="text-xs font-bold text-text-muted">
-              {popularGames.length}
-              {dict.home.itemsCountSuffix}
-            </span>
+          <div className="flex items-center gap-2 border-b border-border/40 pb-3">
+            <TrendingUp className="w-5 h-5 text-brand" />
+            <h3 className="text-xl font-black text-text-primary tracking-tight">
+              {dict.home.popularTitle}
+            </h3>
           </div>
           <GameGrid
             games={popularGames}
@@ -92,17 +86,11 @@ export default function Home() {
       {/* Personalized Section: Recent Plays */}
       {recentGames.length > 0 && (
         <section className="flex flex-col gap-4 w-full">
-          <div className="flex items-center justify-between border-b border-border/40 pb-3">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-brand" />
-              <h3 className="text-xl font-black text-text-primary tracking-tight">
-                {dict.home.recentPlaysTitle}
-              </h3>
-            </div>
-            <span className="text-xs font-bold text-text-muted">
-              {recentGames.length}
-              {dict.home.itemsCountSuffix}
-            </span>
+          <div className="flex items-center gap-2 border-b border-border/40 pb-3">
+            <Clock className="w-5 h-5 text-brand" />
+            <h3 className="text-xl font-black text-text-primary tracking-tight">
+              {dict.home.recentPlaysTitle}
+            </h3>
           </div>
           <GameGrid
             games={recentGames}
@@ -115,17 +103,11 @@ export default function Home() {
       {/* Personalized Section: Favorites */}
       {isAuthenticated && favoriteGames.length > 0 && (
         <section className="flex flex-col gap-4 w-full">
-          <div className="flex items-center justify-between border-b border-border/40 pb-3">
-            <div className="flex items-center gap-2">
-              <Bookmark className="w-5 h-5 text-amber-400 fill-amber-400" />
-              <h3 className="text-xl font-black text-text-primary tracking-tight">
-                {dict.home.favoritesTitle}
-              </h3>
-            </div>
-            <span className="text-xs font-bold text-text-muted">
-              {favoriteGames.length}
-              {dict.home.itemsCountSuffix}
-            </span>
+          <div className="flex items-center gap-2 border-b border-border/40 pb-3">
+            <Bookmark className="w-5 h-5 text-amber-400 fill-amber-400" />
+            <h3 className="text-xl font-black text-text-primary tracking-tight">
+              {dict.home.favoritesTitle}
+            </h3>
           </div>
           <GameGrid
             games={favoriteGames}
@@ -143,10 +125,6 @@ export default function Home() {
             <h2 className="text-2xl font-black text-text-primary tracking-tight">
               {dict.home.lineupTitle}
             </h2>
-            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
-              {filteredGames.length}
-              {dict.home.itemsCountSuffix}
-            </span>
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 w-full sm:w-auto min-w-0">

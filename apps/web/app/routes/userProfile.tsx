@@ -337,15 +337,9 @@ export default function UserProfileRoute() {
               <Bookmark className="h-4 w-4 text-accent-yellow" />
               {dict.userProfile.favoritesTitle}
             </h2>
-            <div className="flex items-center gap-2">
-              {isOwnProfile && !data.visibilitySettings?.showFavorites && (
-                <PrivateBadge label={dict.userProfile.onlyVisibleToYou} />
-              )}
-              <span className="text-xs font-bold text-text-muted">
-                {favoriteGames.length}
-                {dict.userProfile.itemsCountSuffix}
-              </span>
-            </div>
+            {isOwnProfile && !data.visibilitySettings?.showFavorites && (
+              <PrivateBadge label={dict.userProfile.onlyVisibleToYou} />
+            )}
           </div>
           {favoriteGames.length === 0 ? (
             <p className="text-xs text-text-muted">{dict.userProfile.favoritesEmpty}</p>
@@ -375,15 +369,9 @@ export default function UserProfileRoute() {
               <Clock className="h-4 w-4 text-brand" />
               {dict.userProfile.recentPlaysTitle}
             </h2>
-            <div className="flex items-center gap-2">
-              {isOwnProfile && !data.visibilitySettings?.showRecentPlays && (
-                <PrivateBadge label={dict.userProfile.onlyVisibleToYou} />
-              )}
-              <span className="text-xs font-bold text-text-muted">
-                {recentGames.length}
-                {dict.userProfile.itemsCountSuffix}
-              </span>
-            </div>
+            {isOwnProfile && !data.visibilitySettings?.showRecentPlays && (
+              <PrivateBadge label={dict.userProfile.onlyVisibleToYou} />
+            )}
           </div>
           {recentGames.length === 0 ? (
             <p className="text-xs text-text-muted">{dict.userProfile.recentPlaysEmpty}</p>

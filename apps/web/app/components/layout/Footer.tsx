@@ -35,6 +35,9 @@ export function Footer() {
           <Link to="/changelog" className="hover:text-text-primary transition-colors">
             {dict.footer.changelog}
           </Link>
+          <Link to="/contact" className="hover:text-text-primary transition-colors">
+            {dict.footer.contactUs}
+          </Link>
           <Link to="/terms" className="hover:text-text-primary transition-colors">
             {dict.legal.terms.pageTitle}
           </Link>

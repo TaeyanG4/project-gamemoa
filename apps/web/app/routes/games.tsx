@@ -68,10 +68,6 @@ export default function Games() {
             <span>{dict.games.eyebrow}</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-text-primary">{dict.games.title}</h1>
-          <p className="text-sm text-text-secondary mt-1">
-            {filteredGames.length}
-            {dict.games.countSuffix}
-          </p>
         </div>
 
         {/* Live Filter Search Input */}

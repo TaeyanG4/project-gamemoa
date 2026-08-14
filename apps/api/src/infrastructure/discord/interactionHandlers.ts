@@ -132,7 +132,7 @@ export async function handleOwoggCommand(
     case DISCORD_SUBCOMMANDS.LINK:
       return handleLinkCommand(container, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.PROFILE:
-      return handleProfileCommand(container, discordUser, frontendUrl, apiBaseUrl);
+      return handleProfileCommand(container, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.PLAY:
       return handlePlayCommand(container, interaction, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.RANK:
@@ -243,7 +243,6 @@ async function handleProfileCommand(
   container: AppContainer,
   discordUser: DiscordInteractionUser,
   frontendUrl: string,
-  apiBaseUrl: string,
 ): Promise<DiscordInteractionResponse> {
   const footer = owoggFooter(frontendUrl);
   const user = await container.userRepo.findByOAuth("discord", discordUser.id);
@@ -255,10 +254,9 @@ async function handleProfileCommand(
   }
 
   const { summary } = await container.progressionUseCases.getProgressionSummary(user.id);
-  const globalRank = await container.progressionUseCases.getGlobalXpRank(user.id);
   return ephemeralEmbed({
     title: `👤 ${escapeMarkdown(user.nickname)}`,
-    url: `${frontendUrl}/profile`,
+    url: `${frontendUrl}/users/${user.id}`,
     color: COLOR_XP,
     thumbnail: { url: discordAvatarUrl(discordUser) },
     fields: [
@@ -270,16 +268,9 @@ async function handleProfileCommand(
         inline: false,
       },
     ],
-    image: {
-      url: buildRankCardUrl(apiBaseUrl, {
-        nickname: user.nickname,
-        subtitle: "글로벌 프로필",
-        level: summary.level,
-        totalXp: summary.totalXp,
-        progressPercent: summary.progressPercent,
-        rank: globalRank ?? undefined,
-      }),
-    },
+    // No rank-card image here — the text fields above already show everything the card would,
+    // and the extra image made the ephemeral response feel heavier than needed for a quick
+    // `/owogg profile` check. `/owogg rank`'s guild-context card is unaffected.
     footer,
   });
 }

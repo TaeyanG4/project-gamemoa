@@ -52,6 +52,7 @@ export interface Dictionary {
     ranking: string;
     wiki: string;
     changelog: string;
+    contactUs: string;
     rightsReserved: string;
   };
   home: {
@@ -1064,6 +1065,18 @@ export interface Dictionary {
     channelSuffix: string;
     verifiedPlatforms: string;
   };
+  contact: {
+    eyebrow: string;
+    title: string;
+    subtitle: string;
+    emailLabel: string;
+    emailCta: string;
+    guidanceTitle: string;
+    guidanceItems: string[];
+    discordAltTitle: string;
+    discordAltBody: string;
+    discordAltCta: string;
+  };
 }
 
 export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
@@ -1107,6 +1120,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       ranking: "명예의 전당",
       wiki: "Wiki",
       changelog: "업데이트 로그",
+      contactUs: "문의하기",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -2078,7 +2092,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "본 약관은 필요시 개정될 수 있으며, 개정 시 이 페이지를 통해 고지합니다. 개정된 약관은 게시와 동시에 효력이 발생합니다.",
         section8Heading: "8. 문의",
         section8BodyPrefix: "서비스 이용과 관련한 문의는 ",
-        section8BodyEmail: "taeyang95@naver.com",
+        section8BodyEmail: "contact@owogg.com",
         section8BodySuffix: "으로 연락해 주세요.",
       },
       privacy: {
@@ -2134,7 +2148,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "로그인 상태 유지를 위해 세션 쿠키를 사용합니다. 광고 목적의 추적 쿠키나 제3자 분석 도구는 사용하지 않습니다.",
         section7Heading: "7. 문의",
         section7BodyPrefix: "개인정보 관련 문의는 ",
-        section7BodyEmail: "taeyang95@naver.com",
+        section7BodyEmail: "contact@owogg.com",
         section7BodySuffix: "으로 연락해 주세요.",
       },
     },
@@ -2274,6 +2288,23 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       channelSuffix: "채널",
       verifiedPlatforms: "검증된 플랫폼",
     },
+    contact: {
+      eyebrow: "문의하기",
+      title: "무엇을 도와드릴까요?",
+      subtitle: "버그 제보, 계정 문제, 제안 등 무엇이든 아래 이메일로 편하게 알려주세요.",
+      emailLabel: "이메일",
+      emailCta: "이메일 보내기",
+      guidanceTitle: "문의 전 참고해주세요",
+      guidanceItems: [
+        "제목에 문의 유형(버그 / 계정 / 제안 / 기타)을 적어주시면 더 빠르게 확인할 수 있어요.",
+        "버그 제보는 어떤 게임/페이지에서, 어떤 상황에서 발생했는지 함께 적어주세요.",
+        "가능하면 스크린샷을 첨부해주시면 큰 도움이 됩니다.",
+        "계정 문의는 가입에 사용한 이메일 또는 닉네임을 함께 알려주세요.",
+      ],
+      discordAltTitle: "디스코드로도 문의할 수 있어요",
+      discordAltBody: "커뮤니티 서버에서 더 빠르게 소통하고 싶다면 디스코드 가이드를 확인해보세요.",
+      discordAltCta: "디스코드 가이드 보기",
+    },
   },
   "en-US": {
     common: {
@@ -2315,6 +2346,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       ranking: "Hall of Fame",
       wiki: "Wiki",
       changelog: "Changelog",
+      contactUs: "Contact Us",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -3305,7 +3337,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "These Terms may be amended when necessary, and notice will be provided on this page upon amendment. The amended Terms shall take effect immediately upon posting.",
         section8Heading: "8. Contact Us",
         section8BodyPrefix: "For inquiries regarding the use of the Service, please contact ",
-        section8BodyEmail: "taeyang95@naver.com",
+        section8BodyEmail: "contact@owogg.com",
         section8BodySuffix: ".",
       },
       privacy: {
@@ -3361,7 +3393,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "Session cookies are used to maintain login status. Tracking cookies for advertising purposes or third-party analytics tools are not used.",
         section7Heading: "7. Contact Us",
         section7BodyPrefix: "For inquiries regarding privacy, please contact ",
-        section7BodyEmail: "taeyang95@naver.com",
+        section7BodyEmail: "contact@owogg.com",
         section7BodySuffix: ".",
       },
     },
@@ -3502,6 +3534,24 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       channelSuffix: "channel",
       verifiedPlatforms: "Verified platforms",
     },
+    contact: {
+      eyebrow: "Contact",
+      title: "How can we help?",
+      subtitle: "Bug reports, account issues, suggestions — anything. Reach us at the email below.",
+      emailLabel: "Email",
+      emailCta: "Send an email",
+      guidanceTitle: "Before you write in",
+      guidanceItems: [
+        "Include the type of issue (bug / account / suggestion / other) in the subject line.",
+        "For bugs, tell us which game/page and what you were doing when it happened.",
+        "A screenshot helps a lot if you can attach one.",
+        "For account issues, include the email or nickname you signed up with.",
+      ],
+      discordAltTitle: "You can also reach us on Discord",
+      discordAltBody:
+        "For faster back-and-forth, check the Discord guide for our community server.",
+      discordAltCta: "View the Discord guide",
+    },
   },
   "ja-JP": {
     common: {
@@ -3543,6 +3593,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       ranking: "殿堂入り",
       wiki: "Wiki",
       changelog: "更新履歴",
+      contactUs: "お問い合わせ",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -4531,7 +4582,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "本規約は必要に応じて改定されることがあり、改定時には本ページを通じて告知します。改定された規約は掲示と同時に効力を発生します。",
         section8Heading: "8. お問い合わせ",
         section8BodyPrefix: "サービス利用に関するお問い合わせは ",
-        section8BodyEmail: "taeyang95@naver.com",
+        section8BodyEmail: "contact@owogg.com",
         section8BodySuffix: " までご連絡ください。",
       },
       privacy: {
@@ -4587,7 +4638,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "ログイン状態維持のためにセッションクッキーを使用します。広告目的のトラッキングクッキーや第三者の分析ツールは使用しません。",
         section7Heading: "7. お問い合わせ",
         section7BodyPrefix: "個人情報に関するお問い合わせは ",
-        section7BodyEmail: "taeyang95@naver.com",
+        section7BodyEmail: "contact@owogg.com",
         section7BodySuffix: " までご連絡ください。",
       },
     },
@@ -4729,6 +4780,25 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       channelSuffix: "チャンネル",
       verifiedPlatforms: "認証済みプラットフォーム",
     },
+    contact: {
+      eyebrow: "お問い合わせ",
+      title: "何かお困りですか?",
+      subtitle:
+        "不具合報告、アカウントの問題、ご提案など、下記のメールアドレスまでお気軽にご連絡ください。",
+      emailLabel: "メールアドレス",
+      emailCta: "メールを送る",
+      guidanceTitle: "お問い合わせ前にご確認ください",
+      guidanceItems: [
+        "件名に問い合わせ種別(不具合 / アカウント / 提案 / その他)を記載いただくと確認が早くなります。",
+        "不具合報告の場合は、どのゲーム/ページで、どんな状況で発生したかを教えてください。",
+        "可能であればスクリーンショットを添付していただけると大変助かります。",
+        "アカウントに関するお問い合わせは、登録時のメールアドレスまたはニックネームを添えてください。",
+      ],
+      discordAltTitle: "Discordでもお問い合わせいただけます",
+      discordAltBody:
+        "よりスピーディーなやり取りをご希望の場合は、コミュニティサーバーのDiscordガイドをご確認ください。",
+      discordAltCta: "Discordガイドを見る",
+    },
   },
   "zh-CN": {
     common: {
@@ -4770,6 +4840,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       ranking: "名人堂",
       wiki: "Wiki",
       changelog: "更新日志",
+      contactUs: "联系我们",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -5709,7 +5780,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "本条款可在必要时进行修订，修订时将通过本页面进行告知。修订后的条款自发布之日起生效。",
         section8Heading: "8. 联系我们",
         section8BodyPrefix: "与服务使用相关的咨询，请发送邮件至 ",
-        section8BodyEmail: "taeyang95@naver.com",
+        section8BodyEmail: "contact@owogg.com",
         section8BodySuffix: " 与我们联系。",
       },
       privacy: {
@@ -5765,7 +5836,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "使用 Session Cookie 以维持登录状态。不使用用于广告目的的追踪 Cookie 或第三方分析工具。",
         section7Heading: "7. 联系我们",
         section7BodyPrefix: "隐私相关的咨询，请发送邮件至 ",
-        section7BodyEmail: "taeyang95@naver.com",
+        section7BodyEmail: "contact@owogg.com",
         section7BodySuffix: " 与我们联系。",
       },
     },
@@ -5900,6 +5971,23 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       soopLabel: "SOOP",
       channelSuffix: "频道",
       verifiedPlatforms: "已验证平台",
+    },
+    contact: {
+      eyebrow: "联系我们",
+      title: "有什么可以帮您?",
+      subtitle: "错误反馈、账号问题、建议等，欢迎随时通过以下邮箱联系我们。",
+      emailLabel: "邮箱",
+      emailCta: "发送邮件",
+      guidanceTitle: "联系前请注意",
+      guidanceItems: [
+        "请在邮件标题中注明类型(错误 / 账号 / 建议 / 其他)，以便我们更快处理。",
+        "反馈错误时，请说明是在哪个游戏/页面、什么情况下发生的。",
+        "如可以的话，附上截图会有很大帮助。",
+        "账号相关问题请附上注册时使用的邮箱或昵称。",
+      ],
+      discordAltTitle: "也可以通过 Discord 联系我们",
+      discordAltBody: "如果想要更快速的沟通，可以查看社区服务器的 Discord 指南。",
+      discordAltCta: "查看 Discord 指南",
     },
   },
 };

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { Home, Gamepad2, Zap, Trophy, Flame, Compass, X, Bookmark, Check } from "lucide-react";
+import { Home, Gamepad2, Zap, Trophy, Flame, X, Bookmark, Check } from "lucide-react";
 import { SUPPORTED_LOCALES } from "@owogg/core";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { DiscordIcon } from "../ui/DiscordIcon";
@@ -43,13 +43,11 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
           pages taller than the viewport its background simply stopped mid-page, leaving a
           visible horizontal seam with the page background showing through below it. */}
       <aside className="hidden lg:block w-16 hover:w-56 transition-all duration-300 ease-in-out bg-surface-sidebar border-r border-border z-30 group shadow-2xl overflow-hidden shrink-0 select-none">
-        <div className="sticky top-16 flex flex-col justify-between h-[calc(100vh-4rem)] p-2">
-          {/* Main Nav */}
+        <div className="sticky top-16 flex flex-col h-[calc(100vh-4rem)] p-2">
+          {/* Main Nav — no heading above it (used to be a "탐색 메뉴" label here, which just
+              pushed Home down by its own height even while collapsed) so the first item sits
+              right at the top. */}
           <div className="flex flex-col gap-1.5">
-            <div className="px-3 py-2 text-[11px] font-bold text-text-muted uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-              {dict.sidebar.navHeading}
-            </div>
-
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive =
@@ -82,14 +80,6 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
                 </Link>
               );
             })}
-          </div>
-
-          {/* Quick Info Shelf at Bottom of Sidebar */}
-          <div className="p-2 border-t border-border/50 flex flex-col gap-2">
-            <div className="flex items-center gap-3 px-2 py-1.5 text-xs text-text-muted opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-              <Compass className="w-4 h-4 text-brand-light" />
-              <span>{dict.sidebar.tagline}</span>
-            </div>
           </div>
         </div>
       </aside>
