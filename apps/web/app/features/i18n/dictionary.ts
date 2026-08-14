@@ -571,6 +571,66 @@ export interface Dictionary {
       footerLink: string;
       footerSuffix: string;
     };
+    gamesRanking: {
+      title: string;
+      description: string;
+      gameHeading: string;
+      gameBody: string;
+      xpHeading: string;
+      xpBodyPrefix: string;
+      xpBodyLink: string;
+      xpBodySuffix: string;
+      streamerHeading: string;
+      streamerBodyPrefix: string;
+      streamerBodyStrong: string;
+      streamerBodySuffix: string;
+      streamerLinkPrefix: string;
+      streamerLink: string;
+      streamerLinkSuffix: string;
+      calloutFeatured: string;
+      footerPrefix: string;
+      footerLink: string;
+      footerSuffix: string;
+    };
+    gamesXp: {
+      title: string;
+      description: string;
+      grantHeading: string;
+      grantPerPlay: string;
+      grantDailyCap: string;
+      grantAfterCap: string;
+      formulaHeading: string;
+      formulaPrefix: string;
+      formulaSuffix: string;
+      calloutPrefix: string;
+      calloutLink: string;
+      calloutSuffix: string;
+      footerPrefix: string;
+      footerProfileLink: string;
+      footerMid: string;
+      footerRankingLink: string;
+      footerSuffix: string;
+    };
+    gettingStarted: {
+      title: string;
+      description: string;
+      flowHeading: string;
+      step1: string;
+      step2: string;
+      step3: string;
+      step4: string;
+      step5: string;
+      calloutGuest: string;
+      cardCatalog: string;
+      cardCatalogDesc: string;
+      cardRanking: string;
+      cardRankingDesc: string;
+      footerPrefix: string;
+      footerDiscordLink: string;
+      footerMid: string;
+      footerAccountLink: string;
+      footerSuffix: string;
+    };
   };
   platformIcon: {
     chzzkLabel: string;
@@ -1190,6 +1250,73 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerPrefix: "지금 바로 ",
         footerLink: "게임 카탈로그",
         footerSuffix: "에서 플레이해보세요.",
+      },
+      gamesRanking: {
+        title: "랭킹",
+        description:
+          "명예의 전당(/ranking)은 게임 랭킹, 경험치 랭킹, 스트리머 랭킹 세 가지 탭으로 구성됩니다.",
+        gameHeading: "게임 랭킹",
+        gameBody:
+          "게임별 최고 기록(Personal Best) 기준으로 정렬됩니다. 한 사용자가 같은 게임을 여러 번 플레이해도 랭킹에는 가장 좋은 기록 1개만 반영됩니다.",
+        xpHeading: "경험치(XP) 랭킹",
+        xpBodyPrefix: "누적 글로벌 XP 기준으로 정렬됩니다. 자세한 지급 방식은 ",
+        xpBodyLink: "XP와 레벨 문서",
+        xpBodySuffix: "를 참고하세요.",
+        streamerHeading: "스트리머 랭킹",
+        streamerBodyPrefix: "YouTube / CHZZK / SOOP / Twitch 중 ",
+        streamerBodyStrong: "하나 이상",
+        streamerBodySuffix:
+          "의 플랫폼에서 공식 채널 소유권 인증을 완료한 사용자만 노출됩니다. 순위 값은 일반 게임 랭킹/XP 랭킹과 동일한 계산식을 사용하며, 인증한 플랫폼 수는 순위에 영향을 주지 않습니다 — 오른쪽 끝의 플랫폼 아이콘은 필터링·표시 전용입니다.",
+        streamerLinkPrefix: "자세한 인증 방법은 ",
+        streamerLink: "Creator 채널 소유권 인증",
+        streamerLinkSuffix: " 문서를 참고하세요.",
+        calloutFeatured:
+          "Featured Creator 표시는 랭킹 순위나 XP 계산에 어떠한 영향도 주지 않는 표시 전용 배지입니다.",
+        footerPrefix: "Discord 서버 단위 랭킹은 ",
+        footerLink: "Discord 서버 XP 문서",
+        footerSuffix: "를 참고하세요.",
+      },
+      gamesXp: {
+        title: "XP와 레벨",
+        description:
+          "게임을 유효하게 완료할 때마다 경험치가 쌓이고, 누적 경험치에 따라 레벨이 오릅니다.",
+        grantHeading: "XP 지급",
+        grantPerPlay: "인정되는 게임 완료 1회당 10 XP가 지급됩니다.",
+        grantDailyCap: "같은 게임은 하루(UTC 기준) 최대 10회까지만 XP가 지급됩니다.",
+        grantAfterCap:
+          "상한에 도달해도 게임 플레이 자체는 계속 가능합니다 — 추가 XP만 지급되지 않습니다.",
+        formulaHeading: "레벨 공식",
+        formulaPrefix: "레벨 L에 도달하기 위한 누적 XP는 ",
+        formulaSuffix: "입니다. 레벨이 오를수록 다음 레벨까지 필요한 XP가 점점 늘어납니다.",
+        calloutPrefix: "Discord 서버에서 만든 XP와 글로벌 XP의 관계가 궁금하다면 ",
+        calloutLink: "Discord 서버 XP 문서",
+        calloutSuffix: "를 확인하세요.",
+        footerPrefix: "내 레벨과 XP는 ",
+        footerProfileLink: "내 프로필",
+        footerMid: "에서, 전체 순위는 ",
+        footerRankingLink: "명예의 전당",
+        footerSuffix: "에서 확인할 수 있습니다.",
+      },
+      gettingStarted: {
+        title: "시작하기",
+        description: "가장 빠르게 첫 게임을 플레이하고 기록을 남기는 방법입니다.",
+        flowHeading: "기본 흐름",
+        step1: "OwOGG 계정으로 로그인합니다 (Google 또는 Discord).",
+        step2: "게임 카탈로그에서 원하는 미니게임을 선택합니다.",
+        step3: "게임을 플레이하고 결과를 확인합니다 — 유효한 기록은 자동으로 저장됩니다.",
+        step4: "명예의 전당(랭킹)에서 나의 순위와 XP를 확인합니다.",
+        step5: "필요하다면 Discord를 연결해 서버 친구들과 경쟁합니다.",
+        calloutGuest:
+          "게스트로도 게임을 플레이할 수 있습니다. 다만 기록이 계정에 저장되고 랭킹/XP에 반영되려면 로그인이 필요합니다.",
+        cardCatalog: "게임 카탈로그 →",
+        cardCatalogDesc: "지금 플레이할 게임 고르기",
+        cardRanking: "명예의 전당 →",
+        cardRankingDesc: "게임/XP/스트리머 랭킹 확인",
+        footerPrefix: "Discord 서버에서 친구들과 함께 하고 싶다면 ",
+        footerDiscordLink: "Discord 문서",
+        footerMid: "를, 계정 설정은 ",
+        footerAccountLink: "계정 문서",
+        footerSuffix: "를 확인하세요.",
       },
     },
     platformIcon: {
@@ -1823,6 +1950,74 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerLink: "game catalog",
         footerSuffix: " and start playing.",
       },
+      gamesRanking: {
+        title: "Ranking",
+        description:
+          "The Hall of Fame (/ranking) is organized into three tabs: game ranking, XP ranking, and streamer ranking.",
+        gameHeading: "Game ranking",
+        gameBody:
+          "Sorted by each player's personal best per game. No matter how many times someone plays the same game, only their single best record counts toward the ranking.",
+        xpHeading: "XP ranking",
+        xpBodyPrefix: "Sorted by cumulative global XP. For how XP is granted, see the ",
+        xpBodyLink: "XP & levels article",
+        xpBodySuffix: ".",
+        streamerHeading: "Streamer ranking",
+        streamerBodyPrefix: "Only users who completed official channel ownership verification on ",
+        streamerBodyStrong: "at least one",
+        streamerBodySuffix:
+          " of YouTube / CHZZK / SOOP / Twitch appear here. Ranking values use the exact same formula as the regular game/XP rankings, and the number of verified platforms has no effect on position — the platform icons at the right edge are for filtering and display only.",
+        streamerLinkPrefix: "For how to verify, see the ",
+        streamerLink: "Creator channel ownership verification",
+        streamerLinkSuffix: " article.",
+        calloutFeatured:
+          "The Featured Creator mark is a display-only badge that has no effect whatsoever on ranking position or XP calculation.",
+        footerPrefix: "For per-Discord-server rankings, see the ",
+        footerLink: "Discord server XP article",
+        footerSuffix: ".",
+      },
+      gamesXp: {
+        title: "XP & Levels",
+        description:
+          "Every valid game completion accumulates XP, and your level rises with cumulative XP.",
+        grantHeading: "How XP is granted",
+        grantPerPlay: "10 XP is granted per accepted game completion.",
+        grantDailyCap: "XP is granted for at most 10 completions of the same game per day (UTC).",
+        grantAfterCap:
+          "You can keep playing after hitting the cap — only the additional XP stops being granted.",
+        formulaHeading: "Level formula",
+        formulaPrefix: "The cumulative XP required to reach level L is ",
+        formulaSuffix: ". The higher your level, the more XP the next level takes.",
+        calloutPrefix: "Curious how XP earned in a Discord server relates to global XP? See the ",
+        calloutLink: "Discord server XP article",
+        calloutSuffix: ".",
+        footerPrefix: "You can check your level and XP on ",
+        footerProfileLink: "your profile",
+        footerMid: ", and the overall standings in the ",
+        footerRankingLink: "Hall of Fame",
+        footerSuffix: ".",
+      },
+      gettingStarted: {
+        title: "Getting Started",
+        description:
+          "The fastest path to playing your first game and putting a record on the board.",
+        flowHeading: "Basic flow",
+        step1: "Sign in with an OwOGG account (Google or Discord).",
+        step2: "Pick a mini-game from the game catalog.",
+        step3: "Play and check your result — valid records are saved automatically.",
+        step4: "Check your position and XP in the Hall of Fame (ranking).",
+        step5: "Optionally connect Discord to compete with friends in your server.",
+        calloutGuest:
+          "You can play as a guest. However, signing in is required for records to be saved to an account and counted toward rankings/XP.",
+        cardCatalog: "Game catalog →",
+        cardCatalogDesc: "Pick something to play right now",
+        cardRanking: "Hall of Fame →",
+        cardRankingDesc: "Check game/XP/streamer rankings",
+        footerPrefix: "To play with friends in a Discord server, see the ",
+        footerDiscordLink: "Discord article",
+        footerMid: "; for account settings, see the ",
+        footerAccountLink: "account article",
+        footerSuffix: ".",
+      },
     },
     platformIcon: {
       chzzkLabel: "CHZZK",
@@ -2454,6 +2649,73 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerLink: "ゲームカタログ",
         footerSuffix: "からプレイしてみましょう。",
       },
+      gamesRanking: {
+        title: "ランキング",
+        description:
+          "殿堂（/ranking）はゲームランキング、経験値ランキング、ストリーマーランキングの3つのタブで構成されています。",
+        gameHeading: "ゲームランキング",
+        gameBody:
+          "ゲームごとの自己ベスト（Personal Best）を基準に並びます。同じゲームを何度プレイしても、ランキングに反映されるのは最も良い記録1件のみです。",
+        xpHeading: "経験値（XP）ランキング",
+        xpBodyPrefix: "累計グローバルXPを基準に並びます。詳しい付与方式は",
+        xpBodyLink: "XPとレベルのドキュメント",
+        xpBodySuffix: "をご覧ください。",
+        streamerHeading: "ストリーマーランキング",
+        streamerBodyPrefix: "YouTube / CHZZK / SOOP / Twitch のうち",
+        streamerBodyStrong: "1つ以上",
+        streamerBodySuffix:
+          "のプラットフォームで公式チャンネル所有権認証を完了したユーザーのみが表示されます。順位の値は通常のゲームランキング・XPランキングと同じ計算式を使用し、認証したプラットフォームの数は順位に影響しません — 右端のプラットフォームアイコンはフィルタリング・表示専用です。",
+        streamerLinkPrefix: "詳しい認証方法は",
+        streamerLink: "Creatorチャンネル所有権認証",
+        streamerLinkSuffix: "のドキュメントをご覧ください。",
+        calloutFeatured:
+          "Featured Creatorの表示は、ランキング順位やXP計算に一切影響しない表示専用のバッジです。",
+        footerPrefix: "Discordサーバー単位のランキングは",
+        footerLink: "DiscordサーバーXPのドキュメント",
+        footerSuffix: "をご覧ください。",
+      },
+      gamesXp: {
+        title: "XPとレベル",
+        description:
+          "ゲームを有効に完了するたびに経験値が貯まり、累計経験値に応じてレベルが上がります。",
+        grantHeading: "XPの付与",
+        grantPerPlay: "認められたゲーム完了1回につき10 XPが付与されます。",
+        grantDailyCap: "同じゲームは1日（UTC基準）最大10回までXPが付与されます。",
+        grantAfterCap:
+          "上限に達してもゲームのプレイ自体は続けられます — 追加のXPが付与されなくなるだけです。",
+        formulaHeading: "レベル計算式",
+        formulaPrefix: "レベルLに到達するために必要な累計XPは",
+        formulaSuffix: "です。レベルが上がるほど、次のレベルまでに必要なXPは増えていきます。",
+        calloutPrefix: "DiscordサーバーでのXPとグローバルXPの関係が気になる方は",
+        calloutLink: "DiscordサーバーXPのドキュメント",
+        calloutSuffix: "をご確認ください。",
+        footerPrefix: "自分のレベルとXPは",
+        footerProfileLink: "プロフィール",
+        footerMid: "で、全体の順位は",
+        footerRankingLink: "殿堂",
+        footerSuffix: "で確認できます。",
+      },
+      gettingStarted: {
+        title: "はじめる",
+        description: "最速で最初のゲームをプレイし、記録を残すための手順です。",
+        flowHeading: "基本の流れ",
+        step1: "OwOGGアカウントでログインします（GoogleまたはDiscord）。",
+        step2: "ゲームカタログから好きなミニゲームを選びます。",
+        step3: "ゲームをプレイして結果を確認します — 有効な記録は自動的に保存されます。",
+        step4: "殿堂（ランキング）で自分の順位とXPを確認します。",
+        step5: "必要であればDiscordを連携し、サーバーの友達と競い合います。",
+        calloutGuest:
+          "ゲストのままでもゲームをプレイできます。ただし記録がアカウントに保存され、ランキング・XPに反映されるにはログインが必要です。",
+        cardCatalog: "ゲームカタログ →",
+        cardCatalogDesc: "今すぐプレイするゲームを選ぶ",
+        cardRanking: "殿堂 →",
+        cardRankingDesc: "ゲーム・XP・ストリーマーランキングを確認",
+        footerPrefix: "Discordサーバーで友達と一緒に遊びたい場合は",
+        footerDiscordLink: "Discordのドキュメント",
+        footerMid: "を、アカウント設定は",
+        footerAccountLink: "アカウントのドキュメント",
+        footerSuffix: "をご確認ください。",
+      },
     },
     platformIcon: {
       chzzkLabel: "CHZZK",
@@ -3052,6 +3314,70 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerPrefix: "现在就到",
         footerLink: "游戏目录",
         footerSuffix: "开始游玩吧。",
+      },
+      gamesRanking: {
+        title: "排行榜",
+        description: "名人堂（/ranking）由游戏排行榜、经验值排行榜、主播排行榜三个标签页组成。",
+        gameHeading: "游戏排行榜",
+        gameBody:
+          "按各游戏的个人最佳成绩（Personal Best）排序。即使同一位用户多次游玩同一款游戏，排行榜也只会采用其中最好的一条记录。",
+        xpHeading: "经验值（XP）排行榜",
+        xpBodyPrefix: "按累计全局 XP 排序。详细的发放方式请参阅",
+        xpBodyLink: "XP 与等级文档",
+        xpBodySuffix: "。",
+        streamerHeading: "主播排行榜",
+        streamerBodyPrefix: "只有在 YouTube / CHZZK / SOOP / Twitch 中",
+        streamerBodyStrong: "至少一个",
+        streamerBodySuffix:
+          "平台完成官方频道所有权认证的用户才会显示。名次数值使用与普通游戏排行榜/XP 排行榜完全相同的计算公式，已认证的平台数量不会影响名次 —— 最右侧的平台图标仅用于筛选与展示。",
+        streamerLinkPrefix: "详细的认证方法请参阅",
+        streamerLink: "Creator 频道所有权认证",
+        streamerLinkSuffix: "文档。",
+        calloutFeatured:
+          "Featured Creator 标识是仅用于展示的徽章，对排行榜名次和 XP 计算没有任何影响。",
+        footerPrefix: "关于 Discord 服务器维度的排行榜，请参阅",
+        footerLink: "Discord 服务器 XP 文档",
+        footerSuffix: "。",
+      },
+      gamesXp: {
+        title: "XP 与等级",
+        description: "每次有效完成游戏都会累积经验值，并根据累计经验值提升等级。",
+        grantHeading: "XP 发放",
+        grantPerPlay: "每次被认可的游戏完成可获得 10 XP。",
+        grantDailyCap: "同一款游戏每天（以 UTC 为准）最多发放 10 次 XP。",
+        grantAfterCap: "达到上限后仍然可以继续游玩 —— 只是不再发放额外的 XP。",
+        formulaHeading: "等级公式",
+        formulaPrefix: "达到等级 L 所需的累计 XP 为 ",
+        formulaSuffix: "。等级越高，升到下一级所需的 XP 就越多。",
+        calloutPrefix: "如果想了解在 Discord 服务器获得的 XP 与全局 XP 的关系，请查看",
+        calloutLink: "Discord 服务器 XP 文档",
+        calloutSuffix: "。",
+        footerPrefix: "你可以在",
+        footerProfileLink: "我的个人资料",
+        footerMid: "查看自己的等级与 XP，在",
+        footerRankingLink: "名人堂",
+        footerSuffix: "查看总体排名。",
+      },
+      gettingStarted: {
+        title: "开始使用",
+        description: "以最快的方式游玩第一款游戏并留下记录。",
+        flowHeading: "基本流程",
+        step1: "使用 OwOGG 账户登录（Google 或 Discord）。",
+        step2: "从游戏目录中选择想玩的迷你游戏。",
+        step3: "游玩并查看结果 —— 有效记录会被自动保存。",
+        step4: "在名人堂（排行榜）查看自己的名次与 XP。",
+        step5: "如有需要，可连接 Discord 与服务器中的朋友一较高下。",
+        calloutGuest:
+          "以访客身份也可以游玩游戏。不过，若要将记录保存到账户并计入排行榜/XP，则需要登录。",
+        cardCatalog: "游戏目录 →",
+        cardCatalogDesc: "挑选现在就能玩的游戏",
+        cardRanking: "名人堂 →",
+        cardRankingDesc: "查看游戏/XP/主播排行榜",
+        footerPrefix: "若想在 Discord 服务器中与朋友一起游玩，请查看",
+        footerDiscordLink: "Discord 文档",
+        footerMid: "；账户设置请查看",
+        footerAccountLink: "账户文档",
+        footerSuffix: "。",
       },
     },
     platformIcon: {
