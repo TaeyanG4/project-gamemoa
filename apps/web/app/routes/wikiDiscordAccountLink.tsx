@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { WikiLayout, WikiCallout, WikiSteps } from "../components/wiki/WikiLayout";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
@@ -9,51 +10,39 @@ export function meta() {
 }
 
 export default function WikiDiscordAccountLinkRoute() {
+  const { dict } = useI18n();
+  const t = dict.wikiBody.discordAccountLink;
+
   return (
-    <WikiLayout
-      eyebrow="DISCORD"
-      title="계정 연결"
-      description="Discord 계정을 OwOGG 계정과 연결하면 봇 명령어(/owogg profile, /owogg play 등)에서 본인 정보를 사용할 수 있습니다."
-    >
+    <WikiLayout eyebrow="DISCORD" title={t.title} description={t.description}>
       <section>
-        <h2 className="text-lg font-black text-text-primary">연결 방법</h2>
+        <h2 className="text-lg font-black text-text-primary">{t.methodHeading}</h2>
         <div className="mt-3">
-          <WikiSteps
-            steps={[
-              "Discord 서버에서 /owogg link 명령어를 입력합니다.",
-              "봇이 나에게만 보이는(ephemeral) 1회용 연결 링크를 응답합니다.",
-              "그 링크를 클릭해 OwOGG 웹으로 이동합니다.",
-              "OwOGG에 로그인되어 있지 않다면 먼저 로그인합니다.",
-              "연결 확인 화면에서 승인하면 완료됩니다.",
-            ]}
-          />
+          <WikiSteps steps={[t.step1, t.step2, t.step3, t.step4, t.step5]} />
         </div>
       </section>
 
       <WikiCallout>
-        연결 링크는 1회용이며 일정 시간 후 만료됩니다. 만료되었거나 이미 사용한 링크라면 Discord에서{" "}
-        <code className="rounded bg-surface px-1.5 py-0.5 text-xs font-mono">/owogg link</code>를
-        다시 실행해 새 링크를 받으세요.
+        {t.calloutPrefix}
+        <code className="rounded bg-surface px-1.5 py-0.5 text-xs font-mono">{t.calloutCode}</code>
+        {t.calloutSuffix}
       </WikiCallout>
 
-      <WikiCallout tone="warning">
-        하나의 Discord 계정은 하나의 OwOGG 계정에만 연결됩니다. 이미 다른 OwOGG 계정에 연결된
-        Discord 계정으로는 새로 연결할 수 없습니다 — 웹에서 연결을 먼저 해제해야 합니다.
-      </WikiCallout>
+      <WikiCallout tone="warning">{t.calloutWarning}</WikiCallout>
 
       <p className="text-xs text-text-muted">
-        연결에 실패하나요?{" "}
+        {t.footerPrefix}
         <Link
           to="/wiki/discord/troubleshooting"
           className="font-bold text-brand-light hover:underline"
         >
-          문제 해결 가이드
+          {t.footerLink1}
         </Link>
-        를 확인하세요. 또는 웹에서 바로{" "}
+        {t.footerMid}
         <Link to="/discord/link" className="font-bold text-brand-light hover:underline">
-          계정 연결 페이지
+          {t.footerLink2}
         </Link>
-        를 열 수 있습니다.
+        {t.footerSuffix}
       </p>
     </WikiLayout>
   );

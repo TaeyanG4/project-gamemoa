@@ -16,9 +16,9 @@
 
 ## 콘텐츠 파일 요약
 
-- `translated-creator.json`, `translated-account-games.json` — ✅ 이미 번역되어 코드에 연결된
-  9페이지 (구조/상세는 `STATUS.md` 참고)
-- `01-wiki-discord.json`, `02-game-content.json`, `03-terms-privacy.json` — ⏳ 한국어 원문만
-  있는 번역 대기 파일 (번역 방법은 `GUIDE.md`, 대상 목록은 `STATUS.md`)
+- `translated-creator.json`, `translated-account-games.json`, `01-wiki-discord.json` — ✅ 이미
+  번역되어 코드에 연결된 위키 본문 16페이지 전체 (구조/상세는 `STATUS.md` 참고)
+- `02-game-content.json`, `03-terms-privacy.json` — ⏳ 한국어 원문만 있는 번역 대기 파일
+  (번역 방법은 `GUIDE.md`, 대상 목록은 `STATUS.md`)
 - `ko-source-snapshot.json` — 자동 최신화 확인 도구(`pnpm i18n:sync-check`)가 쓰는 상태 파일.
   직접 수정하지 마세요 (`GUIDE.md` 참고).

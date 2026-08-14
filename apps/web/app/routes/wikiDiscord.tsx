@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { WikiLayout, WikiCallout, WikiSteps } from "../components/wiki/WikiLayout";
+import { useI18n } from "../features/i18n/I18nContext";
 
 export function meta() {
   return [
@@ -9,31 +10,20 @@ export function meta() {
 }
 
 export default function WikiDiscordRoute() {
+  const { dict } = useI18n();
+  const t = dict.wikiBody.discordOverview;
+
   return (
-    <WikiLayout
-      eyebrow="DISCORD"
-      title="Discord 개요"
-      description="OwOGG는 상시 접속 봇이 아니라 서명된 HTTP Interactions로 동작합니다. 설치, 계정 연결, 서버 등록은 서로 다른 3단계입니다."
-    >
+    <WikiLayout eyebrow="DISCORD" title={t.title} description={t.description}>
       <WikiCallout>
-        <b className="text-text-primary">
-          일반 사용자는 Bot Token, Application ID, Public Key를 다룰 필요가 없습니다.
-        </b>{" "}
-        이 값들은 OwOGG 운영진만 GitHub Actions Secret으로 관리합니다.
+        <b className="text-text-primary">{t.calloutStrong}</b>
+        {t.calloutBody}
       </WikiCallout>
 
       <section>
-        <h2 className="text-lg font-black text-text-primary">전체 흐름</h2>
+        <h2 className="text-lg font-black text-text-primary">{t.flowHeading}</h2>
         <div className="mt-3">
-          <WikiSteps
-            steps={[
-              "Discord에 OwOGG 앱을 추가합니다 (서버 관리자 권한 필요).",
-              "선택한 서버를 확인하고 승인합니다.",
-              "OwOGG로 돌아와 Discord 계정을 연결합니다.",
-              "관리 권한이 있는 서버를 OwOGG 커뮤니티로 등록합니다.",
-              "Discord에서 /owogg games, /owogg play로 시작합니다.",
-            ]}
-          />
+          <WikiSteps steps={[t.step1, t.step2, t.step3, t.step4, t.step5]} />
         </div>
       </section>
 
@@ -42,38 +32,38 @@ export default function WikiDiscordRoute() {
           to="/wiki/discord/install"
           className="rounded-2xl border border-border bg-surface-raised p-4 hover:border-brand/40"
         >
-          <p className="text-sm font-black text-text-primary">설치하기 →</p>
-          <p className="mt-1 text-xs text-text-muted">서버에 앱을 추가하는 방법</p>
+          <p className="text-sm font-black text-text-primary">{t.cardInstall}</p>
+          <p className="mt-1 text-xs text-text-muted">{t.cardInstallDesc}</p>
         </Link>
         <Link
           to="/wiki/discord/server-registration"
           className="rounded-2xl border border-border bg-surface-raised p-4 hover:border-brand/40"
         >
-          <p className="text-sm font-black text-text-primary">서버 등록 →</p>
-          <p className="mt-1 text-xs text-text-muted">PUBLIC/UNLISTED/PRIVATE 선택</p>
+          <p className="text-sm font-black text-text-primary">{t.cardServerReg}</p>
+          <p className="mt-1 text-xs text-text-muted">{t.cardServerRegDesc}</p>
         </Link>
         <Link
           to="/wiki/discord/commands"
           className="rounded-2xl border border-border bg-surface-raised p-4 hover:border-brand/40"
         >
-          <p className="text-sm font-black text-text-primary">명령어 →</p>
-          <p className="mt-1 text-xs text-text-muted">/owogg 전체 서브커맨드</p>
+          <p className="text-sm font-black text-text-primary">{t.cardCommands}</p>
+          <p className="mt-1 text-xs text-text-muted">{t.cardCommandsDesc}</p>
         </Link>
         <Link
           to="/wiki/discord/troubleshooting"
           className="rounded-2xl border border-border bg-surface-raised p-4 hover:border-brand/40"
         >
-          <p className="text-sm font-black text-text-primary">문제 해결 →</p>
-          <p className="mt-1 text-xs text-text-muted">자주 발생하는 증상별 해결법</p>
+          <p className="text-sm font-black text-text-primary">{t.cardTroubleshooting}</p>
+          <p className="mt-1 text-xs text-text-muted">{t.cardTroubleshootingDesc}</p>
         </Link>
       </section>
 
       <p className="text-xs text-text-muted">
-        지금 바로 설치를 시작하려면{" "}
+        {t.footerPrefix}
         <Link to="/discord/setup" className="font-bold text-brand-light hover:underline">
-          5단계 설치 가이드
+          {t.footerLink}
         </Link>
-        를 이용하세요.
+        {t.footerSuffix}
       </p>
     </WikiLayout>
   );
