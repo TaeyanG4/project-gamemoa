@@ -24,7 +24,7 @@ export default function Games() {
 
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [columns, setColumns] = useGridColumns();
+  const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
 
   const { favoriteGameIds } = usePersonalization();
   const { isAuthenticated, openLoginModal } = useAuth();
@@ -92,13 +92,19 @@ export default function Games() {
           selectedCategory={selectedCategory}
           onSelectCategory={handleSelectCategory}
         />
-        <GridColumnSwitcher columns={columns} onChange={setColumns} />
+        <GridColumnSwitcher
+          mobileColumns={mobileColumns}
+          onMobileChange={setMobileColumns}
+          desktopColumns={desktopColumns}
+          onDesktopChange={setDesktopColumns}
+        />
       </div>
 
       {/* Grid */}
       <GameGrid
         games={filteredGames}
-        columns={columns}
+        mobileColumns={mobileColumns}
+        desktopColumns={desktopColumns}
         emptyMessage={
           selectedCategory === "favorites" ? dict.games.emptyFavorites : dict.games.emptySearch
         }

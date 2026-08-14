@@ -5,6 +5,7 @@ import { fetchLeaderboardApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 import { useI18n } from "../features/i18n/I18nContext";
+import { GameThumbnail } from "../components/ui/GameThumbnail";
 import type { LeaderRecord } from "@owogg/contracts";
 
 export function meta() {
@@ -84,12 +85,12 @@ export default function GameRankingRoute() {
       </Link>
 
       <div className="mb-6 flex items-center gap-3">
-        <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-black"
-          style={{ backgroundColor: manifest.accent ?? "#6366f1" }}
-        >
-          {content?.title.slice(0, 2)}
-        </div>
+        <GameThumbnail
+          thumbnail={manifest.thumbnail}
+          title={content?.title ?? manifest.title}
+          accent={manifest.accent}
+          className="h-12 w-12 shrink-0"
+        />
         <div>
           <p className="text-xs font-black uppercase tracking-wider text-brand-light">
             {dict.gameRanking.eyebrow}

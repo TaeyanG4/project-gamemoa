@@ -17,6 +17,7 @@ import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
 import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import { GameThumbnail } from "../components/ui/GameThumbnail";
 import type { Dictionary } from "../features/i18n/dictionary";
 import type { LeaderRecord } from "@owogg/contracts";
 import {
@@ -280,9 +281,12 @@ export default function GamePlay() {
           <div className="h-4 w-px bg-border hidden sm:block" />
 
           <div className="flex items-center gap-3">
-            <div
-              className="w-6 h-6 rounded-md"
-              style={{ backgroundColor: manifest?.accent ?? "#6366f1" }}
+            <GameThumbnail
+              thumbnail={manifest?.thumbnail ?? ""}
+              title={localizedTitle ?? ""}
+              accent={manifest?.accent}
+              className="h-6 w-6"
+              rounded="rounded-md"
             />
             <span className="font-bold">{localizedTitle ?? dict.gamePlay.loadingTitle}</span>
           </div>

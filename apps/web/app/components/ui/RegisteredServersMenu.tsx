@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { MessagesSquare } from "lucide-react";
+import { DiscordIcon } from "./DiscordIcon";
 import { searchDiscordGuilds } from "../../features/discord/discordGuildApi";
 import type { DiscordGuildDto } from "@owogg/contracts";
 import { useI18n } from "../../features/i18n/I18nContext";
@@ -37,7 +37,7 @@ export function RegisteredServersMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <MessagesSquare className="w-5 h-5" />
+        <DiscordIcon className="w-5 h-5" />
       </button>
 
       {open && (

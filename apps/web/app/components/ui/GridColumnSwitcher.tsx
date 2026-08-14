@@ -1,42 +1,79 @@
-import { LayoutGrid } from "lucide-react";
+import { Smartphone, Monitor } from "lucide-react";
 import {
-  GRID_COLUMN_OPTIONS,
-  type GridColumns,
+  MOBILE_COLUMN_OPTIONS,
+  DESKTOP_COLUMN_OPTIONS,
+  type MobileColumns,
+  type DesktopColumns,
 } from "../../features/personalization/useGridColumns";
 import { useI18n } from "../../features/i18n/I18nContext";
 
 interface GridColumnSwitcherProps {
-  columns: GridColumns;
-  onChange: (columns: GridColumns) => void;
+  mobileColumns: MobileColumns;
+  onMobileChange: (columns: MobileColumns) => void;
+  desktopColumns: DesktopColumns;
+  onDesktopChange: (columns: DesktopColumns) => void;
 }
 
-/** Lets the user pick how dense the game grid renders (4/5/6 columns). Only meaningful on wide
- * screens — smaller breakpoints in GameGrid ignore this and stay at 1-2 columns regardless. */
-export function GridColumnSwitcher({ columns, onChange }: GridColumnSwitcherProps) {
+/** Lets the user pick how dense the game grid renders — separately for mobile (2/3/4 columns,
+ * below `lg`) and desktop (4/5/6 columns, `lg` and up), since GameGrid uses two independent
+ * preferences rather than one value that scales across breakpoints. Both groups are always shown
+ * together (not just the one matching the current viewport) so the setting stays discoverable and
+ * predictable regardless of which device someone is configuring from. */
+export function GridColumnSwitcher({
+  mobileColumns,
+  onMobileChange,
+  desktopColumns,
+  onDesktopChange,
+}: GridColumnSwitcherProps) {
   const { dict } = useI18n();
 
   return (
-    <div className="flex items-center gap-1.5 rounded-xl border border-border/80 bg-surface-raised p-1">
-      <LayoutGrid className="ml-1.5 h-3.5 w-3.5 text-text-muted" aria-hidden="true" />
-      {GRID_COLUMN_OPTIONS.map((option) => {
-        const isSelected = option === columns;
-        return (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onChange(option)}
-            aria-label={`${dict.home.gridColumnsAriaPrefix}${option}${dict.home.gridColumnsAriaSuffix}`}
-            aria-pressed={isSelected}
-            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              isSelected
-                ? "bg-brand text-white shadow-sm"
-                : "text-text-secondary hover:text-text-primary hover:bg-surface-overlay"
-            }`}
-          >
-            {option}
-          </button>
-        );
-      })}
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
+        <Smartphone className="ml-1 h-3.5 w-3.5 text-text-muted" aria-hidden="true" />
+        {MOBILE_COLUMN_OPTIONS.map((option) => {
+          const isSelected = option === mobileColumns;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onMobileChange(option)}
+              aria-label={`${dict.home.gridColumnsAriaPrefix}${option}${dict.home.gridColumnsAriaSuffix}`}
+              aria-pressed={isSelected}
+              className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                isSelected
+                  ? "bg-brand text-white shadow-sm"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-overlay"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
+        <Monitor className="ml-1 h-3.5 w-3.5 text-text-muted" aria-hidden="true" />
+        {DESKTOP_COLUMN_OPTIONS.map((option) => {
+          const isSelected = option === desktopColumns;
+          return (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onDesktopChange(option)}
+              aria-label={`${dict.home.gridColumnsAriaPrefix}${option}${dict.home.gridColumnsAriaSuffix}`}
+              aria-pressed={isSelected}
+              className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                isSelected
+                  ? "bg-brand text-white shadow-sm"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-overlay"
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

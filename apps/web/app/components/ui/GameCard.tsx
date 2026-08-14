@@ -1,8 +1,8 @@
-import { useState } from "react";
 import { Link } from "react-router";
 import { Play, Sparkles, Bookmark } from "lucide-react";
 import { usePersonalization } from "../../features/personalization";
 import { useI18n } from "../../features/i18n/I18nContext";
+import { GameThumbnail } from "./GameThumbnail";
 
 interface GameCardProps {
   slug: string;
@@ -22,7 +22,6 @@ export function GameCard({
   thumbnail,
   accent = "#6366f1",
 }: GameCardProps) {
-  const [imageError, setImageError] = useState(false);
   const { isFavorite, toggleFavorite } = usePersonalization();
   const { dict } = useI18n();
   const isFav = isFavorite(slug);
@@ -82,21 +81,12 @@ export function GameCard({
           </div>
 
           {/* Thumbnail Visual */}
-          {!imageError && (thumbnail.startsWith("/") || thumbnail.startsWith("http")) ? (
-            <img
-              src={thumbnail}
-              alt={title}
-              onError={() => setImageError(true)}
-              className="w-24 h-24 object-contain rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300"
-            />
-          ) : (
-            <div
-              className="w-24 h-24 rounded-2xl shadow-xl transform group-hover:scale-110 transition-transform duration-300 flex items-center justify-center text-white font-extrabold text-xl"
-              style={{ backgroundColor: accent }}
-            >
-              {title.slice(0, 2)}
-            </div>
-          )}
+          <GameThumbnail
+            thumbnail={thumbnail}
+            title={title}
+            accent={accent}
+            className="w-24 h-24 shadow-xl transform group-hover:scale-110 transition-transform duration-300 text-xl"
+          />
 
           {/* Hover Play Action Overlay */}
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center z-20">
@@ -108,11 +98,11 @@ export function GameCard({
 
         {/* Content Info */}
         <div className="p-4 flex flex-col flex-1 gap-1.5 bg-surface-raised">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="font-bold text-base text-text-primary group-hover:text-brand transition-colors line-clamp-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-bold text-base text-text-primary group-hover:text-brand transition-colors">
               {title}
             </h3>
-            <Sparkles className="w-4 h-4 text-brand-light opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <Sparkles className="w-4 h-4 text-brand-light opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
           </div>
 
           <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed flex-1">

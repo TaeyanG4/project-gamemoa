@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router";
-import { Flame, Gamepad2, Zap, Trophy, Sparkles, Compass, X } from "lucide-react";
+import { Home, Gamepad2, Zap, Trophy, Flame, Compass, X } from "lucide-react";
 import { useI18n } from "../../features/i18n/I18nContext";
 
 interface SidebarProps {
@@ -13,9 +13,9 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const { dict } = useI18n();
 
   const navItems = [
-    { label: dict.sidebar.home, path: "/", icon: Flame, badge: "HOT" },
+    { label: dict.sidebar.home, path: "/", icon: Home, badge: "HOT" },
     { label: dict.sidebar.allGames, path: "/games", icon: Gamepad2 },
-    { label: dict.sidebar.popularGames, path: "/games?category=popular", icon: Sparkles },
+    { label: dict.sidebar.popularGames, path: "/games?category=popular", icon: Flame },
     {
       label: dict.sidebar.reactionBrain,
       path: "/games?category=reaction",

@@ -20,7 +20,7 @@ export default function Home() {
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get("category") || "all";
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [columns, setColumns] = useGridColumns();
+  const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
 
   const { favoriteGameIds, recentPlays } = usePersonalization();
   const { dict } = useI18n();
@@ -80,7 +80,11 @@ export default function Home() {
               {dict.home.itemsCountSuffix}
             </span>
           </div>
-          <GameGrid games={popularGames} columns={columns} />
+          <GameGrid
+            games={popularGames}
+            mobileColumns={mobileColumns}
+            desktopColumns={desktopColumns}
+          />
         </section>
       )}
 
@@ -99,7 +103,11 @@ export default function Home() {
               {dict.home.itemsCountSuffix}
             </span>
           </div>
-          <GameGrid games={recentGames} columns={columns} />
+          <GameGrid
+            games={recentGames}
+            mobileColumns={mobileColumns}
+            desktopColumns={desktopColumns}
+          />
         </section>
       )}
 
@@ -118,7 +126,11 @@ export default function Home() {
               {dict.home.itemsCountSuffix}
             </span>
           </div>
-          <GameGrid games={favoriteGames} columns={columns} />
+          <GameGrid
+            games={favoriteGames}
+            mobileColumns={mobileColumns}
+            desktopColumns={desktopColumns}
+          />
         </section>
       )}
 
@@ -142,14 +154,20 @@ export default function Home() {
               selectedCategory={selectedCategory}
               onSelectCategory={handleSelectCategory}
             />
-            <GridColumnSwitcher columns={columns} onChange={setColumns} />
+            <GridColumnSwitcher
+              mobileColumns={mobileColumns}
+              onMobileChange={setMobileColumns}
+              desktopColumns={desktopColumns}
+              onDesktopChange={setDesktopColumns}
+            />
           </div>
         </div>
 
         {/* High Density Game Grid */}
         <GameGrid
           games={filteredGames}
-          columns={columns}
+          mobileColumns={mobileColumns}
+          desktopColumns={desktopColumns}
           emptyMessage={
             selectedCategory === "favorites" ? dict.games.emptyFavorites : dict.home.emptyCategory
           }
