@@ -75,7 +75,7 @@ export default function GameRankingRoute() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-8">
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 md:px-8">
       <Link
         to={`/games/${slug}`}
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-brand-light"

@@ -262,7 +262,7 @@ export default function Ranking() {
           WPM etc.), so instead of a combined table this shows a picker — choose a game to see its
           own dedicated ranking page (osu!-style: ranking per game, not one mixed leaderboard). */}
       {mainTab === "game" && selectedGameId === "all" ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
           {gameManifests.map((game) => {
             const content = getLocalizedGameContent(dict, game);
             return (
