@@ -32,7 +32,7 @@ export function CategoryChips({ selectedCategory, onSelectCategory }: CategoryCh
   const categories = buildCategories(dict.games.categories);
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 w-full select-none">
+    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 w-full min-w-0 select-none">
       {categories.map((cat) => {
         const Icon = cat.icon;
         const isSelected = selectedCategory === cat.id;

@@ -88,7 +88,7 @@ export default function Games() {
       </div>
 
       {/* Category Chips Bar & Grid Density Switcher */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 min-w-0">
         <CategoryChips
           selectedCategory={selectedCategory}
           onSelectCategory={handleSelectCategory}
