@@ -43,6 +43,9 @@ export interface Score {
   avatar_url: string | null;
   game_id: string;
   score: number;
+  /** "normal" for every game without a manifest `difficulty` config — see
+   * domain/scoreValidation.ts's validateDifficulty for how this gets normalized on submission. */
+  difficulty: string;
   created_at: string;
 }
 
@@ -89,8 +92,14 @@ export interface ScoreRepository {
     avatarUrl?: string | null;
     gameId: string;
     score: number;
+    difficulty: string;
   }): Promise<Score>;
-  getLeaderboard(gameId: string, limit?: number, direction?: "asc" | "desc"): Promise<Score[]>;
+  getLeaderboard(
+    gameId: string,
+    limit?: number,
+    direction?: "asc" | "desc",
+    difficulty?: string,
+  ): Promise<Score[]>;
   getUserPersonalBests(userId: number): Promise<UserPersonalBestAggregate[]>;
 }
 

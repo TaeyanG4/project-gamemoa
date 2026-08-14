@@ -1,7 +1,7 @@
 import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
 import { formatScore } from "@owogg/game-sdk";
 import type { Score, ScoreRepository } from "../ports/repositories.js";
-import { validateScorePayload } from "../domain/scoreValidation.js";
+import { validateScorePayload, validateDifficulty } from "../domain/scoreValidation.js";
 
 export interface FormattedScoreRecord extends Score {
   formattedScore: string;
@@ -17,21 +17,38 @@ export class ScoreUseCases {
     avatarUrl?: string | null;
     gameId: string;
     score: number;
+    difficulty?: string | undefined;
   }): Promise<{ valid: boolean; reason?: string; saved?: Score }> {
     const valResult = validateScorePayload(data.gameId, data.score);
     if (!valResult.valid) {
       return { valid: false, ...(valResult.reason ? { reason: valResult.reason } : {}) };
     }
 
-    const saved = await this.scoreRepo.saveScore(data);
+    const difficultyResult = validateDifficulty(data.gameId, data.difficulty);
+    if (!difficultyResult.valid) {
+      return {
+        valid: false,
+        ...(difficultyResult.reason ? { reason: difficultyResult.reason } : {}),
+      };
+    }
+
+    const saved = await this.scoreRepo.saveScore({
+      ...data,
+      difficulty: difficultyResult.normalizedDifficultyId,
+    });
     return { valid: true, saved };
   }
 
-  async getLeaderboard(gameId: string, limit = 20): Promise<FormattedScoreRecord[]> {
+  async getLeaderboard(
+    gameId: string,
+    limit = 20,
+    rawDifficulty?: string,
+  ): Promise<FormattedScoreRecord[]> {
     const manifest = GAME_MANIFEST_MAP[gameId];
     const direction = manifest?.scoreConfig?.direction ?? "desc";
+    const difficulty = validateDifficulty(gameId, rawDifficulty).normalizedDifficultyId;
 
-    const rawScores = await this.scoreRepo.getLeaderboard(gameId, limit, direction);
+    const rawScores = await this.scoreRepo.getLeaderboard(gameId, limit, direction, difficulty);
 
     return rawScores.map((item) => {
       const gManifest = GAME_MANIFEST_MAP[item.game_id];

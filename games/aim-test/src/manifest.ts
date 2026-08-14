@@ -20,6 +20,16 @@ export const manifest: GameManifest = {
   supportsLeaderboard: true,
   inputMethods: ["mouse", "touch"],
   supportsReplay: false,
+  // Hard mode shrinks the target (see logic.ts's TARGET_SIZE_BY_DIFFICULTY) — same 30 targets,
+  // same elapsed-ms scoring, just less margin for error. Scores across tiers are not comparable,
+  // hence a separate leaderboard partition per id (never rename these once real scores exist).
+  difficulty: {
+    levels: [
+      { id: "normal", label: "보통" },
+      { id: "hard", label: "어려움" },
+    ],
+    defaultLevelId: "normal",
+  },
   version: "0.0.1",
   scoreConfig: {
     unit: "ms",

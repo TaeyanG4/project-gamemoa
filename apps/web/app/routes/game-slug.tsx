@@ -18,6 +18,7 @@ import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
 import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import { localizedDifficultyLabel } from "../features/catalog/difficultyLabels";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
 import type { Dictionary } from "../features/i18n/dictionary";
 import type { LeaderRecord } from "@owogg/contracts";
@@ -83,6 +84,15 @@ export default function GamePlay() {
   const localizedTitle = manifest ? getLocalizedGameContent(dict, manifest).title : undefined;
   const isDisabled = useIsGameDisabled(manifest?.id ?? slug);
 
+  // Difficulty selection — only meaningful for games with manifest.difficulty. Resets to the
+  // game's default whenever navigating between games. A change here only affects the NEXT
+  // attempt (handleStart, inside the game component) — an already-in-progress round keeps
+  // whatever it captured when it started, never flips difficulty mid-round.
+  const [selectedDifficultyId, setSelectedDifficultyId] = useState<string>("normal");
+  useEffect(() => {
+    setSelectedDifficultyId(manifest?.difficulty?.defaultLevelId ?? "normal");
+  }, [manifest]);
+
   // Load Game Module
   useEffect(() => {
     let isMounted = true;
@@ -130,9 +140,15 @@ export default function GamePlay() {
       setSubmissionError(null);
 
       try {
-        const payload: { gameId: string; score: number; nickname?: string } = {
+        const payload: {
+          gameId: string;
+          score: number;
+          nickname?: string;
+          difficulty?: string;
+        } = {
           gameId: slug,
           score: scoreToSubmit,
+          difficulty: selectedDifficultyId,
         };
 
         const res = await submitScoreApi(payload);
@@ -148,7 +164,12 @@ export default function GamePlay() {
         setSubmissionError(dict.gamePlay.errorNetworkSubmitFailed);
       }
     },
-    [slug, dict.gamePlay.errorSubmitFailed, dict.gamePlay.errorNetworkSubmitFailed],
+    [
+      slug,
+      selectedDifficultyId,
+      dict.gamePlay.errorSubmitFailed,
+      dict.gamePlay.errorNetworkSubmitFailed,
+    ],
   );
 
   // Reset / Retry Game Attempt
@@ -168,7 +189,7 @@ export default function GamePlay() {
   useEffect(() => {
     if (!result || !manifest?.supportsLeaderboard) return;
     let isMounted = true;
-    fetchLeaderboardApi(slug)
+    fetchLeaderboardApi(slug, selectedDifficultyId)
       .then((records) => {
         if (isMounted) setResultLeaderboard(records.slice(0, 5));
       })
@@ -178,7 +199,7 @@ export default function GamePlay() {
     return () => {
       isMounted = false;
     };
-  }, [result, manifest, slug]);
+  }, [result, manifest, slug, selectedDifficultyId]);
 
   // Share Result (Web Share API where available, clipboard copy as fallback)
   const [shareCopied, setShareCopied] = useState(false);
@@ -214,6 +235,7 @@ export default function GamePlay() {
     () => ({
       sessionId,
       user: user ? { id: String(user.id), displayName: user.nickname } : null,
+      difficultyId: selectedDifficultyId,
       emit: (event) => {
         if (event && event.type === "game_started") {
           void recordRecentPlay(slug);
@@ -238,6 +260,7 @@ export default function GamePlay() {
     [
       sessionId,
       user,
+      selectedDifficultyId,
       navigate,
       slug,
       manifest,
@@ -313,15 +336,40 @@ export default function GamePlay() {
           </div>
         </div>
 
-        {manifest?.supportsLeaderboard && (
-          <Link
-            to={`/games/${slug}/ranking`}
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
-          >
-            <Trophy className="h-4 w-4 text-accent-yellow" />
-            <span className="hidden sm:inline">{dict.gameRanking.eyebrow}</span>
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {manifest?.difficulty && (
+            <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
+              {manifest.difficulty.levels.map((level) => {
+                const isSelected = level.id === selectedDifficultyId;
+                return (
+                  <button
+                    key={level.id}
+                    type="button"
+                    onClick={() => setSelectedDifficultyId(level.id)}
+                    aria-pressed={isSelected}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-brand text-white shadow-sm"
+                        : "text-text-secondary hover:text-text-primary hover:bg-surface-overlay"
+                    }`}
+                  >
+                    {localizedDifficultyLabel(level.id, level.label, dict.gamePlay)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {manifest?.supportsLeaderboard && (
+            <Link
+              to={`/games/${slug}/ranking`}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+            >
+              <Trophy className="h-4 w-4 text-accent-yellow" />
+              <span className="hidden sm:inline">{dict.gameRanking.eyebrow}</span>
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Game Area Container */}

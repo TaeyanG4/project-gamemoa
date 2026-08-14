@@ -16,6 +16,7 @@ class FakeScoreRepository implements ScoreRepository {
     avatarUrl?: string | null;
     gameId: string;
     score: number;
+    difficulty: string;
   }): Promise<Score> {
     const newScore: Score = {
       id: this.scores.length + 1,
@@ -24,6 +25,7 @@ class FakeScoreRepository implements ScoreRepository {
       avatar_url: data.avatarUrl ?? null,
       game_id: data.gameId,
       score: data.score,
+      difficulty: data.difficulty,
       created_at: new Date().toISOString(),
     };
     this.scores.push(newScore);
@@ -34,8 +36,9 @@ class FakeScoreRepository implements ScoreRepository {
     gameId: string,
     limit = 20,
     direction: "asc" | "desc" = "desc",
+    difficulty = "normal",
   ): Promise<Score[]> {
-    const filtered = this.scores.filter((s) => s.game_id === gameId);
+    const filtered = this.scores.filter((s) => s.game_id === gameId && s.difficulty === difficulty);
     filtered.sort((a, b) => (direction === "asc" ? a.score - b.score : b.score - a.score));
     return filtered.slice(0, limit);
   }
@@ -135,4 +138,71 @@ test("ScoreUseCases - getUserBests picks min_score for asc and max_score for des
   const bests = await useCases.getUserBests(42);
   assert.equal(bests["reaction-time"], 180); // asc -> MIN
   assert.equal(bests["memory-test"], 12); // desc -> MAX
+});
+
+test("ScoreUseCases - a game without a difficulty config rejects anything but normal", async () => {
+  const repo = new FakeScoreRepository();
+  const useCases = new ScoreUseCases(repo);
+
+  const res = await useCases.submitScore({
+    userId: 1,
+    gameId: "reaction-time",
+    score: 200,
+    nickname: "Tester",
+    difficulty: "hard",
+  });
+  assert.equal(res.valid, false);
+  assert.equal(repo.scores.length, 0);
+});
+
+test("ScoreUseCases - aim-test accepts its declared difficulty tiers and rejects unknown ones", async () => {
+  const repo = new FakeScoreRepository();
+  const useCases = new ScoreUseCases(repo);
+
+  const hardRes = await useCases.submitScore({
+    userId: 1,
+    gameId: "aim-test",
+    score: 12000,
+    nickname: "Tester",
+    difficulty: "hard",
+  });
+  assert.equal(hardRes.valid, true);
+  assert.equal(hardRes.saved?.difficulty, "hard");
+
+  const unknownRes = await useCases.submitScore({
+    userId: 1,
+    gameId: "aim-test",
+    score: 12000,
+    nickname: "Tester",
+    difficulty: "nightmare",
+  });
+  assert.equal(unknownRes.valid, false);
+});
+
+test("ScoreUseCases - getLeaderboard partitions scores by difficulty, never mixing tiers", async () => {
+  const repo = new FakeScoreRepository();
+  const useCases = new ScoreUseCases(repo);
+
+  await useCases.submitScore({
+    userId: 1,
+    gameId: "aim-test",
+    score: 8000,
+    nickname: "NormalPlayer",
+    difficulty: "normal",
+  });
+  await useCases.submitScore({
+    userId: 2,
+    gameId: "aim-test",
+    score: 20000,
+    nickname: "HardPlayer",
+    difficulty: "hard",
+  });
+
+  const normalBoard = await useCases.getLeaderboard("aim-test", 20, "normal");
+  assert.equal(normalBoard.length, 1);
+  assert.equal(normalBoard[0]?.playerName, "NormalPlayer");
+
+  const hardBoard = await useCases.getLeaderboard("aim-test", 20, "hard");
+  assert.equal(hardBoard.length, 1);
+  assert.equal(hardBoard[0]?.playerName, "HardPlayer");
 });

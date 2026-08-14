@@ -7,6 +7,9 @@ export const scoreSubmissionSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
   playToken: z.string().optional(),
   timestamp: z.number().default(() => Date.now()),
+  /** Omitted = the game's default difficulty (or "normal" for games without difficulty tiers).
+   * Validated server-side against the game's manifest — see scoreValidation.ts. */
+  difficulty: z.string().optional(),
 });
 export type ScoreSubmission = z.infer<typeof scoreSubmissionSchema>;
 

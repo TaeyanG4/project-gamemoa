@@ -37,6 +37,7 @@ scoresRouter.post("/", async (c) => {
       metadata: rawBody.metadata,
       playToken: rawBody.playToken ?? rawBody.play_token,
       timestamp: rawBody.timestamp,
+      difficulty: rawBody.difficulty,
     });
 
     if (!parseResult.success) {
@@ -67,6 +68,7 @@ scoresRouter.post("/", async (c) => {
       avatarUrl,
       gameId,
       score,
+      difficulty: parseResult.data.difficulty,
     });
 
     if (!result.valid || !result.saved) {
@@ -169,7 +171,8 @@ scoresRouter.get("/:gameId", async (c) => {
 
   try {
     const { scoreUseCases } = createContainer(c.env.DB);
-    const leaderboard = await scoreUseCases.getLeaderboard(gameId, 20);
+    const difficulty = c.req.query("difficulty");
+    const leaderboard = await scoreUseCases.getLeaderboard(gameId, 20, difficulty);
 
     const formattedLeaderboard = leaderboard.map((item) => ({
       id: item.id,
@@ -181,6 +184,7 @@ scoresRouter.get("/:gameId", async (c) => {
       gameId: item.game_id,
       score: item.score,
       formattedScore: item.formattedScore,
+      difficulty: item.difficulty,
       createdAt: item.created_at?.split("T")[0] ?? item.created_at,
       created_at: item.created_at,
     }));

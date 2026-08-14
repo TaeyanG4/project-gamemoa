@@ -18,6 +18,7 @@ export const LeaderRecordSchema = z
     /** Null for guest (unauthenticated) scores — no public profile to link to. */
     userId: z.number().nullable().optional(),
     user_id: z.number().nullable().optional(),
+    difficulty: z.string().optional(),
   })
   .transform((data) => ({
     id: String(data.id),
@@ -30,6 +31,7 @@ export const LeaderRecordSchema = z
     createdAt: data.createdAt || data.created_at || "",
     avatarUrl: data.avatarUrl || data.avatar_url || null,
     userId: data.userId ?? data.user_id ?? null,
+    difficulty: data.difficulty || "normal",
   }));
 
 export type LeaderRecord = z.infer<typeof LeaderRecordSchema>;

@@ -9,6 +9,7 @@ function mapScoreRow(row: Record<string, unknown>): Score {
     avatar_url: row.avatar_url ? String(row.avatar_url) : null,
     game_id: String(row.game_id),
     score: Number(row.score),
+    difficulty: row.difficulty ? String(row.difficulty) : "normal",
     created_at: String(row.created_at),
   };
 }
@@ -22,6 +23,10 @@ export class D1ScoreRepository implements ScoreRepository {
     avatarUrl?: string | null;
     gameId: string;
     score: number;
+    /** Already validated/normalized against the game's manifest by the caller (see
+     * domain/scoreValidation.ts's validateDifficulty) — "normal" for every game that doesn't
+     * declare a difficulty config. */
+    difficulty: string;
   }): Promise<Score> {
     if (!data.userId || typeof data.userId !== "number") {
       throw new Error("Valid userId is required to save score");
@@ -31,8 +36,8 @@ export class D1ScoreRepository implements ScoreRepository {
 
     await this.db
       .prepare(
-        `INSERT INTO scores (user_id, nickname, avatar_url, game_id, score, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO scores (user_id, nickname, avatar_url, game_id, score, difficulty, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         data.userId,
@@ -40,6 +45,7 @@ export class D1ScoreRepository implements ScoreRepository {
         data.avatarUrl ?? null,
         data.gameId,
         data.score,
+        data.difficulty,
         createdAt,
       )
       .run();
@@ -55,6 +61,7 @@ export class D1ScoreRepository implements ScoreRepository {
       avatar_url: data.avatarUrl ?? null,
       game_id: data.gameId,
       score: data.score,
+      difficulty: data.difficulty,
       created_at: createdAt,
     };
   }
@@ -63,13 +70,15 @@ export class D1ScoreRepository implements ScoreRepository {
     gameId: string,
     limit = 20,
     direction: "asc" | "desc" = "desc",
+    difficulty = "normal",
   ): Promise<Score[]> {
     // `direction` must only ever originate from the trusted game manifest (never from raw
     // user/query input) — it is interpolated directly into SQL below.
     const orderClause = direction === "asc" ? "ASC" : "DESC";
 
     if (gameId === "all") {
-      // Recent-activity feed, not a per-user ranked leaderboard — no PB dedup semantics apply.
+      // Recent-activity feed, not a per-user ranked leaderboard — no PB dedup semantics apply,
+      // and difficulty doesn't apply either (mixes many games, each with its own tiers).
       const res = await this.db
         .prepare(`SELECT * FROM scores WHERE user_id IS NOT NULL ORDER BY created_at DESC LIMIT ?`)
         .bind(limit)
@@ -81,7 +90,10 @@ export class D1ScoreRepository implements ScoreRepository {
     // LIMIT), then the deduplicated PB set is ranked and paginated. This must never regress to
     // "ORDER BY score LIMIT N" followed by JS de-duplication — a single user holding many of the
     // top-N raw rows would otherwise crowd out every other player from the leaderboard.
-    // Deterministic tie-break: score, then earliest created_at, then row id.
+    // Deterministic tie-break: score, then earliest created_at, then row id. Filtering by
+    // difficulty happens in the WHERE clause, before the window function runs, so "one row per
+    // user" is already scoped to just that difficulty tier — scores across tiers are never
+    // comparable (see docs/GAME_CREATION_GUIDE.md §4) and must never rank against each other.
     const query = `
       WITH ranked AS (
         SELECT *, ROW_NUMBER() OVER (
@@ -89,7 +101,7 @@ export class D1ScoreRepository implements ScoreRepository {
           ORDER BY score ${orderClause}, created_at ASC, id ASC
         ) AS rn
         FROM scores
-        WHERE user_id IS NOT NULL AND game_id = ?
+        WHERE user_id IS NOT NULL AND game_id = ? AND difficulty = ?
       )
       SELECT * FROM ranked
       WHERE rn = 1
@@ -97,7 +109,10 @@ export class D1ScoreRepository implements ScoreRepository {
       LIMIT ?
     `;
 
-    const res = await this.db.prepare(query).bind(gameId, limit).all<Record<string, unknown>>();
+    const res = await this.db
+      .prepare(query)
+      .bind(gameId, difficulty, limit)
+      .all<Record<string, unknown>>();
 
     return res.results.map(mapScoreRow);
   }

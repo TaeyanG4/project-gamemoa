@@ -22,6 +22,19 @@ export const GAME_MANIFESTS: GameManifest[] = [
     supportsLeaderboard: true,
     inputMethods: ["mouse", "touch"],
     supportsReplay: false,
+    difficulty: {
+      levels: [
+        {
+          id: "normal",
+          label: "보통",
+        },
+        {
+          id: "hard",
+          label: "어려움",
+        },
+      ],
+      defaultLevelId: "normal",
+    },
     version: "0.0.1",
     scoreConfig: {
       unit: "ms",
@@ -142,6 +155,19 @@ export const GAME_MANIFEST_MAP: Record<string, GameManifest> = {
     supportsLeaderboard: true,
     inputMethods: ["mouse", "touch"],
     supportsReplay: false,
+    difficulty: {
+      levels: [
+        {
+          id: "normal",
+          label: "보통",
+        },
+        {
+          id: "hard",
+          label: "어려움",
+        },
+      ],
+      defaultLevelId: "normal",
+    },
     version: "0.0.1",
     scoreConfig: {
       unit: "ms",

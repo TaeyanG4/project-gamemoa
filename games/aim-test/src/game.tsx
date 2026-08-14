@@ -5,6 +5,7 @@ import {
   TOTAL_TARGETS,
   generateRandomPercentagePos,
   calculateAverageMs,
+  getTargetSizePx,
   type TargetPercentagePos,
 } from "./logic.js";
 
@@ -13,6 +14,9 @@ export function Game({ runtime }: GameProps) {
   const [targetCount, setTargetCount] = useState(0);
   const [targetPos, setTargetPos] = useState<TargetPercentagePos>({ xPercent: 50, yPercent: 50 });
   const [totalMs, setTotalMs] = useState<number | null>(null);
+  // Captured once when a round starts (not read fresh every render) — changing the difficulty
+  // selector mid-round must never resize an already-in-progress attempt's targets.
+  const [targetSizePx, setTargetSizePx] = useState(() => getTargetSizePx(runtime.difficultyId));
 
   const startTimeRef = useRef<number>(0);
 
@@ -20,6 +24,7 @@ export function Game({ runtime }: GameProps) {
     setPhase("playing");
     setTargetCount(1);
     setTargetPos(generateRandomPercentagePos());
+    setTargetSizePx(getTargetSizePx(runtime.difficultyId));
     startTimeRef.current = Date.now();
     runtime.emit({ type: "game_started", at: Date.now() });
   }, [runtime]);
@@ -41,6 +46,7 @@ export function Game({ runtime }: GameProps) {
         metadata: {
           targets: TOTAL_TARGETS,
           avgPerTargetMs: calculateAverageMs(elapsedMs, TOTAL_TARGETS),
+          difficultyId: runtime.difficultyId,
         },
         clientStartedAt: startTimeRef.current,
         clientEndedAt: endTime,
@@ -99,9 +105,11 @@ export function Game({ runtime }: GameProps) {
             style={{
               left: `${targetPos.xPercent}%`,
               top: `${targetPos.yPercent}%`,
+              width: `${targetSizePx}px`,
+              height: `${targetSizePx}px`,
               transform: "translate(-50%, -50%)",
             }}
-            className="absolute w-11 h-11 rounded-full bg-gradient-to-tr from-rose-500 to-red-400 border-2 border-white shadow-lg flex items-center justify-center transition-transform duration-75 active:scale-90 cursor-pointer animate-pulse"
+            className="absolute rounded-full bg-gradient-to-tr from-rose-500 to-red-400 border-2 border-white shadow-lg flex items-center justify-center transition-transform duration-75 active:scale-90 cursor-pointer animate-pulse"
             aria-label="Target"
           >
             <div className="w-2.5 h-2.5 rounded-full bg-white" />

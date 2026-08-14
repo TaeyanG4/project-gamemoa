@@ -4,6 +4,7 @@ import { ArrowLeft, Trophy, Medal, AlertCircle, RefreshCw } from "lucide-react";
 import { fetchLeaderboardApi } from "../features/scores/api";
 import { gameManifests } from "../features/catalog/registry";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import { localizedDifficultyLabel } from "../features/catalog/difficultyLabels";
 import { useI18n } from "../features/i18n/I18nContext";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
 import type { LeaderRecord } from "@owogg/contracts";
@@ -68,19 +69,22 @@ export default function GameRankingRoute() {
 
   const [records, setRecords] = useState<LeaderRecord[]>([]);
   const [status, setStatus] = useState<LeaderboardState>("loading");
+  const [selectedDifficultyId, setSelectedDifficultyId] = useState<string>(
+    () => manifest?.difficulty?.defaultLevelId ?? "normal",
+  );
 
   const loadData = useCallback(async () => {
     if (!manifest) return;
     setStatus("loading");
     try {
-      const data = await fetchLeaderboardApi(slug);
+      const data = await fetchLeaderboardApi(slug, selectedDifficultyId);
       setRecords(data);
       setStatus("success");
     } catch (err) {
       console.error("Failed to load game leaderboard:", err);
       setStatus("error");
     }
-  }, [slug, manifest]);
+  }, [slug, manifest, selectedDifficultyId]);
 
   useEffect(() => {
     void loadData();
@@ -121,19 +125,47 @@ export default function GameRankingRoute() {
         {dict.gameRanking.backToGame}
       </Link>
 
-      <div className="mb-6 flex items-center gap-3">
-        <GameThumbnail
-          thumbnail={manifest.thumbnail}
-          title={content?.title ?? manifest.title}
-          accent={manifest.accent}
-          className="h-12 w-12 shrink-0"
-        />
-        <div>
-          <p className="text-xs font-black uppercase tracking-wider text-brand-light">
-            {dict.gameRanking.eyebrow}
-          </p>
-          <h1 className="text-2xl font-black text-text-primary md:text-3xl">{content?.title}</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <GameThumbnail
+            thumbnail={manifest.thumbnail}
+            title={content?.title ?? manifest.title}
+            accent={manifest.accent}
+            className="h-12 w-12 shrink-0"
+          />
+          <div>
+            <p className="text-xs font-black uppercase tracking-wider text-brand-light">
+              {dict.gameRanking.eyebrow}
+            </p>
+            <h1 className="text-2xl font-black text-text-primary md:text-3xl">{content?.title}</h1>
+          </div>
         </div>
+
+        {/* Scores across difficulty tiers are never comparable (see
+            docs/GAME_CREATION_GUIDE.md §4) — the leaderboard below is always scoped to exactly
+            one tier, switched here rather than mixed into one table. */}
+        {manifest.difficulty && (
+          <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
+            {manifest.difficulty.levels.map((level) => {
+              const isSelected = level.id === selectedDifficultyId;
+              return (
+                <button
+                  key={level.id}
+                  type="button"
+                  onClick={() => setSelectedDifficultyId(level.id)}
+                  aria-pressed={isSelected}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? "bg-brand text-white shadow-sm"
+                      : "text-text-secondary hover:text-text-primary hover:bg-surface-overlay"
+                  }`}
+                >
+                  {localizedDifficultyLabel(level.id, level.label, dict.gamePlay)}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="w-full overflow-hidden rounded-3xl border border-border bg-surface-raised shadow-2xl">

@@ -1,5 +1,17 @@
 export const TOTAL_TARGETS = 30;
-export const TARGET_SIZE_PX = 44;
+
+/** Target diameter in px per difficulty tier — hard mode is a smaller target, same target
+ * count and same elapsed-ms scoring, so the only thing that changes is precision required. */
+const TARGET_SIZE_BY_DIFFICULTY: Record<string, number> = {
+  normal: 44,
+  hard: 28,
+};
+
+const DEFAULT_TARGET_SIZE_PX = 44;
+
+export function getTargetSizePx(difficultyId: string): number {
+  return TARGET_SIZE_BY_DIFFICULTY[difficultyId] ?? DEFAULT_TARGET_SIZE_PX;
+}
 
 export interface TargetPercentagePos {
   xPercent: number;

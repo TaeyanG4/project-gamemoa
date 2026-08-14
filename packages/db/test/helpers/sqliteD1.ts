@@ -71,6 +71,7 @@ CREATE TABLE scores (
   avatar_url TEXT,
   game_id TEXT NOT NULL,
   score INTEGER NOT NULL,
+  difficulty TEXT NOT NULL DEFAULT 'normal',
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

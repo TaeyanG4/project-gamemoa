@@ -951,6 +951,10 @@ export interface Dictionary {
     retryGameCta: string;
     backToListResult: string;
     shareCta: string;
+    /** Generic difficulty tier labels, reused across every difficulty-supporting game (rather
+     * than per-game localized content) since "normal"/"hard" are the same concept everywhere. */
+    difficultyNormal: string;
+    difficultyHard: string;
     /** Contains literal "{title}" and "{score}" placeholders, filled in with plain .replace()
      * calls (see game-slug.tsx) rather than a Prefix/Mid/Suffix split — English wants
      * score-before-title ("I scored X in Game") while Korean wants title-before-score
@@ -2154,6 +2158,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retryGameCta: "🔄 다시 하기",
       backToListResult: "목록으로",
       shareCta: "공유하기",
+      difficultyNormal: "보통",
+      difficultyHard: "어려움",
       shareText: "{title}에서 {score} 기록! 나도 도전해보기 🎮",
       shareCopiedFeedback: "링크가 복사되었습니다!",
       leaderboardTitle: "리더보드",
@@ -3358,6 +3364,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retryGameCta: "🔄 Play again",
       backToListResult: "Back to list",
       shareCta: "Share",
+      difficultyNormal: "Normal",
+      difficultyHard: "Hard",
       shareText: "I scored {score} in {title}! Can you beat it? 🎮",
       shareCopiedFeedback: "Link copied!",
       leaderboardTitle: "Leaderboard",
@@ -4561,6 +4569,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retryGameCta: "🔄 もう一度プレイ",
       backToListResult: "リストに戻る",
       shareCta: "シェア",
+      difficultyNormal: "ノーマル",
+      difficultyHard: "ハード",
       shareText: "{title}で{score}を記録しました！挑戦してみて 🎮",
       shareCopiedFeedback: "リンクをコピーしました！",
       leaderboardTitle: "リーダーボード",
@@ -5709,6 +5719,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retryGameCta: "🔄 再玩一次",
       backToListResult: "返回列表",
       shareCta: "分享",
+      difficultyNormal: "普通",
+      difficultyHard: "困难",
       shareText: "我在{title}中获得了{score}！来挑战一下吧 🎮",
       shareCopiedFeedback: "链接已复制！",
       leaderboardTitle: "排行榜",

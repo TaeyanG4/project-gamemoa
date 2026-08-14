@@ -67,6 +67,8 @@ export async function submitScoreApi(payload: {
   score: number;
   nickname?: string;
   playToken?: string | null;
+  /** Omitted = the game's default difficulty (or "normal" for games without difficulty tiers). */
+  difficulty?: string;
 }): Promise<SubmitScoreResponse> {
   const tokenToUse = payload.playToken || consumeActivePlayToken();
   return await apiFetch("/api/scores", SubmitScoreResponseSchema, {
@@ -76,13 +78,18 @@ export async function submitScoreApi(payload: {
       score: payload.score,
       nickname: payload.nickname,
       ...(tokenToUse ? { play_token: tokenToUse } : {}),
+      ...(payload.difficulty ? { difficulty: payload.difficulty } : {}),
     }),
   });
 }
 
-export async function fetchLeaderboardApi(gameId = "all"): Promise<LeaderRecord[]> {
+export async function fetchLeaderboardApi(
+  gameId = "all",
+  difficulty?: string,
+): Promise<LeaderRecord[]> {
+  const query = difficulty ? `?difficulty=${encodeURIComponent(difficulty)}` : "";
   const data = await apiFetch(
-    `/api/scores/${encodeURIComponent(gameId)}`,
+    `/api/scores/${encodeURIComponent(gameId)}${query}`,
     LeaderboardResponseSchema,
   );
   const list = data.leaderboard || [];
