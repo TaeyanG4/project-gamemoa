@@ -48,6 +48,10 @@ export interface DiscordEmbedThumbnail {
   url: string;
 }
 
+export interface DiscordEmbedImage {
+  url: string;
+}
+
 export interface DiscordEmbed {
   title?: string;
   description?: string;
@@ -58,6 +62,10 @@ export interface DiscordEmbed {
   fields?: DiscordEmbedField[];
   footer?: DiscordEmbedFooter;
   thumbnail?: DiscordEmbedThumbnail;
+  /** Large image rendered below the embed body — used for the rendered rank/profile card
+   * (see infrastructure/render/rankCard.ts), distinct from `thumbnail` which stays small and
+   * top-right. */
+  image?: DiscordEmbedImage;
 }
 
 export interface DiscordInteractionResponseData {

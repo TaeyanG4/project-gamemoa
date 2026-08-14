@@ -60,6 +60,33 @@ function discordAvatarUrl(user: DiscordInteractionUser): string {
   return `https://cdn.discordapp.com/embed/avatars/${index}.png`;
 }
 
+/** Builds the URL for the rendered rank/profile card image (apps/api/src/routes/render.ts) —
+ * Discord fetches and caches whatever this points to as the embed's large `image`. Query values
+ * are display data the caller already resolved server-side, not identifiers. */
+function buildRankCardUrl(
+  apiBaseUrl: string,
+  props: {
+    nickname: string;
+    subtitle: string;
+    level: number;
+    totalXp: number;
+    progressPercent: number;
+    rank?: number | undefined;
+  },
+): string {
+  const params = new URLSearchParams({
+    nickname: props.nickname,
+    subtitle: props.subtitle,
+    level: String(props.level),
+    totalXp: String(props.totalXp),
+    progressPercent: String(Math.round(props.progressPercent)),
+  });
+  if (props.rank !== undefined) {
+    params.set("rank", String(props.rank));
+  }
+  return `${apiBaseUrl}/api/render/rank-card?${params.toString()}`;
+}
+
 function ephemeralEmbed(embed: DiscordEmbed): DiscordInteractionResponse {
   return {
     type: DISCORD_RESPONSE_TYPE.CHANNEL_MESSAGE_WITH_SOURCE,
@@ -86,6 +113,7 @@ export async function handleOwoggCommand(
   container: AppContainer,
   interaction: DiscordInteraction,
   frontendUrl: string,
+  apiBaseUrl: string,
 ): Promise<DiscordInteractionResponse> {
   const subcommand = interaction.data?.options?.[0]?.name;
   // In-guild interactions carry the user under `member.user`; DM/user-installed
@@ -104,11 +132,11 @@ export async function handleOwoggCommand(
     case DISCORD_SUBCOMMANDS.LINK:
       return handleLinkCommand(container, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.PROFILE:
-      return handleProfileCommand(container, discordUser, frontendUrl);
+      return handleProfileCommand(container, discordUser, frontendUrl, apiBaseUrl);
     case DISCORD_SUBCOMMANDS.PLAY:
       return handlePlayCommand(container, interaction, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.RANK:
-      return handleRankCommand(container, interaction, discordUser, frontendUrl);
+      return handleRankCommand(container, interaction, discordUser, frontendUrl, apiBaseUrl);
     case DISCORD_SUBCOMMANDS.LEADERBOARD:
       return handleLeaderboardCommand(container, interaction, frontendUrl);
     case DISCORD_SUBCOMMANDS.SERVER:
@@ -215,6 +243,7 @@ async function handleProfileCommand(
   container: AppContainer,
   discordUser: DiscordInteractionUser,
   frontendUrl: string,
+  apiBaseUrl: string,
 ): Promise<DiscordInteractionResponse> {
   const footer = owoggFooter(frontendUrl);
   const user = await container.userRepo.findByOAuth("discord", discordUser.id);
@@ -226,6 +255,7 @@ async function handleProfileCommand(
   }
 
   const { summary } = await container.progressionUseCases.getProgressionSummary(user.id);
+  const globalRank = await container.progressionUseCases.getGlobalXpRank(user.id);
   return ephemeralEmbed({
     title: `👤 ${escapeMarkdown(user.nickname)}`,
     url: `${frontendUrl}/profile`,
@@ -240,6 +270,16 @@ async function handleProfileCommand(
         inline: false,
       },
     ],
+    image: {
+      url: buildRankCardUrl(apiBaseUrl, {
+        nickname: user.nickname,
+        subtitle: "글로벌 프로필",
+        level: summary.level,
+        totalXp: summary.totalXp,
+        progressPercent: summary.progressPercent,
+        rank: globalRank ?? undefined,
+      }),
+    },
     footer,
   });
 }
@@ -295,6 +335,7 @@ async function handleRankCommand(
   interaction: DiscordInteraction,
   discordUser: DiscordInteractionUser,
   frontendUrl: string,
+  apiBaseUrl: string,
 ): Promise<DiscordInteractionResponse> {
   const footer = owoggFooter(frontendUrl);
   const guildId = interaction.guild_id;
@@ -341,6 +382,13 @@ async function handleRankCommand(
   }
 
   const nickname = rankSummary.nickname || discordUser.global_name || discordUser.username;
+  // The rendered card's "LEVEL"/XP bar always means global progression (never guild-scoped XP —
+  // the three XP concepts documented in DISCORD_BOT_GUIDE.md §4 are never mixed); the guild rank
+  // badge on the card is this server's contribution rank specifically.
+  const { summary: globalSummary } = await container.progressionUseCases.getProgressionSummary(
+    oauthAccount.user_id,
+  );
+
   return ephemeralEmbed({
     title: `🏆 ${guildName} 활동 현황 (${periodLabel(period)})`,
     color: COLOR_XP,
@@ -350,6 +398,16 @@ async function handleRankCommand(
       { name: "서버 기여 XP", value: `${rankSummary.totalXp.toLocaleString()} XP`, inline: true },
       { name: "서버 순위", value: `#${rankSummary.rank}`, inline: true },
     ],
+    image: {
+      url: buildRankCardUrl(apiBaseUrl, {
+        nickname,
+        subtitle: guildName,
+        level: globalSummary.level,
+        totalXp: globalSummary.totalXp,
+        progressPercent: globalSummary.progressPercent,
+        rank: rankSummary.rank,
+      }),
+    },
     footer,
   });
 }

@@ -138,6 +138,35 @@ API Composition Root (apps/api/src/container.ts)
 전적으로 운영자가 다시 꺼낼 때까지 대기합니다. 참고로 착수하게 될 경우의 순서는: 게임 1개를 시드
 PRNG로 전환 → 리플레이 기록/재생 프로토타입 검증 → 나머지 게임 확장.
 
+### 3.3 서버 사이드 이미지 렌더링 — satori + resvg (2026-08-14)
+
+`/owogg rank`·`/owogg profile` 임베드에 실제 렌더링된 랭크 카드 이미지를 추가하면서, 이
+Worker에 처음으로 WASM + 바이너리 에셋(폰트) 번들링이 들어갔습니다. Workers 호환성을
+`wrangler deploy --dry-run`으로 실측 검증했습니다:
+
+- **번들 크기**: 총 업로드 6.4MB(gzip 2.2MB) — resvg WASM(~2.4MB) + 폰트 서브셋(~2.5MB) +
+  satori/yoga(~0.4MB) + 기존 코드. Cloudflare Workers 압축 한도(10MB, 무료 티어도 3MB 이상)
+  대비 여유 있게 통과합니다.
+- **`.wasm` 임포트**: Wrangler 번들러가 네이티브로 이해합니다(`import x from "*.wasm"` →
+  `WebAssembly.Module`) — 별도 `rules` 설정 불필요.
+- **`.ttf` 임포트**: 네이티브 지원이 없어 `wrangler.jsonc`에 `"rules": [{"type": "Data", ...}]`
+  를 명시적으로 추가해야 `ArrayBuffer`로 해석됩니다(`src/types/assets.d.ts`에 대응하는 ambient
+  모듈 선언 필요).
+- **폰트**: Noto Sans KR 변수 폰트(10.4MB)를 Bold 700 단일 웨이트로 인스턴스화한 뒤, 라틴
+  - 전체 현대 한글 음절(`U+AC00-D7A3`) + 기본 문장부호로 서브셋해 2.5MB까지 줄였습니다
+    (`fonttools`/`pyftsubset` 사용, 저장소에는 최종 서브셋 파일만 커밋).
+- **테스트 러너 함정**: `apps/api/src/index.ts`를 임포트해 Hono `app`으로 인프로세스 요청
+  테스트를 하는 기존 테스트 파일들이, 렌더 라우트가 최상위에서 `.wasm`/`.ttf`를 정적
+  임포트하는 순간 전부 깨졌습니다 — 순수 Node(`tsx`) 테스트 러너는 이 확장자를 이해하지
+  못하기 때문입니다(Wrangler 번들러만 이해). 실제 초기화(`ensureInit`)가 호출될 때만
+  동적 `import()`로 지연 로드하도록 바꿔서 해결 — esbuild 기반 Wrangler 번들러는 정적/동적
+  임포트를 동일하게 청크로 처리하므로 실제 배포 동작은 그대로입니다.
+- **satori 사용법**: 이 Worker는 순수 Hono(JSX 툴체인 없음)라 React/JSX를 새로 들이지 않고,
+  satori가 공식 지원하는 "vanilla" 방식(`{type, props: {style, children}}` 순수 객체 트리)을
+  그대로 사용합니다.
+- **알려진 제한**: 아바타 이미지는 V1 범위에서 제외했습니다(닉네임 이니셜 원형 배지로 대체) —
+  Discord CDN에서 아바타를 페치해 data URI로 변환하는 로직은 후속 작업입니다.
+
 ---
 
 ## 4. 🧬 계정 식별/통합 및 파비콘 (Identity & Brand)

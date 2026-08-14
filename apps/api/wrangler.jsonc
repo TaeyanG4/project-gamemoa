@@ -20,4 +20,8 @@
   "triggers": {
     "crons": ["0 */6 * * *"],
   },
+  // .wasm (satori's yoga.wasm, @resvg/resvg-wasm) is natively understood by Wrangler's bundler
+  // without a rule. .ttf (the embedded rank-card font) needs an explicit "Data" rule to resolve
+  // to an ArrayBuffer the same way — see src/types/assets.d.ts for the matching ambient types.
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }],
 }

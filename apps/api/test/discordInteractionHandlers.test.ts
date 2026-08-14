@@ -7,6 +7,7 @@ import type { DiscordInteraction } from "../src/infrastructure/discord/types.js"
 import type { OAuthAccount, User } from "@owogg/core";
 
 const FRONTEND_URL = "https://owogg.com";
+const API_BASE_URL = "https://api.owogg.com";
 
 function fakeContainer(overrides: {
   findOAuthAccount?: (provider: string, id: string) => Promise<OAuthAccount | null>;
@@ -22,6 +23,7 @@ function fakeContainer(overrides: {
     };
     eligibleCompletions: number;
   }>;
+  getGlobalXpRank?: () => Promise<number | null>;
   getGuildByGuildId?: () => Promise<{
     guild_id: string;
     name: string;
@@ -77,6 +79,7 @@ function fakeContainer(overrides: {
           },
           eligibleCompletions: 12,
         })),
+      getGlobalXpRank: overrides.getGlobalXpRank ?? (async () => null),
     },
     discordGuildDirectoryUseCases: {
       getGuildByGuildId:
@@ -169,7 +172,12 @@ function guildInteraction(
 }
 
 test("/owogg games lists published games with website links as an embed, publicly visible", async () => {
-  const response = await handleOwoggCommand(fakeContainer({}), gamesInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    fakeContainer({}),
+    gamesInteraction(),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.equal(response.type, 4);
   assert.equal(response.data?.flags, undefined); // not ephemeral — fine to share in-channel
   const embed = response.data?.embeds?.[0];
@@ -178,7 +186,12 @@ test("/owogg games lists published games with website links as an embed, publicl
 });
 
 test("/owogg link returns an ephemeral embed with a link URL for a not-yet-linked Discord user", async () => {
-  const response = await handleOwoggCommand(fakeContainer({}), linkInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    fakeContainer({}),
+    linkInteraction(),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.equal(response.data?.flags, 64);
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.description ?? "", /\/discord\/link\?token=raw-token-123/);
@@ -201,14 +214,24 @@ test("/owogg link tells an already-linked Discord user it's already linked, with
     },
   });
 
-  const response = await handleOwoggCommand(container, linkInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    linkInteraction(),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.equal(challengeCalls, 0, "must not mint a link token for an already-linked account");
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.description ?? "", /이미.*연동/);
 });
 
 test("/owogg profile prompts an unlinked Discord user to link first", async () => {
-  const response = await handleOwoggCommand(fakeContainer({}), profileInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    fakeContainer({}),
+    profileInteraction(),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.description ?? "", /owogg link/);
 });
@@ -236,7 +259,12 @@ test("/owogg profile shows nickname/level/XP for a linked Discord user", async (
     }),
   });
 
-  const response = await handleOwoggCommand(container, profileInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    profileInteraction(),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.title ?? "", /Taeyang/);
   const fieldsText = (embed?.fields ?? []).map((f) => `${f.name}:${f.value}`).join(" ");
@@ -251,7 +279,12 @@ test("unknown subcommand returns a safe ephemeral embed fallback", async () => {
     data: { name: "owogg", options: [{ name: "totally-made-up", type: 1 }] },
     member: { user: { id: "1", username: "x" } },
   };
-  const response = await handleOwoggCommand(fakeContainer({}), interaction, FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    fakeContainer({}),
+    interaction,
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.equal(response.data?.flags, 64);
   assert.ok(response.data?.embeds?.[0], "expected an embed response");
 });
@@ -261,6 +294,7 @@ test("/owogg play requires a guild channel", async () => {
     fakeContainer({}),
     guildInteraction("play", null),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   assert.equal(response.data?.flags, 64);
   assert.match(response.data?.embeds?.[0]?.description ?? "", /길드\) 채널/);
@@ -271,6 +305,7 @@ test("/owogg play returns an ephemeral embed with the play link on success", asy
     fakeContainer({}),
     guildInteraction("play"),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   assert.equal(response.data?.flags, 64);
   const embed = response.data?.embeds?.[0];
@@ -293,6 +328,7 @@ test("/owogg rank shows an encouragement embed when the user has no server XP ye
     fakeContainer({ findOAuthAccount: async () => linkedOAuthAccount }),
     guildInteraction("rank"),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.description ?? "", /아직 이 서버에 기여한 XP/);
@@ -303,7 +339,12 @@ test("/owogg rank shows nickname/XP/rank fields with the guild icon as thumbnail
     findOAuthAccount: async () => linkedOAuthAccount,
     getUserGuildRankSummary: async () => ({ totalXp: 250, rank: 3, nickname: "RankedPlayer" }),
   });
-  const response = await handleOwoggCommand(container, guildInteraction("rank"), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    guildInteraction("rank"),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   const embed = response.data?.embeds?.[0];
   assert.equal(embed?.thumbnail?.url, "https://cdn.discordapp.com/icons/g1/abc.png");
   const fieldsText = (embed?.fields ?? []).map((f) => `${f.name}:${f.value}`).join(" ");
@@ -326,6 +367,7 @@ test("/owogg leaderboard is a public (non-ephemeral) embed listing ranked entrie
     container,
     guildInteraction("leaderboard"),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   assert.equal(response.data?.flags, undefined);
   const embed = response.data?.embeds?.[0];
@@ -337,7 +379,12 @@ test("/owogg server shows a public embed with XP/participant fields", async () =
   const container = fakeContainer({
     getGuildSummary: async () => ({ totalXp: 1200, weeklyXp: 80, participantCount: 15 }),
   });
-  const response = await handleOwoggCommand(container, guildInteraction("server"), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    guildInteraction("server"),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.equal(response.data?.flags, undefined);
   const embed = response.data?.embeds?.[0];
   assert.equal(embed?.url, `${FRONTEND_URL}/discord/servers/test-guild`);
@@ -358,6 +405,7 @@ test("/owogg leaderboard escapes markdown in nicknames so a crafted nickname can
     container,
     guildInteraction("leaderboard"),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   const description = response.data?.embeds?.[0]?.description ?? "";
   // The brackets must be backslash-escaped so Discord's markdown parser renders them as
@@ -375,20 +423,35 @@ test("/owogg server and /owogg rank escape markdown in the Discord guild name", 
       registration_status: "ACTIVE",
     }),
   });
-  const response = await handleOwoggCommand(container, guildInteraction("server"), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    guildInteraction("server"),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   const title = response.data?.embeds?.[0]?.title ?? "";
   assert.match(title, /\\\[Click me\\\]\(https:\/\/evil\.example\)/);
 });
 
 test("guild-scoped commands reject an unregistered/inactive server", async () => {
   const container = fakeContainer({ getGuildByGuildId: async () => null });
-  const response = await handleOwoggCommand(container, guildInteraction("server"), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    guildInteraction("server"),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.equal(response.data?.flags, 64);
   assert.match(response.data?.embeds?.[0]?.description ?? "", /등록되지 않았거나/);
 });
 
 test("/owogg help lists every registered subcommand, publicly visible", async () => {
-  const response = await handleOwoggCommand(fakeContainer({}), helpInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    fakeContainer({}),
+    helpInteraction(),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.equal(response.data?.flags, undefined);
   const description = response.data?.embeds?.[0]?.description ?? "";
   for (const name of [
@@ -411,6 +474,7 @@ test("/owogg achievements prompts an unlinked Discord user to link first", async
     fakeContainer({}),
     achievementsInteraction(),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   assert.equal(response.data?.flags, 64);
   assert.match(response.data?.embeds?.[0]?.description ?? "", /owogg link/);
@@ -433,7 +497,12 @@ test("/owogg achievements shows unlocked (✅) vs locked (⬜) achievements with
       recentlyUnlocked: [{ achievementCode: "FIRST_PLAY", unlockedAt: "2026-01-02T00:00:00.000Z" }],
     }),
   });
-  const response = await handleOwoggCommand(container, achievementsInteraction(), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    achievementsInteraction(),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.title ?? "", /Achiever/);
   assert.match(embed?.description ?? "", /✅.*첫 게임 완료/);
@@ -446,7 +515,12 @@ test("/owogg rank and /owogg leaderboard default to all-time when no period opti
     findOAuthAccount: async () => linkedOAuthAccount,
     getUserGuildRankSummary: async () => ({ totalXp: 100, rank: 1, nickname: "Steady" }),
   });
-  const response = await handleOwoggCommand(container, guildInteraction("rank"), FRONTEND_URL);
+  const response = await handleOwoggCommand(
+    container,
+    guildInteraction("rank"),
+    FRONTEND_URL,
+    API_BASE_URL,
+  );
   assert.match(response.data?.embeds?.[0]?.title ?? "", /전체 기간/);
 });
 
@@ -459,6 +533,7 @@ test("/owogg rank shows weekly XP when period:weekly is passed", async () => {
     container,
     guildInteraction("rank", "guild-1", [{ name: "period", type: 3, value: "weekly" }]),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   assert.match(response.data?.embeds?.[0]?.title ?? "", /이번 주/);
 });
@@ -474,6 +549,7 @@ test("/owogg leaderboard shows weekly XP when period:weekly is passed", async ()
     container,
     guildInteraction("leaderboard", "guild-1", [{ name: "period", type: 3, value: "weekly" }]),
     FRONTEND_URL,
+    API_BASE_URL,
   );
   assert.match(response.data?.embeds?.[0]?.title ?? "", /이번 주/);
 });

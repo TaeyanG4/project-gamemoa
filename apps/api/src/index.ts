@@ -16,6 +16,7 @@ import { adminAccountsRouter } from "./routes/adminAccounts.js";
 import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { adminGamesRouter } from "./routes/adminGames.js";
 import { gamesRouter } from "./routes/games.js";
+import { renderRouter } from "./routes/render.js";
 import { createContainer } from "./container.js";
 import { getCreatorProviderAdapters } from "./infrastructure/creators/index.js";
 import { FEATURED_POLICY } from "@owogg/core";
@@ -111,6 +112,7 @@ app.route("/api/admin", adminAccountsRouter);
 app.route("/api/admin/creators", adminCreatorsRouter);
 app.route("/api/admin/games", adminGamesRouter);
 app.route("/api/games", gamesRouter);
+app.route("/api/render", renderRouter);
 
 // 404 Handler
 app.notFound((c) => {

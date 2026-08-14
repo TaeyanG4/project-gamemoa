@@ -89,7 +89,11 @@ discordRouter.post("/interactions", async (c) => {
 
     const container = createContainer(c.env.DB);
     const frontendUrl = c.env.FRONTEND_URL || "https://owogg.com";
-    const response = await handleOwoggCommand(container, interaction, frontendUrl);
+    // This route's own origin (api.owogg.com) — used to build the rendered rank-card image URL
+    // Discord embeds reference, separate from frontendUrl (owogg.com) which everything else here
+    // links to.
+    const apiBaseUrl = new URL(c.req.url).origin;
+    const response = await handleOwoggCommand(container, interaction, frontendUrl, apiBaseUrl);
     return c.json(response);
   }
 
