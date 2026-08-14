@@ -10,7 +10,7 @@ import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@owo
 
 import { levelForTotalXp } from "@owogg/core";
 
-import { gameManifests } from "../features/catalog/registry";
+import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
 import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 
@@ -26,6 +26,7 @@ type LeaderboardState = "loading" | "success" | "error";
 
 export default function Ranking() {
   const { dict } = useI18n();
+  const gameManifests = useEnabledGameManifests();
   const [mainTab, setMainTab] = useState<MainTab>("game");
 
   // Game Score Ranking state

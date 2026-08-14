@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, type ComponentType } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { loadGame, gameManifests } from "../features/catalog/registry";
+import { useIsGameDisabled } from "../features/catalog/gameAvailability";
 import {
   formatScore,
   type GameRuntimeContext,
@@ -80,6 +81,7 @@ export default function GamePlay() {
 
   const manifest = useMemo(() => gameManifests.find((m) => m.slug === slug), [slug]);
   const localizedTitle = manifest ? getLocalizedGameContent(dict, manifest).title : undefined;
+  const isDisabled = useIsGameDisabled(manifest?.id ?? slug);
 
   // Load Game Module
   useEffect(() => {
@@ -250,6 +252,25 @@ export default function GamePlay() {
       <div className="container mx-auto px-4 py-20 flex flex-col items-center justify-center flex-1 select-none">
         <AlertCircle className="w-16 h-16 text-accent-red mb-6" />
         <h2 className="text-2xl font-bold mb-4">{error}</h2>
+        <button
+          type="button"
+          onClick={() => void navigate("/games")}
+          className="px-6 py-3 bg-surface-raised border border-border rounded-lg hover:bg-surface-overlay transition-colors cursor-pointer"
+        >
+          {dict.gamePlay.backToList}
+        </button>
+      </div>
+    );
+  }
+
+  // Admin kill switch (see adminGames.ts) — blocks play even if the client already finished
+  // loading the game bundle before an admin disabled it mid-session.
+  if (isDisabled) {
+    return (
+      <div className="container mx-auto px-4 py-20 flex flex-col items-center justify-center flex-1 select-none text-center">
+        <AlertCircle className="w-16 h-16 text-accent-yellow mb-6" />
+        <h2 className="text-2xl font-bold mb-2">{dict.gamePlay.gameDisabledTitle}</h2>
+        <p className="mb-6 max-w-sm text-sm text-text-muted">{dict.gamePlay.gameDisabledBody}</p>
         <button
           type="button"
           onClick={() => void navigate("/games")}

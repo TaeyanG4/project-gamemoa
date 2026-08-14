@@ -708,3 +708,25 @@ export interface CreatorRepository {
     offset?: number;
   }): Promise<{ entries: CreatorRankEntry[]; total: number }>;
 }
+
+/** Live, DB-backed enable/disable override for a game — see migrations/0019_game_settings.sql. */
+export interface GameSettingRecord {
+  gameId: string;
+  enabled: boolean;
+  disabledReason: string | null;
+  updatedByAdminId: number | null;
+  updatedAt: string;
+}
+
+export interface GameSettingsRepository {
+  /** Only game_ids with an explicit `enabled = 0` row — used for the public availability check. */
+  getDisabledGameIds(): Promise<string[]>;
+  /** Every row that has ever been explicitly toggled (enabled or disabled) — used by the admin list. */
+  getAllOverrides(): Promise<GameSettingRecord[]>;
+  setEnabled(
+    gameId: string,
+    enabled: boolean,
+    reason: string | null,
+    adminId: number,
+  ): Promise<GameSettingRecord>;
+}

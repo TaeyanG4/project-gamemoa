@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { Gamepad2, Search } from "lucide-react";
-import { gameManifests } from "../features/catalog/registry";
+import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
 import { GameGrid } from "../components/ui/GameGrid";
 import { GridColumnSwitcher } from "../components/ui/GridColumnSwitcher";
 import { CategoryChips } from "../components/ui/CategoryChips";
@@ -25,6 +25,7 @@ export default function Games() {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
+  const gameManifests = useEnabledGameManifests();
 
   const { favoriteGameIds } = usePersonalization();
   const { isAuthenticated, openLoginModal } = useAuth();

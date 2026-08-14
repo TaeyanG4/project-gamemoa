@@ -11,6 +11,8 @@ import {
   AdminAccountListResponseSchema,
   AdminAccountCreateRequestSchema,
   AdminAccountAuditListResponseSchema,
+  AdminGameListResponseSchema,
+  AdminGameToggleResponseSchema,
   type AdminAccountRoleValue,
   type AdminAccountStatusValue,
 } from "@owogg/contracts";
@@ -128,5 +130,16 @@ export function postResetAdminAccountPassword(id: number, newPassword: string) {
 export function postRevokeAdminAccountSessions(id: number) {
   return apiFetch(`/api/admin/accounts/${id}/revoke-sessions`, AdminSuccessResponseSchema, {
     method: "POST",
+  });
+}
+
+export function fetchAdminGames() {
+  return apiFetch("/api/admin/games", AdminGameListResponseSchema);
+}
+
+export function postToggleAdminGame(gameId: string, enabled: boolean, reason: string | null) {
+  return apiFetch(`/api/admin/games/${gameId}/toggle`, AdminGameToggleResponseSchema, {
+    method: "POST",
+    body: JSON.stringify({ enabled, reason }),
   });
 }

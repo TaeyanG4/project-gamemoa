@@ -916,6 +916,8 @@ export interface Dictionary {
    * result overlay, and the result-metadata key labels like WPM/CPM shown per game). */
   gamePlay: {
     errorGameNotFound: string;
+    gameDisabledTitle: string;
+    gameDisabledBody: string;
     errorLoadFailed: string;
     errorSubmitFailed: string;
     errorNetworkSubmitFailed: string;
@@ -2117,6 +2119,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     gamePlay: {
       errorGameNotFound: "게임을 찾을 수 없습니다.",
+      gameDisabledTitle: "현재 이용할 수 없는 게임입니다",
+      gameDisabledBody: "운영자가 일시적으로 비활성화했습니다. 잠시 후 다시 확인해주세요.",
       errorLoadFailed: "게임을 불러오는 중 오류가 발생했습니다.",
       errorSubmitFailed: "점수 저장에 실패했습니다.",
       errorNetworkSubmitFailed: "네트워크 오류로 점수를 저장하지 못했습니다.",
@@ -3318,6 +3322,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     gamePlay: {
       errorGameNotFound: "Game not found.",
+      gameDisabledTitle: "This game is currently unavailable",
+      gameDisabledBody: "It's been temporarily disabled by an operator. Please check back later.",
       errorLoadFailed: "An error occurred while loading the game.",
       errorSubmitFailed: "Failed to save your score.",
       errorNetworkSubmitFailed: "A network error prevented your score from being saved.",
@@ -4518,6 +4524,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     gamePlay: {
       errorGameNotFound: "ゲームが見つかりません。",
+      gameDisabledTitle: "現在利用できないゲームです",
+      gameDisabledBody:
+        "運営者により一時的に無効化されています。しばらくしてから再度お試しください。",
       errorLoadFailed: "ゲームの読み込み中にエラーが発生しました。",
       errorSubmitFailed: "スコアの保存に失敗しました。",
       errorNetworkSubmitFailed: "ネットワークエラーによりスコアを保存できませんでした。",
@@ -5665,6 +5674,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     gamePlay: {
       errorGameNotFound: "未找到该游戏。",
+      gameDisabledTitle: "该游戏目前不可用",
+      gameDisabledBody: "运营者已暂时禁用该游戏，请稍后再试。",
       errorLoadFailed: "加载游戏时发生错误。",
       errorSubmitFailed: "保存分数失败。",
       errorNetworkSubmitFailed: "由于网络错误，分数未能保存。",

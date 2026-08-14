@@ -45,6 +45,17 @@ scoresRouter.post("/", async (c) => {
 
     const { gameId, score } = parseResult.data;
 
+    // Admin kill switch (see adminGames.ts) — checked here, not just filtered from the catalog,
+    // so a disabled game can't be scored via a direct API call even if a client still has the
+    // gameplay screen open from before it was disabled.
+    const disabledGameIds = await container.gameSettingsUseCases.getDisabledGameIds();
+    if (disabledGameIds.includes(gameId)) {
+      return c.json(
+        { error: { code: "GAME_DISABLED", message: "현재 비활성화된 게임입니다." } },
+        400,
+      );
+    }
+
     // Server identity strictly from session user
     const userId = authData.user.id;
     const nickname = authData.user.nickname;

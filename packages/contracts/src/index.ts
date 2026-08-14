@@ -12,4 +12,5 @@ export * from "./discordGuild.js";
 export * from "./creator.js";
 export * from "./creatorAdmin.js";
 export * from "./admin.js";
+export * from "./gameSettings.js";
 export * from "./i18n.js";

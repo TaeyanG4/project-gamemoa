@@ -10,6 +10,7 @@ export default [
   route("users/:id", "routes/userProfile.tsx"),
   route("admin", "routes/admin.tsx"),
   route("admin/creators", "routes/adminCreators.tsx"),
+  route("admin/games", "routes/adminGames.tsx"),
   route("admin/accounts", "routes/adminAccounts.tsx"),
   route("admin/settings/security", "routes/adminSettingsSecurity.tsx"),
   route("discord", "routes/discordHub.tsx"),

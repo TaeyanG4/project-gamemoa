@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Gamepad2, Sparkles, Clock, Bookmark, TrendingUp } from "lucide-react";
-import { gameManifests } from "../features/catalog/registry";
+import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
 import { GameGrid } from "../components/ui/GameGrid";
 import { GridColumnSwitcher } from "../components/ui/GridColumnSwitcher";
 import { CategoryChips } from "../components/ui/CategoryChips";
@@ -21,6 +21,7 @@ export default function Home() {
   const initialCategory = searchParams.get("category") || "all";
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
+  const gameManifests = useEnabledGameManifests();
 
   const { favoriteGameIds, recentPlays } = usePersonalization();
   const { dict } = useI18n();

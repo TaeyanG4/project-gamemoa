@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Clock3,
   ExternalLink,
+  Gamepad2,
   Loader2,
   LogOut,
   Server,
@@ -699,6 +700,12 @@ function AdminDashboard({
           className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
         >
           <Users className="h-3.5 w-3.5" /> Creator 심사
+        </Link>
+        <Link
+          to="/admin/games"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+        >
+          <Gamepad2 className="h-3.5 w-3.5" /> 게임 관리
         </Link>
         {role === "SUPERADMIN" && (
           <Link

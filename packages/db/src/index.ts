@@ -11,3 +11,4 @@ export * from "./d1/D1CreatorRepository.js";
 export * from "./d1/D1CreatorReviewRepository.js";
 export * from "./d1/D1AdminAuthRepository.js";
 export * from "./d1/D1AdminAccountRepository.js";
+export * from "./d1/D1GameSettingsRepository.js";
