@@ -16,22 +16,23 @@ import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
 import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import type { Dictionary } from "../features/i18n/dictionary";
 import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck } from "lucide-react";
 
 type SubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
 
-function formatMetadataKey(key: string): string {
+function formatMetadataKey(key: string, dict: Dictionary["gamePlay"]): string {
   const map: Record<string, string> = {
-    wpm: "속도 (WPM)",
-    cpm: "타수 (CPM)",
-    accuracy: "정확도",
-    correctChars: "정타",
-    incorrectChars: "오타",
-    totalTypedChars: "총 입력 타수",
-    durationMs: "소요 시간 (ms)",
-    targetsHit: "적중 타겟",
-    misses: "실패 타겟",
-    level: "달성 레벨",
+    wpm: dict.metadataWpm,
+    cpm: dict.metadataCpm,
+    accuracy: dict.metadataAccuracy,
+    correctChars: dict.metadataCorrectChars,
+    incorrectChars: dict.metadataIncorrectChars,
+    totalTypedChars: dict.metadataTotalTypedChars,
+    durationMs: dict.metadataDurationMs,
+    targetsHit: dict.metadataTargetsHit,
+    misses: dict.metadataMisses,
+    level: dict.metadataLevel,
   };
   return map[key] ?? key;
 }
@@ -79,14 +80,14 @@ export default function GamePlay() {
         if (!isMounted) return;
 
         if (!module) {
-          setError("게임을 찾을 수 없습니다.");
+          setError(dict.gamePlay.errorGameNotFound);
         } else {
           setGameComponent(() => module.Game);
         }
       } catch (err) {
         if (isMounted) {
           console.error("Failed to load game:", err);
-          setError("게임을 불러오는 중 오류가 발생했습니다.");
+          setError(dict.gamePlay.errorLoadFailed);
         }
       } finally {
         if (isMounted) {
@@ -100,7 +101,10 @@ export default function GamePlay() {
     return () => {
       isMounted = false;
     };
-  }, [slug]);
+    // loadGame() dynamic-imports the module, which the bundler caches per specifier — re-running
+    // this on a locale switch is just a cache hit, not a real re-fetch, so it's safe to depend on
+    // these two dict strings the same way exhaustive-deps wants.
+  }, [slug, dict.gamePlay.errorGameNotFound, dict.gamePlay.errorLoadFailed]);
 
   // Handle Score Submission (Authenticated Attempts Only)
   const handleScoreSubmission = useCallback(
@@ -120,14 +124,14 @@ export default function GamePlay() {
           setSubmissionState("success");
         } else {
           setSubmissionState("error");
-          setSubmissionError("점수 저장에 실패했습니다.");
+          setSubmissionError(dict.gamePlay.errorSubmitFailed);
         }
       } catch {
         setSubmissionState("error");
-        setSubmissionError("네트워크 오류로 점수를 저장하지 못했습니다.");
+        setSubmissionError(dict.gamePlay.errorNetworkSubmitFailed);
       }
     },
-    [slug],
+    [slug, dict.gamePlay.errorSubmitFailed, dict.gamePlay.errorNetworkSubmitFailed],
   );
 
   // Reset / Retry Game Attempt
@@ -190,7 +194,7 @@ export default function GamePlay() {
           onClick={() => void navigate("/games")}
           className="px-6 py-3 bg-surface-raised border border-border rounded-lg hover:bg-surface-overlay transition-colors cursor-pointer"
         >
-          목록으로 돌아가기
+          {dict.gamePlay.backToList}
         </button>
       </div>
     );
@@ -210,7 +214,7 @@ export default function GamePlay() {
             className="p-2 -ml-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors cursor-pointer flex items-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />
-            <span className="text-sm font-medium hidden sm:inline">돌아가기</span>
+            <span className="text-sm font-medium hidden sm:inline">{dict.gamePlay.back}</span>
           </button>
 
           <div className="h-4 w-px bg-border hidden sm:block" />
@@ -220,7 +224,7 @@ export default function GamePlay() {
               className="w-6 h-6 rounded-md"
               style={{ backgroundColor: manifest?.accent ?? "#6366f1" }}
             />
-            <span className="font-bold">{localizedTitle ?? "게임 로딩중..."}</span>
+            <span className="font-bold">{localizedTitle ?? dict.gamePlay.loadingTitle}</span>
           </div>
         </div>
       </div>
@@ -230,22 +234,24 @@ export default function GamePlay() {
         {isLoading ? (
           <div className="flex flex-col items-center gap-4">
             <div className="w-10 h-10 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />
-            <p className="text-text-secondary font-medium animate-pulse">게임을 불러오는 중...</p>
+            <p className="text-text-secondary font-medium animate-pulse">
+              {dict.gamePlay.loadingBody}
+            </p>
           </div>
         ) : isAuthBlocked ? (
           <div className="w-full max-w-md bg-surface-raised rounded-3xl border border-border p-8 text-center shadow-2xl flex flex-col items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-brand/10 text-brand flex items-center justify-center">
               <UserCheck className="w-7 h-7" />
             </div>
-            <h3 className="text-2xl font-black text-text-primary">로그인이 필요한 게임입니다</h3>
-            <p className="text-sm text-text-secondary">
-              이 미니게임은 계정 로그인 후 플레이 및 랭킹 등록이 가능합니다.
-            </p>
+            <h3 className="text-2xl font-black text-text-primary">
+              {dict.gamePlay.authRequiredTitle}
+            </h3>
+            <p className="text-sm text-text-secondary">{dict.gamePlay.authRequiredBody}</p>
             <button
               onClick={openLoginModal}
               className="w-full py-3 bg-brand text-white font-extrabold rounded-2xl shadow-lg shadow-brand/30 hover:scale-105 transition-all cursor-pointer mt-2"
             >
-              로그인하고 플레이하기
+              {dict.gamePlay.authRequiredCta}
             </button>
           </div>
         ) : GameComponent ? (
@@ -253,10 +259,14 @@ export default function GamePlay() {
             {/* Game Result & Score Submission Overlay */}
             {result ? (
               <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center">
-                <h3 className="text-3xl font-extrabold mb-2 text-white">게임 종료!</h3>
+                <h3 className="text-3xl font-extrabold mb-2 text-white">
+                  {dict.gamePlay.resultTitle}
+                </h3>
                 <div className="mb-6 p-6 bg-surface-raised rounded-2xl border border-border w-full max-w-md">
                   <p className="text-text-secondary text-sm mb-1">
-                    {rankingEligible ? "최종 점수" : "기기 최고 기록"}
+                    {rankingEligible
+                      ? dict.gamePlay.finalScoreLabel
+                      : dict.gamePlay.deviceBestLabel}
                   </p>
                   <p className="text-5xl font-black text-brand mb-4">
                     {formatScore(result.score, manifest?.scoreConfig)}
@@ -271,7 +281,7 @@ export default function GamePlay() {
                           className="bg-surface/50 p-2.5 rounded-xl border border-border/40"
                         >
                           <p className="text-xs text-text-muted font-bold mb-0.5">
-                            {formatMetadataKey(key)}
+                            {formatMetadataKey(key, dict.gamePlay)}
                           </p>
                           <p className="font-extrabold text-text-primary text-sm">
                             {formatMetadataValue(key, value)}
@@ -286,44 +296,44 @@ export default function GamePlay() {
                     {submissionState === "guest" && (
                       <div className="flex flex-col items-center gap-1.5">
                         <span className="text-xs font-bold text-text-secondary">
-                          게스트 기록은 이 기기에만 저장됩니다.
+                          {dict.gamePlay.guestNoticeTitle}
                         </span>
                         <span className="text-[11px] text-text-muted">
-                          로그인하면 다음 플레이부터 랭킹에 참여할 수 있습니다.
+                          {dict.gamePlay.guestNoticeBody}
                         </span>
                         <button
                           type="button"
                           onClick={openLoginModal}
                           className="mt-1 px-4 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-extrabold rounded-xl transition-colors cursor-pointer"
                         >
-                          로그인
+                          {dict.gamePlay.guestLoginCta}
                         </button>
                       </div>
                     )}
                     {submissionState === "submitting" && (
                       <span className="inline-flex items-center gap-2 text-xs font-bold text-brand animate-pulse">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        랭킹에 점수 등록 중...
+                        {dict.gamePlay.submittingLabel}
                       </span>
                     )}
                     {submissionState === "success" && (
                       <span className="inline-flex items-center gap-2 text-xs font-bold text-emerald-400">
                         <CheckCircle2 className="w-4 h-4" />
-                        기록이 랭킹에 등록되었습니다!
+                        {dict.gamePlay.successLabel}
                       </span>
                     )}
                     {submissionState === "error" && (
                       <div className="flex flex-col items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400">
                           <AlertCircle className="w-4 h-4" />
-                          {submissionError || "기록 저장 실패"}
+                          {submissionError || dict.gamePlay.errorSubmitFallback}
                         </span>
                         <button
                           type="button"
                           onClick={() => void handleScoreSubmission(result.score)}
                           className="px-3 py-1 bg-surface border border-border hover:bg-surface-overlay text-text-primary text-xs font-bold rounded-lg transition-colors cursor-pointer"
                         >
-                          점수 다시 제출
+                          {dict.gamePlay.retrySubmitCta}
                         </button>
                       </div>
                     )}
@@ -336,14 +346,14 @@ export default function GamePlay() {
                     onClick={handleRetryGame}
                     className="px-8 py-3 bg-brand text-white rounded-xl font-extrabold hover:bg-brand-light shadow-lg shadow-brand/25 transition-all cursor-pointer"
                   >
-                    🔄 다시 하기
+                    {dict.gamePlay.retryGameCta}
                   </button>
                   <button
                     type="button"
                     onClick={() => void navigate("/games")}
                     className="px-8 py-3 bg-surface text-text-primary border border-border rounded-xl font-extrabold hover:bg-surface-raised transition-colors cursor-pointer"
                   >
-                    목록으로
+                    {dict.gamePlay.backToListResult}
                   </button>
                 </div>
               </div>

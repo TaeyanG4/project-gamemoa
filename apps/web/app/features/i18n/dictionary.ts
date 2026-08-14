@@ -892,6 +892,43 @@ export interface Dictionary {
       tags: string[];
     }
   >;
+  /** /games/:slug — the actual gameplay screen (header chrome, loading/error states, auth gate,
+   * result overlay, and the result-metadata key labels like WPM/CPM shown per game). */
+  gamePlay: {
+    errorGameNotFound: string;
+    errorLoadFailed: string;
+    errorSubmitFailed: string;
+    errorNetworkSubmitFailed: string;
+    errorSubmitFallback: string;
+    backToList: string;
+    back: string;
+    loadingTitle: string;
+    loadingBody: string;
+    authRequiredTitle: string;
+    authRequiredBody: string;
+    authRequiredCta: string;
+    resultTitle: string;
+    finalScoreLabel: string;
+    deviceBestLabel: string;
+    metadataWpm: string;
+    metadataCpm: string;
+    metadataAccuracy: string;
+    metadataCorrectChars: string;
+    metadataIncorrectChars: string;
+    metadataTotalTypedChars: string;
+    metadataDurationMs: string;
+    metadataTargetsHit: string;
+    metadataMisses: string;
+    metadataLevel: string;
+    guestNoticeTitle: string;
+    guestNoticeBody: string;
+    guestLoginCta: string;
+    submittingLabel: string;
+    successLabel: string;
+    retrySubmitCta: string;
+    retryGameCta: string;
+    backToListResult: string;
+  };
   platformIcon: {
     chzzkLabel: string;
     soopLabel: string;
@@ -1977,6 +2014,41 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "영문 단어를 입력하며 자신의 타자 속도(WPM)와 분당 타수(CPM), 정확도를 측정해보세요. 정교한 타자 타이핑 실력에 도전하세요.",
         tags: ["타자", "WPM", "속도", "순발력", "두뇌"],
       },
+    },
+    gamePlay: {
+      errorGameNotFound: "게임을 찾을 수 없습니다.",
+      errorLoadFailed: "게임을 불러오는 중 오류가 발생했습니다.",
+      errorSubmitFailed: "점수 저장에 실패했습니다.",
+      errorNetworkSubmitFailed: "네트워크 오류로 점수를 저장하지 못했습니다.",
+      errorSubmitFallback: "기록 저장 실패",
+      backToList: "목록으로 돌아가기",
+      back: "돌아가기",
+      loadingTitle: "게임 로딩중...",
+      loadingBody: "게임을 불러오는 중...",
+      authRequiredTitle: "로그인이 필요한 게임입니다",
+      authRequiredBody: "이 미니게임은 계정 로그인 후 플레이 및 랭킹 등록이 가능합니다.",
+      authRequiredCta: "로그인하고 플레이하기",
+      resultTitle: "게임 종료!",
+      finalScoreLabel: "최종 점수",
+      deviceBestLabel: "기기 최고 기록",
+      metadataWpm: "속도 (WPM)",
+      metadataCpm: "타수 (CPM)",
+      metadataAccuracy: "정확도",
+      metadataCorrectChars: "정타",
+      metadataIncorrectChars: "오타",
+      metadataTotalTypedChars: "총 입력 타수",
+      metadataDurationMs: "소요 시간 (ms)",
+      metadataTargetsHit: "적중 타겟",
+      metadataMisses: "실패 타겟",
+      metadataLevel: "달성 레벨",
+      guestNoticeTitle: "게스트 기록은 이 기기에만 저장됩니다.",
+      guestNoticeBody: "로그인하면 다음 플레이부터 랭킹에 참여할 수 있습니다.",
+      guestLoginCta: "로그인",
+      submittingLabel: "랭킹에 점수 등록 중...",
+      successLabel: "기록이 랭킹에 등록되었습니다!",
+      retrySubmitCta: "점수 다시 제출",
+      retryGameCta: "🔄 다시 하기",
+      backToListResult: "목록으로",
     },
     platformIcon: {
       chzzkLabel: "CHZZK (치지직)",
@@ -3081,6 +3153,42 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         tags: ["Typing", "WPM", "Speed", "Reaction", "Brain"],
       },
     },
+    gamePlay: {
+      errorGameNotFound: "Game not found.",
+      errorLoadFailed: "An error occurred while loading the game.",
+      errorSubmitFailed: "Failed to save your score.",
+      errorNetworkSubmitFailed: "A network error prevented your score from being saved.",
+      errorSubmitFallback: "Failed to save record",
+      backToList: "Back to list",
+      back: "Back",
+      loadingTitle: "Loading game...",
+      loadingBody: "Loading the game...",
+      authRequiredTitle: "Sign-in required for this game",
+      authRequiredBody:
+        "Sign in to play this mini-game and register your score on the leaderboard.",
+      authRequiredCta: "Sign in and play",
+      resultTitle: "Game Over!",
+      finalScoreLabel: "Final score",
+      deviceBestLabel: "Device best record",
+      metadataWpm: "Speed (WPM)",
+      metadataCpm: "Keystrokes (CPM)",
+      metadataAccuracy: "Accuracy",
+      metadataCorrectChars: "Correct",
+      metadataIncorrectChars: "Incorrect",
+      metadataTotalTypedChars: "Total typed",
+      metadataDurationMs: "Duration (ms)",
+      metadataTargetsHit: "Targets hit",
+      metadataMisses: "Misses",
+      metadataLevel: "Level reached",
+      guestNoticeTitle: "Guest records are saved only on this device.",
+      guestNoticeBody: "Sign in to join the leaderboard starting with your next play.",
+      guestLoginCta: "Sign in",
+      submittingLabel: "Submitting score to leaderboard...",
+      successLabel: "Your record has been added to the leaderboard!",
+      retrySubmitCta: "Resubmit score",
+      retryGameCta: "🔄 Play again",
+      backToListResult: "Back to list",
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -4182,6 +4290,42 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         tags: ["タイピング", "WPM", "速度", "反射神経", "頭脳"],
       },
     },
+    gamePlay: {
+      errorGameNotFound: "ゲームが見つかりません。",
+      errorLoadFailed: "ゲームの読み込み中にエラーが発生しました。",
+      errorSubmitFailed: "スコアの保存に失敗しました。",
+      errorNetworkSubmitFailed: "ネットワークエラーによりスコアを保存できませんでした。",
+      errorSubmitFallback: "記録の保存に失敗しました",
+      backToList: "リストに戻る",
+      back: "戻る",
+      loadingTitle: "ゲームを読み込み中...",
+      loadingBody: "ゲームを読み込んでいます...",
+      authRequiredTitle: "ログインが必要なゲームです",
+      authRequiredBody:
+        "このミニゲームはアカウントにログイン後、プレイとランキング登録が可能です。",
+      authRequiredCta: "ログインしてプレイする",
+      resultTitle: "ゲーム終了！",
+      finalScoreLabel: "最終スコア",
+      deviceBestLabel: "端末のベスト記録",
+      metadataWpm: "速度（WPM）",
+      metadataCpm: "打鍵数（CPM）",
+      metadataAccuracy: "正確性",
+      metadataCorrectChars: "正打数",
+      metadataIncorrectChars: "誤打数",
+      metadataTotalTypedChars: "総入力数",
+      metadataDurationMs: "所要時間（ms）",
+      metadataTargetsHit: "命中ターゲット",
+      metadataMisses: "失敗ターゲット",
+      metadataLevel: "到達レベル",
+      guestNoticeTitle: "ゲストの記録はこの端末にのみ保存されます。",
+      guestNoticeBody: "ログインすると、次回のプレイからランキングに参加できます。",
+      guestLoginCta: "ログイン",
+      submittingLabel: "ランキングにスコアを登録中...",
+      successLabel: "記録がランキングに登録されました！",
+      retrySubmitCta: "スコアを再送信",
+      retryGameCta: "🔄 もう一度プレイ",
+      backToListResult: "リストに戻る",
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -5229,6 +5373,41 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "通过输入英文单词来测试自己的打字速度（WPM）、每分钟击键数（CPM）和准确度。挑战您精湛的打字技巧。",
         tags: ["打字", "WPM", "速度", "反应力", "益智"],
       },
+    },
+    gamePlay: {
+      errorGameNotFound: "未找到该游戏。",
+      errorLoadFailed: "加载游戏时发生错误。",
+      errorSubmitFailed: "保存分数失败。",
+      errorNetworkSubmitFailed: "由于网络错误，分数未能保存。",
+      errorSubmitFallback: "记录保存失败",
+      backToList: "返回列表",
+      back: "返回",
+      loadingTitle: "游戏加载中...",
+      loadingBody: "正在加载游戏...",
+      authRequiredTitle: "此游戏需要登录",
+      authRequiredBody: "登录账号后即可游玩此小游戏并登记排行榜。",
+      authRequiredCta: "登录并开始游戏",
+      resultTitle: "游戏结束！",
+      finalScoreLabel: "最终得分",
+      deviceBestLabel: "本机最佳记录",
+      metadataWpm: "速度（WPM）",
+      metadataCpm: "击键数（CPM）",
+      metadataAccuracy: "准确度",
+      metadataCorrectChars: "正确",
+      metadataIncorrectChars: "错误",
+      metadataTotalTypedChars: "总输入数",
+      metadataDurationMs: "用时（ms）",
+      metadataTargetsHit: "命中目标",
+      metadataMisses: "未命中",
+      metadataLevel: "达到等级",
+      guestNoticeTitle: "访客记录仅保存在本设备。",
+      guestNoticeBody: "登录后，从下一次游玩开始即可参与排行榜。",
+      guestLoginCta: "登录",
+      submittingLabel: "正在提交分数到排行榜...",
+      successLabel: "记录已登记到排行榜！",
+      retrySubmitCta: "重新提交分数",
+      retryGameCta: "🔄 再玩一次",
+      backToListResult: "返回列表",
     },
     platformIcon: {
       chzzkLabel: "CHZZK",
