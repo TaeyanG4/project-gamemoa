@@ -14,6 +14,10 @@ export interface User {
   country_updated_at?: string | null;
   /** Saved UI locale preference (one of SUPPORTED_LOCALES), or null if never set. */
   locale?: string | null;
+  /** Consecutive UTC-day activity streak — see domain/streak.ts. Defaults to 0/0/null for brand-new users. */
+  current_streak?: number;
+  longest_streak?: number;
+  last_active_date?: string | null;
 }
 
 export interface OAuthAccount {

@@ -38,6 +38,9 @@ export class D1UserRepository implements UserRepository {
       nickname_updated_at: row.nickname_updated_at ? String(row.nickname_updated_at) : null,
       country_updated_at: row.country_updated_at ? String(row.country_updated_at) : null,
       locale: row.locale ? String(row.locale) : null,
+      current_streak: Number(row.current_streak ?? 0),
+      longest_streak: Number(row.longest_streak ?? 0),
+      last_active_date: row.last_active_date ? String(row.last_active_date) : null,
     };
   }
 
@@ -70,6 +73,9 @@ export class D1UserRepository implements UserRepository {
         : null,
       country_updated_at: oauthRow.country_updated_at ? String(oauthRow.country_updated_at) : null,
       locale: oauthRow.locale ? String(oauthRow.locale) : null,
+      current_streak: Number(oauthRow.current_streak ?? 0),
+      longest_streak: Number(oauthRow.longest_streak ?? 0),
+      last_active_date: oauthRow.last_active_date ? String(oauthRow.last_active_date) : null,
     };
   }
 
@@ -144,6 +150,9 @@ export class D1UserRepository implements UserRepository {
       nickname_updated_at: null,
       country_updated_at: null,
       locale: null,
+      current_streak: 0,
+      longest_streak: 0,
+      last_active_date: null,
     };
   }
 

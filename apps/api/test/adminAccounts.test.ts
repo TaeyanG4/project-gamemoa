@@ -100,6 +100,9 @@ CREATE TABLE users (
   nickname_updated_at TEXT,
   country_updated_at TEXT,
   locale TEXT,
+  current_streak INTEGER NOT NULL DEFAULT 0,
+  longest_streak INTEGER NOT NULL DEFAULT 0,
+  last_active_date TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );

@@ -390,19 +390,41 @@ export default function Ranking() {
                                 )}
                               </td>
 
-                              <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
-                                  {record.avatarUrl ? (
-                                    <img
-                                      src={record.avatarUrl}
-                                      alt={record.playerName}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    record.playerName.slice(0, 2)
-                                  )}
-                                </div>
-                                <span>{record.playerName}</span>
+                              <td className="py-4 px-6 font-bold text-text-primary">
+                                {record.userId !== null && record.userId !== undefined ? (
+                                  <Link
+                                    to={`/users/${record.userId}`}
+                                    className="flex w-fit items-center gap-2 hover:underline"
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
+                                      {record.avatarUrl ? (
+                                        <img
+                                          src={record.avatarUrl}
+                                          alt={record.playerName}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        record.playerName.slice(0, 2)
+                                      )}
+                                    </div>
+                                    <span>{record.playerName}</span>
+                                  </Link>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
+                                      {record.avatarUrl ? (
+                                        <img
+                                          src={record.avatarUrl}
+                                          alt={record.playerName}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      ) : (
+                                        record.playerName.slice(0, 2)
+                                      )}
+                                    </div>
+                                    <span>{record.playerName}</span>
+                                  </div>
+                                )}
                               </td>
 
                               <td className="py-4 px-6 text-text-secondary whitespace-nowrap">
@@ -459,19 +481,24 @@ export default function Ranking() {
                                 )}
                               </td>
 
-                              <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
-                                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs overflow-hidden">
-                                  {record.avatarUrl ? (
-                                    <img
-                                      src={record.avatarUrl}
-                                      alt={record.nickname}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    record.nickname.slice(0, 2)
-                                  )}
-                                </div>
-                                <span>{record.nickname}</span>
+                              <td className="py-4 px-6 font-bold text-text-primary">
+                                <Link
+                                  to={`/users/${record.userId}`}
+                                  className="flex w-fit items-center gap-2 hover:underline"
+                                >
+                                  <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs overflow-hidden">
+                                    {record.avatarUrl ? (
+                                      <img
+                                        src={record.avatarUrl}
+                                        alt={record.nickname}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    ) : (
+                                      record.nickname.slice(0, 2)
+                                    )}
+                                  </div>
+                                  <span>{record.nickname}</span>
+                                </Link>
                               </td>
 
                               <td className="py-4 px-6 whitespace-nowrap">

@@ -168,3 +168,69 @@ export async function evaluateAchievementsForUser(
     playedGameIds: Object.keys(bests),
   });
 }
+
+/**
+ * Aggregates the public-safe subset of a user's data for the public profile page
+ * (GET /api/profile/public/:userId, no auth). Deliberately narrower than everything
+ * evaluateAchievementsForUser/the private /profile page can see — never includes email,
+ * linked-provider list, or unverified/pending creator platform attempts.
+ */
+export async function getPublicProfileData(
+  container: AppContainer,
+  userId: number,
+): Promise<{
+  id: number;
+  nickname: string;
+  avatarUrl: string | null;
+  country: string | null;
+  joinedAt: string;
+  progression: import("@owogg/core").ProgressionSummary;
+  globalRank: number | null;
+  currentStreak: number;
+  longestStreak: number;
+  unlockedAchievementCodes: string[];
+  totalAchievements: number;
+  gameBests: Array<{ gameId: string; score: number; formattedScore: string }>;
+  creatorBadges: Array<{
+    platform: string;
+    channelName: string;
+    channelUrl: string;
+    channelHandle: string | null;
+  }>;
+} | null> {
+  const user = await container.userRepo.findById(userId);
+  if (!user) return null;
+
+  const [progress, globalRank, achievements, gameBests, creatorProfile] = await Promise.all([
+    container.progressionUseCases.getProgressionSummary(userId),
+    container.progressionUseCases.getGlobalXpRank(userId),
+    container.achievementUseCases.getSummary(userId),
+    container.scoreUseCases.getUserBestsFormatted(userId),
+    container.creatorUseCases.getCreatorProfileByUserId(userId),
+  ]);
+
+  const creatorBadges = (creatorProfile?.platformAccounts ?? [])
+    .filter((a) => a.verificationStatus === "VERIFIED")
+    .map((a) => ({
+      platform: a.platform,
+      channelName: a.channelName,
+      channelUrl: a.channelUrl,
+      channelHandle: a.channelHandle,
+    }));
+
+  return {
+    id: user.id,
+    nickname: user.nickname,
+    avatarUrl: user.avatar_url,
+    country: user.country ?? null,
+    joinedAt: user.created_at,
+    progression: progress.summary,
+    globalRank,
+    currentStreak: user.current_streak ?? 0,
+    longestStreak: user.longest_streak ?? 0,
+    unlockedAchievementCodes: achievements.unlockedCodes,
+    totalAchievements: achievements.totalAchievements,
+    gameBests,
+    creatorBadges,
+  };
+}

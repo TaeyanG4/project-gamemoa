@@ -17,6 +17,40 @@ export function meta() {
 
 type LeaderboardState = "loading" | "success" | "error";
 
+/** Avatar + nickname, linking to the player's public profile when the score is tied to a
+ * real account (guest scores have no userId, and stay plain text). */
+function PlayerCell({ record }: { record: LeaderRecord }) {
+  const avatar = (
+    <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-brand/20 text-xs font-black text-brand">
+      {record.avatarUrl ? (
+        <img
+          src={record.avatarUrl}
+          alt={record.playerName}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        record.playerName.slice(0, 2)
+      )}
+    </div>
+  );
+
+  if (record.userId === null || record.userId === undefined) {
+    return (
+      <div className="flex items-center gap-2">
+        {avatar}
+        <span>{record.playerName}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Link to={`/users/${record.userId}`} className="flex w-fit items-center gap-2 hover:underline">
+      {avatar}
+      <span>{record.playerName}</span>
+    </Link>
+  );
+}
+
 /** Per-game ranking page — osu!-style: ranking recorded per game (like per-beatmap leaderboards)
  * rather than only living inside the single combined /ranking page's game filter. Games with
  * manifest.supportsLeaderboard === false skip this entirely (casual games where rank isn't
@@ -168,19 +202,8 @@ export default function GameRankingRoute() {
                             <span className="px-3 font-bold text-text-muted">#{rank}</span>
                           )}
                         </td>
-                        <td className="flex items-center gap-2 px-6 py-4 font-bold text-text-primary">
-                          <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-brand/20 text-xs font-black text-brand">
-                            {record.avatarUrl ? (
-                              <img
-                                src={record.avatarUrl}
-                                alt={record.playerName}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              record.playerName.slice(0, 2)
-                            )}
-                          </div>
-                          <span>{record.playerName}</span>
+                        <td className="px-6 py-4 font-bold text-text-primary">
+                          <PlayerCell record={record} />
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-base font-black text-brand-light">
                           {record.formattedScore}

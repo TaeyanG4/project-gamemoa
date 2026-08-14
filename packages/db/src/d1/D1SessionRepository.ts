@@ -1,4 +1,5 @@
 import type { Session, SessionRepository, User } from "@owogg/core";
+import { nextStreakState, todayUtcDateString } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 export async function hashSessionToken(token: string): Promise<string> {
@@ -17,7 +18,8 @@ export class D1SessionRepository implements SessionRepository {
       .prepare(
         `SELECT s.id as session_id, s.user_id, s.created_at as session_created_at, s.expires_at,
                 u.id as user_id, u.nickname, u.email, u.avatar_url, u.created_at as user_created_at, u.updated_at,
-                u.country, u.nickname_updated_at, u.country_updated_at, u.locale
+                u.country, u.nickname_updated_at, u.country_updated_at, u.locale,
+                u.current_streak, u.longest_streak, u.last_active_date
          FROM sessions s
          JOIN users u ON s.user_id = u.id
          WHERE s.id = ?`,
@@ -92,6 +94,36 @@ export class D1SessionRepository implements SessionRepository {
 
     const providers = (providersRes.results || []).map((r) => r.provider);
 
+    // Lazily advance the "consecutive active days" streak. Same-day repeat requests
+    // (the overwhelming majority of calls through this method) are a pure no-op — only
+    // the first authenticated request of a new UTC day writes anything.
+    const streakUpdate = nextStreakState(
+      {
+        currentStreak: Number(row.current_streak ?? 0),
+        longestStreak: Number(row.longest_streak ?? 0),
+        lastActiveDate: row.last_active_date ? String(row.last_active_date) : null,
+      },
+      todayUtcDateString(),
+    );
+    if (streakUpdate.changed) {
+      try {
+        await this.db
+          .prepare(
+            `UPDATE users SET current_streak = ?, longest_streak = ?, last_active_date = ? WHERE id = ?`,
+          )
+          .bind(
+            streakUpdate.currentStreak,
+            streakUpdate.longestStreak,
+            streakUpdate.lastActiveDate,
+            userId,
+          )
+          .run();
+      } catch {
+        // Non-critical — never fail auth over streak bookkeeping. Falls back to the
+        // pre-update values below, retried on the next request.
+      }
+    }
+
     return {
       session: {
         id: rawToken,
@@ -111,6 +143,17 @@ export class D1SessionRepository implements SessionRepository {
         nickname_updated_at: row.nickname_updated_at ? String(row.nickname_updated_at) : null,
         country_updated_at: row.country_updated_at ? String(row.country_updated_at) : null,
         locale: row.locale ? String(row.locale) : null,
+        current_streak: streakUpdate.changed
+          ? streakUpdate.currentStreak
+          : Number(row.current_streak ?? 0),
+        longest_streak: streakUpdate.changed
+          ? streakUpdate.longestStreak
+          : Number(row.longest_streak ?? 0),
+        last_active_date: streakUpdate.changed
+          ? streakUpdate.lastActiveDate
+          : row.last_active_date
+            ? String(row.last_active_date)
+            : null,
       },
     };
   }

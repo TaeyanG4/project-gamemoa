@@ -5,11 +5,32 @@ import {
   UpdateNicknameRequestSchema,
   UpdateCountryRequestSchema,
   UpdateLocaleRequestSchema,
+  PublicProfileResponseSchema,
 } from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
-import { createContainer } from "../container.js";
+import { createContainer, getPublicProfileData } from "../container.js";
 
 export const profileRouter = new Hono<ApiEnv>();
+
+// GET /api/profile/public/:userId — public profile page data, no auth required. Returns
+// only the public-safe subset (see getPublicProfileData); 404 if the user doesn't exist.
+profileRouter.get("/public/:userId", async (c) => {
+  const userId = Number(c.req.param("userId"));
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return profileError(c, "INVALID_USER_ID", "잘못된 사용자 ID입니다.", 400);
+  }
+  if (!c.env?.DB) {
+    return c.json({ error: "Database unavailable" }, 500);
+  }
+
+  const container = createContainer(c.env.DB);
+  const data = await getPublicProfileData(container, userId);
+  if (!data) {
+    return profileError(c, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.", 404);
+  }
+
+  return c.json(PublicProfileResponseSchema.parse(data), 200);
+});
 
 async function getAuthUserId(c: Context<ApiEnv>): Promise<number | null> {
   const sessionId = getCookie(c, "owogg_session");

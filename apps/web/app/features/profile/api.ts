@@ -3,8 +3,10 @@ import {
   UpdateNicknameResponseSchema,
   UpdateCountryRequestSchema,
   UpdateCountryResponseSchema,
+  PublicProfileResponseSchema,
   type UpdateNicknameResponse,
   type UpdateCountryResponse,
+  type PublicProfileResponse,
 } from "@owogg/contracts";
 import { apiFetch } from "../../lib/api";
 
@@ -23,4 +25,14 @@ export async function updateCountryApi(country: string | null): Promise<UpdateCo
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+/** Public profile page data (no auth). Throws ApiClientError with status 404 if unknown userId. */
+export async function fetchPublicProfileApi(
+  userId: number | string,
+): Promise<PublicProfileResponse> {
+  return await apiFetch(
+    `/api/profile/public/${encodeURIComponent(String(userId))}`,
+    PublicProfileResponseSchema,
+  );
 }

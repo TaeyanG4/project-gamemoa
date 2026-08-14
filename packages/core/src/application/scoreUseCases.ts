@@ -57,4 +57,17 @@ export class ScoreUseCases {
 
     return bests;
   }
+
+  /** Same data as {@link getUserBests}, formatted per-game for public display (e.g. the
+   * public profile page's "best records" list). */
+  async getUserBestsFormatted(
+    userId: number,
+  ): Promise<Array<{ gameId: string; score: number; formattedScore: string }>> {
+    const bests = await this.getUserBests(userId);
+    return Object.entries(bests).map(([gameId, score]) => ({
+      gameId,
+      score,
+      formattedScore: formatScore(score, GAME_MANIFEST_MAP[gameId]?.scoreConfig),
+    }));
+  }
 }

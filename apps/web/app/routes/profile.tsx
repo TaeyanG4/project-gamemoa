@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   User,
   LogOut,
+  ExternalLink,
   Trophy,
   ArrowLeft,
   ChevronRight,
@@ -577,13 +578,22 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <button
-              onClick={() => void logout()}
-              className="flex items-center gap-2 px-6 py-2.5 bg-accent-red/10 text-accent-red border border-accent-red/30 rounded-2xl font-bold text-xs hover:bg-accent-red/20 transition-all cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>{dict.profile.logout}</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                to={`/users/${user.id}`}
+                className="flex items-center gap-2 px-6 py-2.5 bg-surface border border-border rounded-2xl font-bold text-xs text-text-secondary hover:text-text-primary hover:border-brand/40 transition-all"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>{dict.profile.viewPublicProfileCta}</span>
+              </Link>
+              <button
+                onClick={() => void logout()}
+                className="flex items-center gap-2 px-6 py-2.5 bg-accent-red/10 text-accent-red border border-accent-red/30 rounded-2xl font-bold text-xs hover:bg-accent-red/20 transition-all cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>{dict.profile.logout}</span>
+              </button>
+            </div>
           </div>
 
           {statusMessage && (

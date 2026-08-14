@@ -15,6 +15,9 @@ export const LeaderRecordSchema = z
     created_at: z.string().optional(),
     avatarUrl: z.string().nullable().optional(),
     avatar_url: z.string().nullable().optional(),
+    /** Null for guest (unauthenticated) scores — no public profile to link to. */
+    userId: z.number().nullable().optional(),
+    user_id: z.number().nullable().optional(),
   })
   .transform((data) => ({
     id: String(data.id),
@@ -26,6 +29,7 @@ export const LeaderRecordSchema = z
     grade: data.grade,
     createdAt: data.createdAt || data.created_at || "",
     avatarUrl: data.avatarUrl || data.avatar_url || null,
+    userId: data.userId ?? data.user_id ?? null,
   }));
 
 export type LeaderRecord = z.infer<typeof LeaderRecordSchema>;

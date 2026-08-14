@@ -142,6 +142,7 @@ export interface Dictionary {
     myProfileTab: string;
     recordsTab: string;
     joinedLabel: string;
+    viewPublicProfileCta: string;
     logout: string;
     favoritesTitle: string;
     emptyFavorites: string;
@@ -968,6 +969,30 @@ export interface Dictionary {
     notSupported: string;
     notSupportedBody: string;
   };
+  /** /users/:id — the public profile page (distinct from the private /profile "My Page").
+   * Uses the account's stable internal id as the URL identifier (survives nickname changes
+   * and stays valid across future Google/Discord account linking/merging). */
+  userProfile: {
+    eyebrow: string;
+    backToHome: string;
+    notFoundTitle: string;
+    notFoundBody: string;
+    loadErrorBody: string;
+    retryButton: string;
+    joinedPrefix: string;
+    levelLabel: string;
+    globalRankPrefix: string;
+    streakLabel: string;
+    streakDaysSuffix: string;
+    longestStreakPrefix: string;
+    achievementsTitle: string;
+    achievementsEmpty: string;
+    achievedSuffix: string;
+    gameRecordsTitle: string;
+    gameRecordsEmpty: string;
+    creatorBadgesTitle: string;
+    manageProfileCta: string;
+  };
   /** Header icon that lists PUBLIC-visibility registered Discord servers (lives next to
    * favorites/language selector) — fetched lazily on first open, not on every page load. */
   registeredServers: {
@@ -1126,6 +1151,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfileTab: "내 프로필",
       recordsTab: "기록",
       joinedLabel: "가입일",
+      viewPublicProfileCta: "공개 프로필 보기",
       logout: "로그아웃",
       favoritesTitle: "즐겨찾기",
       emptyFavorites:
@@ -2134,6 +2160,27 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       notSupported: "이 게임은 순위를 지원하지 않습니다",
       notSupportedBody: "캐주얼 게임이라 등수 없이 즐기는 게임입니다.",
     },
+    userProfile: {
+      eyebrow: "플레이어 프로필",
+      backToHome: "홈으로",
+      notFoundTitle: "사용자를 찾을 수 없습니다",
+      notFoundBody: "존재하지 않거나 탈퇴한 계정입니다.",
+      loadErrorBody: "프로필을 불러오지 못했습니다.",
+      retryButton: "다시 시도",
+      joinedPrefix: "가입일",
+      levelLabel: "레벨",
+      globalRankPrefix: "전체 XP 랭킹 #",
+      streakLabel: "연속 출석",
+      streakDaysSuffix: "일째",
+      longestStreakPrefix: "최고 기록",
+      achievementsTitle: "도전과제",
+      achievementsEmpty: "아직 달성한 도전과제가 없습니다.",
+      achievedSuffix: "달성",
+      gameRecordsTitle: "게임별 최고 기록",
+      gameRecordsEmpty: "아직 등록된 기록이 없습니다.",
+      creatorBadgesTitle: "인증된 크리에이터 채널",
+      manageProfileCta: "내 프로필 관리 →",
+    },
     registeredServers: {
       ariaLabel: "등록된 Discord 서버",
       title: "등록된 서버",
@@ -2285,6 +2332,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfileTab: "My Profile",
       recordsTab: "Records",
       joinedLabel: "Joined",
+      viewPublicProfileCta: "View public profile",
       logout: "Log out",
       favoritesTitle: "Favorites",
       emptyFavorites: "No favorite games yet. Tap the bookmark icon on a game card to add one.",
@@ -3313,6 +3361,27 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       notSupported: "This game doesn't support ranking",
       notSupportedBody: "It's a casual game meant to be played without a scoreboard.",
     },
+    userProfile: {
+      eyebrow: "Player Profile",
+      backToHome: "Back to home",
+      notFoundTitle: "User not found",
+      notFoundBody: "This account doesn't exist or has been deleted.",
+      loadErrorBody: "Couldn't load this profile.",
+      retryButton: "Retry",
+      joinedPrefix: "Joined",
+      levelLabel: "Level",
+      globalRankPrefix: "Global XP Rank #",
+      streakLabel: "Current streak",
+      streakDaysSuffix: " days",
+      longestStreakPrefix: "Best",
+      achievementsTitle: "Achievements",
+      achievementsEmpty: "No achievements unlocked yet.",
+      achievedSuffix: "unlocked",
+      gameRecordsTitle: "Best records by game",
+      gameRecordsEmpty: "No records yet.",
+      creatorBadgesTitle: "Verified creator channels",
+      manageProfileCta: "Manage my profile →",
+    },
     registeredServers: {
       ariaLabel: "Registered Discord servers",
       title: "Registered Servers",
@@ -3464,6 +3533,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfileTab: "マイプロフィール",
       recordsTab: "記録",
       joinedLabel: "登録日",
+      viewPublicProfileCta: "公開プロフィールを見る",
       logout: "ログアウト",
       favoritesTitle: "お気に入り",
       emptyFavorites:
@@ -4490,6 +4560,27 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       notSupported: "このゲームはランキングに対応していません",
       notSupportedBody: "順位なしで楽しむカジュアルゲームです。",
     },
+    userProfile: {
+      eyebrow: "プレイヤープロフィール",
+      backToHome: "ホームへ",
+      notFoundTitle: "ユーザーが見つかりません",
+      notFoundBody: "存在しない、または削除されたアカウントです。",
+      loadErrorBody: "プロフィールを読み込めませんでした。",
+      retryButton: "再試行",
+      joinedPrefix: "登録日",
+      levelLabel: "レベル",
+      globalRankPrefix: "全体XPランキング #",
+      streakLabel: "連続ログイン",
+      streakDaysSuffix: "日目",
+      longestStreakPrefix: "最高記録",
+      achievementsTitle: "実績",
+      achievementsEmpty: "まだ達成した実績がありません。",
+      achievedSuffix: "達成",
+      gameRecordsTitle: "ゲーム別ベスト記録",
+      gameRecordsEmpty: "まだ記録がありません。",
+      creatorBadgesTitle: "認証済みクリエイターチャンネル",
+      manageProfileCta: "マイプロフィール管理 →",
+    },
     registeredServers: {
       ariaLabel: "登録済みDiscordサーバー",
       title: "登録済みサーバー",
@@ -4640,6 +4731,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       myProfileTab: "我的资料",
       recordsTab: "记录",
       joinedLabel: "加入日期",
+      viewPublicProfileCta: "查看公开资料",
       logout: "退出登录",
       favoritesTitle: "收藏",
       emptyFavorites: "还没有收藏的游戏。点击游戏卡片上的收藏图标即可添加。",
@@ -5612,6 +5704,27 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       backToGame: "返回游戏",
       notSupported: "该游戏不支持排名",
       notSupportedBody: "这是一款无需排名、轻松享受的休闲游戏。",
+    },
+    userProfile: {
+      eyebrow: "玩家资料",
+      backToHome: "返回首页",
+      notFoundTitle: "找不到该用户",
+      notFoundBody: "该账号不存在或已被删除。",
+      loadErrorBody: "无法加载该资料。",
+      retryButton: "重试",
+      joinedPrefix: "加入日期",
+      levelLabel: "等级",
+      globalRankPrefix: "全站经验排名 #",
+      streakLabel: "连续登录",
+      streakDaysSuffix: "天",
+      longestStreakPrefix: "最高纪录",
+      achievementsTitle: "成就",
+      achievementsEmpty: "尚未解锁任何成就。",
+      achievedSuffix: "已解锁",
+      gameRecordsTitle: "各游戏最佳记录",
+      gameRecordsEmpty: "暂无记录。",
+      creatorBadgesTitle: "认证创作者频道",
+      manageProfileCta: "管理我的资料 →",
     },
     registeredServers: {
       ariaLabel: "已注册的 Discord 服务器",
