@@ -30,7 +30,7 @@ import {
   RefreshCw,
   CheckCircle2,
   UserCheck,
-  Camera,
+  Copy,
   Trophy,
 } from "lucide-react";
 
@@ -74,7 +74,6 @@ export default function GamePlay() {
   // Attempt Lifecycle State & Auth Eligibility
   const [attemptKey, setAttemptKey] = useState<number>(0);
   const [sessionId, setSessionId] = useState<string>(() => crypto.randomUUID());
-  const [rankingEligible, setRankingEligible] = useState<boolean>(() => isAuthenticated);
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
@@ -180,10 +179,9 @@ export default function GamePlay() {
     setSubmissionState("idle");
     setSubmissionError(null);
     setResultLeaderboard(null);
-    setRankingEligible(isAuthenticated);
     setSessionId(crypto.randomUUID());
     setAttemptKey((prev) => prev + 1);
-  }, [isAuthenticated]);
+  }, []);
 
   // Fetch a compact leaderboard preview as soon as the game ends (not gated on score
   // submission succeeding — guests and rejected submissions still get competitive context).
@@ -206,7 +204,12 @@ export default function GamePlay() {
   // Share Result — scoped to X (official web intent), Discord (no web intent exists, so this
   // copies formatted text to paste manually), and a screenshot-copy of the result card. Web
   // Share API / Instagram / TikTok deliberately dropped from this pass (operator decision).
+  // All three now attach the screenshot by default (see captureScreenshotBlob) rather than only
+  // the dedicated screenshot button — X/Discord have no API for a page to attach an arbitrary
+  // image to a compose window, so "attach by default" means "copy it to the clipboard so the
+  // user can paste it in", which is the most a web page is allowed to do.
   const shareCardRef = useRef<HTMLDivElement>(null);
+  const [xShareState, setXShareState] = useState<"idle" | "sharing" | "shared">("idle");
   const [discordCopied, setDiscordCopied] = useState(false);
   const [screenshotState, setScreenshotState] = useState<
     "idle" | "copying" | "copied" | "downloaded" | "error"
@@ -219,29 +222,75 @@ export default function GamePlay() {
     return dict.gamePlay.shareText.replace("{title}", title).replace("{score}", scoreText);
   }, [result, manifest, dict]);
 
-  const handleShareX = useCallback(() => {
+  const captureScreenshotBlob = useCallback(async (): Promise<Blob | null> => {
+    if (!shareCardRef.current) return null;
+    const { toBlob } = await import("html-to-image");
+    return await toBlob(shareCardRef.current, { pixelRatio: 2 });
+  }, []);
+
+  const handleShareX = useCallback(async () => {
     const shareText = buildShareText();
     if (!shareText) return;
+    setXShareState("sharing");
+
+    // Best-effort — X's web intent has no parameter for attaching an image, so this is the
+    // closest a web page can get to "attach a screenshot": copy it to the clipboard and let the
+    // user paste it into the compose window that's about to open. Never blocks the share itself.
+    if (navigator.clipboard && typeof window.ClipboardItem !== "undefined") {
+      try {
+        const blob = await captureScreenshotBlob();
+        if (blob) {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        }
+      } catch (err) {
+        console.error("Screenshot copy before X share failed (non-fatal):", err);
+      }
+    }
+
     const shareUrl = `${window.location.origin}/games/${slug}`;
     const intentUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(intentUrl, "_blank", "noopener,noreferrer");
-  }, [buildShareText, slug]);
+    setXShareState("shared");
+    setTimeout(() => setXShareState("idle"), 4000);
+  }, [buildShareText, captureScreenshotBlob, slug]);
 
   const handleShareDiscord = useCallback(async () => {
     const shareText = buildShareText();
     if (!shareText || !navigator.clipboard) return;
     const shareUrl = `${window.location.origin}/games/${slug}`;
-    await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+    const fullText = `${shareText} ${shareUrl}`;
+
+    // A single ClipboardItem can carry multiple representations of the same copy — Discord's
+    // paste handler picks the image when one is present (attaches it as a file), so this is the
+    // only way to get "text + screenshot" into one paste action instead of two separate copies.
+    if (typeof window.ClipboardItem !== "undefined") {
+      try {
+        const blob = await captureScreenshotBlob();
+        if (blob) {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              "image/png": blob,
+              "text/plain": new Blob([fullText], { type: "text/plain" }),
+            }),
+          ]);
+          setDiscordCopied(true);
+          setTimeout(() => setDiscordCopied(false), 2500);
+          return;
+        }
+      } catch (err) {
+        console.error("Combined image+text copy failed, falling back to text-only:", err);
+      }
+    }
+
+    await navigator.clipboard.writeText(fullText);
     setDiscordCopied(true);
-    setTimeout(() => setDiscordCopied(false), 2000);
-  }, [buildShareText, slug]);
+    setTimeout(() => setDiscordCopied(false), 2500);
+  }, [buildShareText, captureScreenshotBlob, slug]);
 
   const handleCopyScreenshot = useCallback(async () => {
-    if (!shareCardRef.current) return;
     setScreenshotState("copying");
     try {
-      const { toBlob } = await import("html-to-image");
-      const blob = await toBlob(shareCardRef.current, { pixelRatio: 2 });
+      const blob = await captureScreenshotBlob();
       if (!blob) throw new Error("html-to-image returned no blob");
 
       if (navigator.clipboard && typeof window.ClipboardItem !== "undefined") {
@@ -266,7 +315,7 @@ export default function GamePlay() {
     } finally {
       setTimeout(() => setScreenshotState("idle"), 2500);
     }
-  }, [slug]);
+  }, [captureScreenshotBlob, slug]);
 
   const { recordRecentPlay } = usePersonalization();
 
@@ -287,7 +336,11 @@ export default function GamePlay() {
         const lowerIsBetter = manifest?.scoreConfig?.direction === "asc";
         saveLocalBestScore(slug, gameResult.score, lowerIsBetter);
 
-        if (rankingEligible) {
+        // Read isAuthenticated live at completion time rather than a value frozen at round
+        // start — a frozen snapshot (the previous approach) went stale whenever the session
+        // check hadn't resolved yet at mount, permanently showing the guest notice to an
+        // already-logged-in player until their next retry happened to re-capture it correctly.
+        if (isAuthenticated) {
           await handleScoreSubmission(gameResult.score);
         } else {
           setSubmissionState("guest");
@@ -300,11 +353,11 @@ export default function GamePlay() {
     [
       sessionId,
       user,
+      isAuthenticated,
       selectedDifficultyId,
       navigate,
       slug,
       manifest,
-      rankingEligible,
       handleScoreSubmission,
       recordRecentPlay,
     ],
@@ -439,17 +492,27 @@ export default function GamePlay() {
           </div>
         ) : GameComponent ? (
           <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
-            {/* Game Result & Score Submission Overlay */}
+            {/* Game Result & Score Submission Overlay.
+                overflow-y-auto + min-h-full (rather than a fixed-height flex-center with no
+                scroll) is what actually fixes two things at once: the result staying visually
+                centered when it fits, and the retry/back-to-list buttons no longer clipping off
+                the bottom edge when the content (card + status + leaderboard + share row) is
+                taller than the viewport — previously there was nowhere for that overflow to go. */}
             {result ? (
-              <div className="absolute inset-0 bg-black/90 flex flex-col items-center justify-center z-50 p-8 text-center">
-                <h3 className="text-3xl font-extrabold mb-2 text-white">
-                  {dict.gamePlay.resultTitle}
-                </h3>
-                <div className="mb-6 p-6 bg-surface-raised rounded-2xl border border-border w-full max-w-md">
-                  {/* Everything inside this ref is what handleCopyScreenshot captures — kept
-                      self-contained (branding + game + score) since a screenshot has to make
-                      sense on its own outside the app, unlike the interactive elements below it. */}
-                  <div ref={shareCardRef} className="bg-surface-raised">
+              <div className="absolute inset-0 z-50 overflow-y-auto bg-black/90">
+                <div className="flex min-h-full flex-col items-center justify-center gap-6 p-6 text-center md:p-8">
+                  <h3 className="text-3xl font-extrabold text-white">
+                    {dict.gamePlay.resultTitle}
+                  </h3>
+
+                  {/* The score card is now its own self-contained box — everything inside this
+                      ref is what handleCopyScreenshot captures, and owogg.com is genuinely its
+                      last/bottom element now that submission status, leaderboard, and share
+                      buttons live in a separate section below instead of the same bordered box. */}
+                  <div
+                    ref={shareCardRef}
+                    className="w-full max-w-md rounded-2xl border border-border bg-surface-raised p-6"
+                  >
                     <div className="mb-3 flex items-center justify-center gap-2">
                       <GameThumbnail
                         thumbnail={manifest?.thumbnail ?? ""}
@@ -463,7 +526,7 @@ export default function GamePlay() {
                       </span>
                     </div>
                     <p className="text-text-secondary text-sm mb-1">
-                      {rankingEligible
+                      {isAuthenticated
                         ? dict.gamePlay.finalScoreLabel
                         : dict.gamePlay.deviceBestLabel}
                     </p>
@@ -495,8 +558,11 @@ export default function GamePlay() {
                     </p>
                   </div>
 
-                  {/* Score Submission Status Indicator */}
-                  <div className="mt-6 pt-4 border-t border-border/60 flex items-center justify-center">
+                  {/* Everything below is deliberately outside shareCardRef (not part of the
+                      screenshot) — submission status, leaderboard, share actions. Only shown to
+                      guests (submissionState only ever becomes "guest" when signed out — see
+                      runtime.complete), so an already-logged-in player never sees it. */}
+                  <div className="w-full max-w-md flex flex-col gap-4">
                     {submissionState === "guest" && (
                       <div className="flex flex-col items-center gap-1.5">
                         <span className="text-xs font-bold text-text-secondary">
@@ -515,13 +581,13 @@ export default function GamePlay() {
                       </div>
                     )}
                     {submissionState === "submitting" && (
-                      <span className="inline-flex items-center gap-2 text-xs font-bold text-brand animate-pulse">
+                      <span className="inline-flex items-center justify-center gap-2 text-xs font-bold text-brand animate-pulse">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                         {dict.gamePlay.submittingLabel}
                       </span>
                     )}
                     {submissionState === "success" && (
-                      <span className="inline-flex items-center gap-2 text-xs font-bold text-emerald-400">
+                      <span className="inline-flex items-center justify-center gap-2 text-xs font-bold text-emerald-400">
                         <CheckCircle2 className="w-4 h-4" />
                         {dict.gamePlay.successLabel}
                       </span>
@@ -541,116 +607,130 @@ export default function GamePlay() {
                         </button>
                       </div>
                     )}
-                  </div>
 
-                  {/* Leaderboard preview — skipped for games with supportsLeaderboard: false */}
-                  {manifest?.supportsLeaderboard && resultLeaderboard && (
-                    <div className="mt-4 border-t border-border/60 pt-4 text-left">
-                      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-text-muted">
-                        <Trophy className="h-3.5 w-3.5 text-accent-yellow" />
-                        {dict.gamePlay.leaderboardTitle}
-                      </p>
-                      {resultLeaderboard.length === 0 ? (
-                        <p className="py-3 text-center text-xs text-text-muted">
-                          {dict.gamePlay.leaderboardEmpty}
+                    {/* Leaderboard preview — skipped for games with supportsLeaderboard: false */}
+                    {manifest?.supportsLeaderboard && resultLeaderboard && (
+                      <div className="rounded-2xl border border-border bg-surface-raised p-4 text-left">
+                        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-text-muted">
+                          <Trophy className="h-3.5 w-3.5 text-accent-yellow" />
+                          {dict.gamePlay.leaderboardTitle}
                         </p>
-                      ) : (
-                        <ol className="space-y-1">
-                          {resultLeaderboard.map((record, i) => (
-                            <li
-                              key={record.id}
-                              className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs"
-                            >
-                              {record.userId !== null && record.userId !== undefined ? (
-                                <Link
-                                  to={`/users/${record.userId}`}
-                                  className="flex items-center gap-2 truncate font-semibold text-brand-light hover:underline"
-                                >
-                                  <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
-                                  <span className="truncate">{record.playerName}</span>
-                                </Link>
-                              ) : (
-                                <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
-                                  <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
-                                  <span className="truncate">{record.playerName}</span>
+                        {resultLeaderboard.length === 0 ? (
+                          <p className="py-3 text-center text-xs text-text-muted">
+                            {dict.gamePlay.leaderboardEmpty}
+                          </p>
+                        ) : (
+                          <ol className="space-y-1">
+                            {resultLeaderboard.map((record, i) => (
+                              <li
+                                key={record.id}
+                                className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs"
+                              >
+                                {record.userId !== null && record.userId !== undefined ? (
+                                  <Link
+                                    to={`/users/${record.userId}`}
+                                    className="flex items-center gap-2 truncate font-semibold text-brand-light hover:underline"
+                                  >
+                                    <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                                    <span className="truncate">{record.playerName}</span>
+                                  </Link>
+                                ) : (
+                                  <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
+                                    <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                                    <span className="truncate">{record.playerName}</span>
+                                  </span>
+                                )}
+                                <span className="shrink-0 font-black text-brand-light">
+                                  {record.formattedScore}
                                 </span>
-                              )}
-                              <span className="shrink-0 font-black text-brand-light">
-                                {record.formattedScore}
-                              </span>
-                            </li>
-                          ))}
-                        </ol>
-                      )}
-                      <Link
-                        to={`/games/${slug}/ranking`}
-                        className="mt-2 inline-block text-[11px] font-bold text-brand-light hover:underline"
-                      >
-                        {dict.gamePlay.viewFullRanking}
-                      </Link>
-                    </div>
-                  )}
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                        <Link
+                          to={`/games/${slug}/ranking`}
+                          className="mt-2 inline-block text-[11px] font-bold text-brand-light hover:underline"
+                        >
+                          {dict.gamePlay.viewFullRanking}
+                        </Link>
+                      </div>
+                    )}
 
-                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    {/* Share row — icon-only (X's official wordmark, Discord's brand mark, a
+                        plain copy icon for the screenshot action) with a native title tooltip
+                        standing in for the text labels these used to carry. A brief checkmark
+                        swap is the only per-button feedback now that there's no label text to
+                        change; the X button additionally gets a one-line hint below the row
+                        since "screenshot copied, paste it yourself" needs actual explaining. */}
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => void handleShareX()}
+                        title={dict.gamePlay.shareXCta}
+                        aria-label={dict.gamePlay.shareXCta}
+                        className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+                      >
+                        {xShareState === "shared" ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                        ) : (
+                          <XIcon className="h-5 w-5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleShareDiscord()}
+                        title={dict.gamePlay.shareDiscordCta}
+                        aria-label={dict.gamePlay.shareDiscordCta}
+                        className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+                      >
+                        {discordCopied ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                        ) : (
+                          <DiscordIcon className="h-5 w-5" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleCopyScreenshot()}
+                        disabled={screenshotState === "copying"}
+                        title={dict.gamePlay.screenshotCopyCta}
+                        aria-label={dict.gamePlay.screenshotCopyCta}
+                        className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer disabled:opacity-50"
+                      >
+                        {screenshotState === "copying" ? (
+                          <RefreshCw className="h-5 w-5 animate-spin" />
+                        ) : screenshotState === "copied" || screenshotState === "downloaded" ? (
+                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                        ) : screenshotState === "error" ? (
+                          <AlertCircle className="h-5 w-5 text-rose-400" />
+                        ) : (
+                          <Copy className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                    {xShareState === "shared" && (
+                      <p className="-mt-2 text-[11px] font-semibold text-text-muted">
+                        {dict.gamePlay.shareXScreenshotHint}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-4">
                     <button
                       type="button"
-                      onClick={handleShareX}
-                      className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface px-2 py-2.5 text-[10px] font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+                      onClick={handleRetryGame}
+                      className="px-8 py-3 bg-brand text-white rounded-xl font-extrabold hover:bg-brand-light shadow-lg shadow-brand/25 transition-all cursor-pointer"
                     >
-                      <XIcon className="h-3.5 w-3.5" />
-                      <span className="truncate">{dict.gamePlay.shareXCta}</span>
+                      {dict.gamePlay.retryGameCta}
                     </button>
                     <button
                       type="button"
-                      onClick={() => void handleShareDiscord()}
-                      className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface px-2 py-2.5 text-[10px] font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+                      onClick={() => void navigate("/games")}
+                      className="px-8 py-3 bg-surface text-text-primary border border-border rounded-xl font-extrabold hover:bg-surface-raised transition-colors cursor-pointer"
                     >
-                      <DiscordIcon className="h-3.5 w-3.5" />
-                      <span className="truncate">
-                        {discordCopied
-                          ? dict.gamePlay.shareDiscordCopiedFeedback
-                          : dict.gamePlay.shareDiscordCta}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleCopyScreenshot()}
-                      disabled={screenshotState === "copying"}
-                      className="flex flex-col items-center gap-1 rounded-xl border border-border bg-surface px-2 py-2.5 text-[10px] font-bold text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer disabled:opacity-50"
-                    >
-                      {screenshotState === "copying" ? (
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Camera className="h-3.5 w-3.5" />
-                      )}
-                      <span className="truncate">
-                        {screenshotState === "copied"
-                          ? dict.gamePlay.screenshotCopiedFeedback
-                          : screenshotState === "downloaded"
-                            ? dict.gamePlay.screenshotDownloadedFeedback
-                            : screenshotState === "error"
-                              ? dict.gamePlay.screenshotErrorFeedback
-                              : dict.gamePlay.screenshotCopyCta}
-                      </span>
+                      {dict.gamePlay.backToListResult}
                     </button>
                   </div>
-                </div>
-
-                <div className="flex gap-4">
-                  <button
-                    type="button"
-                    onClick={handleRetryGame}
-                    className="px-8 py-3 bg-brand text-white rounded-xl font-extrabold hover:bg-brand-light shadow-lg shadow-brand/25 transition-all cursor-pointer"
-                  >
-                    {dict.gamePlay.retryGameCta}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void navigate("/games")}
-                    className="px-8 py-3 bg-surface text-text-primary border border-border rounded-xl font-extrabold hover:bg-surface-raised transition-colors cursor-pointer"
-                  >
-                    {dict.gamePlay.backToListResult}
-                  </button>
                 </div>
               </div>
             ) : null}

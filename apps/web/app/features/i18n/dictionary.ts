@@ -991,6 +991,11 @@ export interface Dictionary {
     screenshotCopiedFeedback: string;
     screenshotDownloadedFeedback: string;
     screenshotErrorFeedback: string;
+    /** Shown briefly after clicking the X share button — X's web intent has no parameter for
+     * attaching an arbitrary image, so the best available UX is: copy the result screenshot to
+     * the clipboard as a courtesy, open the compose window with the text prefilled, and tell the
+     * user to paste (Ctrl+V) the image in themselves. */
+    shareXScreenshotHint: string;
     /** Shown on the result overlay only when the game's manifest has supportsLeaderboard: true —
      * casual games where rank doesn't mean much can opt out by setting that flag false. */
     leaderboardTitle: string;
@@ -2225,6 +2230,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareXCta: "X에 공유",
       shareDiscordCta: "Discord용 복사",
       shareDiscordCopiedFeedback: "복사 완료! Discord에 붙여넣으세요",
+      shareXScreenshotHint: "스크린샷이 복사됐어요! 트윗 작성창에 붙여넣기(Ctrl+V) 하세요",
       screenshotCopyCta: "스크린샷 복사",
       screenshotCopiedFeedback: "이미지가 복사되었습니다!",
       screenshotDownloadedFeedback: "이미지를 다운로드했습니다",
@@ -3471,6 +3477,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareXCta: "Share on X",
       shareDiscordCta: "Copy for Discord",
       shareDiscordCopiedFeedback: "Copied! Paste it into Discord",
+      shareXScreenshotHint: "Screenshot copied! Paste it (Ctrl+V) into the tweet box",
       screenshotCopyCta: "Copy screenshot",
       screenshotCopiedFeedback: "Image copied!",
       screenshotDownloadedFeedback: "Image downloaded",
@@ -4717,6 +4724,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareXCta: "Xでシェア",
       shareDiscordCta: "Discord用にコピー",
       shareDiscordCopiedFeedback: "コピーしました！Discordに貼り付けてください",
+      shareXScreenshotHint:
+        "スクリーンショットをコピーしました！ツイート作成画面に貼り付け(Ctrl+V)てください",
       screenshotCopyCta: "スクリーンショットをコピー",
       screenshotCopiedFeedback: "画像をコピーしました！",
       screenshotDownloadedFeedback: "画像をダウンロードしました",
@@ -5909,6 +5918,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareXCta: "分享到 X",
       shareDiscordCta: "复制 Discord 用文本",
       shareDiscordCopiedFeedback: "已复制！请粘贴到 Discord",
+      shareXScreenshotHint: "截图已复制！请在推文框中粘贴(Ctrl+V)",
       screenshotCopyCta: "复制截图",
       screenshotCopiedFeedback: "图片已复制！",
       screenshotDownloadedFeedback: "图片已下载",
