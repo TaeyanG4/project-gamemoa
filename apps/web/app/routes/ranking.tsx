@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router";
 import { Trophy, Medal, AlertCircle, RefreshCw, Zap, Video, Gamepad2, Globe } from "lucide-react";
 import { fetchLeaderboardApi } from "../features/scores/api";
 import { fetchXpLeaderboardApi } from "../features/progression/api";
 import { fetchCreatorRankingsApi } from "../features/creators/creatorApi";
 import { PlatformIconRow, PlatformIcon } from "../components/ui/PlatformIcon";
+import { GameThumbnail } from "../components/ui/GameThumbnail";
 import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@owogg/contracts";
 
 import { levelForTotalXp } from "@owogg/core";
@@ -42,6 +44,15 @@ export default function Ranking() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    // "전체 종목" under the game tab has no meaningful combined leaderboard — scores from
+    // different games aren't comparable (ms vs. WPM etc.), and the API has no "all games mixed"
+    // endpoint (GET /api/scores/all 400s, since "all" isn't a real game id). That state instead
+    // renders a game-picker grid below, so there's nothing to fetch here.
+    if (mainTab === "game" && selectedGameId === "all") {
+      setGameRecords([]);
+      setStatus("success");
+      return;
+    }
     setStatus("loading");
     setErrorMsg(null);
     try {
@@ -247,304 +258,336 @@ export default function Ranking() {
         </div>
       )}
 
-      {/* Leaderboard Table Container */}
-      <div className="w-full bg-surface-raised rounded-3xl border border-border overflow-hidden shadow-2xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-surface-sidebar border-b border-border text-xs font-extrabold text-text-muted uppercase tracking-wider">
-                <th className="py-4 px-6">{dict.ranking.rankHeader}</th>
-                <th className="py-4 px-6">
-                  {mainTab === "creator" ? dict.ranking.streamerHeader : dict.ranking.playerHeader}
-                </th>
-                {mainTab === "game" && (
-                  <>
-                    <th className="py-4 px-6">{dict.ranking.categoryHeader}</th>
-                    <th className="py-4 px-6">{dict.ranking.recordHeader}</th>
-                    <th className="py-4 px-6">{dict.ranking.dateHeader}</th>
-                  </>
-                )}
-                {mainTab === "xp" && (
-                  <>
-                    <th className="py-4 px-6">{dict.ranking.levelHeader}</th>
-                    <th className="py-4 px-6">{dict.ranking.totalXpHeader}</th>
-                  </>
-                )}
-                {mainTab === "creator" && (
-                  <>
+      {/* "전체 종목" under the game tab: scores aren't comparable across different games (ms vs.
+          WPM etc.), so instead of a combined table this shows a picker — choose a game to see its
+          own dedicated ranking page (osu!-style: ranking per game, not one mixed leaderboard). */}
+      {mainTab === "game" && selectedGameId === "all" ? (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {gameManifests.map((game) => {
+            const content = getLocalizedGameContent(dict, game);
+            return (
+              <Link
+                key={game.slug}
+                to={`/games/${game.slug}/ranking`}
+                className="group flex flex-col items-center gap-3 rounded-2xl border border-border bg-surface-raised p-5 text-center shadow-lg transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-2xl"
+              >
+                <GameThumbnail
+                  thumbnail={game.thumbnail}
+                  title={content.title}
+                  accent={game.accent}
+                  className="h-16 w-16 transition-transform duration-300 group-hover:scale-110"
+                />
+                <span className="font-bold text-text-primary group-hover:text-brand transition-colors">
+                  {content.title}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <>
+          {/* Leaderboard Table Container */}
+          <div className="w-full bg-surface-raised rounded-3xl border border-border overflow-hidden shadow-2xl">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-sidebar border-b border-border text-xs font-extrabold text-text-muted uppercase tracking-wider">
+                    <th className="py-4 px-6">{dict.ranking.rankHeader}</th>
                     <th className="py-4 px-6">
-                      {creatorMode === "score"
-                        ? dict.ranking.recordOrCategory
-                        : dict.ranking.activityLevel}
+                      {mainTab === "creator"
+                        ? dict.ranking.streamerHeader
+                        : dict.ranking.playerHeader}
                     </th>
-                    <th className="py-4 px-6">{dict.ranking.badgeHeader}</th>
-                    <th className="py-4 px-6 text-right">{dict.ranking.platformHeader}</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50 text-sm font-medium text-text-primary">
-              {status === "loading" && (
-                <tr>
-                  <td colSpan={6} className="py-16 text-center text-text-muted animate-pulse">
-                    {dict.common.loading}
-                  </td>
-                </tr>
-              )}
-
-              {status === "error" && (
-                <tr>
-                  <td colSpan={6} className="py-16 text-center text-text-muted">
-                    <div className="flex flex-col items-center justify-center gap-3">
-                      <AlertCircle className="w-8 h-8 text-accent-red" />
-                      <p className="font-semibold text-text-primary">{errorMsg}</p>
-                      <button
-                        onClick={() => void loadData()}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-surface-raised border border-border rounded-xl text-xs font-bold hover:bg-surface-overlay transition-colors cursor-pointer"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        {dict.ranking.retryButton}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              )}
-
-              {/* Mode 1: Game Score Leaderboard */}
-              {status === "success" && mainTab === "game" && (
-                <>
-                  {gameRecords.length === 0 ? (
+                    {mainTab === "game" && (
+                      <>
+                        <th className="py-4 px-6">{dict.ranking.categoryHeader}</th>
+                        <th className="py-4 px-6">{dict.ranking.recordHeader}</th>
+                        <th className="py-4 px-6">{dict.ranking.dateHeader}</th>
+                      </>
+                    )}
+                    {mainTab === "xp" && (
+                      <>
+                        <th className="py-4 px-6">{dict.ranking.levelHeader}</th>
+                        <th className="py-4 px-6">{dict.ranking.totalXpHeader}</th>
+                      </>
+                    )}
+                    {mainTab === "creator" && (
+                      <>
+                        <th className="py-4 px-6">
+                          {creatorMode === "score"
+                            ? dict.ranking.recordOrCategory
+                            : dict.ranking.activityLevel}
+                        </th>
+                        <th className="py-4 px-6">{dict.ranking.badgeHeader}</th>
+                        <th className="py-4 px-6 text-right">{dict.ranking.platformHeader}</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/50 text-sm font-medium text-text-primary">
+                  {status === "loading" && (
                     <tr>
-                      <td colSpan={5} className="py-16 text-center text-text-muted">
-                        {dict.ranking.emptyGames}
+                      <td colSpan={6} className="py-16 text-center text-text-muted animate-pulse">
+                        {dict.common.loading}
                       </td>
                     </tr>
-                  ) : (
-                    gameRecords.map((record, index) => {
-                      const rank = index + 1;
+                  )}
 
-                      return (
-                        <tr
-                          key={record.id}
-                          className="hover:bg-surface-overlay/50 transition-colors"
-                        >
-                          <td className="py-4 px-6 whitespace-nowrap">
-                            {rank === 1 && (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40 shadow-md">
-                                <Medal className="w-4 h-4" /> {dict.ranking.rank1}
-                              </span>
-                            )}
-                            {rank === 2 && (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
-                                <Medal className="w-4 h-4" /> {dict.ranking.rank2}
-                              </span>
-                            )}
-                            {rank === 3 && (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
-                                <Medal className="w-4 h-4" /> {dict.ranking.rank3}
-                              </span>
-                            )}
-                            {rank > 3 && (
-                              <span className="text-text-muted font-bold px-3">#{rank}</span>
-                            )}
-                          </td>
+                  {status === "error" && (
+                    <tr>
+                      <td colSpan={6} className="py-16 text-center text-text-muted">
+                        <div className="flex flex-col items-center justify-center gap-3">
+                          <AlertCircle className="w-8 h-8 text-accent-red" />
+                          <p className="font-semibold text-text-primary">{errorMsg}</p>
+                          <button
+                            onClick={() => void loadData()}
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-surface-raised border border-border rounded-xl text-xs font-bold hover:bg-surface-overlay transition-colors cursor-pointer"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                            {dict.ranking.retryButton}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
 
-                          <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
-                              {record.avatarUrl ? (
-                                <img
-                                  src={record.avatarUrl}
-                                  alt={record.playerName}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                record.playerName.slice(0, 2)
-                              )}
-                            </div>
-                            <span>{record.playerName}</span>
-                          </td>
-
-                          <td className="py-4 px-6 text-text-secondary whitespace-nowrap">
-                            {record.gameTitle}
-                          </td>
-
-                          <td className="py-4 px-6 font-black text-brand-light text-base whitespace-nowrap">
-                            {record.formattedScore}
-                          </td>
-
-                          <td className="py-4 px-6 text-text-muted text-xs whitespace-nowrap">
-                            {record.createdAt}
+                  {/* Mode 1: Game Score Leaderboard */}
+                  {status === "success" && mainTab === "game" && (
+                    <>
+                      {gameRecords.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-16 text-center text-text-muted">
+                            {dict.ranking.emptyGames}
                           </td>
                         </tr>
-                      );
-                    })
+                      ) : (
+                        gameRecords.map((record, index) => {
+                          const rank = index + 1;
+
+                          return (
+                            <tr
+                              key={record.id}
+                              className="hover:bg-surface-overlay/50 transition-colors"
+                            >
+                              <td className="py-4 px-6 whitespace-nowrap">
+                                {rank === 1 && (
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40 shadow-md">
+                                    <Medal className="w-4 h-4" /> {dict.ranking.rank1}
+                                  </span>
+                                )}
+                                {rank === 2 && (
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
+                                    <Medal className="w-4 h-4" /> {dict.ranking.rank2}
+                                  </span>
+                                )}
+                                {rank === 3 && (
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
+                                    <Medal className="w-4 h-4" /> {dict.ranking.rank3}
+                                  </span>
+                                )}
+                                {rank > 3 && (
+                                  <span className="text-text-muted font-bold px-3">#{rank}</span>
+                                )}
+                              </td>
+
+                              <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
+                                  {record.avatarUrl ? (
+                                    <img
+                                      src={record.avatarUrl}
+                                      alt={record.playerName}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    record.playerName.slice(0, 2)
+                                  )}
+                                </div>
+                                <span>{record.playerName}</span>
+                              </td>
+
+                              <td className="py-4 px-6 text-text-secondary whitespace-nowrap">
+                                {record.gameTitle}
+                              </td>
+
+                              <td className="py-4 px-6 font-black text-brand-light text-base whitespace-nowrap">
+                                {record.formattedScore}
+                              </td>
+
+                              <td className="py-4 px-6 text-text-muted text-xs whitespace-nowrap">
+                                {record.createdAt}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </>
                   )}
-                </>
-              )}
 
-              {/* Mode 2: XP Leaderboard */}
-              {status === "success" && mainTab === "xp" && (
-                <>
-                  {xpRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-16 text-center text-text-muted">
-                        {dict.ranking.emptyXp}
-                      </td>
-                    </tr>
-                  ) : (
-                    xpRecords.map((record) => {
-                      const level = levelForTotalXp(record.totalXp);
-
-                      return (
-                        <tr
-                          key={record.userId}
-                          className="hover:bg-surface-overlay/50 transition-colors"
-                        >
-                          <td className="py-4 px-6 whitespace-nowrap font-bold">
-                            {record.rank === 1 ? (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40">
-                                <Medal className="w-4 h-4" /> {dict.ranking.rank1}
-                              </span>
-                            ) : record.rank === 2 ? (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
-                                <Medal className="w-4 h-4" /> {dict.ranking.rank2}
-                              </span>
-                            ) : record.rank === 3 ? (
-                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
-                                <Medal className="w-4 h-4" /> {dict.ranking.rank3}
-                              </span>
-                            ) : (
-                              <span className="text-text-muted px-3">#{record.rank}</span>
-                            )}
+                  {/* Mode 2: XP Leaderboard */}
+                  {status === "success" && mainTab === "xp" && (
+                    <>
+                      {xpRecords.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-16 text-center text-text-muted">
+                            {dict.ranking.emptyXp}
                           </td>
+                        </tr>
+                      ) : (
+                        xpRecords.map((record) => {
+                          const level = levelForTotalXp(record.totalXp);
 
-                          <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs overflow-hidden">
+                          return (
+                            <tr
+                              key={record.userId}
+                              className="hover:bg-surface-overlay/50 transition-colors"
+                            >
+                              <td className="py-4 px-6 whitespace-nowrap font-bold">
+                                {record.rank === 1 ? (
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 font-black border border-amber-500/40">
+                                    <Medal className="w-4 h-4" /> {dict.ranking.rank1}
+                                  </span>
+                                ) : record.rank === 2 ? (
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-400/20 text-slate-300 font-bold border border-slate-400/40">
+                                    <Medal className="w-4 h-4" /> {dict.ranking.rank2}
+                                  </span>
+                                ) : record.rank === 3 ? (
+                                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-700/20 text-amber-600 font-bold border border-amber-700/40">
+                                    <Medal className="w-4 h-4" /> {dict.ranking.rank3}
+                                  </span>
+                                ) : (
+                                  <span className="text-text-muted px-3">#{record.rank}</span>
+                                )}
+                              </td>
+
+                              <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs overflow-hidden">
+                                  {record.avatarUrl ? (
+                                    <img
+                                      src={record.avatarUrl}
+                                      alt={record.nickname}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    record.nickname.slice(0, 2)
+                                  )}
+                                </div>
+                                <span>{record.nickname}</span>
+                              </td>
+
+                              <td className="py-4 px-6 whitespace-nowrap">
+                                <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-extrabold text-indigo-300 border border-indigo-500/20">
+                                  Lv. {level}
+                                </span>
+                              </td>
+
+                              <td className="py-4 px-6 font-black text-amber-300 text-base whitespace-nowrap">
+                                {record.totalXp.toLocaleString()} XP
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </>
+                  )}
+
+                  {/* Mode 3: Creator Ranking */}
+                  {status === "success" && mainTab === "creator" && (
+                    <>
+                      {creatorRecords.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-16 text-center space-y-3">
+                            <div className="text-3xl">🎥</div>
+                            <p className="text-sm font-semibold text-text-secondary">
+                              {dict.ranking.emptyCreatorTitle}
+                            </p>
+                            <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">
+                              {dict.ranking.emptyCreatorBody}
+                            </p>
+                          </td>
+                        </tr>
+                      ) : (
+                        creatorRecords.map((record) => (
+                          <tr
+                            key={record.creatorId}
+                            className="hover:bg-surface-overlay/50 transition-colors"
+                          >
+                            <td className="py-4 px-6 whitespace-nowrap font-bold">
+                              <span className="text-purple-300 px-3">#{record.rank}</span>
+                            </td>
+
+                            <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-3">
                               {record.avatarUrl ? (
                                 <img
                                   src={record.avatarUrl}
                                   alt={record.nickname}
-                                  className="w-full h-full object-cover"
+                                  className="w-9 h-9 rounded-full object-cover border border-purple-500/30"
                                 />
                               ) : (
-                                record.nickname.slice(0, 2)
-                              )}
-                            </div>
-                            <span>{record.nickname}</span>
-                          </td>
-
-                          <td className="py-4 px-6 whitespace-nowrap">
-                            <span className="inline-flex items-center rounded-full bg-indigo-500/10 px-2.5 py-0.5 text-xs font-extrabold text-indigo-300 border border-indigo-500/20">
-                              Lv. {level}
-                            </span>
-                          </td>
-
-                          <td className="py-4 px-6 font-black text-amber-300 text-base whitespace-nowrap">
-                            {record.totalXp.toLocaleString()} XP
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </>
-              )}
-
-              {/* Mode 3: Creator Ranking */}
-              {status === "success" && mainTab === "creator" && (
-                <>
-                  {creatorRecords.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-16 text-center space-y-3">
-                        <div className="text-3xl">🎥</div>
-                        <p className="text-sm font-semibold text-text-secondary">
-                          {dict.ranking.emptyCreatorTitle}
-                        </p>
-                        <p className="text-xs text-text-muted max-w-md mx-auto leading-relaxed">
-                          {dict.ranking.emptyCreatorBody}
-                        </p>
-                      </td>
-                    </tr>
-                  ) : (
-                    creatorRecords.map((record) => (
-                      <tr
-                        key={record.creatorId}
-                        className="hover:bg-surface-overlay/50 transition-colors"
-                      >
-                        <td className="py-4 px-6 whitespace-nowrap font-bold">
-                          <span className="text-purple-300 px-3">#{record.rank}</span>
-                        </td>
-
-                        <td className="py-4 px-6 font-bold text-text-primary flex items-center gap-3">
-                          {record.avatarUrl ? (
-                            <img
-                              src={record.avatarUrl}
-                              alt={record.nickname}
-                              className="w-9 h-9 rounded-full object-cover border border-purple-500/30"
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-full bg-purple-600/30 text-purple-200 flex items-center justify-center font-black text-xs border border-purple-500/30">
-                              {record.nickname.slice(0, 2)}
-                            </div>
-                          )}
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-white">{record.nickname}</span>
-                              {record.country && (
-                                <span className="text-[10px] text-text-muted font-mono">
-                                  [{record.country}]
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="py-4 px-6 whitespace-nowrap font-black text-purple-200">
-                          {creatorMode === "score" ? (
-                            <div>
-                              <div>{record.formattedScore}</div>
-                              {record.gameTitle && (
-                                <div className="text-[11px] font-normal text-text-muted">
-                                  {record.gameTitle}
+                                <div className="w-9 h-9 rounded-full bg-purple-600/30 text-purple-200 flex items-center justify-center font-black text-xs border border-purple-500/30">
+                                  {record.nickname.slice(0, 2)}
                                 </div>
                               )}
-                            </div>
-                          ) : (
-                            <div>
-                              <div className="text-amber-300">
-                                {(record.totalXp ?? 0).toLocaleString()} XP
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-white">{record.nickname}</span>
+                                  {record.country && (
+                                    <span className="text-[10px] text-text-muted font-mono">
+                                      [{record.country}]
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-[11px] font-normal text-text-muted">
-                                Lv. {record.level ?? 1}
-                              </div>
-                            </div>
-                          )}
-                        </td>
+                            </td>
 
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          {/* Featured/Partner 배지는 현재 공개 노출하지 않습니다 — 심사 최소 기준을
+                            <td className="py-4 px-6 whitespace-nowrap font-black text-purple-200">
+                              {creatorMode === "score" ? (
+                                <div>
+                                  <div>{record.formattedScore}</div>
+                                  {record.gameTitle && (
+                                    <div className="text-[11px] font-normal text-text-muted">
+                                      {record.gameTitle}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="text-amber-300">
+                                    {(record.totalXp ?? 0).toLocaleString()} XP
+                                  </div>
+                                  <div className="text-[11px] font-normal text-text-muted">
+                                    Lv. {record.level ?? 1}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+
+                            <td className="py-4 px-6 whitespace-nowrap">
+                              {/* Featured/Partner 배지는 현재 공개 노출하지 않습니다 — 심사 최소 기준을
                               임시로 낮춘 테스트 단계라, 관리자가 실제로 승인하기 전까지는 모든
                               검증된 크리에이터를 동일하게 "CREATOR"로만 표시합니다. 실제
                               featuredStatus는 계속 계산/저장되며 관리자 화면(/admin/creators)에서만
                               확인할 수 있습니다. */}
-                          <span className="inline-flex items-center rounded-full border border-indigo-500/30 bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-300">
-                            CREATOR
-                          </span>
-                        </td>
+                              <span className="inline-flex items-center rounded-full border border-indigo-500/30 bg-indigo-500/20 px-2.5 py-0.5 text-[10px] font-extrabold text-indigo-300">
+                                CREATOR
+                              </span>
+                            </td>
 
-                        <td className="py-4 px-6 whitespace-nowrap">
-                          <div className="flex justify-end">
-                            <PlatformIconRow accounts={record.platformAccounts} size={24} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                            <td className="py-4 px-6 whitespace-nowrap">
+                              <div className="flex justify-end">
+                                <PlatformIconRow accounts={record.platformAccounts} size={24} />
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
