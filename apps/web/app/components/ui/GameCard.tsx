@@ -51,10 +51,10 @@ export function GameCard({
         onClick={handleFavoriteClick}
         aria-label={favoriteAriaLabel}
         aria-pressed={isFav}
-        className="absolute top-3 right-3 z-30 p-2 rounded-full bg-black/60 hover:bg-black/90 text-white transition-all backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95 cursor-pointer"
+        className="absolute top-1.5 right-1.5 sm:top-3 sm:right-3 z-30 p-1.5 sm:p-2 rounded-full bg-black/60 hover:bg-black/90 text-white transition-all backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95 cursor-pointer"
       >
         <Bookmark
-          className={`w-4 h-4 transition-colors ${
+          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-colors ${
             isFav ? "fill-amber-400 text-amber-400" : "text-white/80 hover:text-white"
           }`}
         />
@@ -63,17 +63,17 @@ export function GameCard({
       <Link to={`/games/${slug}`} className="flex flex-col flex-1">
         {/* Thumbnail Aspect 16:9 */}
         <div
-          className="w-full aspect-[16/10] relative flex items-center justify-center p-6 overflow-hidden bg-surface-overlay"
+          className="w-full aspect-[16/10] relative flex items-center justify-center p-3 sm:p-6 overflow-hidden bg-surface-overlay"
           style={{
             background: `radial-gradient(circle at center, ${accent}25 0%, rgba(15, 19, 31, 0.95) 100%)`,
           }}
         >
           {/* Top Badges */}
-          <div className="absolute top-3 left-3 z-10 flex gap-1.5">
+          <div className="absolute top-1.5 left-1.5 sm:top-3 sm:left-3 z-10 flex gap-1 sm:gap-1.5">
             {modes.slice(0, 2).map((mode) => (
               <span
                 key={mode}
-                className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-md border border-white/10 tracking-wider"
+                className="text-[8px] sm:text-[10px] uppercase font-extrabold px-1.5 sm:px-2 py-0.5 rounded-md bg-black/60 text-white backdrop-blur-md border border-white/10 tracking-wider"
               >
                 {mode}
               </span>
@@ -85,7 +85,7 @@ export function GameCard({
             thumbnail={thumbnail}
             title={title}
             accent={accent}
-            className="w-24 h-24 shadow-xl transform group-hover:scale-110 transition-transform duration-300 text-xl"
+            className="w-14 h-14 sm:w-24 sm:h-24 shadow-xl transform group-hover:scale-110 transition-transform duration-300 text-base sm:text-xl"
           />
 
           {/* Hover Play Action Overlay */}
@@ -97,15 +97,17 @@ export function GameCard({
         </div>
 
         {/* Content Info */}
-        <div className="p-4 flex flex-col flex-1 gap-1.5 bg-surface-raised">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-bold text-base text-text-primary group-hover:text-brand transition-colors">
+        <div className="p-2.5 sm:p-4 flex flex-col flex-1 gap-1 sm:gap-1.5 bg-surface-raised">
+          <div className="flex items-start justify-between gap-1.5 sm:gap-2">
+            {/* break-keep (word-break: keep-all) stops Korean titles from splitting mid-word
+                (e.g. "속도로" -> "속" + "도로") in narrow high-density grid columns. */}
+            <h3 className="break-keep font-bold text-xs sm:text-base leading-snug text-text-primary group-hover:text-brand transition-colors">
               {title}
             </h3>
-            <Sparkles className="w-4 h-4 text-brand-light opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5" />
+            <Sparkles className="w-4 h-4 text-brand-light opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-0.5 hidden sm:block" />
           </div>
 
-          <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed flex-1">
+          <p className="break-keep text-[10px] sm:text-xs text-text-secondary line-clamp-2 leading-relaxed flex-1">
             {shortDescription}
           </p>
         </div>

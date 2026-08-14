@@ -16,9 +16,10 @@ interface GridColumnSwitcherProps {
 
 /** Lets the user pick how dense the game grid renders — separately for mobile (2/3/4 columns,
  * below `lg`) and desktop (4/5/6 columns, `lg` and up), since GameGrid uses two independent
- * preferences rather than one value that scales across breakpoints. Both groups are always shown
- * together (not just the one matching the current viewport) so the setting stays discoverable and
- * predictable regardless of which device someone is configuring from. */
+ * preferences rather than one value that scales across breakpoints. Only the group matching the
+ * *current* viewport is shown (`lg:hidden` / `hidden lg:flex`, mirroring GameGrid's own `lg`
+ * split) — showing both at once regardless of device just confused mobile users into thinking
+ * the 4/5/6 buttons did something on their screen. */
 export function GridColumnSwitcher({
   mobileColumns,
   onMobileChange,
@@ -29,7 +30,7 @@ export function GridColumnSwitcher({
 
   return (
     <div className="flex items-center gap-2">
-      <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
+      <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1 lg:hidden">
         <Smartphone className="ml-1 h-3.5 w-3.5 text-text-muted" aria-hidden="true" />
         {MOBILE_COLUMN_OPTIONS.map((option) => {
           const isSelected = option === mobileColumns;
@@ -52,7 +53,7 @@ export function GridColumnSwitcher({
         })}
       </div>
 
-      <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
+      <div className="hidden items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1 lg:flex">
         <Monitor className="ml-1 h-3.5 w-3.5 text-text-muted" aria-hidden="true" />
         {DESKTOP_COLUMN_OPTIONS.map((option) => {
           const isSelected = option === desktopColumns;

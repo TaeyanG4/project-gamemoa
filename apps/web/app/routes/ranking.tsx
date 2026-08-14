@@ -394,7 +394,7 @@ export default function Ranking() {
                                 {record.userId !== null && record.userId !== undefined ? (
                                   <Link
                                     to={`/users/${record.userId}`}
-                                    className="flex w-fit items-center gap-2 hover:underline"
+                                    className="flex w-fit items-center gap-2 text-brand-light hover:underline"
                                   >
                                     <div className="w-8 h-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-black text-xs overflow-hidden">
                                       {record.avatarUrl ? (
@@ -484,7 +484,7 @@ export default function Ranking() {
                               <td className="py-4 px-6 font-bold text-text-primary">
                                 <Link
                                   to={`/users/${record.userId}`}
-                                  className="flex w-fit items-center gap-2 hover:underline"
+                                  className="flex w-fit items-center gap-2 text-brand-light hover:underline"
                                 >
                                   <div className="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-xs overflow-hidden">
                                     {record.avatarUrl ? (

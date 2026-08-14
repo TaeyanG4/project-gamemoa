@@ -19,6 +19,7 @@ export interface Dictionary {
     login: string;
     logout: string;
     myProfile: string;
+    publicProfile: string;
     ranking: string;
     wiki: string;
     /** Appended after the provider name in the header's connected-providers badges, e.g.
@@ -1037,6 +1038,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       login: "로그인",
       logout: "로그아웃",
       myProfile: "내 프로필 & 기록",
+      publicProfile: "공개 프로필",
       ranking: "명예의 전당",
       wiki: "Wiki",
       accountSuffix: " 계정",
@@ -2218,6 +2220,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       login: "Log in",
       logout: "Log out",
       myProfile: "My Profile & Records",
+      publicProfile: "Public Profile",
       ranking: "Hall of Fame",
       wiki: "Wiki",
       accountSuffix: " account",
@@ -3419,6 +3422,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       login: "ログイン",
       logout: "ログアウト",
       myProfile: "マイプロフィール＆記録",
+      publicProfile: "公開プロフィール",
       ranking: "殿堂入り",
       wiki: "Wiki",
       accountSuffix: "アカウント",
@@ -4618,6 +4622,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       login: "登录",
       logout: "退出登录",
       myProfile: "我的资料和记录",
+      publicProfile: "公开资料",
       ranking: "名人堂",
       wiki: "Wiki",
       accountSuffix: "账号",

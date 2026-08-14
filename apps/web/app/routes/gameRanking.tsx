@@ -44,7 +44,10 @@ function PlayerCell({ record }: { record: LeaderRecord }) {
   }
 
   return (
-    <Link to={`/users/${record.userId}`} className="flex w-fit items-center gap-2 hover:underline">
+    <Link
+      to={`/users/${record.userId}`}
+      className="flex w-fit items-center gap-2 text-brand-light hover:underline"
+    >
       {avatar}
       <span>{record.playerName}</span>
     </Link>

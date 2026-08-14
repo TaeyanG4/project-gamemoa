@@ -431,10 +431,20 @@ export default function GamePlay() {
                               key={record.id}
                               className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs"
                             >
-                              <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
-                                <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
-                                <span className="truncate">{record.playerName}</span>
-                              </span>
+                              {record.userId !== null && record.userId !== undefined ? (
+                                <Link
+                                  to={`/users/${record.userId}`}
+                                  className="flex items-center gap-2 truncate font-semibold text-brand-light hover:underline"
+                                >
+                                  <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                                  <span className="truncate">{record.playerName}</span>
+                                </Link>
+                              ) : (
+                                <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
+                                  <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                                  <span className="truncate">{record.playerName}</span>
+                                </span>
+                              )}
                               <span className="shrink-0 font-black text-brand-light">
                                 {record.formattedScore}
                               </span>
