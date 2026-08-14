@@ -4,6 +4,7 @@ export default [
   index("routes/home.tsx"),
   route("games", "routes/games.tsx"),
   route("games/:slug", "routes/game-slug.tsx"),
+  route("games/:slug/ranking", "routes/gameRanking.tsx"),
   route("ranking", "routes/ranking.tsx"),
   route("profile", "routes/profile.tsx"),
   route("admin", "routes/admin.tsx"),

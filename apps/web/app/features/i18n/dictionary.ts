@@ -953,6 +953,20 @@ export interface Dictionary {
      * ("Game에서 X 기록"), so each locale needs to control the full word order itself. */
     shareText: string;
     shareCopiedFeedback: string;
+    /** Shown on the result overlay only when the game's manifest has supportsLeaderboard: true —
+     * casual games where rank doesn't mean much can opt out by setting that flag false. */
+    leaderboardTitle: string;
+    leaderboardEmpty: string;
+    viewFullRanking: string;
+  };
+  /** /games/:slug/ranking — a dedicated per-game leaderboard page (osu!-style: ranking recorded
+   * per map/game, not just one combined table). Table column headers are shared with dict.ranking
+   * (rankHeader/playerHeader/recordHeader/dateHeader etc.) rather than duplicated here. */
+  gameRanking: {
+    eyebrow: string;
+    backToGame: string;
+    notSupported: string;
+    notSupportedBody: string;
   };
   /** /changelog — page chrome only. Individual entries (apps/web/app/features/changelog/entries.ts)
    * stay Korean-only for now per the "translation doesn't have to happen inline" policy
@@ -2102,6 +2116,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareCta: "공유하기",
       shareText: "{title}에서 {score} 기록! 나도 도전해보기 🎮",
       shareCopiedFeedback: "링크가 복사되었습니다!",
+      leaderboardTitle: "리더보드",
+      leaderboardEmpty: "아직 등록된 기록이 없습니다.",
+      viewFullRanking: "전체 순위 보기 →",
+    },
+    gameRanking: {
+      eyebrow: "게임별 순위",
+      backToGame: "게임으로 돌아가기",
+      notSupported: "이 게임은 순위를 지원하지 않습니다",
+      notSupportedBody: "캐주얼 게임이라 등수 없이 즐기는 게임입니다.",
     },
     changelog: {
       eyebrow: "Changelog",
@@ -3266,6 +3289,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareCta: "Share",
       shareText: "I scored {score} in {title}! Can you beat it? 🎮",
       shareCopiedFeedback: "Link copied!",
+      leaderboardTitle: "Leaderboard",
+      leaderboardEmpty: "No records yet.",
+      viewFullRanking: "View full ranking →",
+    },
+    gameRanking: {
+      eyebrow: "Game Ranking",
+      backToGame: "Back to game",
+      notSupported: "This game doesn't support ranking",
+      notSupportedBody: "It's a casual game meant to be played without a scoreboard.",
     },
     changelog: {
       eyebrow: "Changelog",
@@ -4428,6 +4460,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareCta: "シェア",
       shareText: "{title}で{score}を記録しました！挑戦してみて 🎮",
       shareCopiedFeedback: "リンクをコピーしました！",
+      leaderboardTitle: "リーダーボード",
+      leaderboardEmpty: "まだ記録がありません。",
+      viewFullRanking: "全体ランキングを見る →",
+    },
+    gameRanking: {
+      eyebrow: "ゲーム別ランキング",
+      backToGame: "ゲームに戻る",
+      notSupported: "このゲームはランキングに対応していません",
+      notSupportedBody: "順位なしで楽しむカジュアルゲームです。",
     },
     changelog: {
       eyebrow: "Changelog",
@@ -5536,6 +5577,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       shareCta: "分享",
       shareText: "我在{title}中获得了{score}！来挑战一下吧 🎮",
       shareCopiedFeedback: "链接已复制！",
+      leaderboardTitle: "排行榜",
+      leaderboardEmpty: "暂无记录。",
+      viewFullRanking: "查看完整排行榜 →",
+    },
+    gameRanking: {
+      eyebrow: "游戏排行榜",
+      backToGame: "返回游戏",
+      notSupported: "该游戏不支持排名",
+      notSupportedBody: "这是一款无需排名、轻松享受的休闲游戏。",
     },
     changelog: {
       eyebrow: "Changelog",

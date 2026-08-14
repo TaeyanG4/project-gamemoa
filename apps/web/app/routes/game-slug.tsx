@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, type ComponentType } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import { loadGame, gameManifests } from "../features/catalog/registry";
 import {
   formatScore,
@@ -11,13 +11,23 @@ import {
   saveLocalBestScore,
   submitScoreApi,
   extractPlayTokenFromLocation,
+  fetchLeaderboardApi,
 } from "../features/scores/api";
 import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
 import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 import type { Dictionary } from "../features/i18n/dictionary";
-import { ArrowLeft, AlertCircle, RefreshCw, CheckCircle2, UserCheck, Share2 } from "lucide-react";
+import type { LeaderRecord } from "@owogg/contracts";
+import {
+  ArrowLeft,
+  AlertCircle,
+  RefreshCw,
+  CheckCircle2,
+  UserCheck,
+  Share2,
+  Trophy,
+} from "lucide-react";
 
 type SubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
 
@@ -62,6 +72,10 @@ export default function GamePlay() {
   const [rankingEligible, setRankingEligible] = useState<boolean>(() => isAuthenticated);
   const [submissionState, setSubmissionState] = useState<SubmissionState>("idle");
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+
+  // Result-screen leaderboard preview — only fetched for games that opt in
+  // (manifest.supportsLeaderboard), so casual games where rank doesn't matter can skip it.
+  const [resultLeaderboard, setResultLeaderboard] = useState<LeaderRecord[] | null>(null);
 
   const manifest = useMemo(() => gameManifests.find((m) => m.slug === slug), [slug]);
   const localizedTitle = manifest ? getLocalizedGameContent(dict, manifest).title : undefined;
@@ -139,10 +153,29 @@ export default function GamePlay() {
     setResult(null);
     setSubmissionState("idle");
     setSubmissionError(null);
+    setResultLeaderboard(null);
     setRankingEligible(isAuthenticated);
     setSessionId(crypto.randomUUID());
     setAttemptKey((prev) => prev + 1);
   }, [isAuthenticated]);
+
+  // Fetch a compact leaderboard preview as soon as the game ends (not gated on score
+  // submission succeeding — guests and rejected submissions still get competitive context).
+  // Skipped entirely for games with supportsLeaderboard: false.
+  useEffect(() => {
+    if (!result || !manifest?.supportsLeaderboard) return;
+    let isMounted = true;
+    fetchLeaderboardApi(slug)
+      .then((records) => {
+        if (isMounted) setResultLeaderboard(records.slice(0, 5));
+      })
+      .catch(() => {
+        if (isMounted) setResultLeaderboard([]);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [result, manifest, slug]);
 
   // Share Result (Web Share API where available, clipboard copy as fallback)
   const [shareCopied, setShareCopied] = useState(false);
@@ -254,6 +287,16 @@ export default function GamePlay() {
             <span className="font-bold">{localizedTitle ?? dict.gamePlay.loadingTitle}</span>
           </div>
         </div>
+
+        {manifest?.supportsLeaderboard && (
+          <Link
+            to={`/games/${slug}/ranking`}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+          >
+            <Trophy className="h-4 w-4 text-accent-yellow" />
+            <span className="hidden sm:inline">{dict.gameRanking.eyebrow}</span>
+          </Link>
+        )}
       </div>
 
       {/* Game Area Container */}
@@ -365,6 +408,44 @@ export default function GamePlay() {
                       </div>
                     )}
                   </div>
+
+                  {/* Leaderboard preview — skipped for games with supportsLeaderboard: false */}
+                  {manifest?.supportsLeaderboard && resultLeaderboard && (
+                    <div className="mt-4 border-t border-border/60 pt-4 text-left">
+                      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-text-muted">
+                        <Trophy className="h-3.5 w-3.5 text-accent-yellow" />
+                        {dict.gamePlay.leaderboardTitle}
+                      </p>
+                      {resultLeaderboard.length === 0 ? (
+                        <p className="py-3 text-center text-xs text-text-muted">
+                          {dict.gamePlay.leaderboardEmpty}
+                        </p>
+                      ) : (
+                        <ol className="space-y-1">
+                          {resultLeaderboard.map((record, i) => (
+                            <li
+                              key={record.id}
+                              className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs"
+                            >
+                              <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
+                                <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                                <span className="truncate">{record.playerName}</span>
+                              </span>
+                              <span className="shrink-0 font-black text-brand-light">
+                                {record.formattedScore}
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      <Link
+                        to={`/games/${slug}/ranking`}
+                        className="mt-2 inline-block text-[11px] font-bold text-brand-light hover:underline"
+                      >
+                        {dict.gamePlay.viewFullRanking}
+                      </Link>
+                    </div>
+                  )}
 
                   <button
                     type="button"
