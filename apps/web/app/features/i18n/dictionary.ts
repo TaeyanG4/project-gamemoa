@@ -42,7 +42,6 @@ export interface Dictionary {
   };
   footer: {
     tagline: string;
-    githubRepo: string;
     allGames: string;
     ranking: string;
     wiki: string;
@@ -1075,7 +1074,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     footer: {
       tagline: "설치 없이, 1초 만에 즐기는 미니게임",
-      githubRepo: "GitHub Repo",
       allGames: "전체 게임 목록",
       ranking: "명예의 전당",
       wiki: "Wiki",
@@ -2266,7 +2264,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     footer: {
       tagline: "No install, playable in a second",
-      githubRepo: "GitHub Repo",
       allGames: "All Games",
       ranking: "Hall of Fame",
       wiki: "Wiki",
@@ -3477,7 +3474,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     footer: {
       tagline: "インストール不要、すぐに遊べるミニゲーム",
-      githubRepo: "GitHub リポジトリ",
       allGames: "全ゲーム一覧",
       ranking: "殿堂入り",
       wiki: "Wiki",
@@ -4687,7 +4683,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     footer: {
       tagline: "无需安装，一秒畅玩的小游戏",
-      githubRepo: "GitHub 仓库",
       allGames: "全部游戏",
       ranking: "名人堂",
       wiki: "Wiki",
