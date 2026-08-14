@@ -1,6 +1,9 @@
 import { Link, useLocation } from "react-router";
-import { Home, Gamepad2, Zap, Trophy, Flame, Compass, X } from "lucide-react";
+import { Home, Gamepad2, Zap, Trophy, Flame, Compass, X, Bookmark, Check } from "lucide-react";
+import { SUPPORTED_LOCALES } from "@owogg/core";
 import { useI18n } from "../../features/i18n/I18nContext";
+import { DiscordIcon } from "../ui/DiscordIcon";
+import { NATIVE_LABELS } from "../ui/LanguageSelector";
 
 interface SidebarProps {
   isMobileOpen: boolean;
@@ -10,7 +13,7 @@ interface SidebarProps {
 export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
   const location = useLocation();
   const currentPath = location.pathname;
-  const { dict } = useI18n();
+  const { dict, locale, setLocale } = useI18n();
 
   const navItems = [
     { label: dict.sidebar.home, path: "/", icon: Home, badge: "HOT" },
@@ -133,6 +136,57 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
                 );
               })}
             </nav>
+
+            {/* Secondary actions — favorites, Discord servers, language. These stay out of the
+                header's icon row on narrow phones (Header.tsx's "growth rule" comment explains
+                why) and live here instead, so they're always one hamburger-tap away rather than
+                fighting the header for a width that phones don't have. */}
+            <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2">
+              <p className="px-4 text-[11px] font-bold text-text-muted uppercase tracking-wider">
+                {dict.sidebar.moreHeading}
+              </p>
+
+              <Link
+                to="/games?category=favorites"
+                onClick={onMobileClose}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+              >
+                <Bookmark className="w-5 h-5" />
+                <span className="text-base font-medium">{dict.sidebar.favorites}</span>
+              </Link>
+
+              <Link
+                to="/discord/servers"
+                onClick={onMobileClose}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
+              >
+                <DiscordIcon className="w-5 h-5" />
+                <span className="text-base font-medium">{dict.sidebar.discordServers}</span>
+              </Link>
+
+              <div className="px-4 py-1">
+                <div className="flex flex-wrap gap-1.5">
+                  {SUPPORTED_LOCALES.map((l) => {
+                    const active = l === locale;
+                    return (
+                      <button
+                        key={l}
+                        type="button"
+                        onClick={() => setLocale(l)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
+                          active
+                            ? "bg-brand/10 text-brand-light border border-brand/30"
+                            : "text-text-secondary border border-border hover:text-text-primary hover:bg-surface-raised"
+                        }`}
+                      >
+                        {active && <Check className="w-3 h-3" aria-hidden="true" />}
+                        {NATIVE_LABELS[l]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

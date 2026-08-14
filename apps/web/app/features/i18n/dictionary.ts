@@ -39,6 +39,12 @@ export interface Dictionary {
     reactionBrain: string;
     rankingRecords: string;
     tagline: string;
+    /** Divider label above the drawer's secondary actions (favorites/Discord servers/language) —
+     * the items narrow phones can't fit in the header itself. See Header.tsx's comment for why
+     * this split exists. */
+    moreHeading: string;
+    favorites: string;
+    discordServers: string;
   };
   footer: {
     tagline: string;
@@ -1071,6 +1077,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       reactionBrain: "순발력 & 두뇌",
       rankingRecords: "랭킹 & 기록",
       tagline: "웹 게임 100% 무설치",
+      moreHeading: "더보기",
+      favorites: "즐겨찾기",
+      discordServers: "등록된 디스코드 서버",
     },
     footer: {
       tagline: "설치 없이, 1초 만에 즐기는 미니게임",
@@ -2261,6 +2270,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       reactionBrain: "Reaction & Brain",
       rankingRecords: "Ranking & Records",
       tagline: "100% no-install web games",
+      moreHeading: "More",
+      favorites: "Favorites",
+      discordServers: "Registered Discord Servers",
     },
     footer: {
       tagline: "No install, playable in a second",
@@ -3471,6 +3483,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       reactionBrain: "反射神経＆頭脳",
       rankingRecords: "ランキング＆記録",
       tagline: "インストール不要のWebゲーム100%",
+      moreHeading: "もっと見る",
+      favorites: "お気に入り",
+      discordServers: "登録済みDiscordサーバー",
     },
     footer: {
       tagline: "インストール不要、すぐに遊べるミニゲーム",
@@ -4680,6 +4695,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       reactionBrain: "反应力和益智",
       rankingRecords: "排行榜和记录",
       tagline: "100% 免安装网页游戏",
+      moreHeading: "更多",
+      favorites: "收藏",
+      discordServers: "已注册的 Discord 服务器",
     },
     footer: {
       tagline: "无需安装，一秒畅玩的小游戏",

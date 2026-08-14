@@ -71,7 +71,16 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
           </div>
         </form>
 
-        {/* Right: Quick Actions & Auth */}
+        {/* Right: Quick Actions & Auth.
+            Growth rule for this row: on narrow phones (<sm), the header only ever shows the
+            small, fixed set of actions every visitor needs on every page — search and
+            profile/login. Everything else (favorites, Discord servers, language, and whatever
+            gets added next) lives in the `hidden sm:flex` cluster below, which is free to grow
+            since sm+ viewports have the width for it, PLUS a matching entry in the mobile
+            drawer's "more" section (Sidebar.tsx) so it's never actually unreachable on phones —
+            just one tap behind the hamburger instead of a 6th icon fighting for header space.
+            A horizontal icon row has a hard width ceiling; a vertical drawer list doesn't, so
+            new features should default to the drawer rather than squeezing into this row. */}
         <div className="flex items-center gap-2.5">
           {/* Search is a full input on sm+ (above); below that there's no room for it, so this
               icon links to /games where the search input lives instead of hiding search entirely. */}
@@ -84,17 +93,19 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
             <Search className="w-5 h-5" />
           </Link>
 
-          <Link
-            to="/games?category=favorites"
-            className="p-2.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors relative cursor-pointer"
-            title={dict.nav.favorites}
-          >
-            <Bookmark className="w-5 h-5" />
-          </Link>
+          <div className="hidden sm:flex items-center gap-2.5">
+            <Link
+              to="/games?category=favorites"
+              className="p-2.5 rounded-full text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors relative cursor-pointer"
+              title={dict.nav.favorites}
+            >
+              <Bookmark className="w-5 h-5" />
+            </Link>
 
-          <RegisteredServersMenu />
+            <RegisteredServersMenu />
 
-          <LanguageSelector />
+            <LanguageSelector />
+          </div>
 
           {isAuthenticated && user ? (
             <div className="relative" ref={userDropdownRef}>

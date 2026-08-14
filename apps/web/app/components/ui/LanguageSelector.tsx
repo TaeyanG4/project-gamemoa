@@ -5,7 +5,10 @@ import type { SupportedLocale } from "@owogg/contracts";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { useClickOutside } from "../../hooks/useClickOutside";
 
-const NATIVE_LABELS: Record<SupportedLocale, string> = {
+/** Exported so the mobile sidebar drawer (Sidebar.tsx) can render the same locale names inline
+ * without duplicating this map — the drawer hosts its own language section on narrow phones
+ * instead of this component, since a dropdown-anchored panel doesn't fit a full-width list. */
+export const NATIVE_LABELS: Record<SupportedLocale, string> = {
   "ko-KR": "한국어",
   "en-US": "English",
   "ja-JP": "日本語",
