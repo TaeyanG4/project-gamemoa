@@ -526,6 +526,51 @@ export interface Dictionary {
       calloutTestingPhase: string;
       footerNote: string;
     };
+    account: {
+      title: string;
+      description: string;
+      loginHeading: string;
+      loginBody: string;
+      profileHeading: string;
+      profileBody: string;
+      profileLink: string;
+      calloutPrefix: string;
+      calloutLink: string;
+      calloutSuffix: string;
+    };
+    accountMerge: {
+      title: string;
+      description: string;
+      howHeading: string;
+      howBodyPrefix: string;
+      howBodyPrimary: string;
+      howBodySuffix: string;
+      stepsHeading: string;
+      step1: string;
+      step2: string;
+      step3: string;
+      step4: string;
+      step5: string;
+      calloutNoMergeStrong: string;
+      calloutNoMergeBody: string;
+      calloutAdminStrong: string;
+      calloutAdminBody: string;
+      footerPrefix: string;
+      footerLink: string;
+      footerSuffix: string;
+    };
+    games: {
+      title: string;
+      description: string;
+      intro: string;
+      cardRanking: string;
+      cardRankingDesc: string;
+      cardXp: string;
+      cardXpDesc: string;
+      footerPrefix: string;
+      footerLink: string;
+      footerSuffix: string;
+    };
   };
   platformIcon: {
     chzzkLabel: string;
@@ -1092,6 +1137,59 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "현재는 서비스 검증 단계라 Featured가 자동으로 부여되지 않고, 채널 소유권이 인증된 모든 Creator가 운영진 수동 심사 대기 상태를 거칩니다. 스트리머 랭킹에는 Featured 여부와 무관하게 동일하게 노출되며, Featured 배지도 아직 공개적으로 표시하지 않습니다.",
         footerNote:
           "운영진의 심사 기준과 절차는 내부 운영 문서로 별도 관리되며, 특정 수치를 공개하지 않습니다 — 심사는 항상 공식 API로 확인 가능한 지표만 사용합니다.",
+      },
+      account: {
+        title: "계정 개요",
+        description:
+          "OwOGG는 Google과 Discord 로그인을 지원하며, 두 방식은 기본적으로 별도 계정입니다.",
+        loginHeading: "로그인 방식",
+        loginBody:
+          "Google 또는 Discord로 로그인할 수 있습니다. 같은 사람이더라도 Google로 만든 계정과 Discord로 만든 계정은 기본적으로 서로 다른 OwOGG 계정입니다 — 자동으로 합쳐지지 않습니다.",
+        profileHeading: "프로필 설정",
+        profileBody:
+          "내 프로필 페이지에서 닉네임과 국가/지역을 설정할 수 있고, 레벨·XP·업적·즐겨찾기·최근 플레이 기록을 확인할 수 있습니다.",
+        profileLink: "내 프로필로 이동 →",
+        calloutPrefix: "Google과 Discord 계정을 따로 만들었다면 ",
+        calloutLink: "계정 통합",
+        calloutSuffix: " 기능으로 하나로 합칠 수 있습니다.",
+      },
+      accountMerge: {
+        title: "계정 통합",
+        description: "Primary Account Wins 방식 — 남길 계정(Primary)을 먼저 선택하고 진행합니다.",
+        howHeading: "통합 방식: Primary Account Wins",
+        howBodyPrefix: "두 계정 중 계속 사용할 계정을 ",
+        howBodyPrimary: "Primary",
+        howBodySuffix:
+          "로 지정합니다. 통합이 완료되면 Primary의 게임 기록·XP·개인화 설정이 그대로 유지되고, Secondary의 해당 데이터는 합쳐지지 않고 정리됩니다. Secondary에 연결되어 있던 Google/Discord 로그인 수단만 Primary로 옮겨져, 이후에는 어느 수단으로 로그인해도 같은 Primary 계정으로 들어오게 됩니다.",
+        stepsHeading: "진행 순서",
+        step1: "계속 사용할 계정(Primary)으로 로그인합니다.",
+        step2: "계정 통합을 시작하고, 합칠 대상 계정(Secondary)으로 본인 확인을 진행합니다.",
+        step3: "통합 내용을 확인합니다 — Secondary의 게임/개인화 데이터는 유지되지 않습니다.",
+        step4: "확인 후 통합을 확정합니다.",
+        step5: "이후 Secondary였던 로그인 수단으로도 Primary 계정에 로그인됩니다.",
+        calloutNoMergeStrong: "기록은 합쳐지지 않습니다.",
+        calloutNoMergeBody:
+          " Primary의 점수/XP/진행도만 유지되며, Secondary의 기록은 통합 후 사라집니다 — 반드시 남기고 싶은 계정을 Primary로 선택하세요.",
+        calloutAdminStrong: "Secondary 계정이 관리자 계정이면 통합이 차단됩니다.",
+        calloutAdminBody:
+          " 관리자 권한이 있는 계정을 Secondary로 통합하면 그 권한이 어디로도 옮겨지지 않고 사라질 수 있어, OwOGG는 안전을 위해 이 경우 통합 자체를 막고 운영진의 별도 처리를 요구합니다.",
+        footerPrefix: "플랫폼 소유권 인증(Creator)이 되어 있는 계정을 통합하는 경우의 규칙은 ",
+        footerLink: "Creator 채널 소유권 인증",
+        footerSuffix: " 문서를 참고하세요.",
+      },
+      games: {
+        title: "게임과 랭킹 개요",
+        description:
+          "OwOGG는 반응속도, 순서 기억력, 에임, 타자 속도 등 미니게임 카탈로그를 제공합니다.",
+        intro:
+          "각 게임은 독립적인 규칙과 점수 방식을 가지며, 유효한 기록은 자동으로 랭킹에 반영됩니다. 플레이와 별개로 활동 자체는 경험치(XP)로도 누적됩니다.",
+        cardRanking: "랭킹 →",
+        cardRankingDesc: "게임별/스트리머 랭킹 계산 방식",
+        cardXp: "XP와 레벨 →",
+        cardXpDesc: "경험치 지급 방식과 레벨 공식",
+        footerPrefix: "지금 바로 ",
+        footerLink: "게임 카탈로그",
+        footerSuffix: "에서 플레이해보세요.",
       },
     },
     platformIcon: {
@@ -1666,6 +1764,64 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "We are currently in a service validation phase, so Featured is not granted automatically: every Creator with verified channel ownership goes through a staff manual-review queue. Streamer ranking visibility is identical regardless of Featured status, and the Featured badge is not publicly displayed yet.",
         footerNote:
           "Staff review criteria and procedures are maintained separately as internal operations documents, and specific figures are not published — review always uses only metrics verifiable through official APIs.",
+      },
+      account: {
+        title: "Account Overview",
+        description:
+          "OwOGG supports Google and Discord sign-in, and by default the two are separate accounts.",
+        loginHeading: "Sign-in methods",
+        loginBody:
+          "You can sign in with Google or Discord. Even for the same person, an account created via Google and one created via Discord are different OwOGG accounts by default — they are never merged automatically.",
+        profileHeading: "Profile settings",
+        profileBody:
+          "On your profile page you can set your nickname and country/region, and review your level, XP, achievements, favorites, and recent play history.",
+        profileLink: "Go to my profile →",
+        calloutPrefix:
+          "If you created separate Google and Discord accounts, you can combine them into one with ",
+        calloutLink: "account merge",
+        calloutSuffix: ".",
+      },
+      accountMerge: {
+        title: "Account Merge",
+        description:
+          "Primary Account Wins — pick the account you want to keep (the Primary) first, then proceed.",
+        howHeading: "How it works: Primary Account Wins",
+        howBodyPrefix: "Designate the account you want to keep using as the ",
+        howBodyPrimary: "Primary",
+        howBodySuffix:
+          ". Once the merge completes, the Primary's game records, XP, and personalization settings are kept as-is, while the Secondary's equivalent data is discarded rather than combined. Only the Google/Discord sign-in methods attached to the Secondary move over to the Primary, so afterwards either method signs you into the same Primary account.",
+        stepsHeading: "Steps",
+        step1: "Sign in with the account you want to keep (the Primary).",
+        step2:
+          "Start the account merge and verify ownership of the account to be merged (the Secondary).",
+        step3: "Review the summary — the Secondary's game/personalization data will not be kept.",
+        step4: "Confirm to finalize the merge.",
+        step5:
+          "From then on, the former Secondary sign-in method also signs you into the Primary account.",
+        calloutNoMergeStrong: "Records are not combined.",
+        calloutNoMergeBody:
+          " Only the Primary's scores/XP/progress are kept; the Secondary's records are gone after the merge — be sure to choose the account you want to keep as the Primary.",
+        calloutAdminStrong: "The merge is blocked if the Secondary is an administrator account.",
+        calloutAdminBody:
+          " Merging an account that holds admin privileges as the Secondary could make those privileges vanish without transferring anywhere, so for safety OwOGG blocks the merge outright and requires separate handling by staff.",
+        footerPrefix:
+          "For the rules that apply when merging an account with Creator channel ownership verification, see the ",
+        footerLink: "Creator channel ownership verification",
+        footerSuffix: " article.",
+      },
+      games: {
+        title: "Games & Ranking Overview",
+        description:
+          "OwOGG offers a catalog of mini-games including reaction time, sequence memory, aim, and typing speed.",
+        intro:
+          "Each game has its own rules and scoring, and valid records are reflected in the rankings automatically. Separately from scores, the act of playing also accumulates XP.",
+        cardRanking: "Ranking →",
+        cardRankingDesc: "How per-game and streamer rankings are calculated",
+        cardXp: "XP & Levels →",
+        cardXpDesc: "How XP is granted and the level formula",
+        footerPrefix: "Jump right into the ",
+        footerLink: "game catalog",
+        footerSuffix: " and start playing.",
       },
     },
     platformIcon: {
@@ -2243,6 +2399,61 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerNote:
           "運営の審査基準と手順は内部運用ドキュメントとして別途管理され、具体的な数値は公開していません — 審査には常に公式APIで確認可能な指標のみを使用します。",
       },
+      account: {
+        title: "アカウント概要",
+        description:
+          "OwOGGはGoogleとDiscordのログインに対応しており、2つは基本的に別々のアカウントです。",
+        loginHeading: "ログイン方法",
+        loginBody:
+          "GoogleまたはDiscordでログインできます。同じ方であっても、Googleで作成したアカウントとDiscordで作成したアカウントは基本的に別のOwOGGアカウントです — 自動的に統合されることはありません。",
+        profileHeading: "プロフィール設定",
+        profileBody:
+          "プロフィールページでニックネームと国・地域を設定でき、レベル・XP・実績・お気に入り・最近プレイした記録を確認できます。",
+        profileLink: "プロフィールへ移動 →",
+        calloutPrefix: "GoogleとDiscordのアカウントを別々に作成した場合は、",
+        calloutLink: "アカウント統合",
+        calloutSuffix: "機能で1つにまとめられます。",
+      },
+      accountMerge: {
+        title: "アカウント統合",
+        description:
+          "Primary Account Wins方式 — 残すアカウント（Primary）を先に選んでから進めます。",
+        howHeading: "統合方式: Primary Account Wins",
+        howBodyPrefix: "2つのアカウントのうち、使い続ける方を",
+        howBodyPrimary: "Primary",
+        howBodySuffix:
+          "に指定します。統合が完了すると、Primaryのゲーム記録・XP・パーソナライズ設定はそのまま維持され、Secondaryの該当データは統合されずに整理されます。Secondaryに紐づいていたGoogle/Discordのログイン手段のみがPrimaryへ移り、以降はどちらの手段でログインしても同じPrimaryアカウントに入ります。",
+        stepsHeading: "手順",
+        step1: "使い続けるアカウント（Primary）でログインします。",
+        step2: "アカウント統合を開始し、統合対象のアカウント（Secondary）で本人確認を行います。",
+        step3: "統合内容を確認します — Secondaryのゲーム・パーソナライズデータは維持されません。",
+        step4: "確認後、統合を確定します。",
+        step5: "以降はSecondaryだったログイン手段でもPrimaryアカウントにログインできます。",
+        calloutNoMergeStrong: "記録は統合されません。",
+        calloutNoMergeBody:
+          " Primaryのスコア・XP・進行度のみが維持され、Secondaryの記録は統合後に失われます — 必ず残したいアカウントをPrimaryとして選択してください。",
+        calloutAdminStrong: "Secondaryが管理者アカウントの場合、統合はブロックされます。",
+        calloutAdminBody:
+          " 管理者権限を持つアカウントをSecondaryとして統合すると、その権限がどこにも移らずに失われる可能性があるため、OwOGGは安全のためこの場合の統合自体を防ぎ、運営による個別対応を必要とします。",
+        footerPrefix:
+          "プラットフォーム所有権認証（Creator）済みのアカウントを統合する場合のルールは、",
+        footerLink: "Creatorチャンネル所有権認証",
+        footerSuffix: "のドキュメントをご覧ください。",
+      },
+      games: {
+        title: "ゲームとランキングの概要",
+        description:
+          "OwOGGは反応速度、順序記憶、エイム、タイピング速度などのミニゲームカタログを提供します。",
+        intro:
+          "各ゲームは独立したルールとスコア方式を持ち、有効な記録は自動的にランキングへ反映されます。プレイとは別に、活動そのものも経験値（XP）として蓄積されます。",
+        cardRanking: "ランキング →",
+        cardRankingDesc: "ゲーム別・ストリーマーランキングの計算方式",
+        cardXp: "XPとレベル →",
+        cardXpDesc: "経験値の付与方式とレベル計算式",
+        footerPrefix: "今すぐ",
+        footerLink: "ゲームカタログ",
+        footerSuffix: "からプレイしてみましょう。",
+      },
     },
     platformIcon: {
       chzzkLabel: "CHZZK",
@@ -2790,6 +3001,57 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
           "目前处于服务验证阶段，因此不会自动授予 Featured，所有已认证频道所有权的 Creator 都会进入运营人工审核等待状态。无论是否为 Featured，在主播排行榜中的展示完全相同，并且 Featured 徽章目前尚未公开显示。",
         footerNote:
           "运营的审核标准与流程作为内部运营文档单独管理，不公开具体数值 —— 审核始终只使用可通过官方 API 核实的指标。",
+      },
+      account: {
+        title: "账户概览",
+        description: "OwOGG 支持 Google 与 Discord 登录，两者默认属于各自独立的账户。",
+        loginHeading: "登录方式",
+        loginBody:
+          "你可以使用 Google 或 Discord 登录。即使是同一个人，通过 Google 创建的账户与通过 Discord 创建的账户默认也是不同的 OwOGG 账户 —— 系统不会自动合并。",
+        profileHeading: "个人资料设置",
+        profileBody:
+          "在个人资料页面可以设置昵称和国家/地区，并查看等级、XP、成就、收藏以及最近游玩记录。",
+        profileLink: "前往我的个人资料 →",
+        calloutPrefix: "如果你分别创建了 Google 和 Discord 账户，可以通过",
+        calloutLink: "账户合并",
+        calloutSuffix: "功能将它们合并为一个。",
+      },
+      accountMerge: {
+        title: "账户合并",
+        description: "采用 Primary Account Wins 方式 —— 请先选择要保留的账户（Primary）再继续。",
+        howHeading: "合并方式：Primary Account Wins",
+        howBodyPrefix: "将两个账户中你要继续使用的那个指定为 ",
+        howBodyPrimary: "Primary",
+        howBodySuffix:
+          "。合并完成后，Primary 的游戏记录、XP 和个性化设置将原封不动地保留，而 Secondary 的对应数据不会被合并，而是被清理。只有绑定在 Secondary 上的 Google/Discord 登录方式会转移到 Primary，此后无论使用哪种方式登录，都会进入同一个 Primary 账户。",
+        stepsHeading: "操作步骤",
+        step1: "使用你要继续使用的账户（Primary）登录。",
+        step2: "启动账户合并，并使用待合并的账户（Secondary）完成身份验证。",
+        step3: "确认合并内容 —— Secondary 的游戏/个性化数据不会被保留。",
+        step4: "确认无误后完成合并。",
+        step5: "此后使用原 Secondary 的登录方式也会登录到 Primary 账户。",
+        calloutNoMergeStrong: "记录不会被合并。",
+        calloutNoMergeBody:
+          " 仅保留 Primary 的分数/XP/进度，Secondary 的记录在合并后会消失 —— 请务必将想保留的账户选为 Primary。",
+        calloutAdminStrong: "若 Secondary 为管理员账户，合并将被阻止。",
+        calloutAdminBody:
+          " 若将拥有管理员权限的账户作为 Secondary 合并，该权限可能不会转移到任何地方而直接消失，因此出于安全考虑，OwOGG 会直接阻止此类合并，并要求由运营单独处理。",
+        footerPrefix: "关于合并已完成平台所有权认证（Creator）账户的规则，请参阅",
+        footerLink: "Creator 频道所有权认证",
+        footerSuffix: "文档。",
+      },
+      games: {
+        title: "游戏与排行榜概览",
+        description: "OwOGG 提供包括反应速度、顺序记忆、瞄准、打字速度等在内的迷你游戏目录。",
+        intro:
+          "每款游戏都有各自独立的规则与计分方式，有效记录会自动计入排行榜。除分数之外，游玩行为本身也会累积经验值（XP）。",
+        cardRanking: "排行榜 →",
+        cardRankingDesc: "各游戏/主播排行榜的计算方式",
+        cardXp: "XP 与等级 →",
+        cardXpDesc: "经验值的发放方式与等级公式",
+        footerPrefix: "现在就到",
+        footerLink: "游戏目录",
+        footerSuffix: "开始游玩吧。",
       },
     },
     platformIcon: {
