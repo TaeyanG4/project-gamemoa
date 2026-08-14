@@ -129,7 +129,7 @@ export default function DiscordServerManageRoute() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 px-4 py-8">
+    <div className="mx-auto max-w-3xl space-y-8 px-4 py-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

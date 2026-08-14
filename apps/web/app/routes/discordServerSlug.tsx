@@ -126,7 +126,7 @@ export default function DiscordServerSlugRoute() {
   const currentManifest = GAME_MANIFESTS.find((m) => m.id === selectedGameId);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 px-4 py-8">
+    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
       {/* Header Banner */}
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-6 md:p-8 backdrop-blur-md shadow-2xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -158,7 +158,6 @@ export default function DiscordServerSlugRoute() {
                   {guild.visibility}
                 </span>
               </div>
-              <p className="text-xs font-mono text-indigo-400">/discord/servers/{guild.slug}</p>
             </div>
           </div>
 

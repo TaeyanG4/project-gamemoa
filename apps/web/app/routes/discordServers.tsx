@@ -115,7 +115,7 @@ export default function DiscordServersRoute() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
+    <div className="mx-auto max-w-7xl space-y-8 px-4 py-8">
       {/* Search Header Banner */}
       <div className="rounded-3xl bg-slate-900/80 border border-white/10 p-6 md:p-8 backdrop-blur-md space-y-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -200,8 +200,7 @@ export default function DiscordServersRoute() {
                 <div className="text-4xl">🎉</div>
                 <h3 className="text-lg font-bold text-white">{dict.discordServers.successTitle}</h3>
                 <p className="text-xs text-slate-300">
-                  <span className="font-semibold text-indigo-300">{regSuccessGuild.name}</span>{" "}
-                  (/discord/servers/{regSuccessGuild.slug})
+                  <span className="font-semibold text-indigo-300">{regSuccessGuild.name}</span>
                 </p>
                 <div className="pt-4 flex gap-3">
                   <Link
@@ -350,7 +349,7 @@ export default function DiscordServersRoute() {
             <p className="text-xs text-slate-400">{dict.discordServers.emptyResultsHint}</p>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {guilds.map((guild) => (
               <Link
                 key={guild.guildId}
@@ -374,9 +373,6 @@ export default function DiscordServersRoute() {
                       <h3 className="truncate text-base font-bold text-white group-hover:text-indigo-300 transition-colors">
                         {guild.name}
                       </h3>
-                      <p className="truncate text-xs text-slate-400 font-mono">
-                        /discord/servers/{guild.slug}
-                      </p>
                     </div>
                   </div>
 
