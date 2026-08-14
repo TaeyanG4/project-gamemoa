@@ -24,7 +24,7 @@ export default function WikiAccountRoute() {
         <h2 className="text-lg font-black text-text-primary">{t.profileHeading}</h2>
         <p className="mt-2 text-sm text-text-secondary">{t.profileBody}</p>
         <Link
-          to="/profile"
+          to="/settings"
           className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-brand-light hover:underline"
         >
           {t.profileLink}

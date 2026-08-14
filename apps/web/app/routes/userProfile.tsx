@@ -1,12 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router";
-import { ArrowLeft, Flame, Trophy, Award, Video, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  Flame,
+  Trophy,
+  Award,
+  Video,
+  AlertCircle,
+  RefreshCw,
+  Bookmark,
+  Clock,
+  Lock,
+} from "lucide-react";
 import { useAuth } from "../features/auth";
 import { useI18n } from "../features/i18n/I18nContext";
 import { fetchPublicProfileApi } from "../features/profile/api";
 import { gameManifests } from "../features/catalog/registry";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
+import { GameFavoriteCard, GameActivityCard } from "../components/ui/GameLinkCard";
 import { ACHIEVEMENT_DEFINITIONS, type AchievementCode } from "@owogg/core";
 import { ApiClientError } from "../lib/api";
 import type { PublicProfileResponse } from "@owogg/contracts";
@@ -32,11 +44,15 @@ function countryFlagEmoji(code: string): string {
 
 type LoadState = "loading" | "success" | "notFound" | "error";
 
-/** /users/:id — public profile. Intentionally not a grid-of-bordered-cards like /profile
- * (that layout suits a private settings dashboard); this one leans on generous whitespace,
- * type hierarchy, and thin dividers so it reads as one continuous page instead of stacked
- * boxes. Only shows data that is genuinely public server-side — favorites/recent plays live
- * in localStorage only and have no public server representation, so they're omitted here. */
+/** /users/:id — the single unified "프로필" page (replaces the old split between this public
+ * page and /profile's private "내 프로필" tab, which duplicated header/avatar/records). Not a
+ * grid-of-bordered-cards; leans on generous whitespace, type hierarchy, and thin dividers so it
+ * reads as one continuous page instead of stacked boxes. Account settings (nickname, connected
+ * logins, creator verification, visibility toggles) live separately at /settings — this page is
+ * display-only. Favorites/recent-plays are gated server-side per viewer (see
+ * getPublicProfileData's viewerId param): `null` means hidden from the CURRENT viewer, which
+ * for a guest or another user can mean either "set private" or "empty" — those aren't
+ * distinguished on purpose, since revealing "private but non-empty" is itself a small leak. */
 export default function UserProfileRoute() {
   const { id } = useParams();
   const { dict } = useI18n();
@@ -110,6 +126,19 @@ export default function UserProfileRoute() {
   const isOwnProfile = viewer?.id === data.id;
   const flag = data.country ? countryFlagEmoji(data.country) : "";
 
+  const favoriteGames = (data.favoriteGameIds ?? [])
+    .map((id) => gameManifests.find((g) => g.slug === id || g.id === id))
+    .filter((g): g is (typeof gameManifests)[number] => Boolean(g));
+
+  const recentGames = (data.recentPlays ?? [])
+    .map((r) => {
+      const game = gameManifests.find((g) => g.slug === r.gameId || g.id === r.gameId);
+      return game ? { game, lastPlayedAt: r.lastPlayedAt } : null;
+    })
+    .filter((entry): entry is { game: (typeof gameManifests)[number]; lastPlayedAt: string } =>
+      Boolean(entry),
+    );
+
   const gameRecords = data.gameBests
     .map((best) => {
       const manifest = gameManifests.find((g) => g.slug === best.gameId || g.id === best.gameId);
@@ -174,7 +203,7 @@ export default function UserProfileRoute() {
           </div>
           {isOwnProfile && (
             <Link
-              to="/profile"
+              to="/settings"
               className="mt-1 w-fit text-xs font-bold text-brand-light hover:underline sm:mx-0 mx-auto"
             >
               {dict.userProfile.manageProfileCta}
@@ -298,6 +327,94 @@ export default function UserProfileRoute() {
           </div>
         )}
       </section>
+
+      {/* Favorites — only rendered at all when this viewer is entitled to see it (the owner
+          always is; other viewers only when the owner made it public from /settings). */}
+      {data.favoriteGameIds !== null && (
+        <section className="flex flex-col gap-3 border-t border-border pt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-text-primary">
+              <Bookmark className="h-4 w-4 text-accent-yellow" />
+              {dict.userProfile.favoritesTitle}
+            </h2>
+            <div className="flex items-center gap-2">
+              {isOwnProfile && !data.visibilitySettings?.showFavorites && (
+                <PrivateBadge label={dict.userProfile.onlyVisibleToYou} />
+              )}
+              <span className="text-xs font-bold text-text-muted">
+                {favoriteGames.length}
+                {dict.userProfile.itemsCountSuffix}
+              </span>
+            </div>
+          </div>
+          {favoriteGames.length === 0 ? (
+            <p className="text-xs text-text-muted">{dict.userProfile.favoritesEmpty}</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {favoriteGames.map((game) => (
+                <GameFavoriteCard key={game.slug} game={game} />
+              ))}
+            </div>
+          )}
+          {isOwnProfile && (
+            <Link
+              to="/settings"
+              className="w-fit text-[11px] font-bold text-text-muted hover:text-brand-light hover:underline"
+            >
+              {dict.userProfile.settingsCta}
+            </Link>
+          )}
+        </section>
+      )}
+
+      {/* Recent plays — same viewer-gating as favorites, independent toggle. */}
+      {data.recentPlays !== null && (
+        <section className="flex flex-col gap-3 border-t border-border pt-6">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-text-primary">
+              <Clock className="h-4 w-4 text-brand" />
+              {dict.userProfile.recentPlaysTitle}
+            </h2>
+            <div className="flex items-center gap-2">
+              {isOwnProfile && !data.visibilitySettings?.showRecentPlays && (
+                <PrivateBadge label={dict.userProfile.onlyVisibleToYou} />
+              )}
+              <span className="text-xs font-bold text-text-muted">
+                {recentGames.length}
+                {dict.userProfile.itemsCountSuffix}
+              </span>
+            </div>
+          </div>
+          {recentGames.length === 0 ? (
+            <p className="text-xs text-text-muted">{dict.userProfile.recentPlaysEmpty}</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {recentGames.map(({ game, lastPlayedAt }) => (
+                <GameActivityCard key={game.slug} game={game} lastPlayedAt={lastPlayedAt} />
+              ))}
+            </div>
+          )}
+          {isOwnProfile && (
+            <Link
+              to="/settings"
+              className="w-fit text-[11px] font-bold text-text-muted hover:text-brand-light hover:underline"
+            >
+              {dict.userProfile.settingsCta}
+            </Link>
+          )}
+        </section>
+      )}
     </div>
+  );
+}
+
+/** Small inline marker next to a section only the owner can see — makes it obvious the section
+ * isn't part of what visitors get, without needing a whole explanatory paragraph. */
+function PrivateBadge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-raised px-2 py-0.5 text-[10px] font-bold text-text-muted">
+      <Lock className="h-2.5 w-2.5" />
+      {label}
+    </span>
   );
 }

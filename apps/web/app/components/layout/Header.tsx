@@ -1,5 +1,14 @@
 import { Link, useNavigate } from "react-router";
-import { Search, Menu, Bookmark, User, Command, LogOut, Trophy, ExternalLink } from "lucide-react";
+import {
+  Search,
+  Menu,
+  Bookmark,
+  User,
+  Command,
+  LogOut,
+  Trophy,
+  Settings as SettingsIcon,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useI18n } from "../../features/i18n/I18nContext";
@@ -155,8 +164,11 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                     </div>
                   </div>
 
+                  {/* A single "프로필" entry — this used to be two separate links (a private
+                      "내 프로필" and a "공개 프로필") pointing at two pages that duplicated most
+                      of their content; they're merged into one unified page at /users/:id now. */}
                   <Link
-                    to="/profile"
+                    to={`/users/${user.id}`}
                     onClick={() => setShowUserDropdown(false)}
                     className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
                   >
@@ -165,12 +177,12 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                   </Link>
 
                   <Link
-                    to={`/users/${user.id}`}
+                    to="/settings"
                     onClick={() => setShowUserDropdown(false)}
                     className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
                   >
-                    <ExternalLink className="w-4 h-4 text-brand-light" />
-                    <span>{dict.nav.publicProfile}</span>
+                    <SettingsIcon className="w-4 h-4 text-brand-light" />
+                    <span>{dict.nav.settings}</span>
                   </Link>
 
                   <Link

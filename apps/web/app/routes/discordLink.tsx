@@ -153,7 +153,7 @@ export default function DiscordLinkPage() {
           {dict.discordLink.successBodySuffix}
         </p>
         <Link
-          to="/profile"
+          to="/settings"
           className="px-8 py-3 bg-brand text-white font-extrabold rounded-2xl shadow-xl shadow-brand/30 hover:scale-105 transition-all cursor-pointer"
         >
           {dict.discordLink.goToProfileCta}

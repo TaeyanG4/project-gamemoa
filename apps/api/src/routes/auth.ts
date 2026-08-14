@@ -328,13 +328,13 @@ authRouter.get("/discord/callback", async (c) => {
     }
 
     if (!code || !state || !linkIntent || linkIntent.state !== state) {
-      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+      return c.redirect(`${frontendUrl}/settings?link_status=error`);
     }
 
     // Re-validate the current authenticated session belongs to the same user that started the link.
     const auth = await requireAuth(c);
     if (!auth || auth.userId !== linkIntent.userId) {
-      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+      return c.redirect(`${frontendUrl}/settings?link_status=error`);
     }
 
     const clientId = c.env.DISCORD_CLIENT_ID;
@@ -342,11 +342,11 @@ authRouter.get("/discord/callback", async (c) => {
     const redirectUri = getDiscordRedirectUri(c);
 
     if (!clientId || !clientSecret) {
-      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+      return c.redirect(`${frontendUrl}/settings?link_status=error`);
     }
     const exchangeResult = await exchangeDiscordCode({ code, clientId, clientSecret, redirectUri });
     if (!exchangeResult.valid || !exchangeResult.profile) {
-      return c.redirect(`${frontendUrl}/profile?link_status=error`);
+      return c.redirect(`${frontendUrl}/settings?link_status=error`);
     }
 
     const profile = exchangeResult.profile;
@@ -368,13 +368,13 @@ authRouter.get("/discord/callback", async (c) => {
           profile.id,
         );
         return c.redirect(
-          `${frontendUrl}/profile?link_status=conflict&provider=discord&challenge=${encodeURIComponent(challenge.challengeId)}`,
+          `${frontendUrl}/settings?link_status=conflict&provider=discord&challenge=${encodeURIComponent(challenge.challengeId)}`,
         );
       }
-      return c.redirect(`${frontendUrl}/profile?link_status=already&provider=discord`);
+      return c.redirect(`${frontendUrl}/settings?link_status=already&provider=discord`);
     }
 
-    return c.redirect(`${frontendUrl}/profile?link_status=success&provider=discord`);
+    return c.redirect(`${frontendUrl}/settings?link_status=success&provider=discord`);
   }
 
   // ---- Normal LOGIN callback ----

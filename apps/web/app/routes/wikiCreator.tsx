@@ -36,7 +36,7 @@ export default function WikiCreatorRoute() {
 
       <p className="text-xs text-text-muted">
         {t.profileHint}{" "}
-        <Link to="/profile" className="font-bold text-brand-light hover:underline">
+        <Link to="/settings" className="font-bold text-brand-light hover:underline">
           {t.profileLink}
         </Link>
       </p>

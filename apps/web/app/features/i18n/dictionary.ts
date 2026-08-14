@@ -19,7 +19,7 @@ export interface Dictionary {
     login: string;
     logout: string;
     myProfile: string;
-    publicProfile: string;
+    settings: string;
     ranking: string;
     wiki: string;
     /** Appended after the provider name in the header's connected-providers badges, e.g.
@@ -144,12 +144,23 @@ export interface Dictionary {
     rank2: string;
     rank3: string;
   };
+  /** The SETTINGS page (/settings). Display-only profile content lives under `userProfile`
+   * (/users/:id) — these two used to overlap heavily and were merged; this namespace keeps
+   * only the sensitive/account-management side. */
   profile: {
-    myProfileTab: string;
-    recordsTab: string;
+    pageTitle: string;
+    pageSubtitle: string;
     joinedLabel: string;
-    viewPublicProfileCta: string;
+    viewProfileCta: string;
     logout: string;
+    visibilityTitle: string;
+    visibilitySubtitle: string;
+    visibilityFavoritesLabel: string;
+    visibilityRecentPlaysLabel: string;
+    visibilityPublicOption: string;
+    visibilityPrivateOption: string;
+    visibilityUpdated: string;
+    visibilityUpdateFailed: string;
     favoritesTitle: string;
     emptyFavorites: string;
     recentPlaysTitle: string;
@@ -1017,6 +1028,15 @@ export interface Dictionary {
     gameRecordsEmpty: string;
     creatorBadgesTitle: string;
     manageProfileCta: string;
+    favoritesTitle: string;
+    favoritesEmpty: string;
+    recentPlaysTitle: string;
+    recentPlaysEmpty: string;
+    itemsCountSuffix: string;
+    /** Badge shown to the OWNER next to a section only they can see, so it's obvious the
+     * section isn't part of what visitors get. */
+    onlyVisibleToYou: string;
+    settingsCta: string;
   };
   /** Header icon that lists PUBLIC-visibility registered Discord servers (lives next to
    * favorites/language selector) — fetched lazily on first open, not on every page load. */
@@ -1061,8 +1081,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       favorites: "즐겨찾기",
       login: "로그인",
       logout: "로그아웃",
-      myProfile: "내 프로필 & 기록",
-      publicProfile: "공개 프로필",
+      myProfile: "프로필",
+      settings: "설정",
       ranking: "명예의 전당",
       wiki: "Wiki",
       accountSuffix: " 계정",
@@ -1176,10 +1196,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       rank3: "3위",
     },
     profile: {
-      myProfileTab: "내 프로필",
-      recordsTab: "기록",
+      pageTitle: "설정",
+      pageSubtitle: "계정 정보와 공개 범위를 관리합니다.",
+      visibilityTitle: "공개 범위",
+      visibilitySubtitle: "각 항목을 다른 사람의 프로필 방문 시 보여줄지 선택합니다.",
+      visibilityFavoritesLabel: "즐겨찾기",
+      visibilityRecentPlaysLabel: "최근 플레이",
+      visibilityPublicOption: "공개",
+      visibilityPrivateOption: "비공개",
+      visibilityUpdated: "공개 범위를 저장했습니다.",
+      visibilityUpdateFailed: "공개 범위를 저장하지 못했습니다.",
       joinedLabel: "가입일",
-      viewPublicProfileCta: "공개 프로필 보기",
+      viewProfileCta: "프로필 보기",
       logout: "로그아웃",
       favoritesTitle: "즐겨찾기",
       emptyFavorites:
@@ -2216,7 +2244,14 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       gameRecordsTitle: "게임별 최고 기록",
       gameRecordsEmpty: "아직 등록된 기록이 없습니다.",
       creatorBadgesTitle: "인증된 크리에이터 채널",
-      manageProfileCta: "내 프로필 관리 →",
+      manageProfileCta: "설정 →",
+      favoritesTitle: "즐겨찾기",
+      favoritesEmpty: "아직 즐겨찾기한 게임이 없습니다.",
+      recentPlaysTitle: "최근 플레이",
+      recentPlaysEmpty: "아직 플레이 기록이 없습니다.",
+      itemsCountSuffix: "개",
+      onlyVisibleToYou: "나만 보기",
+      settingsCta: "설정에서 변경",
     },
     registeredServers: {
       ariaLabel: "등록된 Discord 서버",
@@ -2254,8 +2289,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       favorites: "Favorites",
       login: "Log in",
       logout: "Log out",
-      myProfile: "My Profile & Records",
-      publicProfile: "Public Profile",
+      myProfile: "Profile",
+      settings: "Settings",
       ranking: "Hall of Fame",
       wiki: "Wiki",
       accountSuffix: " account",
@@ -2369,10 +2404,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       rank3: "3rd",
     },
     profile: {
-      myProfileTab: "My Profile",
-      recordsTab: "Records",
+      pageTitle: "Settings",
+      pageSubtitle: "Manage your account details and what others can see.",
+      visibilityTitle: "Visibility",
+      visibilitySubtitle: "Choose what visitors see when they open your profile.",
+      visibilityFavoritesLabel: "Favorites",
+      visibilityRecentPlaysLabel: "Recent Plays",
+      visibilityPublicOption: "Public",
+      visibilityPrivateOption: "Private",
+      visibilityUpdated: "Visibility saved.",
+      visibilityUpdateFailed: "Couldn't save visibility.",
       joinedLabel: "Joined",
-      viewPublicProfileCta: "View public profile",
+      viewProfileCta: "View profile",
       logout: "Log out",
       favoritesTitle: "Favorites",
       emptyFavorites: "No favorite games yet. Tap the bookmark icon on a game card to add one.",
@@ -3429,7 +3472,14 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       gameRecordsTitle: "Best records by game",
       gameRecordsEmpty: "No records yet.",
       creatorBadgesTitle: "Verified creator channels",
-      manageProfileCta: "Manage my profile →",
+      manageProfileCta: "Settings →",
+      favoritesTitle: "Favorites",
+      favoritesEmpty: "No favorite games yet.",
+      recentPlaysTitle: "Recent Plays",
+      recentPlaysEmpty: "No plays recorded yet.",
+      itemsCountSuffix: "",
+      onlyVisibleToYou: "Only you",
+      settingsCta: "Change in settings",
     },
     registeredServers: {
       ariaLabel: "Registered Discord servers",
@@ -3467,8 +3517,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       favorites: "お気に入り",
       login: "ログイン",
       logout: "ログアウト",
-      myProfile: "マイプロフィール＆記録",
-      publicProfile: "公開プロフィール",
+      myProfile: "プロフィール",
+      settings: "設定",
       ranking: "殿堂入り",
       wiki: "Wiki",
       accountSuffix: "アカウント",
@@ -3582,10 +3632,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       rank3: "3位",
     },
     profile: {
-      myProfileTab: "マイプロフィール",
-      recordsTab: "記録",
+      pageTitle: "設定",
+      pageSubtitle: "アカウント情報と公開範囲を管理します。",
+      visibilityTitle: "公開範囲",
+      visibilitySubtitle: "他の人がプロフィールを開いたときに表示する項目を選びます。",
+      visibilityFavoritesLabel: "お気に入り",
+      visibilityRecentPlaysLabel: "最近のプレイ",
+      visibilityPublicOption: "公開",
+      visibilityPrivateOption: "非公開",
+      visibilityUpdated: "公開範囲を保存しました。",
+      visibilityUpdateFailed: "公開範囲を保存できませんでした。",
       joinedLabel: "登録日",
-      viewPublicProfileCta: "公開プロフィールを見る",
+      viewProfileCta: "プロフィールを見る",
       logout: "ログアウト",
       favoritesTitle: "お気に入り",
       emptyFavorites:
@@ -4641,7 +4699,14 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       gameRecordsTitle: "ゲーム別ベスト記録",
       gameRecordsEmpty: "まだ記録がありません。",
       creatorBadgesTitle: "認証済みクリエイターチャンネル",
-      manageProfileCta: "マイプロフィール管理 →",
+      manageProfileCta: "設定 →",
+      favoritesTitle: "お気に入り",
+      favoritesEmpty: "まだお気に入りのゲームがありません。",
+      recentPlaysTitle: "最近のプレイ",
+      recentPlaysEmpty: "まだプレイ記録がありません。",
+      itemsCountSuffix: "件",
+      onlyVisibleToYou: "自分のみ",
+      settingsCta: "設定で変更",
     },
     registeredServers: {
       ariaLabel: "登録済みDiscordサーバー",
@@ -4679,8 +4744,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       favorites: "收藏",
       login: "登录",
       logout: "退出登录",
-      myProfile: "我的资料和记录",
-      publicProfile: "公开资料",
+      myProfile: "个人资料",
+      settings: "设置",
       ranking: "名人堂",
       wiki: "Wiki",
       accountSuffix: "账号",
@@ -4793,10 +4858,18 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       rank3: "第3名",
     },
     profile: {
-      myProfileTab: "我的资料",
-      recordsTab: "记录",
+      pageTitle: "设置",
+      pageSubtitle: "管理账号信息与公开范围。",
+      visibilityTitle: "公开范围",
+      visibilitySubtitle: "选择他人访问你的资料页时可以看到的内容。",
+      visibilityFavoritesLabel: "收藏",
+      visibilityRecentPlaysLabel: "最近游玩",
+      visibilityPublicOption: "公开",
+      visibilityPrivateOption: "私密",
+      visibilityUpdated: "已保存公开范围。",
+      visibilityUpdateFailed: "无法保存公开范围。",
       joinedLabel: "加入日期",
-      viewPublicProfileCta: "查看公开资料",
+      viewProfileCta: "查看个人资料",
       logout: "退出登录",
       favoritesTitle: "收藏",
       emptyFavorites: "还没有收藏的游戏。点击游戏卡片上的收藏图标即可添加。",
@@ -5798,7 +5871,14 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       gameRecordsTitle: "各游戏最佳记录",
       gameRecordsEmpty: "暂无记录。",
       creatorBadgesTitle: "认证创作者频道",
-      manageProfileCta: "管理我的资料 →",
+      manageProfileCta: "设置 →",
+      favoritesTitle: "收藏",
+      favoritesEmpty: "还没有收藏的游戏。",
+      recentPlaysTitle: "最近游玩",
+      recentPlaysEmpty: "还没有游玩记录。",
+      itemsCountSuffix: "个",
+      onlyVisibleToYou: "仅自己可见",
+      settingsCta: "在设置中修改",
     },
     registeredServers: {
       ariaLabel: "已注册的 Discord 服务器",

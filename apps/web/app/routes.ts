@@ -7,6 +7,7 @@ export default [
   route("games/:slug/ranking", "routes/gameRanking.tsx"),
   route("ranking", "routes/ranking.tsx"),
   route("profile", "routes/profile.tsx"),
+  route("settings", "routes/settings.tsx"),
   route("users/:id", "routes/userProfile.tsx"),
   route("admin", "routes/admin.tsx"),
   route("admin/creators", "routes/adminCreators.tsx"),

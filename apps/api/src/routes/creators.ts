@@ -166,13 +166,13 @@ creatorsRouter.get("/verify/:platform", async (c) => {
 
   const validPlatforms: CreatorPlatformType[] = ["YOUTUBE", "TWITCH", "CHZZK", "SOOP"];
   if (!validPlatforms.includes(rawPlatform as CreatorPlatformType)) {
-    return c.redirect(`${frontendUrl}/profile?creator_verify=error&reason=invalid_platform`);
+    return c.redirect(`${frontendUrl}/settings?creator_verify=error&reason=invalid_platform`);
   }
 
   const platform = rawPlatform as CreatorPlatformType;
   if (!auth) {
     return c.redirect(
-      `${frontendUrl}/profile?creator_verify=unauthorized&platform=${platform.toLowerCase()}`,
+      `${frontendUrl}/settings?creator_verify=unauthorized&platform=${platform.toLowerCase()}`,
     );
   }
 
@@ -180,7 +180,7 @@ creatorsRouter.get("/verify/:platform", async (c) => {
   const adapter = adapters[platform];
   if (!adapter || !adapter.isConfigured()) {
     return c.redirect(
-      `${frontendUrl}/profile?creator_verify=unconfigured&platform=${platform.toLowerCase()}`,
+      `${frontendUrl}/settings?creator_verify=unconfigured&platform=${platform.toLowerCase()}`,
     );
   }
 
@@ -232,14 +232,14 @@ creatorsRouter.get("/verify/:platform/callback", async (c) => {
 
   if (!code || !state || !intent || intent.state !== state || intent.platform !== rawPlatform) {
     return c.redirect(
-      `${frontendUrl}/profile?creator_verify=error&reason=state_mismatch&platform=${rawPlatform.toLowerCase()}`,
+      `${frontendUrl}/settings?creator_verify=error&reason=state_mismatch&platform=${rawPlatform.toLowerCase()}`,
     );
   }
 
   const auth = await requireAuth(c);
   if (!auth || auth.userId !== intent.userId) {
     return c.redirect(
-      `${frontendUrl}/profile?creator_verify=unauthorized&platform=${rawPlatform.toLowerCase()}`,
+      `${frontendUrl}/settings?creator_verify=unauthorized&platform=${rawPlatform.toLowerCase()}`,
     );
   }
 
@@ -247,7 +247,7 @@ creatorsRouter.get("/verify/:platform/callback", async (c) => {
   const adapter = adapters[rawPlatform];
   if (!adapter || !adapter.isConfigured()) {
     return c.redirect(
-      `${frontendUrl}/profile?creator_verify=unconfigured&platform=${rawPlatform.toLowerCase()}`,
+      `${frontendUrl}/settings?creator_verify=unconfigured&platform=${rawPlatform.toLowerCase()}`,
     );
   }
 
@@ -261,23 +261,23 @@ creatorsRouter.get("/verify/:platform/callback", async (c) => {
     if (!result.ok) {
       if (result.code === "CHANNEL_ALREADY_VERIFIED") {
         return c.redirect(
-          `${frontendUrl}/profile?creator_verify=conflict&platform=${rawPlatform.toLowerCase()}`,
+          `${frontendUrl}/settings?creator_verify=conflict&platform=${rawPlatform.toLowerCase()}`,
         );
       }
       return c.redirect(
-        `${frontendUrl}/profile?creator_verify=error&platform=${rawPlatform.toLowerCase()}`,
+        `${frontendUrl}/settings?creator_verify=error&platform=${rawPlatform.toLowerCase()}`,
       );
     }
 
     return c.redirect(
-      `${frontendUrl}/profile?creator_verify=success&platform=${rawPlatform.toLowerCase()}&channel=${encodeURIComponent(
+      `${frontendUrl}/settings?creator_verify=success&platform=${rawPlatform.toLowerCase()}&channel=${encodeURIComponent(
         channelInfo.channelName,
       )}`,
     );
   } catch (err) {
     console.error(`Creator verification error for ${rawPlatform}:`, err);
     return c.redirect(
-      `${frontendUrl}/profile?creator_verify=error&platform=${rawPlatform.toLowerCase()}`,
+      `${frontendUrl}/settings?creator_verify=error&platform=${rawPlatform.toLowerCase()}`,
     );
   }
 });
