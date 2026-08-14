@@ -36,4 +36,5 @@ export default [
   route("wiki/creator/featured", "routes/wikiCreatorFeatured.tsx"),
   route("terms", "routes/terms.tsx"),
   route("privacy", "routes/privacy.tsx"),
+  route("changelog", "routes/changelog.tsx"),
 ] satisfies RouteConfig;

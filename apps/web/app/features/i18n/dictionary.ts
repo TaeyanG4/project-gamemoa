@@ -28,6 +28,7 @@ export interface Dictionary {
     allGames: string;
     ranking: string;
     wiki: string;
+    changelog: string;
     rightsReserved: string;
   };
   home: {
@@ -929,6 +930,18 @@ export interface Dictionary {
     retryGameCta: string;
     backToListResult: string;
   };
+  /** /changelog — page chrome only. Individual entries (apps/web/app/features/changelog/entries.ts)
+   * stay Korean-only for now per the "translation doesn't have to happen inline" policy
+   * (docs/i18n-content/GUIDE.md) — this is fast-growing content, not a fixed page. */
+  changelog: {
+    eyebrow: string;
+    title: string;
+    subtitle: string;
+    emptyState: string;
+    tagFeature: string;
+    tagImprovement: string;
+    tagFix: string;
+  };
   platformIcon: {
     chzzkLabel: string;
     soopLabel: string;
@@ -962,6 +975,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       allGames: "전체 게임 목록",
       ranking: "명예의 전당",
       wiki: "Wiki",
+      changelog: "업데이트 로그",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -2050,6 +2064,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retryGameCta: "🔄 다시 하기",
       backToListResult: "목록으로",
     },
+    changelog: {
+      eyebrow: "Changelog",
+      title: "업데이트 로그",
+      subtitle: "OwOGG의 변경 사항과 공지를 확인하세요.",
+      emptyState: "아직 등록된 업데이트가 없습니다.",
+      tagFeature: "신규",
+      tagImprovement: "개선",
+      tagFix: "수정",
+    },
     platformIcon: {
       chzzkLabel: "CHZZK (치지직)",
       soopLabel: "SOOP (아프리카)",
@@ -2081,6 +2104,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       allGames: "All Games",
       ranking: "Hall of Fame",
       wiki: "Wiki",
+      changelog: "Changelog",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -3189,6 +3213,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retryGameCta: "🔄 Play again",
       backToListResult: "Back to list",
     },
+    changelog: {
+      eyebrow: "Changelog",
+      title: "Changelog",
+      subtitle: "See what's new and what's changed on OwOGG.",
+      emptyState: "No updates yet.",
+      tagFeature: "New",
+      tagImprovement: "Improved",
+      tagFix: "Fixed",
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -3220,6 +3253,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       allGames: "全ゲーム一覧",
       ranking: "殿堂入り",
       wiki: "Wiki",
+      changelog: "更新履歴",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -4326,6 +4360,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retryGameCta: "🔄 もう一度プレイ",
       backToListResult: "リストに戻る",
     },
+    changelog: {
+      eyebrow: "Changelog",
+      title: "更新履歴",
+      subtitle: "OwOGGの変更点やお知らせをご確認ください。",
+      emptyState: "まだ更新履歴がありません。",
+      tagFeature: "新機能",
+      tagImprovement: "改善",
+      tagFix: "修正",
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -4357,6 +4400,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       allGames: "全部游戏",
       ranking: "名人堂",
       wiki: "Wiki",
+      changelog: "更新日志",
       rightsReserved: "All rights reserved.",
     },
     home: {
@@ -5408,6 +5452,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       retrySubmitCta: "重新提交分数",
       retryGameCta: "🔄 再玩一次",
       backToListResult: "返回列表",
+    },
+    changelog: {
+      eyebrow: "Changelog",
+      title: "更新日志",
+      subtitle: "查看 OwOGG 的更新与公告。",
+      emptyState: "暂无更新记录。",
+      tagFeature: "新功能",
+      tagImprovement: "改进",
+      tagFix: "修复",
     },
     platformIcon: {
       chzzkLabel: "CHZZK",

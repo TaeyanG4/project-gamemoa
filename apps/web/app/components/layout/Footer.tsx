@@ -40,11 +40,14 @@ export function Footer() {
           <Link to="/wiki" className="hover:text-text-primary transition-colors">
             {dict.footer.wiki}
           </Link>
+          <Link to="/changelog" className="hover:text-text-primary transition-colors">
+            {dict.footer.changelog}
+          </Link>
           <Link to="/terms" className="hover:text-text-primary transition-colors">
-            이용약관
+            {dict.legal.terms.pageTitle}
           </Link>
           <Link to="/privacy" className="hover:text-text-primary transition-colors">
-            개인정보처리방침
+            {dict.legal.privacy.pageTitle}
           </Link>
         </div>
       </div>
