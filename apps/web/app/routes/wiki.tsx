@@ -49,8 +49,8 @@ function buildCategories(dict: Dictionary["wiki"]) {
     },
     {
       icon: FileText,
-      title: "정책",
-      description: "이용약관과 개인정보 처리방침을 확인하세요.",
+      title: dict.catPolicyTitle,
+      description: dict.catPolicyDesc,
       path: "/terms",
       tone: "text-sky-300 bg-sky-500/10 border-sky-500/30",
     },

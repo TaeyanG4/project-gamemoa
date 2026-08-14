@@ -1,0 +1,42 @@
+{
+  "categories": {
+    "all": "全部",
+    "popular": "热门",
+    "reaction": "反应力",
+    "brain": "益智",
+    "aim": "瞄准",
+    "typing": "打字",
+    "favorites": "收藏"
+  },
+  "games": {
+    "reactionTime": {
+      "title": "反应速度测试",
+      "shortDescription": "当屏幕颜色改变时，请尽快点击！",
+      "description": "在绿色屏幕出现的瞬间，尽可能快地点击。测试您的反应速度。",
+      "tags": ["反应速度", "点击", "时机"]
+    },
+    "memoryTest": {
+      "title": "顺序记忆力测试",
+      "shortDescription": "记住闪烁颜色的顺序，并按相同顺序按下！",
+      "description": "尝试完美记住越来越长的模式。您的短期记忆力极限在哪里？",
+      "tags": ["记忆力", "益智", "模式", "家庭"]
+    },
+    "aimTest": {
+      "title": "瞄准测试",
+      "shortDescription": "快速瞄准并点击屏幕上出现的目标！",
+      "description": "准确且快速地瞄准并点击随机生成的31个目标。测量您的反应速度和准确度。",
+      "tags": ["瞄准", "对准", "反应速度", "点击"]
+    },
+    "typingTest": {
+      "title": "打字速度测试",
+      "shortDescription": "在60秒内快速准确地输入给定句子，以测量您的WPM（每分钟单词数）和准确度！",
+      "description": "通过输入英文单词来测试自己的打字速度（WPM）、每分钟击键数（CPM）和准确度。挑战您精湛的打字技巧。",
+      "tags": ["打字", "WPM", "速度", "反应力", "益智"]
+    }
+  },
+  "_note_wikiHomePolicyCard": "以下与游戏无关，但在发现dict.wiki卡片网格中缺少翻译后一并存放在此处（/wiki首页的“政策”卡片）。",
+  "wikiHomePolicyCard": {
+    "title": "政策",
+    "description": "查看服务条款和隐私政策。"
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "_note": "This is a legal document, so human review is recommended after translation. In particular, the 'Personal Information Collected' and 'Purpose of Collection' lists are compiled by comparing with the actual DB schema, so please be careful not to alter their meaning.",
+  "terms": {
+    "metaTitle": "Terms of Service",
+    "metaDescription": "OwOGG Terms of Service",
+    "pageTitle": "Terms of Service",
+    "effectiveDate": "Effective Date: August 14, 2026",
+    "sections": [
+      {
+        "heading": "1. Service Overview",
+        "body": "OwOGG (hereinafter \"Service\") is a web mini-game collection platform enjoyed directly in the browser without installation, providing additional features such as Discord server integration, rankings/experience points (XP), and Creator channel verification."
+      },
+      {
+        "heading": "2. Accounts and Login",
+        "body": "The Service only supports OAuth login through Google or Discord accounts and does not directly issue separate IDs/passwords (excluding administrator-exclusive accounts). Users must log in only with accounts they own, and users themselves are responsible for managing their accounts."
+      },
+      {
+        "heading": "3. Obligations of Users",
+        "intro": "Users shall not engage in the following activities:",
+        "list": [
+          "Fraudulently manipulating game records or experience points using automated tools, macros, etc.",
+          "Registering or verifying accounts, channels, or Discord servers not owned by oneself as if they were owned by oneself",
+          "Collecting or posting others' personal information without authorization, or causing harm to others through the Service",
+          "Attacks, excessive requests, or exploiting vulnerabilities that interfere with the normal operation of the Service"
+        ]
+      },
+      {
+        "heading": "4. Content and Game Records",
+        "body": "Game records, nicknames, and profile information created by users are used for service provision purposes such as rankings/XP. The Service may adjust or delete data deemed as fraudulent records without prior notice."
+      },
+      {
+        "heading": "5. Changes to and Discontinuation of Service",
+        "body": "The Service may change or discontinue games, features, and screen configurations provided as needed for operational or technical reasons without prior notice. The Service is provided free of charge and does not guarantee availability or specific performance."
+      },
+      {
+        "heading": "6. Disclaimer",
+        "body": "The Service is a free personal/small-scale project and is not liable for damages arising from or related to the use of the Service to the extent permitted by applicable laws, except for damages caused by intentional misconduct or gross negligence."
+      },
+      {
+        "heading": "7. Amendments to Terms",
+        "body": "These Terms may be amended when necessary, and notice will be provided on this page upon amendment. The amended Terms shall take effect immediately upon posting."
+      },
+      {
+        "heading": "8. Contact Us",
+        "bodyPrefix": "For inquiries regarding the use of the Service, please contact ",
+        "bodyEmail": "taeyang95@naver.com",
+        "bodySuffix": "."
+      }
+    ]
+  },
+  "privacy": {
+    "metaTitle": "Privacy Policy",
+    "metaDescription": "OwOGG Privacy Policy",
+    "pageTitle": "Privacy Policy",
+    "effectiveDate": "Effective Date: August 14, 2026",
+    "sections": [
+      {
+        "heading": "1. Personal Information Collected",
+        "intro": "OwOGG collects only the following information to provide the Service:",
+        "list": [
+          {
+            "term": "Login Information",
+            "desc": " — Email, nickname (display name), profile picture URL, and unique account identifier (sub/ID) provided when logging in with a Google or Discord account"
+          },
+          {
+            "term": "Game Play Records",
+            "desc": " — Scores/records per game, experience points (XP), level, and achievement history"
+          },
+          {
+            "term": "Profile Settings",
+            "desc": " — Nickname directly entered by the user, country/region (optional, self-reported information, not proof of nationality)"
+          },
+          {
+            "term": "Discord Integration Information",
+            "desc": " — Discord user ID when linking accounts, server ID/name/icon and administrative permissions when registering servers (guilds)"
+          },
+          {
+            "term": "Creator Channel Verification Information",
+            "desc": " — Channel name, channel URL, subscriber/follower count verified through official APIs of respective platforms (YouTube/Twitch/CHZZK/SOOP) when voluntarily completing channel ownership verification to participate in Streamer rankings"
+          }
+        ],
+        "outro": "Passwords are not collected separately (administrator-exclusive accounts are an exception, where passwords are stored hashed with PBKDF2 and never stored in plain text)."
+      },
+      {
+        "heading": "2. Purpose of Collection",
+        "list": [
+          "Member identification and maintaining login state",
+          "Providing game records, rankings, and experience point systems",
+          "Querying user account information in Discord bot commands and aggregating activity per server",
+          "Verifying eligibility for Creator/Streamer rankings",
+          "Detecting abusive behavior (abuse) and maintaining service stability"
+        ]
+      },
+      {
+        "heading": "3. Retention Period",
+        "body": "Personal information is retained until member withdrawal or user request for deletion, except where separate retention is required by applicable laws."
+      },
+      {
+        "heading": "4. Provision to Third Parties",
+        "body": "OwOGG does not provide or sell users' personal information to third parties for advertising or marketing purposes. Only infrastructure necessary for service operation (Cloudflare — server/database hosting) is used, which does not constitute provision for third-party marketing."
+      },
+      {
+        "heading": "5. Rights of Users",
+        "body": "Users may request to inspect, correct, or delete (account deletion) their personal information at any time. Please contact the email address below, and we will process it upon verification."
+      },
+      {
+        "heading": "6. Cookies and Sessions",
+        "body": "Session cookies are used to maintain login status. Tracking cookies for advertising purposes or third-party analytics tools are not used."
+      },
+      {
+        "heading": "7. Contact Us",
+        "bodyPrefix": "For inquiries regarding privacy, please contact ",
+        "bodyEmail": "taeyang95@naver.com",
+        "bodySuffix": "."
+      }
+    ]
+  }
+}

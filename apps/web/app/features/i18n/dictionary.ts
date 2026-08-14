@@ -62,6 +62,15 @@ export interface Dictionary {
     searchPlaceholder: string;
     emptyFavorites: string;
     emptySearch: string;
+    categories: {
+      all: string;
+      popular: string;
+      reaction: string;
+      brain: string;
+      aim: string;
+      typing: string;
+      favorites: string;
+    };
   };
   ranking: {
     eyebrow: string;
@@ -469,6 +478,8 @@ export interface Dictionary {
     catAccountDesc: string;
     catGamesDesc: string;
     catCreatorDesc: string;
+    catPolicyTitle: string;
+    catPolicyDesc: string;
   };
   /** Wiki article bodies. Split from `wiki` (which holds the shell: nav, home, category cards)
    * so each article's prose stays grouped by page. Sentences that wrap an inline <b>/<Link>
@@ -799,6 +810,60 @@ export interface Dictionary {
       footerSuffix: string;
     };
   };
+  /** /terms and /privacy. Section numbering matches the numbered headings shown on the page
+   * (sectionNHeading etc.) so it's easy to cross-check against docs/i18n-content/03-terms-privacy.json,
+   * which uses the same section order. */
+  legal: {
+    terms: {
+      metaTitle: string;
+      metaDescription: string;
+      pageTitle: string;
+      effectiveDate: string;
+      section1Heading: string;
+      section1Body: string;
+      section2Heading: string;
+      section2Body: string;
+      section3Heading: string;
+      section3Intro: string;
+      section3List: string[];
+      section4Heading: string;
+      section4Body: string;
+      section5Heading: string;
+      section5Body: string;
+      section6Heading: string;
+      section6Body: string;
+      section7Heading: string;
+      section7Body: string;
+      section8Heading: string;
+      section8BodyPrefix: string;
+      section8BodyEmail: string;
+      section8BodySuffix: string;
+    };
+    privacy: {
+      metaTitle: string;
+      metaDescription: string;
+      pageTitle: string;
+      effectiveDate: string;
+      section1Heading: string;
+      section1Intro: string;
+      section1List: { term: string; desc: string }[];
+      section1Outro: string;
+      section2Heading: string;
+      section2List: string[];
+      section3Heading: string;
+      section3Body: string;
+      section4Heading: string;
+      section4Body: string;
+      section5Heading: string;
+      section5Body: string;
+      section6Heading: string;
+      section6Body: string;
+      section7Heading: string;
+      section7BodyPrefix: string;
+      section7BodyEmail: string;
+      section7BodySuffix: string;
+    };
+  };
   platformIcon: {
     chzzkLabel: string;
     soopLabel: string;
@@ -860,6 +925,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       searchPlaceholder: "게임 검색...",
       emptyFavorites: "아직 즐겨찾기한 게임이 없습니다.",
       emptySearch: "검색 결과와 일치하는 게임이 없습니다.",
+      categories: {
+        all: "전체",
+        popular: "인기",
+        reaction: "순발력",
+        brain: "두뇌",
+        aim: "에임",
+        typing: "타자",
+        favorites: "즐겨찾기",
+      },
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",
@@ -1298,6 +1372,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       catAccountDesc: "로그인 방식, 프로필 설정, 여러 계정을 하나로 합치는 계정 통합.",
       catGamesDesc: "게임 카탈로그, 순위 계산 방식, 경험치(XP)와 레벨.",
       catCreatorDesc: "채널 소유권 인증, 스트리머 랭킹 자격, Featured Creator 기준.",
+      catPolicyTitle: "정책",
+      catPolicyDesc: "이용약관과 개인정보 처리방침을 확인하세요.",
     },
     wikiBody: {
       creator: {
@@ -1734,6 +1810,100 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerSuffix: "의 FAQ도 확인해보세요.",
       },
     },
+    legal: {
+      terms: {
+        metaTitle: "이용약관",
+        metaDescription: "OwOGG 서비스 이용약관",
+        pageTitle: "이용약관",
+        effectiveDate: "시행일: 2026년 8월 14일",
+        section1Heading: "1. 서비스 개요",
+        section1Body:
+          'OwOGG(이하 "서비스")는 설치 없이 브라우저에서 바로 즐기는 웹 미니게임 모음 플랫폼이며, Discord 서버 연동, 랭킹/경험치(XP), Creator 채널 인증 등 부가 기능을 함께 제공합니다.',
+        section2Heading: "2. 계정 및 로그인",
+        section2Body:
+          "서비스는 Google 또는 Discord 계정을 통한 OAuth 로그인만 지원하며, 별도의 아이디/비밀번호를 직접 발급하지 않습니다(관리자 전용 계정 제외). 이용자는 본인이 소유한 계정으로만 로그인해야 하며, 계정 관리에 대한 책임은 이용자 본인에게 있습니다.",
+        section3Heading: "3. 이용자의 의무",
+        section3Intro: "이용자는 다음 행위를 해서는 안 됩니다.",
+        section3List: [
+          "자동화 도구, 매크로 등을 이용해 게임 기록이나 경험치를 부정하게 조작하는 행위",
+          "본인이 소유하지 않은 계정, 채널, Discord 서버를 마치 본인 소유인 것처럼 등록하거나 인증하는 행위",
+          "타인의 개인정보를 무단으로 수집·게시하거나 서비스를 통해 타인에게 피해를 주는 행위",
+          "서비스의 정상적인 운영을 방해하는 공격, 과도한 요청, 취약점 악용 행위",
+        ],
+        section4Heading: "4. 콘텐츠 및 게임 기록",
+        section4Body:
+          "이용자가 생성한 게임 기록, 닉네임, 프로필 정보는 랭킹/XP 등 서비스 제공 목적으로 사용됩니다. 서비스는 부정 기록으로 판단되는 데이터를 사전 통지 없이 조정하거나 삭제할 수 있습니다.",
+        section5Heading: "5. 서비스 변경 및 중단",
+        section5Body:
+          "서비스는 운영상·기술상 필요에 따라 제공하는 게임, 기능, 화면 구성을 예고 없이 변경하거나 중단할 수 있습니다. 서비스는 무료로 제공되며, 가용성이나 특정 성능을 보장하지 않습니다.",
+        section6Heading: "6. 면책조항",
+        section6Body:
+          "서비스는 무료로 제공되는 개인/소규모 프로젝트로, 관련 법령이 허용하는 범위에서 서비스 이용과 관련하여 발생하는 손해에 대해 책임을 지지 않습니다. 다만 고의 또는 중과실로 인한 손해는 예외로 합니다.",
+        section7Heading: "7. 약관의 변경",
+        section7Body:
+          "본 약관은 필요시 개정될 수 있으며, 개정 시 이 페이지를 통해 고지합니다. 개정된 약관은 게시와 동시에 효력이 발생합니다.",
+        section8Heading: "8. 문의",
+        section8BodyPrefix: "서비스 이용과 관련한 문의는 ",
+        section8BodyEmail: "taeyang95@naver.com",
+        section8BodySuffix: "으로 연락해 주세요.",
+      },
+      privacy: {
+        metaTitle: "개인정보 처리방침",
+        metaDescription: "OwOGG 개인정보 처리방침",
+        pageTitle: "개인정보 처리방침",
+        effectiveDate: "시행일: 2026년 8월 14일",
+        section1Heading: "1. 수집하는 개인정보 항목",
+        section1Intro: "OwOGG는 서비스 제공을 위해 아래 정보만 수집합니다.",
+        section1List: [
+          {
+            term: "로그인 정보",
+            desc: " — Google 또는 Discord 계정으로 로그인 시 제공되는 이메일, 닉네임(표시 이름), 프로필 사진 URL, 계정 고유 식별자(sub/ID)",
+          },
+          {
+            term: "게임 이용 기록",
+            desc: " — 게임별 점수/기록, 경험치(XP), 레벨, 도전과제 달성 내역",
+          },
+          {
+            term: "프로필 설정",
+            desc: " — 이용자가 직접 입력하는 닉네임, 국가/지역(선택, 자기 신고 정보이며 국적 인증이 아님)",
+          },
+          {
+            term: "Discord 연동 정보",
+            desc: " — 계정 연동 시 Discord 사용자 ID, 서버(길드) 등록 시 서버 ID/이름/아이콘, 관리 권한 여부",
+          },
+          {
+            term: "Creator 채널 인증 정보",
+            desc: " — 스트리머 랭킹 참여를 위해 자발적으로 채널 소유권 인증을 진행한 경우, 해당 플랫폼(YouTube/Twitch/CHZZK/SOOP)의 공식 API를 통해 확인된 채널명, 채널 URL, 구독자/팔로워 수",
+          },
+        ],
+        section1Outro:
+          "비밀번호는 별도로 수집하지 않습니다(관리자 전용 계정은 예외이며, 해당 비밀번호는 PBKDF2로 해시되어 저장되고 평문으로 보관되지 않습니다).",
+        section2Heading: "2. 수집 목적",
+        section2List: [
+          "회원 식별 및 로그인 상태 유지",
+          "게임 기록·랭킹·경험치 시스템 제공",
+          "Discord 봇 명령어에서 본인 계정 정보 조회, 서버별 활동 집계",
+          "Creator/스트리머 랭킹 자격 확인",
+          "부정 이용(어뷰징) 탐지 및 서비스 안정성 유지",
+        ],
+        section3Heading: "3. 보관 기간",
+        section3Body:
+          "개인정보는 회원 탈퇴 시 또는 이용자의 삭제 요청 시까지 보관하며, 관련 법령에서 별도 보관을 요구하는 경우 그에 따릅니다.",
+        section4Heading: "4. 제3자 제공",
+        section4Body:
+          "OwOGG는 이용자의 개인정보를 광고, 마케팅 등 목적으로 제3자에게 제공하거나 판매하지 않습니다. 서비스 운영에 필요한 인프라(Cloudflare — 서버/데이터베이스 호스팅)만 이용하며, 이는 제3자 마케팅 제공에 해당하지 않습니다.",
+        section5Heading: "5. 이용자의 권리",
+        section5Body:
+          "이용자는 언제든지 본인의 개인정보 열람, 정정, 삭제(계정 탈퇴)를 요청할 수 있습니다. 아래 문의처로 연락해 주시면 확인 후 처리해 드립니다.",
+        section6Heading: "6. 쿠키 및 세션",
+        section6Body:
+          "로그인 상태 유지를 위해 세션 쿠키를 사용합니다. 광고 목적의 추적 쿠키나 제3자 분석 도구는 사용하지 않습니다.",
+        section7Heading: "7. 문의",
+        section7BodyPrefix: "개인정보 관련 문의는 ",
+        section7BodyEmail: "taeyang95@naver.com",
+        section7BodySuffix: "으로 연락해 주세요.",
+      },
+    },
     platformIcon: {
       chzzkLabel: "CHZZK (치지직)",
       soopLabel: "SOOP (아프리카)",
@@ -1793,6 +1963,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       searchPlaceholder: "Search games...",
       emptyFavorites: "You haven't favorited any games yet.",
       emptySearch: "No games match your search.",
+      categories: {
+        all: "All",
+        popular: "Popular",
+        reaction: "Reaction",
+        brain: "Brain",
+        aim: "Aim",
+        typing: "Typing",
+        favorites: "Favorites",
+      },
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",
@@ -2237,6 +2416,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       catGamesDesc: "The game catalog, how rankings are calculated, and XP & levels.",
       catCreatorDesc:
         "Channel ownership verification, streamer ranking eligibility, and Featured Creator criteria.",
+      catPolicyTitle: "Policies",
+      catPolicyDesc: "Check the Terms of Service and Privacy Policy.",
     },
     wikiBody: {
       creator: {
@@ -2686,6 +2867,100 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerSuffix: " too.",
       },
     },
+    legal: {
+      terms: {
+        metaTitle: "Terms of Service",
+        metaDescription: "OwOGG Terms of Service",
+        pageTitle: "Terms of Service",
+        effectiveDate: "Effective Date: August 14, 2026",
+        section1Heading: "1. Service Overview",
+        section1Body:
+          'OwOGG (hereinafter "Service") is a web mini-game collection platform enjoyed directly in the browser without installation, providing additional features such as Discord server integration, rankings/experience points (XP), and Creator channel verification.',
+        section2Heading: "2. Accounts and Login",
+        section2Body:
+          "The Service only supports OAuth login through Google or Discord accounts and does not directly issue separate IDs/passwords (excluding administrator-exclusive accounts). Users must log in only with accounts they own, and users themselves are responsible for managing their accounts.",
+        section3Heading: "3. Obligations of Users",
+        section3Intro: "Users shall not engage in the following activities:",
+        section3List: [
+          "Fraudulently manipulating game records or experience points using automated tools, macros, etc.",
+          "Registering or verifying accounts, channels, or Discord servers not owned by oneself as if they were owned by oneself",
+          "Collecting or posting others' personal information without authorization, or causing harm to others through the Service",
+          "Attacks, excessive requests, or exploiting vulnerabilities that interfere with the normal operation of the Service",
+        ],
+        section4Heading: "4. Content and Game Records",
+        section4Body:
+          "Game records, nicknames, and profile information created by users are used for service provision purposes such as rankings/XP. The Service may adjust or delete data deemed as fraudulent records without prior notice.",
+        section5Heading: "5. Changes to and Discontinuation of Service",
+        section5Body:
+          "The Service may change or discontinue games, features, and screen configurations provided as needed for operational or technical reasons without prior notice. The Service is provided free of charge and does not guarantee availability or specific performance.",
+        section6Heading: "6. Disclaimer",
+        section6Body:
+          "The Service is a free personal/small-scale project and is not liable for damages arising from or related to the use of the Service to the extent permitted by applicable laws, except for damages caused by intentional misconduct or gross negligence.",
+        section7Heading: "7. Amendments to Terms",
+        section7Body:
+          "These Terms may be amended when necessary, and notice will be provided on this page upon amendment. The amended Terms shall take effect immediately upon posting.",
+        section8Heading: "8. Contact Us",
+        section8BodyPrefix: "For inquiries regarding the use of the Service, please contact ",
+        section8BodyEmail: "taeyang95@naver.com",
+        section8BodySuffix: ".",
+      },
+      privacy: {
+        metaTitle: "Privacy Policy",
+        metaDescription: "OwOGG Privacy Policy",
+        pageTitle: "Privacy Policy",
+        effectiveDate: "Effective Date: August 14, 2026",
+        section1Heading: "1. Personal Information Collected",
+        section1Intro: "OwOGG collects only the following information to provide the Service:",
+        section1List: [
+          {
+            term: "Login Information",
+            desc: " — Email, nickname (display name), profile picture URL, and unique account identifier (sub/ID) provided when logging in with a Google or Discord account",
+          },
+          {
+            term: "Game Play Records",
+            desc: " — Scores/records per game, experience points (XP), level, and achievement history",
+          },
+          {
+            term: "Profile Settings",
+            desc: " — Nickname directly entered by the user, country/region (optional, self-reported information, not proof of nationality)",
+          },
+          {
+            term: "Discord Integration Information",
+            desc: " — Discord user ID when linking accounts, server ID/name/icon and administrative permissions when registering servers (guilds)",
+          },
+          {
+            term: "Creator Channel Verification Information",
+            desc: " — Channel name, channel URL, subscriber/follower count verified through official APIs of respective platforms (YouTube/Twitch/CHZZK/SOOP) when voluntarily completing channel ownership verification to participate in Streamer rankings",
+          },
+        ],
+        section1Outro:
+          "Passwords are not collected separately (administrator-exclusive accounts are an exception, where passwords are stored hashed with PBKDF2 and never stored in plain text).",
+        section2Heading: "2. Purpose of Collection",
+        section2List: [
+          "Member identification and maintaining login state",
+          "Providing game records, rankings, and experience point systems",
+          "Querying user account information in Discord bot commands and aggregating activity per server",
+          "Verifying eligibility for Creator/Streamer rankings",
+          "Detecting abusive behavior (abuse) and maintaining service stability",
+        ],
+        section3Heading: "3. Retention Period",
+        section3Body:
+          "Personal information is retained until member withdrawal or user request for deletion, except where separate retention is required by applicable laws.",
+        section4Heading: "4. Provision to Third Parties",
+        section4Body:
+          "OwOGG does not provide or sell users' personal information to third parties for advertising or marketing purposes. Only infrastructure necessary for service operation (Cloudflare — server/database hosting) is used, which does not constitute provision for third-party marketing.",
+        section5Heading: "5. Rights of Users",
+        section5Body:
+          "Users may request to inspect, correct, or delete (account deletion) their personal information at any time. Please contact the email address below, and we will process it upon verification.",
+        section6Heading: "6. Cookies and Sessions",
+        section6Body:
+          "Session cookies are used to maintain login status. Tracking cookies for advertising purposes or third-party analytics tools are not used.",
+        section7Heading: "7. Contact Us",
+        section7BodyPrefix: "For inquiries regarding privacy, please contact ",
+        section7BodyEmail: "taeyang95@naver.com",
+        section7BodySuffix: ".",
+      },
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -2745,6 +3020,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       searchPlaceholder: "ゲームを検索...",
       emptyFavorites: "まだお気に入りのゲームがありません。",
       emptySearch: "検索結果に一致するゲームがありません。",
+      categories: {
+        all: "すべて",
+        popular: "人気",
+        reaction: "反射神経",
+        brain: "頭脳",
+        aim: "エイム",
+        typing: "タイピング",
+        favorites: "お気に入り",
+      },
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",
@@ -3193,6 +3477,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         "ログイン方法、プロフィール設定、複数アカウントを1つに統合するアカウント統合。",
       catGamesDesc: "ゲームカタログ、順位の計算方法、経験値（XP）とレベル。",
       catCreatorDesc: "チャンネル所有権認証、ストリーマーランキング資格、Featured Creator基準。",
+      catPolicyTitle: "ポリシー",
+      catPolicyDesc: "利用規約とプライバシーポリシーをご確認ください。",
     },
     wikiBody: {
       creator: {
@@ -3636,6 +3922,100 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerSuffix: "のFAQもご確認ください。",
       },
     },
+    legal: {
+      terms: {
+        metaTitle: "利用規約",
+        metaDescription: "OwOGG サービス利用規約",
+        pageTitle: "利用規約",
+        effectiveDate: "施行日: 2026年8月14日",
+        section1Heading: "1. サービスの概要",
+        section1Body:
+          "OwOGG（以下「サービス」）は、インストール不要でブラウザから直接楽しめるウェブミニゲーム集プラットフォームであり、Discordサーバー連携、ランキング/経験値（XP）、Creatorチャンネル認証などの付加機能を併せて提供します。",
+        section2Heading: "2. アカウントおよびログイン",
+        section2Body:
+          "本サービスはGoogleまたはDiscordアカウントによるOAuthログインのみをサポートし、別途のID/パスワードを直接発行しません（管理者専用アカウントを除く）。利用者はご自身が所有するアカウントでのみログインする必要があり、アカウント管理に関する責任は利用者ご自身にあります。",
+        section3Heading: "3. 利用者の義務",
+        section3Intro: "利用者は以下の行為を行ってはなりません。",
+        section3List: [
+          "自動化ツールやマクロなどを利用してゲームの記録や経験値を不正に操作する行為",
+          "ご自身が所有していないアカウント、チャンネル、Discordサーバーをあたかもご自身の所有であるかのように登録・認証する行為",
+          "他人の個人情報を無断で収集・掲載したり、サービスを通じて他人に被害を与える行為",
+          "サービスの正常な運営を妨害する攻撃、過度なリクエスト、脆弱性の悪用行為",
+        ],
+        section4Heading: "4. コンテンツおよびゲーム記録",
+        section4Body:
+          "利用者が作成したゲーム記録、ニックネーム、プロフィール情報はランキング/XPなどのサービス提供目的で使用されます。本サービスは不正な記録と判断されるデータを事前の通知なく調整または削除することがあります。",
+        section5Heading: "5. サービスの変更および中断",
+        section5Body:
+          "本サービスは運営上・技術上の必要に応じて、提供するゲーム、機能、画面構成を予告なく変更または中断することがあります。本サービスは無料で提供され、可用性や特定のパフォーマンスを保証するものではありません。",
+        section6Heading: "6. 免責事項",
+        section6Body:
+          "本サービスは無料で提供される個人/小規模プロジェクトであり、関連法令が許容する範囲においてサービス利用に関して発生する損害について責任を負いません。ただし、故意または重過失による損害は例外とします。",
+        section7Heading: "7. 規約の変更",
+        section7Body:
+          "本規約は必要に応じて改定されることがあり、改定時には本ページを通じて告知します。改定された規約は掲示と同時に効力を発生します。",
+        section8Heading: "8. お問い合わせ",
+        section8BodyPrefix: "サービス利用に関するお問い合わせは ",
+        section8BodyEmail: "taeyang95@naver.com",
+        section8BodySuffix: " までご連絡ください。",
+      },
+      privacy: {
+        metaTitle: "プライバシーポリシー",
+        metaDescription: "OwOGG プライバシーポリシー",
+        pageTitle: "プライバシーポリシー",
+        effectiveDate: "施行日: 2026年8月14日",
+        section1Heading: "1. 収集する個人情報の項目",
+        section1Intro: "OwOGGはサービス提供のため、以下の情報のみを収集します。",
+        section1List: [
+          {
+            term: "ログイン情報",
+            desc: " — GoogleまたはDiscordアカウントでのログイン時に提供されるメールアドレス、ニックネーム（表示名）、プロフィール写真URL、アカウント固有識別子（sub/ID）",
+          },
+          {
+            term: "ゲーム利用記録",
+            desc: " — ゲーム別のスコア/記録、経験値（XP）、レベル、実績達成履歴",
+          },
+          {
+            term: "プロフィール設定",
+            desc: " — 利用者が直接入力するニックネーム、国/地域（任意、自己申告情報であり国籍認証ではありません）",
+          },
+          {
+            term: "Discord連携情報",
+            desc: " — アカウント連携時のDiscordユーザーID、サーバー（ギルド）登録時のサーバーID/名前/アイコン、管理権限の有無",
+          },
+          {
+            term: "Creatorチャンネル認証情報",
+            desc: " — ストリーマーランキング参加のために自主的にチャンネル所有権認証を行った場合、該当プラットフォーム（YouTube/Twitch/CHZZK/SOOP）の公式APIを通じて確認されたチャンネル名、チャンネルURL、チャンネル登録者/フォロワー数",
+          },
+        ],
+        section1Outro:
+          "パスワードは別途収集しません（管理者専用アカウントは例外であり、該当パスワードはPBKDF2でハッシュ化して保存され、平文で保管されません）。",
+        section2Heading: "2. 収集目的",
+        section2List: [
+          "会員識別およびログイン状態の維持",
+          "ゲーム記録・ランキング・経験値システムの提供",
+          "Discordボットコマンドでのご自身のアカウント情報照会、サーバー別活動集計",
+          "Creator/ストリーマーランキング資格の確認",
+          "不正利用（アビューズ）の検知およびサービスの安定性維持",
+        ],
+        section3Heading: "3. 保管期間",
+        section3Body:
+          "個人情報は会員退会時または利用者の削除要請時まで保管し、関連法令で別途保管が義務付けられている場合はそれに従います。",
+        section4Heading: "4. 第三者への提供",
+        section4Body:
+          "OwOGGは利用者の個人情報を広告、マーケティング等の目的で第三者に提供または販売しません。サービス運営に必要なインフラ（Cloudflare — サーバー/データベースホスティング）のみを利用しており、これは第三者へのマーケティング提供には該当しません。",
+        section5Heading: "5. 利用者の権利",
+        section5Body:
+          "利用者はいつでもご自身の個人情報の閲覧、訂正、削除（アカウント退会）を要請できます。以下のお問い合わせ先にご連絡いただければ、確認の上処理いたします。",
+        section6Heading: "6. クッキーおよびセッション",
+        section6Body:
+          "ログイン状態維持のためにセッションクッキーを使用します。広告目的のトラッキングクッキーや第三者の分析ツールは使用しません。",
+        section7Heading: "7. お問い合わせ",
+        section7BodyPrefix: "個人情報に関するお問い合わせは ",
+        section7BodyEmail: "taeyang95@naver.com",
+        section7BodySuffix: " までご連絡ください。",
+      },
+    },
     platformIcon: {
       chzzkLabel: "CHZZK",
       soopLabel: "SOOP",
@@ -3695,6 +4075,15 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       searchPlaceholder: "搜索游戏...",
       emptyFavorites: "还没有收藏的游戏。",
       emptySearch: "没有匹配的游戏。",
+      categories: {
+        all: "全部",
+        popular: "热门",
+        reaction: "反应力",
+        brain: "益智",
+        aim: "瞄准",
+        typing: "打字",
+        favorites: "收藏",
+      },
     },
     ranking: {
       eyebrow: "Leaderboard & Community Hall of Fame",
@@ -4118,6 +4507,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       catAccountDesc: "登录方式、个人资料设置，以及将多个账户合并为一个的账户合并功能。",
       catGamesDesc: "游戏目录、排名计算方式、经验值（XP）与等级。",
       catCreatorDesc: "频道所有权认证、主播排行榜资格、Featured Creator 标准。",
+      catPolicyTitle: "政策",
+      catPolicyDesc: "查看服务条款和隐私政策。",
     },
     wikiBody: {
       creator: {
@@ -4536,6 +4927,100 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerPrefix: "这里没有您遇到的问题？请查看",
         footerLink: "Discord 使用指南",
         footerSuffix: "中的 FAQ。",
+      },
+    },
+    legal: {
+      terms: {
+        metaTitle: "服务条款",
+        metaDescription: "OwOGG 服务条款",
+        pageTitle: "服务条款",
+        effectiveDate: "生效日期：2026年8月14日",
+        section1Heading: "1. 服务概述",
+        section1Body:
+          "OwOGG（以下简称「服务」）是一个无需安装、可在浏览器中直接游玩的网页小游戏集合平台，同时提供 Discord 服务器联动、排行榜/经验值（XP）、Creator 频道认证等附加功能。",
+        section2Heading: "2. 账号与登录",
+        section2Body:
+          "本服务仅支持通过 Google 或 Discord 账号进行 OAuth 登录，不直接发放单独的账号/密码（管理员专用账号除外）。用户必须仅使用自己拥有的账号登录，账号管理的责任由用户本人承担。",
+        section3Heading: "3. 用户的义务",
+        section3Intro: "用户不得从事以下行为：",
+        section3List: [
+          "利用自动化工具、宏等不正当篡改游戏记录或经验值的行为",
+          "将不属于本人的账号、频道、Discord 服务器伪造成本人所有进行注册或认证的行为",
+          "未经授权收集、发布他人个人信息，或通过本服务对他人造成损害的行为",
+          "干扰服务正常运营的攻击、过度请求或利用漏洞的行为",
+        ],
+        section4Heading: "4. 内容与游戏记录",
+        section4Body:
+          "用户生成的游戏记录、昵称、个人资料信息将用于排行榜/XP 等服务提供目的。本服务可以在不事先通知的情况下调整或删除判定为不正当记录的数据。",
+        section5Heading: "5. 服务的变更与中断",
+        section5Body:
+          "本服务可根据运营和技术需要，在不事先通知的情况下变更或中断所提供的游戏、功能及页面结构。本服务免费提供，不保证可用性或特定性能。",
+        section6Heading: "6. 免责声明",
+        section6Body:
+          "本服务为免费提供的个人/小规模项目，在相关法律法规允许的范围内，不对因使用本服务而产生的损害承担责任。但因故意或重大过失造成的损害除外。",
+        section7Heading: "7. 条款的变更",
+        section7Body:
+          "本条款可在必要时进行修订，修订时将通过本页面进行告知。修订后的条款自发布之日起生效。",
+        section8Heading: "8. 联系我们",
+        section8BodyPrefix: "与服务使用相关的咨询，请发送邮件至 ",
+        section8BodyEmail: "taeyang95@naver.com",
+        section8BodySuffix: " 与我们联系。",
+      },
+      privacy: {
+        metaTitle: "隐私政策",
+        metaDescription: "OwOGG 隐私政策",
+        pageTitle: "隐私政策",
+        effectiveDate: "生效日期：2026年8月14日",
+        section1Heading: "1. 收集的个人信息项目",
+        section1Intro: "OwOGG 为提供服务仅收集以下信息：",
+        section1List: [
+          {
+            term: "登录信息",
+            desc: " — 使用 Google 或 Discord 账号登录时提供的电子邮件、昵称（显示名称）、头像 URL、账号唯一标识符（sub/ID）",
+          },
+          {
+            term: "游戏使用记录",
+            desc: " — 各游戏的分数/记录、经验值（XP）、等级、成就完成记录",
+          },
+          {
+            term: "个人资料设置",
+            desc: " — 用户直接输入的昵称、国家/地区（可选，为自主申报信息，非国籍认证）",
+          },
+          {
+            term: "Discord 联动信息",
+            desc: " — 绑定账号时的 Discord 用户 ID，注册服务器（公会）时的服务器 ID/名称/图标、管理权限状态",
+          },
+          {
+            term: "Creator 频道认证信息",
+            desc: " — 为参与主播排行榜而自愿完成频道所有权认证时，通过相应平台（YouTube/Twitch/CHZZK/SOOP）官方 API 确认的频道名称、频道 URL、订阅者/粉丝数量",
+          },
+        ],
+        section1Outro:
+          "不另外收集密码（管理员专用账号除外，该密码经 PBKDF2 哈希处理后存储，绝不以明文保管）。",
+        section2Heading: "2. 收集目的",
+        section2List: [
+          "会员识别及维持登录状态",
+          "提供游戏记录·排行榜·经验值系统",
+          "在 Discord 机器人命令中查询本人账号信息，按服务器统计活动",
+          "确认 Creator/主播排行榜资格",
+          "检测不正当使用（滥用）及维持服务稳定性",
+        ],
+        section3Heading: "3. 保管期限",
+        section3Body:
+          "个人信息保管至会员注销或用户请求删除时止，相关法律法规要求单独保管的情况除外。",
+        section4Heading: "4. 向第三方提供",
+        section4Body:
+          "OwOGG 不会出于广告、营销等目的向第三方提供或出售用户的个人信息。仅使用服务运营所需的底层基础设施（Cloudflare — 服务器/数据库托管），这不属于向第三方提供营销信息。",
+        section5Heading: "5. 用户的权利",
+        section5Body:
+          "用户可随时请求查阅、更正或删除（账号注销）其个人信息。请联系以下联系方式，经确认后将进行处理。",
+        section6Heading: "6. Cookie 与 Session",
+        section6Body:
+          "使用 Session Cookie 以维持登录状态。不使用用于广告目的的追踪 Cookie 或第三方分析工具。",
+        section7Heading: "7. 联系我们",
+        section7BodyPrefix: "隐私相关的咨询，请发送邮件至 ",
+        section7BodyEmail: "taeyang95@naver.com",
+        section7BodySuffix: " 与我们联系。",
       },
     },
     platformIcon: {

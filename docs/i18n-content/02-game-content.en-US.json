@@ -1,0 +1,42 @@
+{
+  "categories": {
+    "all": "All",
+    "popular": "Popular",
+    "reaction": "Reaction",
+    "brain": "Brain",
+    "aim": "Aim",
+    "typing": "Typing",
+    "favorites": "Favorites"
+  },
+  "games": {
+    "reactionTime": {
+      "title": "Reaction Time Test",
+      "shortDescription": "Click as fast as you can when the screen changes!",
+      "description": "Click as quickly as possible the moment the screen turns green. Test your reaction speed.",
+      "tags": ["Reaction Time", "Click", "Timing"]
+    },
+    "memoryTest": {
+      "title": "Sequence Memory Test",
+      "shortDescription": "Remember the flashing color sequence and press them in the exact order!",
+      "description": "Try to perfectly memorize the increasingly long patterns. What are the limits of your short-term memory?",
+      "tags": ["Memory", "Brain", "Pattern", "Family"]
+    },
+    "aimTest": {
+      "title": "Aim Test",
+      "shortDescription": "Aim and click on targets appearing on the screen quickly!",
+      "description": "Accurately and quickly aim and click 31 randomly generated targets. Measures your reaction speed and accuracy.",
+      "tags": ["Aim", "Targeting", "Reaction Time", "Click"]
+    },
+    "typingTest": {
+      "title": "Typing Speed Test",
+      "shortDescription": "Type the given sentences quickly and accurately for 60 seconds to measure your WPM (Words Per Minute) and accuracy!",
+      "description": "Test your typing speed (WPM), CPM (Characters Per Minute), and accuracy by typing English words. Challenge your precise typing skills.",
+      "tags": ["Typing", "WPM", "Speed", "Reaction", "Brain"]
+    }
+  },
+  "_note_wikiHomePolicyCard": "Below is unrelated to games, but added here after noticing it missing translation in dict.wiki card grid ('Policies' card on /wiki home).",
+  "wikiHomePolicyCard": {
+    "title": "Policies",
+    "description": "Check the Terms of Service and Privacy Policy."
+  }
+}

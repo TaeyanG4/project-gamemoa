@@ -1,4 +1,6 @@
 import { Flame, Sparkles, Zap, Brain, Target, Keyboard, Bookmark } from "lucide-react";
+import { useI18n } from "../../features/i18n/I18nContext";
+import type { Dictionary } from "../../features/i18n/dictionary";
 
 export interface CategoryOption {
   id: string;
@@ -6,15 +8,19 @@ export interface CategoryOption {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-export const CATEGORIES: CategoryOption[] = [
-  { id: "all", label: "전체", icon: Flame },
-  { id: "popular", label: "인기", icon: Sparkles },
-  { id: "reaction", label: "순발력", icon: Zap },
-  { id: "brain", label: "두뇌", icon: Brain },
-  { id: "aim", label: "에임", icon: Target },
-  { id: "typing", label: "타자", icon: Keyboard },
-  { id: "favorites", label: "즐겨찾기", icon: Bookmark },
-];
+/** Category ids are stable identifiers used for filtering/URL state — only the label text is
+ * localized. Mirrors dict.games.categories in docs/i18n-content/02-game-content.json. */
+function buildCategories(t: Dictionary["games"]["categories"]): CategoryOption[] {
+  return [
+    { id: "all", label: t.all, icon: Flame },
+    { id: "popular", label: t.popular, icon: Sparkles },
+    { id: "reaction", label: t.reaction, icon: Zap },
+    { id: "brain", label: t.brain, icon: Brain },
+    { id: "aim", label: t.aim, icon: Target },
+    { id: "typing", label: t.typing, icon: Keyboard },
+    { id: "favorites", label: t.favorites, icon: Bookmark },
+  ];
+}
 
 interface CategoryChipsProps {
   selectedCategory: string;
@@ -22,9 +28,12 @@ interface CategoryChipsProps {
 }
 
 export function CategoryChips({ selectedCategory, onSelectCategory }: CategoryChipsProps) {
+  const { dict } = useI18n();
+  const categories = buildCategories(dict.games.categories);
+
   return (
     <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2 w-full select-none">
-      {CATEGORIES.map((cat) => {
+      {categories.map((cat) => {
         const Icon = cat.icon;
         const isSelected = selectedCategory === cat.id;
 
