@@ -1,6 +1,7 @@
-import { GAME_MANIFEST_MAP } from "@owogg/core";
+import { GAME_MANIFEST_MAP, ACHIEVEMENT_DEFINITIONS, ALL_ACHIEVEMENT_CODES } from "@owogg/core";
+import type { AchievementCode } from "@owogg/core";
 import type { AppContainer } from "../../container.js";
-import { DISCORD_SUBCOMMANDS } from "./commands.js";
+import { DISCORD_SUBCOMMANDS, OWOGG_DISCORD_COMMAND } from "./commands.js";
 import {
   DISCORD_MESSAGE_FLAG_EPHEMERAL,
   DISCORD_RESPONSE_TYPE,
@@ -96,6 +97,8 @@ export async function handleOwoggCommand(
   }
 
   switch (subcommand) {
+    case DISCORD_SUBCOMMANDS.HELP:
+      return handleHelpCommand(frontendUrl);
     case DISCORD_SUBCOMMANDS.GAMES:
       return handleGamesCommand(frontendUrl);
     case DISCORD_SUBCOMMANDS.LINK:
@@ -110,9 +113,41 @@ export async function handleOwoggCommand(
       return handleLeaderboardCommand(container, interaction, frontendUrl);
     case DISCORD_SUBCOMMANDS.SERVER:
       return handleServerCommand(container, interaction, frontendUrl);
+    case DISCORD_SUBCOMMANDS.ACHIEVEMENTS:
+      return handleAchievementsCommand(container, discordUser, frontendUrl);
     default:
       return errorEmbed("알 수 없는 명령어입니다.", frontendUrl);
   }
+}
+
+/** Reads the option value from the invoked subcommand's own option list (not the top-level
+ * command) — Discord nests subcommand options one level down in `data.options[0].options`. */
+function getSubcommandOptionValue(
+  interaction: DiscordInteraction,
+  optionName: string,
+): string | undefined {
+  const value = interaction.data?.options?.[0]?.options?.find((o) => o.name === optionName)?.value;
+  return typeof value === "string" ? value : undefined;
+}
+
+function periodLabel(period: "alltime" | "weekly"): string {
+  return period === "weekly" ? "이번 주" : "전체 기간";
+}
+
+/** Lists every /owogg subcommand and its description, generated straight from
+ * OWOGG_DISCORD_COMMAND (commands.ts) so this can never drift out of sync with what's actually
+ * registered. */
+function handleHelpCommand(frontendUrl: string): DiscordInteractionResponse {
+  const lines = OWOGG_DISCORD_COMMAND.options.map(
+    (opt) => `**/owogg ${opt.name}** — ${opt.description}`,
+  );
+
+  return publicEmbed({
+    title: "📖 OwOGG 봇 명령어",
+    description: lines.join("\n"),
+    color: COLOR_BRAND,
+    footer: owoggFooter(frontendUrl),
+  });
 }
 
 function handleGamesCommand(frontendUrl: string): DiscordInteractionResponse {
@@ -283,10 +318,12 @@ async function handleRankCommand(
     );
   }
 
+  const period =
+    getSubcommandOptionValue(interaction, "period") === "weekly" ? "weekly" : "alltime";
   const rankSummary = await container.discordGuildXpUseCases.getUserGuildRankSummary(
     guildId,
     discordUser.id,
-    "alltime",
+    period,
   );
 
   const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
@@ -294,7 +331,7 @@ async function handleRankCommand(
 
   if (!rankSummary.rank || rankSummary.totalXp <= 0) {
     return ephemeralEmbed({
-      title: `🏆 ${guildName}`,
+      title: `🏆 ${guildName} (${periodLabel(period)})`,
       description:
         "아직 이 서버에 기여한 XP가 없습니다. `/owogg play` 명령어로 게임을 플레이해보세요!",
       color: COLOR_BRAND,
@@ -305,7 +342,7 @@ async function handleRankCommand(
 
   const nickname = rankSummary.nickname || discordUser.global_name || discordUser.username;
   return ephemeralEmbed({
-    title: `🏆 ${guildName} 활동 현황`,
+    title: `🏆 ${guildName} 활동 현황 (${periodLabel(period)})`,
     color: COLOR_XP,
     ...(thumbnail ? { thumbnail } : {}),
     fields: [
@@ -336,9 +373,11 @@ async function handleLeaderboardCommand(
     );
   }
 
+  const period =
+    getSubcommandOptionValue(interaction, "period") === "weekly" ? "weekly" : "alltime";
   const leaderboard = await container.discordGuildXpUseCases.getGuildLeaderboard(
     guildId,
-    "alltime",
+    period,
     10,
     0,
   );
@@ -346,10 +385,11 @@ async function handleLeaderboardCommand(
   const serverUrl = `${frontendUrl}/discord/servers/${guild.slug}`;
   const thumbnail = guild.icon_url ? { url: guild.icon_url } : undefined;
   const guildName = escapeMarkdown(guild.name);
+  const periodTitle = periodLabel(period);
 
   if (leaderboard.entries.length === 0) {
     return publicEmbed({
-      title: `📊 ${guildName} 서버 XP 리더보드`,
+      title: `📊 ${guildName} 서버 XP 리더보드 (${periodTitle})`,
       description: "아직 등록된 활동 XP가 없습니다. `/owogg play`로 첫 기여를 시작해보세요!",
       color: COLOR_BRAND,
       ...(thumbnail ? { thumbnail } : {}),
@@ -363,12 +403,48 @@ async function handleLeaderboardCommand(
   );
 
   return publicEmbed({
-    title: `📊 ${guildName} 서버 XP 리더보드 (Top 10)`,
+    title: `📊 ${guildName} 서버 XP 리더보드 (${periodTitle}, Top 10)`,
     description: lines.join("\n"),
     color: COLOR_XP,
     ...(thumbnail ? { thumbnail } : {}),
     fields: [{ name: "전체 랭킹", value: `[웹에서 전체 보기](${serverUrl})` }],
     footer,
+  });
+}
+
+async function handleAchievementsCommand(
+  container: AppContainer,
+  discordUser: DiscordInteractionUser,
+  frontendUrl: string,
+): Promise<DiscordInteractionResponse> {
+  const footer = owoggFooter(frontendUrl);
+  const user = await container.userRepo.findByOAuth("discord", discordUser.id);
+  if (!user) {
+    return errorEmbed(
+      "이 Discord 계정은 아직 OwOGG 계정과 연동되지 않았습니다. `/owogg link`로 먼저 연동해주세요.",
+      frontendUrl,
+    );
+  }
+
+  const summary = await container.achievementUseCases.getSummary(user.id);
+  const unlocked = new Set(summary.unlockedCodes);
+
+  const lines = ALL_ACHIEVEMENT_CODES.map((code: AchievementCode) => {
+    const def = ACHIEVEMENT_DEFINITIONS[code];
+    const mark = unlocked.has(code) ? "✅" : "⬜";
+    return `${mark} **${def.titleKo}** — ${def.descriptionKo}`;
+  });
+
+  return ephemeralEmbed({
+    title: `🏅 ${escapeMarkdown(user.nickname)}님의 도전과제`,
+    url: `${frontendUrl}/profile`,
+    description: lines.join("\n"),
+    color: COLOR_XP,
+    thumbnail: { url: discordAvatarUrl(discordUser) },
+    footer: {
+      text: `${summary.unlockedCodes.length} / ${summary.totalAchievements} 달성 · OwOGG`,
+      ...(footer.icon_url ? { icon_url: footer.icon_url } : {}),
+    },
   });
 }
 

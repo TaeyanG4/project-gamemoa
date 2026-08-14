@@ -45,6 +45,11 @@ function fakeContainer(overrides: {
     total: number;
   }>;
   getGuildSummary?: () => Promise<{ totalXp: number; weeklyXp: number; participantCount: number }>;
+  getAchievementSummary?: () => Promise<{
+    unlockedCodes: string[];
+    totalAchievements: number;
+    recentlyUnlocked: { achievementCode: string; unlockedAt: string }[];
+  }>;
 }): AppContainer {
   return {
     userRepo: {
@@ -101,6 +106,11 @@ function fakeContainer(overrides: {
         overrides.getGuildSummary ??
         (async () => ({ totalXp: 0, weeklyXp: 0, participantCount: 0 })),
     },
+    achievementUseCases: {
+      getSummary:
+        overrides.getAchievementSummary ??
+        (async () => ({ unlockedCodes: [], totalAchievements: 7, recentlyUnlocked: [] })),
+    },
     // Unused by these handlers, but required by AppContainer's shape.
   } as unknown as AppContainer;
 }
@@ -129,13 +139,30 @@ function profileInteraction(discordId = "222"): DiscordInteraction {
   };
 }
 
+function helpInteraction(): DiscordInteraction {
+  return {
+    type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
+    data: { name: "owogg", options: [{ name: "help", type: 1 }] },
+    member: { user: { id: "444", username: "curious" } },
+  };
+}
+
+function achievementsInteraction(discordId = "555"): DiscordInteraction {
+  return {
+    type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
+    data: { name: "owogg", options: [{ name: "achievements", type: 1 }] },
+    member: { user: { id: discordId, username: "achiever" } },
+  };
+}
+
 function guildInteraction(
   subcommand: "play" | "rank" | "leaderboard" | "server",
   guildId: string | null = "guild-1",
+  subOptions: { name: string; type: number; value: string }[] = [],
 ): DiscordInteraction {
   return {
     type: DISCORD_INTERACTION_TYPE.APPLICATION_COMMAND,
-    data: { name: "owogg", options: [{ name: subcommand, type: 1 }] },
+    data: { name: "owogg", options: [{ name: subcommand, type: 1, options: subOptions }] },
     member: { user: { id: "333", username: "player" } },
     ...(guildId ? { guild_id: guildId } : {}),
   };
@@ -358,4 +385,95 @@ test("guild-scoped commands reject an unregistered/inactive server", async () =>
   const response = await handleOwoggCommand(container, guildInteraction("server"), FRONTEND_URL);
   assert.equal(response.data?.flags, 64);
   assert.match(response.data?.embeds?.[0]?.description ?? "", /등록되지 않았거나/);
+});
+
+test("/owogg help lists every registered subcommand, publicly visible", async () => {
+  const response = await handleOwoggCommand(fakeContainer({}), helpInteraction(), FRONTEND_URL);
+  assert.equal(response.data?.flags, undefined);
+  const description = response.data?.embeds?.[0]?.description ?? "";
+  for (const name of [
+    "help",
+    "link",
+    "profile",
+    "games",
+    "play",
+    "rank",
+    "leaderboard",
+    "server",
+    "achievements",
+  ]) {
+    assert.match(description, new RegExp(`/owogg ${name}`));
+  }
+});
+
+test("/owogg achievements prompts an unlinked Discord user to link first", async () => {
+  const response = await handleOwoggCommand(
+    fakeContainer({}),
+    achievementsInteraction(),
+    FRONTEND_URL,
+  );
+  assert.equal(response.data?.flags, 64);
+  assert.match(response.data?.embeds?.[0]?.description ?? "", /owogg link/);
+});
+
+test("/owogg achievements shows unlocked (✅) vs locked (⬜) achievements with a progress footer", async () => {
+  const container = fakeContainer({
+    findByOAuth: async () => ({
+      id: 9,
+      nickname: "Achiever",
+      email: null,
+      avatar_url: null,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      providers: ["discord"],
+    }),
+    getAchievementSummary: async () => ({
+      unlockedCodes: ["FIRST_PLAY"],
+      totalAchievements: 7,
+      recentlyUnlocked: [{ achievementCode: "FIRST_PLAY", unlockedAt: "2026-01-02T00:00:00.000Z" }],
+    }),
+  });
+  const response = await handleOwoggCommand(container, achievementsInteraction(), FRONTEND_URL);
+  const embed = response.data?.embeds?.[0];
+  assert.match(embed?.title ?? "", /Achiever/);
+  assert.match(embed?.description ?? "", /✅.*첫 게임 완료/);
+  assert.match(embed?.description ?? "", /⬜/); // at least one still-locked achievement listed
+  assert.match(embed?.footer?.text ?? "", /1 \/ 7/);
+});
+
+test("/owogg rank and /owogg leaderboard default to all-time when no period option is given", async () => {
+  const container = fakeContainer({
+    findOAuthAccount: async () => linkedOAuthAccount,
+    getUserGuildRankSummary: async () => ({ totalXp: 100, rank: 1, nickname: "Steady" }),
+  });
+  const response = await handleOwoggCommand(container, guildInteraction("rank"), FRONTEND_URL);
+  assert.match(response.data?.embeds?.[0]?.title ?? "", /전체 기간/);
+});
+
+test("/owogg rank shows weekly XP when period:weekly is passed", async () => {
+  const container = fakeContainer({
+    findOAuthAccount: async () => linkedOAuthAccount,
+    getUserGuildRankSummary: async () => ({ totalXp: 40, rank: 2, nickname: "ThisWeek" }),
+  });
+  const response = await handleOwoggCommand(
+    container,
+    guildInteraction("rank", "guild-1", [{ name: "period", type: 3, value: "weekly" }]),
+    FRONTEND_URL,
+  );
+  assert.match(response.data?.embeds?.[0]?.title ?? "", /이번 주/);
+});
+
+test("/owogg leaderboard shows weekly XP when period:weekly is passed", async () => {
+  const container = fakeContainer({
+    getGuildLeaderboard: async () => ({
+      entries: [{ rank: 1, nickname: "WeeklyTop", xp: 77 }],
+      total: 1,
+    }),
+  });
+  const response = await handleOwoggCommand(
+    container,
+    guildInteraction("leaderboard", "guild-1", [{ name: "period", type: 3, value: "weekly" }]),
+    FRONTEND_URL,
+  );
+  assert.match(response.data?.embeds?.[0]?.title ?? "", /이번 주/);
 });

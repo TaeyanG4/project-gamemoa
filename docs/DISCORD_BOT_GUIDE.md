@@ -74,15 +74,17 @@ OwOGG의 설치 링크는 Discord Developer Portal의 실제 설정을 기준으
 
 아래 목록은 현재 `commands.ts`에 등록된 실제 명령어입니다. 명령어가 보이는 위치는 앱 설치 컨텍스트와 Discord 서버 설정에 따라 달라질 수 있습니다.
 
-| 명령어               | 목적                                         | 사용 위치                          | 계정 연결     | 등록 서버 | 옵션/예시             | 관련 웹                  |
-| -------------------- | -------------------------------------------- | ---------------------------------- | ------------- | --------- | --------------------- | ------------------------ |
-| `/owogg games`       | 현재 게시된 게임 목록과 링크 확인            | 명령어가 표시되는 Discord 컨텍스트 | 불필요        | 불필요    | `/owogg games`        | `/games`                 |
-| `/owogg link`        | Discord 계정과 OwOGG 계정 연결 시작          | 명령어가 표시되는 Discord 컨텍스트 | 미연결 사용자 | 불필요    | `/owogg link`         | `/discord/link`          |
-| `/owogg profile`     | 연결된 프로필의 닉네임, 레벨, 글로벌 XP 확인 | 명령어가 표시되는 Discord 컨텍스트 | 필요          | 불필요    | `/owogg profile`      | `/profile`               |
-| `/owogg play`        | 서버 귀속 플레이 링크 생성                   | Discord 서버 채널                  | 필요          | 필요      | 게임 선택은 선택 사항 | `/games`                 |
-| `/owogg rank`        | 현재 서버에서 자신의 XP와 순위 확인          | Discord 서버 채널                  | 필요          | 필요      | `/owogg rank`         | 해당 서버 페이지         |
-| `/owogg leaderboard` | 서버 XP Top 10과 전체 페이지 링크 확인       | Discord 서버 채널                  | 불필요        | 필요      | `/owogg leaderboard`  | `/discord/servers/:slug` |
-| `/owogg server`      | 서버 전체 XP, 주간 XP, 참여자 수 확인        | Discord 서버 채널                  | 불필요        | 필요      | `/owogg server`       | `/discord/servers/:slug` |
+| 명령어                | 목적                                         | 사용 위치                          | 계정 연결     | 등록 서버 | 옵션/예시                         | 관련 웹                  |
+| --------------------- | -------------------------------------------- | ---------------------------------- | ------------- | --------- | --------------------------------- | ------------------------ |
+| `/owogg help`         | 전체 명령어 목록과 설명 확인                 | 명령어가 표시되는 Discord 컨텍스트 | 불필요        | 불필요    | `/owogg help`                     | -                        |
+| `/owogg games`        | 현재 게시된 게임 목록과 링크 확인            | 명령어가 표시되는 Discord 컨텍스트 | 불필요        | 불필요    | `/owogg games`                    | `/games`                 |
+| `/owogg link`         | Discord 계정과 OwOGG 계정 연결 시작          | 명령어가 표시되는 Discord 컨텍스트 | 미연결 사용자 | 불필요    | `/owogg link`                     | `/discord/link`          |
+| `/owogg profile`      | 연결된 프로필의 닉네임, 레벨, 글로벌 XP 확인 | 명령어가 표시되는 Discord 컨텍스트 | 필요          | 불필요    | `/owogg profile`                  | `/profile`               |
+| `/owogg achievements` | 연동된 계정의 도전과제 달성 현황 확인        | 명령어가 표시되는 Discord 컨텍스트 | 필요          | 불필요    | `/owogg achievements`             | `/profile`               |
+| `/owogg play`         | 서버 귀속 플레이 링크 생성                   | Discord 서버 채널                  | 필요          | 필요      | 게임 선택은 선택 사항             | `/games`                 |
+| `/owogg rank`         | 현재 서버에서 자신의 XP와 순위 확인          | Discord 서버 채널                  | 필요          | 필요      | `period:` 전체 기간(기본)/이번 주 | 해당 서버 페이지         |
+| `/owogg leaderboard`  | 서버 XP Top 10과 전체 페이지 링크 확인       | Discord 서버 채널                  | 불필요        | 필요      | `period:` 전체 기간(기본)/이번 주 | `/discord/servers/:slug` |
+| `/owogg server`       | 서버 전체 XP, 주간 XP, 참여자 수 확인        | Discord 서버 채널                  | 불필요        | 필요      | `/owogg server`                   | `/discord/servers/:slug` |
 
 ### `/owogg play` 게임 옵션
 

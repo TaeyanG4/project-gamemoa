@@ -7,6 +7,7 @@ import { GAME_MANIFEST_MAP } from "@owogg/core";
 export const OWOGG_COMMAND_NAME = "owogg";
 
 export const DISCORD_SUBCOMMANDS = {
+  HELP: "help",
   LINK: "link",
   PROFILE: "profile",
   GAMES: "games",
@@ -14,6 +15,7 @@ export const DISCORD_SUBCOMMANDS = {
   RANK: "rank",
   LEADERBOARD: "leaderboard",
   SERVER: "server",
+  ACHIEVEMENTS: "achievements",
 } as const;
 
 export type DiscordSubcommand = (typeof DISCORD_SUBCOMMANDS)[keyof typeof DISCORD_SUBCOMMANDS];
@@ -26,11 +28,24 @@ const gameChoices = Object.values(GAME_MANIFEST_MAP).map((m) => ({
   name: m.title,
   value: m.id,
 }));
+// Static `choices` (not live autocomplete, ApplicationCommandOptionType 4) is deliberate here —
+// Discord allows up to 25 static choices, and the catalog only has 4 games. Autocomplete earns
+// its complexity (a second interaction round-trip, live filtering) once the catalog grows past
+// that cap or gets a live/user-submitted source (see #16) — not before.
+const periodChoices = [
+  { name: "전체 기간", value: "alltime" },
+  { name: "이번 주", value: "weekly" },
+];
 
 export const OWOGG_DISCORD_COMMAND = {
   name: OWOGG_COMMAND_NAME,
   description: "OwOGG 계정 연동 및 정보 확인",
   options: [
+    {
+      type: OPTION_TYPE_SUB_COMMAND,
+      name: DISCORD_SUBCOMMANDS.HELP,
+      description: "/owogg 명령어 전체 목록과 사용법을 확인합니다",
+    },
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.LINK,
@@ -64,16 +79,39 @@ export const OWOGG_DISCORD_COMMAND = {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.RANK,
       description: "이 Discord 서버 내 나의 OwOGG 순위와 기여 XP를 확인합니다",
+      options: [
+        {
+          type: OPTION_TYPE_STRING,
+          name: "period",
+          description: "집계 기간을 선택합니다 (기본값: 전체 기간)",
+          required: false,
+          choices: periodChoices,
+        },
+      ],
     },
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.LEADERBOARD,
       description: "이 Discord 서버의 OwOGG XP 리더보드를 확인합니다",
+      options: [
+        {
+          type: OPTION_TYPE_STRING,
+          name: "period",
+          description: "집계 기간을 선택합니다 (기본값: 전체 기간)",
+          required: false,
+          choices: periodChoices,
+        },
+      ],
     },
     {
       type: OPTION_TYPE_SUB_COMMAND,
       name: DISCORD_SUBCOMMANDS.SERVER,
       description: "이 Discord 서버의 OwOGG 활동 정보 요약을 확인합니다",
+    },
+    {
+      type: OPTION_TYPE_SUB_COMMAND,
+      name: DISCORD_SUBCOMMANDS.ACHIEVEMENTS,
+      description: "연동된 OwOGG 계정의 도전과제 달성 현황을 확인합니다",
     },
   ],
 } as const;

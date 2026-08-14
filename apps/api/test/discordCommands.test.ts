@@ -11,7 +11,7 @@ test("Discord command source lists every implemented OwOGG subcommand", () => {
   const names = Object.values(DISCORD_SUBCOMMANDS);
   const options = OWOGG_DISCORD_COMMAND.options.map((option) => option.name);
   assert.deepEqual(new Set(options), new Set(names));
-  assert.equal(names.length, 7);
+  assert.equal(names.length, 9);
 });
 
 test("Discord Bot guide documents every registered subcommand", () => {
