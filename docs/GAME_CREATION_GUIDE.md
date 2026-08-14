@@ -119,9 +119,91 @@
 - 악성 코드, 다른 사용자에게 피해를 주는 로직 금지.
 - OwOGG의 전체적인 톤/브랜드와 크게 어긋나지 않아야 합니다.
 
-## 8. 다음 단계
+## 8. V1 기술 설계안 (2026-08-14 타당성 조사)
+
+아직 코드 구현은 하지 않은 **설계 단계 결론**입니다. §2에서 이미 확정된 "설정 기반 변형만
+가능(코드 실행 없음)" 제약 위에서, 실제로 어떤 테이블·워크플로우로 구축할지 구체화합니다.
+
+### 8.1 핵심 아이디어: 난이도 시스템의 일반화
+
+이 문서 §4.1에서 이미 구현된 게임별 난이도 기능(`GameManifest.difficulty`,
+`GameRuntimeContext.difficultyId`)이 정확히 이 시스템의 축소판입니다 — 에임 테스트의
+`hard`는 "같은 엔진 코드, 다른 파라미터(타겟 크기)"로 동작합니다. 유저 게임 제작 시스템은 이
+패턴을 "운영자가 매니페스트에 미리 박아둔 몇 개의 난이도"에서 "유저가 직접 채워 넣는 임의
+개수의 파라미터 세트"로 일반화한 것뿐입니다 — 새 렌더링 인프라가 필요하지 않고, 기존 4개
+게임 컴포넌트가 `runtime`으로부터 파라미터를 읽는 범위만 넓히면 됩니다.
+
+### 8.2 DB 스키마 초안
+
+```sql
+-- 유저가 제출한 게임 변형(승인 전까지 creator 본인에게만 노출)
+CREATE TABLE user_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  creator_user_id INTEGER NOT NULL REFERENCES users(id),
+  base_engine_id TEXT NOT NULL,      -- 기존 4개 게임 패키지 id 중 하나
+  slug TEXT NOT NULL UNIQUE,         -- 그대로 scores.game_id로 사용 (아래 8.4 참고)
+  title TEXT NOT NULL,
+  short_description TEXT,
+  config_json TEXT NOT NULL,         -- 엔진별 파라미터 세트, 엔진별 스키마로 검증
+  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW', -- PENDING_REVIEW/APPROVED/REJECTED/DISABLED
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Creator 심사 시스템의 creator_review_audit_log와 동일한 append-only 패턴 재사용
+CREATE TABLE user_game_review_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_game_id INTEGER NOT NULL REFERENCES user_games(id),
+  reviewer_admin_id INTEGER,
+  action TEXT NOT NULL,              -- APPROVED/REJECTED/DISABLED
+  reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- progression의 user_progress처럼 비정규화된 카운터 — 매번 COUNT(*) 하지 않음
+CREATE TABLE user_game_quota (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id),
+  tier TEXT NOT NULL DEFAULT 'FREE', -- FREE/PAID
+  active_game_count INTEGER NOT NULL DEFAULT 0,
+  max_games INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+```
+
+`status` → `visibility` 매핑은 별도 컬럼 없이 파생시킵니다: `PENDING_REVIEW`/`REJECTED`는
+creator 본인에게만, `APPROVED`만 전체 공개 — §6에서 이미 정한 원칙 그대로입니다.
+
+### 8.3 엔진별 파라미터 표면 (예시)
+
+| 베이스 엔진     | 노출 가능한 파라미터 예시                                    |
+| --------------- | ------------------------------------------------------------ |
+| `aim-test`      | 타겟 크기, 타겟 개수, 라운드 시간, 타겟 색상/테마            |
+| `reaction-time` | 최소/최대 대기시간, 클릭 영역 크기, 색상 테마                |
+| `memory-test`   | 패턴 길이 증가 속도, 색상 팔레트/테마, 플래시 간격           |
+| `typing-test`   | 커스텀 지문/단어 목록(§7 콘텐츠 정책 심사 대상), 라운드 시간 |
+
+### 8.4 점수/리더보드는 스키마 변경이 필요 없음
+
+`scores.game_id`는 이미 임의 문자열입니다 — 승인된 `user_games.slug`를 그대로 `game_id`로
+쓰면, 기존 리더보드 인프라(`(game_id, difficulty, score)` 인덱스, 난이도 파티셔닝)가 코드
+변경 없이 그대로 적용됩니다. 단, `GAME_MANIFEST_MAP`(빌드타임 정적 레지스트리)에는 없는
+`game_id`이므로 점수 검증(`validateScorePayload`)이 DB 조회 기반으로 바뀌어야 합니다 — 이
+부분이 실제 구현 시 가장 손이 많이 가는 지점입니다.
+
+### 8.5 심사 워크플로우
+
+Creator 심사 시스템(`/admin/creators`, 수동 심사 큐 + 감사 로그)과 동일한 UI/API 패턴을
+재사용합니다. 이번 세션에서 만든 `/admin/games`(게임 활성화/비활성화)도 유사한 참고 사례 —
+운영자 전용, `requireElevatedAdmin` 가드, append-only 감사 기록.
+
+### 8.6 명시적 비목표 (V1 범위 밖)
+
+- 유저가 직접 짠 새 게임 로직(코드 실행) — §2에서 이미 대형 별도 투자로 분류.
+- 실시간 멀티플레이어 — #32에서 별도 설계.
+
+## 9. 다음 단계
 
 이 문서는 유저 게임 제작·등록 시스템의 실제 설계/구축이 진행되면서 계속 업데이트됩니다.
 현재 단계에서 확정된 것은 "사람이 직접 승인", "인증된 사용자만", "승인 전 비공개",
-"무료/유료 티어 구분" 네 가지 원칙뿐이며, 나머지 세부 사항(정확한 용량 수치, 심사 SLA,
-콘텐츠 신고 절차 등)은 시스템 설계 단계에서 함께 확정합니다.
+"무료/유료 티어 구분", "V1은 설정 기반 변형만(§8)" 다섯 가지 원칙이며, 나머지 세부 사항
+(정확한 용량 수치, 심사 SLA, 콘텐츠 신고 절차 등)은 실제 착수 시점에 함께 확정합니다.
