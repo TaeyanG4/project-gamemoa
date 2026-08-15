@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router";
 import {
   fetchDiscordGuildBySlug,
-  fetchGuildXpLeaderboard,
   fetchGuildServerGameLeaderboard,
 } from "../features/discord/discordGuildApi";
 import type {
@@ -11,14 +10,24 @@ import type {
   GuildXpLeaderboardEntryDto,
   ServerGameLeaderboardEntryDto,
 } from "@owogg/contracts";
-import { GAME_MANIFESTS } from "@owogg/core";
+import { gameManifests } from "../features/catalog/registry";
+import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import { GameThumbnail } from "../components/ui/GameThumbnail";
 
 import { ApiClientError } from "../lib/api/errors";
-import { Trophy, Zap, Calendar, Users, Gamepad2, Lock } from "lucide-react";
+import { ArrowLeft, Trophy, Zap, Calendar, Users, AlertCircle, RefreshCw } from "lucide-react";
 import { useI18n } from "../features/i18n/I18nContext";
 
 type ServerTab = "alltime" | "weekly" | "games";
 
+/** /discord/servers/:slug — rebuilt on top of the same non-boxed, semantic-token, divided-list
+ * layout language as /users/:id (userProfile.tsx) instead of the standalone dark
+ * slate/indigo/backdrop-blur "glass card" look this page used to have. That old look didn't
+ * follow the app's theme tokens (hardcoded `slate-900`/`white` instead of `surface`/
+ * `text-primary`, so it never actually adapted to light mode) and read as visually disconnected
+ * from every other page — especially the heavy bordered cards floating in a wide, mostly-empty
+ * `max-w-6xl` container. Matching profile's `max-w-4xl` + divider sections fixes both at once:
+ * the whitespace reads as intentional instead of like unfinished padding. */
 export default function DiscordServerSlugRoute() {
   const { dict } = useI18n();
   const { slug } = useParams<{ slug: string }>();
@@ -30,7 +39,7 @@ export default function DiscordServerSlugRoute() {
 
   const [activeTab, setActiveTab] = useState<ServerTab>("alltime");
   const [selectedGameId, setSelectedGameId] = useState<string>(
-    GAME_MANIFESTS[0]?.id ?? "reaction-time",
+    gameManifests[0]?.id ?? "reaction-time",
   );
   const [gameLeaderboard, setGameLeaderboard] = useState<ServerGameLeaderboardEntryDto[]>([]);
   const [loadingGameScores, setLoadingGameScores] = useState(false);
@@ -40,35 +49,39 @@ export default function DiscordServerSlugRoute() {
     null,
   );
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!slug) return;
     setLoading(true);
     setError(null);
 
-    fetchDiscordGuildBySlug(slug)
-      .then((res) => {
-        setGuild(res.guild);
-        setIsManager(res.isManager);
-        setSummary(res.summary ?? { totalXp: 0, weeklyXp: 0, participantCount: 0 });
-        setTopAllTime(res.topAllTime ?? []);
-        setTopWeekly(res.topWeekly ?? []);
-      })
-      .catch((err) => {
-        if (err instanceof ApiClientError) {
-          const errObj: { code?: string; message: string; status?: number } = {
-            message: err.detail || err.message,
-          };
-          if (err.code !== undefined) errObj.code = err.code;
-          if (err.status !== undefined) errObj.status = err.status;
-          setError(errObj);
-        } else {
-          setError({
-            message: err instanceof Error ? err.message : dict.discordServerSlug.loadFailedGeneric,
-          });
-        }
-      })
-      .finally(() => setLoading(false));
+    try {
+      const res = await fetchDiscordGuildBySlug(slug);
+      setGuild(res.guild);
+      setIsManager(res.isManager);
+      setSummary(res.summary ?? { totalXp: 0, weeklyXp: 0, participantCount: 0 });
+      setTopAllTime(res.topAllTime ?? []);
+      setTopWeekly(res.topWeekly ?? []);
+    } catch (err) {
+      if (err instanceof ApiClientError) {
+        const errObj: { code?: string; message: string; status?: number } = {
+          message: err.detail || err.message,
+        };
+        if (err.code !== undefined) errObj.code = err.code;
+        if (err.status !== undefined) errObj.status = err.status;
+        setError(errObj);
+      } else {
+        setError({
+          message: err instanceof Error ? err.message : dict.discordServerSlug.loadFailedGeneric,
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [slug, dict.discordServerSlug.loadFailedGeneric]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   // Fetch Game Scores when game tab or selected game changes
   useEffect(() => {
@@ -87,7 +100,7 @@ export default function DiscordServerSlugRoute() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-4xl px-4 py-16 text-center text-sm text-slate-400">
+      <div className="mx-auto w-full max-w-4xl px-4 py-24 text-center text-sm text-text-muted">
         {dict.discordServerSlug.loadingServer}
       </div>
     );
@@ -95,27 +108,33 @@ export default function DiscordServerSlugRoute() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-16 text-center space-y-4">
-        <div className="rounded-3xl border border-rose-500/20 bg-slate-900/80 p-8 md:p-12 backdrop-blur-md space-y-4">
-          <div className="text-4xl">
-            <Lock className="mx-auto h-12 w-12 text-rose-400" />
-          </div>
-          <h1 className="text-xl font-bold text-white">
-            {error.status === 403
-              ? dict.discordServerSlug.privateServerTitle
-              : dict.discordServerSlug.notFoundTitle}
-          </h1>
-          <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
-            {error.status === 403 ? dict.discordServerSlug.privateServerMessage : error.message}
-          </p>
-          <div className="pt-4">
-            <Link
-              to="/discord/servers"
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-5 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors"
+      <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-4 px-4 py-24 text-center">
+        <AlertCircle className="h-9 w-9 text-text-muted" />
+        <h1 className="text-lg font-black text-text-primary">
+          {error.status === 403
+            ? dict.discordServerSlug.privateServerTitle
+            : dict.discordServerSlug.notFoundTitle}
+        </h1>
+        <p className="max-w-md text-sm text-text-muted">
+          {error.status === 403 ? dict.discordServerSlug.privateServerMessage : error.message}
+        </p>
+        <div className="mt-2 flex items-center gap-4">
+          <Link
+            to="/discord/servers"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-light hover:underline"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            {dict.discordServerSlug.backToDirectory}
+          </Link>
+          {error.status !== 403 && (
+            <button
+              onClick={() => void load()}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-text-muted hover:text-text-primary"
             >
-              {dict.discordServerSlug.backToDirectory}
-            </Link>
-          </div>
+              <RefreshCw className="h-3.5 w-3.5" />
+              {dict.userProfile.retryButton}
+            </button>
+          )}
         </div>
       </div>
     );
@@ -123,378 +142,344 @@ export default function DiscordServerSlugRoute() {
 
   if (!guild) return null;
 
-  const currentManifest = GAME_MANIFESTS.find((m) => m.id === selectedGameId);
+  const currentManifest = gameManifests.find((m) => m.id === selectedGameId);
+  const currentGameTitle = currentManifest
+    ? getLocalizedGameContent(dict, currentManifest).title
+    : "";
+
+  const visibilityToneClass =
+    guild.visibility === "PUBLIC"
+      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+      : guild.visibility === "UNLISTED"
+        ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+        : "border-rose-500/30 bg-rose-500/10 text-rose-400";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 px-4 py-8">
-      {/* Header Banner */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/80 p-6 md:p-8 backdrop-blur-md shadow-2xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            {guild.iconUrl ? (
-              <img
-                src={guild.iconUrl}
-                alt={guild.name}
-                className="h-16 w-16 md:h-20 md:w-20 rounded-2xl object-cover border-2 border-white/10 shadow-lg"
-              />
-            ) : (
-              <div className="flex h-16 w-16 md:h-20 md:w-20 items-center justify-center rounded-2xl bg-indigo-600/40 border-2 border-indigo-400/30 text-2xl font-bold text-indigo-200">
-                {guild.name.charAt(0).toUpperCase()}
-              </div>
-            )}
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 py-10 md:px-8">
+      <Link
+        to="/discord/servers"
+        className="flex w-fit items-center gap-2 text-xs font-bold text-text-muted transition-colors hover:text-text-primary"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        {dict.discordServerSlug.backToDirectory}
+      </Link>
 
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl md:text-3xl font-extrabold text-white">{guild.name}</h1>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-                    guild.visibility === "PUBLIC"
-                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                      : guild.visibility === "UNLISTED"
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                        : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                  }`}
-                >
-                  {guild.visibility}
-                </span>
-              </div>
+      {/* Header — no card border/background, matches /users/:id's avatar+name+meta pattern. */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-3xl border-2 border-brand/30 bg-brand/10 text-2xl font-black text-brand shadow-lg shadow-brand/10">
+          {guild.iconUrl ? (
+            <img src={guild.iconUrl} alt={guild.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              {guild.name.charAt(0).toUpperCase()}
             </div>
-          </div>
+          )}
+        </div>
 
+        <div className="flex flex-1 flex-col gap-2 text-center sm:text-left">
+          <p className="text-[11px] font-black uppercase tracking-wider text-brand-light">
+            Discord Server
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+            <h1 className="text-3xl font-black text-text-primary">{guild.name}</h1>
+            <span
+              className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${visibilityToneClass}`}
+            >
+              {guild.visibility}
+            </span>
+          </div>
+          {guild.description && (
+            <p className="max-w-xl text-xs text-text-secondary sm:text-sm">{guild.description}</p>
+          )}
           {isManager && (
             <Link
               to={`/discord/servers/${guild.slug}/manage`}
-              id="manage-server-button"
-              className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/20 px-5 py-2.5 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/30 hover:text-white transition-all"
+              className="mt-1 w-fit text-xs font-bold text-brand-light hover:underline sm:mx-0 mx-auto"
             >
               {dict.discordServerSlug.manageServerCta}
             </Link>
           )}
         </div>
-
-        {guild.description && (
-          <div className="mt-6 pt-4 border-t border-white/10 text-xs md:text-sm text-slate-300 leading-relaxed">
-            {guild.description}
-          </div>
-        )}
       </div>
 
-      {/* Summary Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 backdrop-blur-sm space-y-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-            <Users className="h-4 w-4 text-indigo-400" />
-            <span>{dict.discordServerSlug.participantsLabel}</span>
-          </div>
-          <div className="text-2xl font-extrabold text-white">
+      {/* Summary metrics — a slim unboxed row, same spirit as profile's XP bar. */}
+      <div className="grid grid-cols-1 gap-6 border-t border-border pt-6 sm:grid-cols-3">
+        <div className="flex flex-col gap-1">
+          <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <Users className="h-3.5 w-3.5 text-brand-light" />
+            {dict.discordServerSlug.participantsLabel}
+          </span>
+          <span className="text-2xl font-black text-text-primary">
             {(summary?.participantCount ?? 0).toLocaleString()}
             {dict.discordServerSlug.participantsUnit}
-          </div>
-          <div className="text-[11px] text-slate-500">
+          </span>
+          <span className="text-[11px] text-text-muted">
             {dict.discordServerSlug.participantsHint}
-          </div>
+          </span>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 backdrop-blur-sm space-y-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-            <Zap className="h-4 w-4 text-amber-400" />
-            <span>{dict.discordServerSlug.totalXpLabel}</span>
-          </div>
-          <div className="text-2xl font-extrabold text-amber-300">
+        <div className="flex flex-col gap-1">
+          <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <Zap className="h-3.5 w-3.5 text-accent-yellow" />
+            {dict.discordServerSlug.totalXpLabel}
+          </span>
+          <span className="text-2xl font-black text-accent-yellow">
             {(summary?.totalXp ?? 0).toLocaleString()} XP
-          </div>
-          <div className="text-[11px] text-slate-500">{dict.discordServerSlug.totalXpHint}</div>
+          </span>
+          <span className="text-[11px] text-text-muted">{dict.discordServerSlug.totalXpHint}</span>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 backdrop-blur-sm space-y-2">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400">
-            <Calendar className="h-4 w-4 text-purple-400" />
-            <span>{dict.discordServerSlug.weeklyXpLabel}</span>
-          </div>
-          <div className="text-2xl font-extrabold text-purple-300">
+        <div className="flex flex-col gap-1">
+          <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-text-muted">
+            <Calendar className="h-3.5 w-3.5 text-brand-light" />
+            {dict.discordServerSlug.weeklyXpLabel}
+          </span>
+          <span className="text-2xl font-black text-text-primary">
             {(summary?.weeklyXp ?? 0).toLocaleString()} XP
-          </div>
-          <div className="text-[11px] text-slate-500">{dict.discordServerSlug.weeklyXpHint}</div>
+          </span>
+          <span className="text-[11px] text-text-muted">{dict.discordServerSlug.weeklyXpHint}</span>
         </div>
       </div>
 
-      {/* Leaderboard Section & Tabs */}
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-indigo-400" />
-            <h2 className="text-lg font-extrabold text-white">
-              {dict.discordServerSlug.leaderboardTitle}
-            </h2>
-          </div>
+      {/* Leaderboard — divided list rows (no bordered card), tab pills styled like ranking.tsx's
+          main mode tabs for visual consistency with the rest of the app. */}
+      <section className="flex flex-col gap-4 border-t border-border pt-6">
+        <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+          <h2 className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-text-primary">
+            <Trophy className="h-4 w-4 text-accent-yellow" />
+            {dict.discordServerSlug.leaderboardTitle}
+          </h2>
 
-          <div className="flex items-center gap-1.5 rounded-xl bg-slate-950 p-1 border border-white/10">
-            <button
-              onClick={() => setActiveTab("alltime")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                activeTab === "alltime"
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {dict.discordServerSlug.tabAlltime}
-            </button>
-            <button
-              onClick={() => setActiveTab("weekly")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                activeTab === "weekly"
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {dict.discordServerSlug.tabWeekly}
-            </button>
-            <button
-              onClick={() => setActiveTab("games")}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                activeTab === "games"
-                  ? "bg-indigo-600 text-white shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {dict.discordServerSlug.tabGames}
-            </button>
+          <div className="flex items-center gap-1.5 rounded-2xl border border-border bg-surface-sidebar p-1.5">
+            {(
+              [
+                ["alltime", dict.discordServerSlug.tabAlltime],
+                ["weekly", dict.discordServerSlug.tabWeekly],
+                ["games", dict.discordServerSlug.tabGames],
+              ] as const
+            ).map(([tab, label]) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`cursor-pointer rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition-all ${
+                  activeTab === tab
+                    ? "bg-brand text-white shadow-lg shadow-brand/25"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Tab 1: All-time Server XP */}
-        {activeTab === "alltime" && (
-          <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-            {topAllTime.length === 0 ? (
-              <div className="p-12 text-center space-y-3">
-                <div className="text-3xl">🎮</div>
-                <p className="text-sm font-semibold text-slate-300">
-                  {dict.discordServerSlug.emptyAlltimeTitle}
-                </p>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  {dict.discordServerSlug.emptyAlltimeHintPrefix}{" "}
-                  <code className="text-indigo-300 font-mono">/owogg play</code>{" "}
-                  {dict.discordServerSlug.emptyAlltimeHintSuffix}
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-white/5">
-                {topAllTime.map((entry) => (
-                  <div
-                    key={entry.userId}
-                    className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-white/5"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold ${
-                          entry.rank === 1
-                            ? "bg-amber-400 text-slate-950"
-                            : entry.rank === 2
-                              ? "bg-slate-300 text-slate-950"
-                              : entry.rank === 3
-                                ? "bg-amber-700 text-white"
-                                : "bg-slate-800 text-slate-400"
-                        }`}
-                      >
-                        #{entry.rank}
-                      </span>
-
-                      {entry.avatarUrl ? (
-                        <img
-                          src={entry.avatarUrl}
-                          alt={entry.nickname}
-                          className="h-9 w-9 rounded-full object-cover border border-white/10"
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600/40 text-xs font-bold text-indigo-200">
-                          {entry.nickname.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-
-                      <span className="text-sm font-semibold text-white">{entry.nickname}</span>
-                    </div>
-
-                    <div className="text-sm font-extrabold text-amber-300">
-                      {entry.xp.toLocaleString()} XP
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === "alltime" &&
+          (topAllTime.length === 0 ? (
+            <EmptyLeaderboardState
+              title={dict.discordServerSlug.emptyAlltimeTitle}
+              hintPrefix={dict.discordServerSlug.emptyAlltimeHintPrefix}
+              hintSuffix={dict.discordServerSlug.emptyAlltimeHintSuffix}
+              command="/owogg play"
+            />
+          ) : (
+            <div className="flex flex-col divide-y divide-border/60">
+              {topAllTime.map((entry) => (
+                <LeaderboardRow
+                  key={entry.userId}
+                  rank={entry.rank}
+                  nickname={entry.nickname}
+                  avatarUrl={entry.avatarUrl}
+                  valueLabel={`${entry.xp.toLocaleString()} XP`}
+                />
+              ))}
+            </div>
+          ))}
 
         {/* Tab 2: Weekly Server XP */}
-        {activeTab === "weekly" && (
-          <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-            {topWeekly.length === 0 ? (
-              <div className="p-12 text-center space-y-3">
-                <div className="text-3xl">📅</div>
-                <p className="text-sm font-semibold text-slate-300">
-                  {dict.discordServerSlug.emptyWeeklyTitle}
-                </p>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  {dict.discordServerSlug.emptyWeeklyHint}
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-white/5">
-                {topWeekly.map((entry) => (
-                  <div
-                    key={entry.userId}
-                    className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-white/5"
-                  >
-                    <div className="flex items-center gap-4">
-                      <span
-                        className={`flex h-7 w-7 items-center justify-center rounded-lg text-xs font-bold ${
-                          entry.rank === 1
-                            ? "bg-purple-400 text-slate-950"
-                            : entry.rank === 2
-                              ? "bg-slate-300 text-slate-950"
-                              : entry.rank === 3
-                                ? "bg-purple-700 text-white"
-                                : "bg-slate-800 text-slate-400"
-                        }`}
-                      >
-                        #{entry.rank}
-                      </span>
-
-                      {entry.avatarUrl ? (
-                        <img
-                          src={entry.avatarUrl}
-                          alt={entry.nickname}
-                          className="h-9 w-9 rounded-full object-cover border border-white/10"
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-purple-600/40 text-xs font-bold text-purple-200">
-                          {entry.nickname.charAt(0).toUpperCase()}
-                        </div>
-                      )}
-
-                      <span className="text-sm font-semibold text-white">{entry.nickname}</span>
-                    </div>
-
-                    <div className="text-sm font-extrabold text-purple-300">
-                      {entry.xp.toLocaleString()} XP
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === "weekly" &&
+          (topWeekly.length === 0 ? (
+            <EmptyLeaderboardState
+              title={dict.discordServerSlug.emptyWeeklyTitle}
+              hint={dict.discordServerSlug.emptyWeeklyHint}
+            />
+          ) : (
+            <div className="flex flex-col divide-y divide-border/60">
+              {topWeekly.map((entry) => (
+                <LeaderboardRow
+                  key={entry.userId}
+                  rank={entry.rank}
+                  nickname={entry.nickname}
+                  avatarUrl={entry.avatarUrl}
+                  valueLabel={`${entry.xp.toLocaleString()} XP`}
+                />
+              ))}
+            </div>
+          ))}
 
         {/* Tab 3: Canonical Game Scores for Server Participants */}
         {activeTab === "games" && (
-          <div className="space-y-4">
-            {/* Game Selector Pills */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-              {GAME_MANIFESTS.map((g) => (
-                <button
-                  key={g.id}
-                  onClick={() => setSelectedGameId(g.id)}
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold whitespace-nowrap transition-all ${
-                    selectedGameId === g.id
-                      ? "bg-indigo-600 text-white border border-indigo-400/40 shadow-lg"
-                      : "bg-slate-900/80 text-slate-400 border border-white/10 hover:text-white hover:bg-slate-800"
-                  }`}
-                >
-                  <Gamepad2 className="h-3.5 w-3.5" />
-                  <span>{g.title}</span>
-                </button>
-              ))}
+          <div className="flex flex-col gap-4">
+            <div className="scrollbar-none flex items-center gap-2 overflow-x-auto pb-1">
+              {gameManifests.map((g) => {
+                const title = getLocalizedGameContent(dict, g).title;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setSelectedGameId(g.id)}
+                    className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
+                      selectedGameId === g.id
+                        ? "border-brand bg-brand text-white shadow-lg shadow-brand/25"
+                        : "border-border bg-surface-raised text-text-secondary hover:text-text-primary"
+                    }`}
+                  >
+                    <GameThumbnail
+                      thumbnail={g.thumbnail}
+                      title={title}
+                      accent={g.accent}
+                      className="h-4 w-4 rounded"
+                    />
+                    <span>{title}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-900/60 backdrop-blur-sm overflow-hidden">
-              {loadingGameScores ? (
-                <div className="p-12 text-center text-xs text-slate-400">
-                  {dict.discordServerSlug.loadingGame}
-                </div>
-              ) : gameLeaderboard.length === 0 ? (
-                <div className="p-12 text-center space-y-3">
-                  <div className="text-3xl">🎯</div>
-                  <p className="text-sm font-semibold text-slate-300">
-                    <b>{currentManifest?.title}</b> {dict.discordServerSlug.emptyGameScoreSuffix}
-                  </p>
-                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                    {dict.discordServerSlug.emptyGameHintPrefix}{" "}
-                    <code className="text-indigo-300 font-mono">
-                      /owogg play game:{selectedGameId}
-                    </code>{" "}
-                    {dict.discordServerSlug.emptyGameHintSuffix}
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-white/5">
-                  {gameLeaderboard.map((entry, idx) => (
-                    <div
-                      key={entry.id}
-                      className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-white/5"
-                    >
-                      <div className="flex items-center gap-4">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-slate-400">
-                          #{idx + 1}
-                        </span>
-
-                        {entry.avatarUrl ? (
-                          <img
-                            src={entry.avatarUrl}
-                            alt={entry.nickname}
-                            className="h-9 w-9 rounded-full object-cover border border-white/10"
-                          />
-                        ) : (
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600/40 text-xs font-bold text-indigo-200">
-                            {entry.nickname.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-
-                        <div>
-                          <div className="text-sm font-semibold text-white font-mono">
-                            {entry.nickname}
-                          </div>
-                          <div className="text-[11px] text-slate-500">
-                            {entry.createdAt.slice(0, 10)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-sm font-extrabold text-indigo-300 font-mono">
-                        {entry.score.toLocaleString()}{" "}
-                        <span className="text-xs font-normal text-slate-400">
-                          {currentManifest?.scoreConfig?.unit ?? "pts"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {loadingGameScores ? (
+              <p className="py-8 text-center text-xs text-text-muted">
+                {dict.discordServerSlug.loadingGame}
+              </p>
+            ) : gameLeaderboard.length === 0 ? (
+              <EmptyLeaderboardState
+                title={`${currentGameTitle} ${dict.discordServerSlug.emptyGameScoreSuffix}`}
+                hintPrefix={dict.discordServerSlug.emptyGameHintPrefix}
+                hintSuffix={dict.discordServerSlug.emptyGameHintSuffix}
+                command={`/owogg play game:${selectedGameId}`}
+              />
+            ) : (
+              <div className="flex flex-col divide-y divide-border/60">
+                {gameLeaderboard.map((entry, idx) => (
+                  <LeaderboardRow
+                    key={entry.id}
+                    rank={idx + 1}
+                    nickname={entry.nickname}
+                    avatarUrl={entry.avatarUrl}
+                    subtext={entry.createdAt.slice(0, 10)}
+                    valueLabel={`${entry.score.toLocaleString()} ${currentManifest?.scoreConfig?.unit ?? "pts"}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Metadata Info Card */}
-      <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 backdrop-blur-sm space-y-3">
-        <h3 className="text-sm font-bold text-white">{dict.discordServerSlug.infoCardTitle}</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+      {/* Metadata — plain label/value pairs instead of a bordered "info card". */}
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-sm font-black uppercase tracking-wide text-text-primary">
+          {dict.discordServerSlug.infoCardTitle}
+        </h2>
+        <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">
           <div>
-            <div className="text-slate-400">Discord Guild ID</div>
-            <div className="font-mono text-slate-200 mt-1 truncate">{guild.guildId}</div>
+            <div className="text-text-muted">Discord Guild ID</div>
+            <div className="mt-1 truncate font-mono text-text-secondary">{guild.guildId}</div>
           </div>
           <div>
-            <div className="text-slate-400">{dict.discord.registeredLabel}</div>
-            <div className="text-slate-200 mt-1">{guild.registeredAt.slice(0, 10)}</div>
+            <div className="text-text-muted">{dict.discord.registeredLabel}</div>
+            <div className="mt-1 text-text-secondary">{guild.registeredAt.slice(0, 10)}</div>
           </div>
           <div>
-            <div className="text-slate-400">{dict.discordServerSlug.statusLabel}</div>
-            <div className="text-emerald-400 font-semibold mt-1">{guild.registrationStatus}</div>
+            <div className="text-text-muted">{dict.discordServerSlug.statusLabel}</div>
+            <div className="mt-1 font-semibold text-emerald-400">{guild.registrationStatus}</div>
           </div>
           <div>
-            <div className="text-slate-400">{dict.discordServerSlug.visibilityLabel}</div>
-            <div className="text-indigo-300 font-semibold mt-1">{guild.visibility}</div>
+            <div className="text-text-muted">{dict.discordServerSlug.visibilityLabel}</div>
+            <div className="mt-1 font-semibold text-brand-light">{guild.visibility}</div>
           </div>
         </div>
+      </section>
+    </div>
+  );
+}
+
+/** One divided-list row shared by all three leaderboard tabs — top-3 ranks get a filled badge,
+ * the rest a plain muted one, matching profile's understated game-records rows. */
+function LeaderboardRow({
+  rank,
+  nickname,
+  avatarUrl,
+  valueLabel,
+  subtext,
+}: {
+  rank: number;
+  nickname: string;
+  avatarUrl?: string | null;
+  valueLabel: string;
+  subtext?: string;
+}) {
+  const rankBadgeClass =
+    rank === 1
+      ? "bg-accent-yellow text-black"
+      : rank === 2
+        ? "bg-text-secondary/80 text-black"
+        : rank === 3
+          ? "bg-amber-700 text-white"
+          : "bg-surface-raised text-text-muted";
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-3 transition-colors hover:bg-surface-raised/50">
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-black ${rankBadgeClass}`}
+        >
+          #{rank}
+        </span>
+
+        <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-border bg-brand/10 text-xs font-bold text-brand">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt={nickname} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              {nickname.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold text-text-primary">{nickname}</div>
+          {subtext && <div className="text-[11px] text-text-muted">{subtext}</div>}
+        </div>
       </div>
+
+      <div className="shrink-0 text-sm font-black text-brand-light">{valueLabel}</div>
+    </div>
+  );
+}
+
+function EmptyLeaderboardState({
+  title,
+  hint,
+  hintPrefix,
+  hintSuffix,
+  command,
+}: {
+  title: string;
+  hint?: string;
+  hintPrefix?: string;
+  hintSuffix?: string;
+  command?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-12 text-center">
+      <p className="text-sm font-bold text-text-secondary">{title}</p>
+      {hint && <p className="max-w-sm text-xs text-text-muted">{hint}</p>}
+      {command && (
+        <p className="max-w-sm text-xs text-text-muted">
+          {hintPrefix} <code className="font-mono text-brand-light">{command}</code> {hintSuffix}
+        </p>
+      )}
     </div>
   );
 }

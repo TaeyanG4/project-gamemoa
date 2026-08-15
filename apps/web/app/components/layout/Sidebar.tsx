@@ -10,6 +10,8 @@ import {
   Bookmark,
   Check,
   ScrollText,
+  BookOpen,
+  Compass,
 } from "lucide-react";
 import { SUPPORTED_LOCALES } from "@owogg/core";
 import { useI18n } from "../../features/i18n/I18nContext";
@@ -121,6 +123,9 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
 
   const otherNavItems = [
     { label: dict.sidebar.discordHub, path: "/discord", icon: DiscordIcon },
+    // dict.nav.wiki already existed (translated in all 4 locales) but was unused — Footer links
+    // to Wiki via dict.footer.wiki, the sidebar previously had no Wiki entry at all.
+    { label: dict.nav.wiki, path: "/wiki", icon: BookOpen },
     { label: dict.footer.changelog, path: "/changelog", icon: ScrollText },
   ];
 
@@ -241,7 +246,9 @@ export function Sidebar({ isMobileOpen, onMobileClose }: SidebarProps) {
                 onClick={onMobileClose}
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-text-secondary hover:text-text-primary hover:bg-surface-raised transition-colors"
               >
-                <DiscordIcon className="w-5 h-5" />
+                {/* Compass (not DiscordIcon) so this doesn't look identical to the "Discord Hub"
+                    row above in the same drawer — see RegisteredServersMenu.tsx's comment. */}
+                <Compass className="w-5 h-5" />
                 <span className="text-base font-medium">{dict.sidebar.discordServers}</span>
               </Link>
 

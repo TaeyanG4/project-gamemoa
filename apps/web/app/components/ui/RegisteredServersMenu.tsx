@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { DiscordIcon } from "./DiscordIcon";
+import { Compass } from "lucide-react";
 import { searchDiscordGuilds } from "../../features/discord/discordGuildApi";
 import type { DiscordGuildDto } from "@owogg/contracts";
 import { useI18n } from "../../features/i18n/I18nContext";
@@ -8,7 +8,13 @@ import { useClickOutside } from "../../hooks/useClickOutside";
 
 /** Header icon listing PUBLIC-visibility registered Discord servers — lives next to the
  * favorites/language selector. Fetched lazily on first open (not on every page load) since the
- * header renders on every route. */
+ * header renders on every route.
+ *
+ * Deliberately uses `Compass` (Discord's own "Discover Servers" glyph) rather than the plain
+ * Discord brand mark — the sidebar's "Discord Hub" link already uses `DiscordIcon`, and on the
+ * mobile drawer the two sat right next to each other looking identical despite going to
+ * different places. Compass reads as "browse/discover a directory", which is what this menu
+ * actually is. */
 export function RegisteredServersMenu() {
   const { dict } = useI18n();
   const [open, setOpen] = useState(false);
@@ -37,7 +43,7 @@ export function RegisteredServersMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <DiscordIcon className="w-5 h-5" />
+        <Compass className="w-5 h-5" />
       </button>
 
       {open && (
