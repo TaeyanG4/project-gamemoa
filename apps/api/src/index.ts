@@ -15,6 +15,7 @@ import { adminAuthRouter } from "./routes/adminAuth.js";
 import { adminAccountsRouter } from "./routes/adminAccounts.js";
 import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { adminGamesRouter } from "./routes/adminGames.js";
+import { adminUsersRouter } from "./routes/adminUsers.js";
 import { gamesRouter } from "./routes/games.js";
 import { renderRouter } from "./routes/render.js";
 import { createContainer } from "./container.js";
@@ -111,6 +112,7 @@ app.route("/api/admin", adminAuthRouter);
 app.route("/api/admin", adminAccountsRouter);
 app.route("/api/admin/creators", adminCreatorsRouter);
 app.route("/api/admin/games", adminGamesRouter);
+app.route("/api/admin/users", adminUsersRouter);
 app.route("/api/games", gamesRouter);
 app.route("/api/render", renderRouter);
 

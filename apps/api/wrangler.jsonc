@@ -17,6 +17,20 @@
   "vars": {
     "COMMIT_SHA": "dev",
   },
+  // Capacity protection for write endpoints (see src/middleware/rateLimit.ts). 30 submissions
+  // per 60s per session is far above human play — the shortest game round is 30 seconds — but
+  // caps a submission loop before it can monopolize D1's serialized query throughput.
+  // Limits are enforced per Cloudflare location, which is the right granularity here: the goal
+  // is protecting each colo's share of DB throughput, not global exactness.
+  // The binding is read optionally by the middleware, so removing this block degrades to
+  // "unprotected" rather than breaking the deploy.
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 30, "period": 60 },
+    },
+  ],
   "triggers": {
     "crons": ["0 */6 * * *"],
   },

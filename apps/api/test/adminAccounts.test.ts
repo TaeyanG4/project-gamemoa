@@ -120,6 +120,15 @@ CREATE TABLE oauth_accounts (
   provider_email TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE user_moderation (
+  user_id INTEGER PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  suspended_until TEXT,
+  score_submission_blocked INTEGER NOT NULL DEFAULT 0,
+  reason TEXT,
+  updated_by_admin_id INTEGER,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE admin_step_up_challenges (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   token_hash TEXT NOT NULL UNIQUE,

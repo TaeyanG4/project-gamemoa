@@ -1,0 +1,249 @@
+import { Hono } from "hono";
+import {
+  AdminUserSearchResponseSchema,
+  AdminUserDetailResponseSchema,
+  AdminSuspendUserRequestSchema,
+  AdminBanUserRequestSchema,
+  AdminScoreSubmissionBlockRequestSchema,
+  AdminResetScoresRequestSchema,
+  AdminScoreActionResponseSchema,
+  UserModerationRecordSchema,
+} from "@owogg/contracts";
+import { UserModerationUseCaseFailure } from "@owogg/core";
+import { createContainer } from "../container.js";
+import { isTrustedAdminOrigin } from "../auth/admin.js";
+import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
+import type { ApiEnv } from "./auth.js";
+
+export const adminUsersRouter = new Hono<ApiEnv>();
+
+adminUsersRouter.use("*", async (c, next) => {
+  c.header("Cache-Control", "no-store");
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(c.req.method.toUpperCase())) {
+    if (!isTrustedAdminOrigin(c.req.header("Origin"), c.env.FRONTEND_URL)) {
+      return c.json(
+        { error: { code: "FORBIDDEN", message: "요청 출처를 확인할 수 없습니다." } },
+        403,
+      );
+    }
+  }
+  await next();
+});
+
+const FAILURE_STATUS: Record<UserModerationUseCaseFailure["code"], number> = {
+  USER_NOT_FOUND: 404,
+  REASON_REQUIRED: 400,
+  SUSPENDED_UNTIL_MUST_BE_FUTURE: 400,
+};
+
+const FAILURE_MESSAGE: Record<UserModerationUseCaseFailure["code"], string> = {
+  USER_NOT_FOUND: "존재하지 않는 사용자입니다.",
+  REASON_REQUIRED: "사유를 입력해야 합니다.",
+  SUSPENDED_UNTIL_MUST_BE_FUTURE: "정지 해제 시각은 현재 시각 이후여야 합니다.",
+};
+
+/** Maps a UserModerationUseCaseFailure to `{ body, status }` for `c.json(body, status)` — every
+ * mutating route below follows the same try/catch shape, so this stays in one place instead of
+ * being duplicated six times. Re-throws anything that isn't a UserModerationUseCaseFailure so
+ * genuinely unexpected errors still surface as 500s instead of being silently swallowed. */
+function moderationErrorResponse(err: unknown): { body: unknown; status: 400 | 404 } {
+  if (!(err instanceof UserModerationUseCaseFailure)) throw err;
+  return {
+    body: { error: { code: err.code, message: FAILURE_MESSAGE[err.code] } },
+    status: FAILURE_STATUS[err.code] as 400 | 404,
+  };
+}
+
+// GET /api/admin/users?query=... — nickname/email substring or exact numeric id.
+adminUsersRouter.get("/", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const query = c.req.query("query")?.trim() ?? "";
+  if (!query) {
+    return c.json(AdminUserSearchResponseSchema.parse({ users: [] }), 200);
+  }
+
+  const { userModerationUseCases } = createContainer(c.env.DB);
+  const users = await userModerationUseCases.searchUsers(query, 20);
+  return c.json(AdminUserSearchResponseSchema.parse({ users }), 200);
+});
+
+// GET /api/admin/users/:userId — detail view: linked providers, game bests, moderation status,
+// full audit history for this user.
+adminUsersRouter.get("/:userId", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const userId = Number(c.req.param("userId"));
+  if (!Number.isInteger(userId) || userId <= 0) {
+    return c.json({ error: { code: "INVALID_REQUEST", message: "잘못된 사용자 ID입니다." } }, 400);
+  }
+
+  const container = createContainer(c.env.DB);
+  const [user, providers, bests, moderation, auditLog] = await Promise.all([
+    container.userRepo.findById(userId),
+    container.userRepo.getOAuthAccounts(userId),
+    container.scoreUseCases.getUserBestsFormatted(userId),
+    container.userModerationUseCases.getModeration(userId),
+    container.userModerationUseCases.getAuditLog(userId),
+  ]);
+
+  if (!user) {
+    return c.json(
+      { error: { code: "USER_NOT_FOUND", message: "존재하지 않는 사용자입니다." } },
+      404,
+    );
+  }
+
+  const response = AdminUserDetailResponseSchema.parse({
+    id: user.id,
+    nickname: user.nickname,
+    email: user.email,
+    createdAt: user.created_at,
+    providers: providers.map((p) => p.provider),
+    gameBests: bests,
+    moderation,
+    auditLog,
+  });
+  return c.json(response, 200);
+});
+
+// POST /api/admin/users/:userId/suspend — temporary, blocks login until suspendedUntil.
+adminUsersRouter.post("/:userId/suspend", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const userId = Number(c.req.param("userId"));
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = AdminSuspendUserRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: { code: "INVALID_REQUEST", message: "suspendedUntil, reason이 필요합니다." } },
+      400,
+    );
+  }
+
+  try {
+    const { userModerationUseCases } = createContainer(c.env.DB);
+    const record = await userModerationUseCases.suspendUser(
+      userId,
+      admin.userId,
+      parsed.data.suspendedUntil,
+      parsed.data.reason,
+    );
+    return c.json(UserModerationRecordSchema.parse(record), 200);
+  } catch (err) {
+    const { body, status } = moderationErrorResponse(err);
+    return c.json(body, status);
+  }
+});
+
+// POST /api/admin/users/:userId/ban — permanent, blocks login until an admin unbans.
+adminUsersRouter.post("/:userId/ban", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const userId = Number(c.req.param("userId"));
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = AdminBanUserRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: { code: "INVALID_REQUEST", message: "reason이 필요합니다." } }, 400);
+  }
+
+  try {
+    const { userModerationUseCases } = createContainer(c.env.DB);
+    const record = await userModerationUseCases.banUser(userId, admin.userId, parsed.data.reason);
+    return c.json(UserModerationRecordSchema.parse(record), 200);
+  } catch (err) {
+    const { body, status } = moderationErrorResponse(err);
+    return c.json(body, status);
+  }
+});
+
+// POST /api/admin/users/:userId/unsuspend — lifts SUSPENDED or BANNED back to ACTIVE early.
+adminUsersRouter.post("/:userId/unsuspend", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const userId = Number(c.req.param("userId"));
+  try {
+    const { userModerationUseCases } = createContainer(c.env.DB);
+    const record = await userModerationUseCases.unsuspendUser(userId, admin.userId);
+    return c.json(UserModerationRecordSchema.parse(record), 200);
+  } catch (err) {
+    const { body, status } = moderationErrorResponse(err);
+    return c.json(body, status);
+  }
+});
+
+// POST /api/admin/users/:userId/score-submission-block — independent of suspend/ban: user can
+// still log in, just can't submit new scores.
+adminUsersRouter.post("/:userId/score-submission-block", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const userId = Number(c.req.param("userId"));
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = AdminScoreSubmissionBlockRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: { code: "INVALID_REQUEST", message: "blocked 값이 필요합니다." } }, 400);
+  }
+
+  try {
+    const { userModerationUseCases } = createContainer(c.env.DB);
+    const record = await userModerationUseCases.setScoreSubmissionBlocked(
+      userId,
+      admin.userId,
+      parsed.data.blocked,
+      parsed.data.reason ?? null,
+    );
+    return c.json(UserModerationRecordSchema.parse(record), 200);
+  } catch (err) {
+    const { body, status } = moderationErrorResponse(err);
+    return c.json(body, status);
+  }
+});
+
+// POST /api/admin/users/:userId/reset-scores — soft-deletes every visible score for this user.
+adminUsersRouter.post("/:userId/reset-scores", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const userId = Number(c.req.param("userId"));
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = AdminResetScoresRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: { code: "INVALID_REQUEST", message: "reason이 필요합니다." } }, 400);
+  }
+
+  try {
+    const { userModerationUseCases } = createContainer(c.env.DB);
+    const result = await userModerationUseCases.resetUserScores(
+      userId,
+      admin.userId,
+      parsed.data.reason,
+    );
+    return c.json(AdminScoreActionResponseSchema.parse(result), 200);
+  } catch (err) {
+    const { body, status } = moderationErrorResponse(err);
+    return c.json(body, status);
+  }
+});
+
+// POST /api/admin/users/:userId/restore-scores — undoes the most recent reset-scores action
+// (restores every currently soft-deleted row for this user).
+adminUsersRouter.post("/:userId/restore-scores", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const userId = Number(c.req.param("userId"));
+  try {
+    const { userModerationUseCases } = createContainer(c.env.DB);
+    const result = await userModerationUseCases.restoreUserScores(userId, admin.userId);
+    return c.json(AdminScoreActionResponseSchema.parse(result), 200);
+  } catch (err) {
+    const { body, status } = moderationErrorResponse(err);
+    return c.json(body, status);
+  }
+});

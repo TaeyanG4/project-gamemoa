@@ -383,7 +383,7 @@ export class D1CreatorRepository implements CreatorRepository {
           SELECT s.id, s.user_id, s.game_id, s.score, s.created_at, cp.id AS creator_id, cp.featured_status
           FROM scores s
           JOIN creator_profiles cp ON cp.user_id = s.user_id
-          WHERE cp.status = 'VERIFIED' ${gameFilterClause} ${platformFilterClause}
+          WHERE cp.status = 'VERIFIED' AND s.deleted_at IS NULL ${gameFilterClause} ${platformFilterClause}
         ),
         pb AS (
           SELECT *, ROW_NUMBER() OVER (

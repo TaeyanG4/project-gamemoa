@@ -57,14 +57,26 @@ function createMockD1(): {
             );
             return found ? ({ id: found.id } as unknown as T) : null;
           }
-          if (query.includes("date(created_at) = date('now')")) {
-            const [userId, gameId] = bound as [number, string];
+          // Daily-cap count. The production query bounds created_at with a half-open ISO range
+          // (index-usable) rather than date(created_at) = date('now'); this branch mirrors that
+          // range so the mock stays faithful to the real comparison. Day-boundary semantics are
+          // additionally verified against a real SQLite engine in
+          // D1ProgressionRepositoryDailyCap.test.ts — a substring-matching mock like this one
+          // cannot meaningfully prove them.
+          if (query.includes("created_at >= ?") && query.includes("created_at < ?")) {
+            const [userId, gameId, startOfDay, startOfNextDay] = bound as [
+              number,
+              string,
+              string,
+              string,
+            ];
             const count = xpEvents.filter(
               (e) =>
                 e.user_id === userId &&
                 e.game_id === gameId &&
                 e.amount > 0 &&
-                e.created_at.slice(0, 10) === todayStr(),
+                e.created_at >= startOfDay &&
+                e.created_at < startOfNextDay,
             ).length;
             return { count } as unknown as T;
           }

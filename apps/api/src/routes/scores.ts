@@ -1,14 +1,20 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createContainer, evaluateAchievementsForUser } from "../container.js";
+import { createReadContainer } from "../readReplica.js";
+import { edgeCache } from "../middleware/edgeCache.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { scoreSubmissionSchema } from "@owogg/contracts";
 import { GAME_MANIFEST_MAP } from "@owogg/core";
 import type { ApiEnv } from "./auth.js";
 
 export const scoresRouter = new Hono<ApiEnv>();
 
-// POST /api/scores
-scoresRouter.post("/", async (c) => {
+// POST /api/scores — the most D1-expensive endpoint in the app (~10-15 serialized queries per
+// submission), so it is rate limited ahead of any DB work. The configured ceiling is far above
+// what human play can produce: the fastest game is a 30-second round, so a real player cannot
+// approach it, while a submission loop is capped before it can monopolize D1's throughput.
+scoresRouter.post("/", rateLimit({ name: "score-submit" }), async (c) => {
   try {
     const sessionId = getCookie(c, "owogg_session");
     if (!sessionId) {
@@ -27,6 +33,22 @@ scoresRouter.post("/", async (c) => {
 
     if (!authData) {
       return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    // Score-submission block (see UserModerationUseCases) — a lighter tool than SUSPENDED/BANNED,
+    // which are already enforced by findSession itself (an actually-suspended/banned user never
+    // gets this far — authData would be null). This lets an admin stop a specific abuser from
+    // polluting leaderboards without locking them out of the rest of the site.
+    if (authData.user.score_submission_blocked) {
+      return c.json(
+        {
+          error: {
+            code: "SCORE_SUBMISSION_BLOCKED",
+            message: "현재 점수 제출이 제한된 계정입니다.",
+          },
+        },
+        403,
+      );
     }
 
     const rawBody = await c.req.json().catch(() => ({}));
@@ -104,7 +126,26 @@ scoresRouter.post("/", async (c) => {
         }
       }
 
-      newlyUnlockedAchievements = await evaluateAchievementsForUser(container, userId);
+      // Achievement re-evaluation is 3 further reads (progression summary, personal bests,
+      // personalization) plus any unlock writes — the largest remaining block of D1 work in this
+      // request, and the only part the caller does not need before it can render the result
+      // screen. Deferred via waitUntil so it runs after the response is sent: the submission's
+      // latency (and its hold on D1's serialized queue) drops accordingly, while the work still
+      // completes. `newlyUnlockedAchievements` is declared optional in scoreSubmissionResponse
+      // and is not read by the web client, so omitting it here is within the contract; the
+      // profile/achievements screens read unlock state from the DB on their own next load.
+      const deferredAchievements = evaluateAchievementsForUser(container, userId).catch(
+        (achievementErr) => {
+          console.error("Deferred Achievement Evaluation Error:", achievementErr);
+        },
+      );
+      try {
+        c.executionCtx.waitUntil(deferredAchievements);
+      } catch {
+        // No ExecutionContext (test runner / non-Workers host): await inline so the behavior is
+        // still correct and observable, just without the latency benefit.
+        newlyUnlockedAchievements = (await deferredAchievements) ?? [];
+      }
     } catch (progressionErr) {
       // Progression bookkeeping must never fail the score submission itself.
       console.error("Progression Update Error:", progressionErr);
@@ -154,8 +195,10 @@ scoresRouter.get("/user/me", async (c) => {
   }
 });
 
-// GET /api/scores/:gameId
-scoresRouter.get("/:gameId", async (c) => {
+// GET /api/scores/:gameId — public leaderboard. Edge-cached: the response depends only on
+// gameId + the ?difficulty query (both in the URL), never on who is asking, so one cached entry
+// per URL correctly serves every visitor. This is the single hottest read path in the app.
+scoresRouter.get("/:gameId", edgeCache({ ttlSeconds: 30 }), async (c) => {
   const gameId = c.req.param("gameId");
 
   if (!GAME_MANIFEST_MAP[gameId]) {
@@ -170,7 +213,10 @@ scoresRouter.get("/:gameId", async (c) => {
   }
 
   try {
-    const { scoreUseCases } = createContainer(c.env.DB);
+    // Read-replica eligible: this is a public leaderboard already served with a 30s edge cache,
+    // so it is explicitly allowed to lag — a replica cannot make it staler than the cache TTL
+    // already does. See readReplica.ts for why auth/session reads deliberately stay on primary.
+    const { scoreUseCases } = createReadContainer(c.env.DB);
     const difficulty = c.req.query("difficulty");
     const leaderboard = await scoreUseCases.getLeaderboard(gameId, 20, difficulty);
 

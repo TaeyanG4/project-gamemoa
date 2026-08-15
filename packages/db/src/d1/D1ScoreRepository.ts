@@ -80,7 +80,9 @@ export class D1ScoreRepository implements ScoreRepository {
       // Recent-activity feed, not a per-user ranked leaderboard — no PB dedup semantics apply,
       // and difficulty doesn't apply either (mixes many games, each with its own tiers).
       const res = await this.db
-        .prepare(`SELECT * FROM scores WHERE user_id IS NOT NULL ORDER BY created_at DESC LIMIT ?`)
+        .prepare(
+          `SELECT * FROM scores WHERE user_id IS NOT NULL AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?`,
+        )
         .bind(limit)
         .all<Record<string, unknown>>();
       return res.results.map(mapScoreRow);
@@ -101,7 +103,7 @@ export class D1ScoreRepository implements ScoreRepository {
           ORDER BY score ${orderClause}, created_at ASC, id ASC
         ) AS rn
         FROM scores
-        WHERE user_id IS NOT NULL AND game_id = ? AND difficulty = ?
+        WHERE user_id IS NOT NULL AND game_id = ? AND difficulty = ? AND deleted_at IS NULL
       )
       SELECT * FROM ranked
       WHERE rn = 1
@@ -120,7 +122,7 @@ export class D1ScoreRepository implements ScoreRepository {
   async getUserPersonalBests(userId: number): Promise<UserPersonalBestAggregate[]> {
     const res = await this.db
       .prepare(
-        `SELECT game_id, MIN(score) as min_score, MAX(score) as max_score FROM scores WHERE user_id = ? GROUP BY game_id`,
+        `SELECT game_id, MIN(score) as min_score, MAX(score) as max_score FROM scores WHERE user_id = ? AND deleted_at IS NULL GROUP BY game_id`,
       )
       .bind(userId)
       .all<{ game_id: string; min_score: number; max_score: number }>();

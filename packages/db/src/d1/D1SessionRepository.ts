@@ -19,15 +19,31 @@ export class D1SessionRepository implements SessionRepository {
         `SELECT s.id as session_id, s.user_id, s.created_at as session_created_at, s.expires_at,
                 u.id as user_id, u.nickname, u.email, u.avatar_url, u.created_at as user_created_at, u.updated_at,
                 u.country, u.nickname_updated_at, u.country_updated_at, u.locale,
-                u.current_streak, u.longest_streak, u.last_active_date
+                u.current_streak, u.longest_streak, u.last_active_date,
+                m.status as moderation_status, m.suspended_until, m.score_submission_blocked
          FROM sessions s
          JOIN users u ON s.user_id = u.id
+         LEFT JOIN user_moderation m ON m.user_id = u.id
          WHERE s.id = ?`,
       )
       .bind(sessionId)
       .first<Record<string, unknown>>();
 
     return row || null;
+  }
+
+  /** True if this session's user must be treated as logged out — a BANNED user, or a
+   * currently-SUSPENDED one (an expired suspension no longer blocks; see migration 0023's
+   * comment on `suspended_until`). Independent of `score_submission_blocked`, which still lets
+   * the user through here and is enforced separately by the scores route. */
+  private isLoginBlocked(row: Record<string, unknown>): boolean {
+    const status = row.moderation_status ? String(row.moderation_status) : "ACTIVE";
+    if (status === "BANNED") return true;
+    if (status === "SUSPENDED") {
+      const until = row.suspended_until ? String(row.suspended_until) : null;
+      return !until || until > new Date().toISOString();
+    }
+    return false;
   }
 
   async createSession(userId: number, ttlDays = 30): Promise<Session> {
@@ -73,6 +89,16 @@ export class D1SessionRepository implements SessionRepository {
       await this.db.prepare(`DELETE FROM sessions WHERE id = ?`).bind(String(row.session_id)).run();
       return null;
     }
+
+    // BANNED/currently-SUSPENDED users are treated as logged out everywhere — this is the one
+    // choke point every authenticated request passes through (requireAuth in routes/auth.ts and
+    // the scores route both call findSession directly), so this single check is sufficient to
+    // block login app-wide without touching every route individually. The session row itself is
+    // deliberately left alone here (not deleted) — a suspension is expected to end and the
+    // session to become valid again; an admin ban/suspend proactively revokes sessions at
+    // action time (see UserModerationUseCases.suspendUser/banUser), this is just defense in
+    // depth for a session created in the gap between the action and this read.
+    if (this.isLoginBlocked(row)) return null;
 
     // 3. Migrate legacy raw row to hashed token
     if (isLegacy) {
@@ -154,6 +180,7 @@ export class D1SessionRepository implements SessionRepository {
           : row.last_active_date
             ? String(row.last_active_date)
             : null,
+        score_submission_blocked: Number(row.score_submission_blocked ?? 0) === 1,
       },
     };
   }
@@ -165,5 +192,9 @@ export class D1SessionRepository implements SessionRepository {
       .prepare(`DELETE FROM sessions WHERE id = ? OR id = ?`)
       .bind(hashedToken, rawToken)
       .run();
+  }
+
+  async deleteAllSessionsForUser(userId: number): Promise<void> {
+    await this.db.prepare(`DELETE FROM sessions WHERE user_id = ?`).bind(userId).run();
   }
 }

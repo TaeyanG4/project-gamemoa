@@ -38,12 +38,25 @@ export class D1ProgressionRepository implements ProgressionRepository {
     // Daily anti-farming cap: count XP-awarding completions already recorded today (UTC)
     // for this user + game. Beyond the cap, the completion is still recorded (amount 0)
     // so achievement progress keeps advancing, but no further XP is granted.
+    //
+    // Expressed as a half-open range on created_at rather than `date(created_at) = date('now')`.
+    // Wrapping the column in a function makes it unusable as an index key, so the old form could
+    // only use idx_xp_events_user_game_created for its (user_id, game_id) prefix and then had to
+    // evaluate date() on every one of that user's historical rows for the game — cost grew with
+    // the player's lifetime history, on the single most latency-sensitive write in the app. The
+    // range form seeks straight to today's slice. This is a pure index-usability change: every
+    // row is written by the INSERT below with an explicit ISO-8601 UTC `created_at`, which sorts
+    // lexicographically in the same order as chronologically, so the two forms select identically.
+    const startOfUtcDay = `${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`;
+    const startOfNextUtcDay = `${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}T00:00:00.000Z`;
+
     const todayCountRow = await this.db
       .prepare(
         `SELECT COUNT(*) as count FROM xp_events
-         WHERE user_id = ? AND game_id = ? AND amount > 0 AND date(created_at) = date('now')`,
+         WHERE user_id = ? AND game_id = ? AND amount > 0
+           AND created_at >= ? AND created_at < ?`,
       )
-      .bind(input.userId, input.gameId)
+      .bind(input.userId, input.gameId, startOfUtcDay, startOfNextUtcDay)
       .first<{ count: number }>();
 
     const todayCount = Number(todayCountRow?.count ?? 0);

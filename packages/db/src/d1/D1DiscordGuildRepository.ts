@@ -591,7 +591,7 @@ export class D1DiscordGuildRepository implements DiscordGuildRepository {
       SELECT s.id, s.user_id, u.nickname, u.avatar_url, s.game_id, s.score, s.created_at
       FROM scores s
       JOIN users u ON u.id = s.user_id
-      WHERE s.user_id IS NOT NULL AND s.game_id = ?
+      WHERE s.user_id IS NOT NULL AND s.game_id = ? AND s.deleted_at IS NULL
         AND s.user_id IN (SELECT DISTINCT user_id FROM discord_guild_xp_events WHERE guild_id = ?)
       ORDER BY s.score ${orderClause}, s.created_at ASC
       LIMIT 100

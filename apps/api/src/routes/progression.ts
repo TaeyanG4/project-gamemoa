@@ -9,6 +9,8 @@ import {
 } from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer } from "../container.js";
+import { edgeCache } from "../middleware/edgeCache.js";
+import { createReadContainer } from "../readReplica.js";
 
 export const progressionRouter = new Hono<ApiEnv>();
 
@@ -48,8 +50,10 @@ progressionRouter.get("/me", async (c) => {
 });
 
 // GET /api/progression/leaderboard?limit=20 — public global XP ranking ("who has been
-// actively using OwOGG"), separate from any game skill leaderboard.
-progressionRouter.get("/leaderboard", async (c) => {
+// actively using OwOGG"), separate from any game skill leaderboard. Edge-cached (60s): the
+// response depends only on ?limit, and global XP standings move far more slowly than a
+// per-game leaderboard, so a longer TTL than /api/scores/:gameId is safe here.
+progressionRouter.get("/leaderboard", edgeCache({ ttlSeconds: 60 }), async (c) => {
   const query = XpLeaderboardQuerySchema.safeParse({ limit: c.req.query("limit") });
   if (!query.success) {
     return c.json(
@@ -62,7 +66,8 @@ progressionRouter.get("/leaderboard", async (c) => {
     return c.json({ entries: [] }, 200);
   }
 
-  const { progressionUseCases } = createContainer(c.env.DB);
+  // Read-replica eligible: public ranking, already edge-cached for 60s (see readReplica.ts).
+  const { progressionUseCases } = createReadContainer(c.env.DB);
   const entries = await progressionUseCases.getGlobalXpLeaderboard(query.data.limit);
 
   const validated = XpLeaderboardResponseSchema.parse({

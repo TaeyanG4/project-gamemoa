@@ -30,4 +30,5 @@ export * from "./application/creatorUseCases.js";
 export * from "./application/adminAuthUseCases.js";
 export * from "./application/adminAccountUseCases.js";
 export * from "./application/gameSettingsUseCases.js";
+export * from "./application/userModerationUseCases.js";
 export * from "./registry/gameRegistry.generated.js";
