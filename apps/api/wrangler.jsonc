@@ -9,8 +9,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "gamemoa-d1",
-      "database_id": "e55f84c5-e3a3-4547-8aa3-7a8ec186a02e",
+      "database_name": "owogg-d1",
+      "database_id": "4668dc75-0d25-43fa-9a8b-38bf78271655",
       "migrations_dir": "../../packages/db/migrations",
     },
   ],
