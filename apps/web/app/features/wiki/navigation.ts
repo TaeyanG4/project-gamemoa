@@ -59,6 +59,10 @@ export function buildWikiSections(dict: Dictionary): WikiNavSection[] {
       ],
     },
     {
+      title: dict.wiki.navSupport,
+      items: [{ path: "/wiki/support", label: dict.wiki.navSupport }],
+    },
+    {
       title: dict.wiki.catPolicyTitle,
       items: [
         { path: "/terms", label: dict.legal.terms.pageTitle },

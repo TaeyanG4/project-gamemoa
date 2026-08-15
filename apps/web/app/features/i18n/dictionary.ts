@@ -519,6 +519,8 @@ export interface Dictionary {
     navCreatorOverview: string;
     navCreatorVerification: string;
     navCreatorFeatured: string;
+    navSupport: string;
+    catSupportDesc: string;
     tocAriaLabel: string;
     homeTitle: string;
     homeSubtitle: string;
@@ -861,6 +863,26 @@ export interface Dictionary {
       footerLink: string;
       footerSuffix: string;
     };
+    /** Documentation only — the actual actionable page (mailto buttons) is /contact
+     * (dict.contact). This page explains which of the three channels a given message belongs
+     * on before the reader ever gets to the buttons. */
+    support: {
+      title: string;
+      description: string;
+      generalHeading: string;
+      generalBody: string;
+      reportHeading: string;
+      reportBody: string;
+      bugHeading: string;
+      bugBody: string;
+      tipsHeading: string;
+      tip1: string;
+      tip2: string;
+      tip3: string;
+      footerPrefix: string;
+      footerLink: string;
+      footerSuffix: string;
+    };
   };
   /** /terms and /privacy. Section numbering matches the numbered headings shown on the page
    * (sectionNHeading etc.) so it's easy to cross-check against docs/i18n-content/03-terms-privacy.json,
@@ -1075,8 +1097,13 @@ export interface Dictionary {
     eyebrow: string;
     title: string;
     subtitle: string;
-    emailLabel: string;
     emailCta: string;
+    generalLabel: string;
+    generalDesc: string;
+    reportLabel: string;
+    reportDesc: string;
+    bugLabel: string;
+    bugDesc: string;
     guidanceTitle: string;
     guidanceItems: string[];
     discordAltTitle: string;
@@ -1613,6 +1640,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navCreatorOverview: "Creator 개요",
       navCreatorVerification: "채널 소유권 인증",
       navCreatorFeatured: "Featured Creator",
+      navSupport: "지원",
+      catSupportDesc: "문의, 신고, 버그 제보 채널 안내",
       tocAriaLabel: "Wiki 목차",
       homeTitle: "궁금한 걸 빠르게 찾아보세요",
       homeSubtitle:
@@ -2062,6 +2091,25 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerLink: "Discord 이용 가이드",
         footerSuffix: "의 FAQ도 확인해보세요.",
       },
+      support: {
+        title: "문의 · 신고 · 버그 제보",
+        description: "상황에 맞는 채널로 연락해주시면 더 빠르게 도와드릴 수 있어요.",
+        generalHeading: "일반 문의 (contact@owogg.com)",
+        generalBody: "계정 문제, 사용 방법, 기능 제안 등 그 외 모든 문의사항을 보내주세요.",
+        reportHeading: "신고하기 (report@owogg.com)",
+        reportBody:
+          "부정행위, 어뷰징, 부적절한 콘텐츠 등 커뮤니티 가이드라인 위반 사항을 신고해주세요.",
+        bugHeading: "버그 제보 (bug@owogg.com)",
+        bugBody:
+          "게임 오류, 기능 오작동, 화면 깨짐 등 기술적인 문제를 알려주세요. 어떤 게임/페이지에서, 어떤 상황에서 발생했는지 함께 적어주시면 더 빠르게 확인할 수 있어요.",
+        tipsHeading: "공통 팁",
+        tip1: "가능하면 스크린샷을 함께 첨부해주세요.",
+        tip2: "계정 관련 문의는 가입에 사용한 이메일 또는 닉네임을 알려주세요.",
+        tip3: "신고는 대상(닉네임/게시물 등)과 구체적인 상황을 함께 적어주세요.",
+        footerPrefix: "한 곳에서 모든 채널을 확인하고 바로 메일을 보내려면 ",
+        footerLink: "문의하기 페이지",
+        footerSuffix: "를 이용해보세요.",
+      },
     },
     legal: {
       terms: {
@@ -2297,15 +2345,20 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     contact: {
       eyebrow: "문의하기",
       title: "무엇을 도와드릴까요?",
-      subtitle: "버그 제보, 계정 문제, 제안 등 무엇이든 아래 이메일로 편하게 알려주세요.",
-      emailLabel: "이메일",
+      subtitle: "문의 유형에 맞는 채널로 보내주시면 더 빠르게 확인할 수 있어요.",
       emailCta: "이메일 보내기",
+      generalLabel: "일반 문의",
+      generalDesc: "계정, 사용법, 제안 등 그 외 모든 문의",
+      reportLabel: "신고하기",
+      reportDesc: "부정행위, 어뷰징, 부적절한 콘텐츠 신고",
+      bugLabel: "버그 제보",
+      bugDesc: "게임 오류, 기능 오작동 등 버그 제보",
       guidanceTitle: "문의 전 참고해주세요",
       guidanceItems: [
-        "제목에 문의 유형(버그 / 계정 / 제안 / 기타)을 적어주시면 더 빠르게 확인할 수 있어요.",
         "버그 제보는 어떤 게임/페이지에서, 어떤 상황에서 발생했는지 함께 적어주세요.",
         "가능하면 스크린샷을 첨부해주시면 큰 도움이 됩니다.",
         "계정 문의는 가입에 사용한 이메일 또는 닉네임을 함께 알려주세요.",
+        "신고하기는 신고 대상(닉네임/게시물 등)과 구체적인 상황을 함께 적어주세요.",
       ],
       discordAltTitle: "디스코드로도 문의할 수 있어요",
       discordAltBody: "커뮤니티 서버에서 더 빠르게 소통하고 싶다면 디스코드 가이드를 확인해보세요.",
@@ -2843,6 +2896,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navCreatorOverview: "Creator Overview",
       navCreatorVerification: "Channel Ownership Verification",
       navCreatorFeatured: "Featured Creator",
+      navSupport: "Support",
+      catSupportDesc: "Contact, report, and bug report channels",
       tocAriaLabel: "Wiki table of contents",
       homeTitle: "Find what you need, fast",
       homeSubtitle:
@@ -3307,6 +3362,26 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerLink: "Discord usage guide",
         footerSuffix: " too.",
       },
+      support: {
+        title: "Contact · Report · Bug Report",
+        description: "Reach out on the channel that matches your message — it gets seen faster.",
+        generalHeading: "General (contact@owogg.com)",
+        generalBody: "Account issues, how-to questions, feature suggestions — anything else.",
+        reportHeading: "Report (report@owogg.com)",
+        reportBody:
+          "Cheating, abuse, inappropriate content, or other community guideline violations.",
+        bugHeading: "Bug Report (bug@owogg.com)",
+        bugBody:
+          "Game errors, broken features, visual glitches. Tell us which game/page and what you were doing when it happened — that helps us confirm it faster.",
+        tipsHeading: "General tips",
+        tip1: "A screenshot helps a lot if you can attach one.",
+        tip2: "For account issues, include the email or nickname you signed up with.",
+        tip3: "For reports, include who/what you're reporting and what happened.",
+        footerPrefix:
+          "To see all three channels in one place and send an email right away, use the ",
+        footerLink: "Contact page",
+        footerSuffix: ".",
+      },
     },
     legal: {
       terms: {
@@ -3543,15 +3618,20 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     contact: {
       eyebrow: "Contact",
       title: "How can we help?",
-      subtitle: "Bug reports, account issues, suggestions — anything. Reach us at the email below.",
-      emailLabel: "Email",
+      subtitle: "Pick the channel that matches your message — it gets seen faster that way.",
       emailCta: "Send an email",
+      generalLabel: "General",
+      generalDesc: "Account, how-to, suggestions, anything else",
+      reportLabel: "Report",
+      reportDesc: "Cheating, abuse, inappropriate content",
+      bugLabel: "Bug Report",
+      bugDesc: "Game errors, broken features, other bugs",
       guidanceTitle: "Before you write in",
       guidanceItems: [
-        "Include the type of issue (bug / account / suggestion / other) in the subject line.",
         "For bugs, tell us which game/page and what you were doing when it happened.",
         "A screenshot helps a lot if you can attach one.",
         "For account issues, include the email or nickname you signed up with.",
+        "For reports, include who/what you're reporting and what happened.",
       ],
       discordAltTitle: "You can also reach us on Discord",
       discordAltBody:
@@ -4094,6 +4174,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navCreatorOverview: "Creator概要",
       navCreatorVerification: "チャンネル所有権認証",
       navCreatorFeatured: "Featured Creator",
+      navSupport: "サポート",
+      catSupportDesc: "お問い合わせ・通報・不具合報告チャンネルのご案内",
       tocAriaLabel: "Wiki目次",
       homeTitle: "知りたいことをすぐに見つけよう",
       homeSubtitle:
@@ -4552,6 +4634,25 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerLink: "Discord利用ガイド",
         footerSuffix: "のFAQもご確認ください。",
       },
+      support: {
+        title: "お問い合わせ・通報・不具合報告",
+        description: "内容に合ったチャンネルにご連絡いただくと、より早く対応できます。",
+        generalHeading: "一般のお問い合わせ (contact@owogg.com)",
+        generalBody: "アカウントの問題、使い方、機能のご提案など、その他すべてのお問い合わせ。",
+        reportHeading: "通報 (report@owogg.com)",
+        reportBody:
+          "不正行為、迷惑行為、不適切なコンテンツなど、コミュニティガイドライン違反の通報。",
+        bugHeading: "不具合報告 (bug@owogg.com)",
+        bugBody:
+          "ゲームのエラー、機能不具合、表示崩れなど技術的な問題。どのゲーム/ページで、どんな状況で発生したかを教えていただけると、確認が早くなります。",
+        tipsHeading: "共通のヒント",
+        tip1: "可能であればスクリーンショットを添付してください。",
+        tip2: "アカウントに関するお問い合わせは、登録時のメールアドレスまたはニックネームを添えてください。",
+        tip3: "通報の場合は、対象(ニックネーム/投稿など)と具体的な状況を添えてください。",
+        footerPrefix: "3つのチャンネルをまとめて確認し、すぐにメールを送るには",
+        footerLink: "お問い合わせページ",
+        footerSuffix: "をご利用ください。",
+      },
     },
     legal: {
       terms: {
@@ -4790,16 +4891,20 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     contact: {
       eyebrow: "お問い合わせ",
       title: "何かお困りですか?",
-      subtitle:
-        "不具合報告、アカウントの問題、ご提案など、下記のメールアドレスまでお気軽にご連絡ください。",
-      emailLabel: "メールアドレス",
+      subtitle: "内容に合ったチャンネルにお送りいただくと、より早く確認できます。",
       emailCta: "メールを送る",
+      generalLabel: "一般のお問い合わせ",
+      generalDesc: "アカウント、使い方、ご提案など",
+      reportLabel: "通報",
+      reportDesc: "不正行為、迷惑行為、不適切なコンテンツの通報",
+      bugLabel: "不具合報告",
+      bugDesc: "ゲームのエラーや機能不具合などの報告",
       guidanceTitle: "お問い合わせ前にご確認ください",
       guidanceItems: [
-        "件名に問い合わせ種別(不具合 / アカウント / 提案 / その他)を記載いただくと確認が早くなります。",
         "不具合報告の場合は、どのゲーム/ページで、どんな状況で発生したかを教えてください。",
         "可能であればスクリーンショットを添付していただけると大変助かります。",
         "アカウントに関するお問い合わせは、登録時のメールアドレスまたはニックネームを添えてください。",
+        "通報の場合は、対象(ニックネーム/投稿など)と具体的な状況を添えてください。",
       ],
       discordAltTitle: "Discordでもお問い合わせいただけます",
       discordAltBody:
@@ -5319,6 +5424,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navCreatorOverview: "Creator 概览",
       navCreatorVerification: "频道所有权认证",
       navCreatorFeatured: "Featured Creator",
+      navSupport: "支持",
+      catSupportDesc: "联系、举报、错误反馈渠道说明",
       tocAriaLabel: "Wiki 目录",
       homeTitle: "快速找到你想了解的内容",
       homeSubtitle: "从 Discord 安装到排行榜计算方式，使用 OwOGG 所需的一切说明都汇总在这里。",
@@ -5751,6 +5858,24 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         footerLink: "Discord 使用指南",
         footerSuffix: "中的 FAQ。",
       },
+      support: {
+        title: "联系 · 举报 · 错误反馈",
+        description: "发送到对应的渠道，我们能更快为您处理。",
+        generalHeading: "一般咨询 (contact@owogg.com)",
+        generalBody: "账号问题、使用方法、功能建议等其他所有咨询。",
+        reportHeading: "举报 (report@owogg.com)",
+        reportBody: "作弊、滥用、不当内容等违反社区准则的行为举报。",
+        bugHeading: "错误反馈 (bug@owogg.com)",
+        bugBody:
+          "游戏错误、功能异常、画面显示问题等技术问题。请告诉我们具体是哪个游戏/页面、在什么情况下发生的，这样能更快确认问题。",
+        tipsHeading: "通用提示",
+        tip1: "如可以的话，请附上截图。",
+        tip2: "账号相关问题请附上注册时使用的邮箱或昵称。",
+        tip3: "举报时请附上举报对象(昵称/内容等)和具体情况。",
+        footerPrefix: "如需一次查看全部渠道并直接发送邮件，请使用",
+        footerLink: "联系我们页面",
+        footerSuffix: "。",
+      },
     },
     legal: {
       terms: {
@@ -5982,15 +6107,20 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     contact: {
       eyebrow: "联系我们",
       title: "有什么可以帮您?",
-      subtitle: "错误反馈、账号问题、建议等，欢迎随时通过以下邮箱联系我们。",
-      emailLabel: "邮箱",
+      subtitle: "发送到对应的渠道，我们能更快处理您的问题。",
       emailCta: "发送邮件",
+      generalLabel: "一般咨询",
+      generalDesc: "账号、使用方法、建议等其他问题",
+      reportLabel: "举报",
+      reportDesc: "作弊、滥用、不当内容举报",
+      bugLabel: "错误反馈",
+      bugDesc: "游戏错误、功能异常等问题反馈",
       guidanceTitle: "联系前请注意",
       guidanceItems: [
-        "请在邮件标题中注明类型(错误 / 账号 / 建议 / 其他)，以便我们更快处理。",
         "反馈错误时，请说明是在哪个游戏/页面、什么情况下发生的。",
         "如可以的话，附上截图会有很大帮助。",
         "账号相关问题请附上注册时使用的邮箱或昵称。",
+        "举报时请附上举报对象(昵称/内容等)和具体情况。",
       ],
       discordAltTitle: "也可以通过 Discord 联系我们",
       discordAltBody: "如果想要更快速的沟通，可以查看社区服务器的 Discord 指南。",

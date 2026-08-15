@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { BookOpen, FileText, Gamepad2, MessagesSquare, User, Video } from "lucide-react";
+import { BookOpen, FileText, Gamepad2, MessagesSquare, User, Video, LifeBuoy } from "lucide-react";
 import { useI18n } from "../features/i18n/I18nContext";
 import type { Dictionary } from "../features/i18n/dictionary";
 
@@ -46,6 +46,13 @@ function buildCategories(dict: Dictionary["wiki"]) {
       description: dict.catCreatorDesc,
       path: "/wiki/creator",
       tone: "text-purple-300 bg-purple-500/10 border-purple-500/30",
+    },
+    {
+      icon: LifeBuoy,
+      title: dict.navSupport,
+      description: dict.catSupportDesc,
+      path: "/wiki/support",
+      tone: "text-rose-300 bg-rose-500/10 border-rose-500/30",
     },
     {
       icon: FileText,

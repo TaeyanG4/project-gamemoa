@@ -38,6 +38,7 @@ export default [
   route("wiki/creator", "routes/wikiCreator.tsx"),
   route("wiki/creator/verification", "routes/wikiCreatorVerification.tsx"),
   route("wiki/creator/featured", "routes/wikiCreatorFeatured.tsx"),
+  route("wiki/support", "routes/wikiSupport.tsx"),
   route("contact", "routes/contact.tsx"),
   route("terms", "routes/terms.tsx"),
   route("privacy", "routes/privacy.tsx"),

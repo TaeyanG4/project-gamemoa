@@ -286,5 +286,20 @@
   "wikiBody.discordTroubleshooting.faqBotOffline.answer": "위와 같은 이유입니다. HTTP Interactions 기반 앱은 상시 접속 상태를 유지하지 않으므로 Discord 멤버 목록에서 오프라인으로 표시될 수 있습니다. 명령어가 정상적으로 실행된다면 문제가 아닙니다.",
   "wikiBody.discordTroubleshooting.footerPrefix": "여기에 없는 문제인가요? ",
   "wikiBody.discordTroubleshooting.footerLink": "Discord 이용 가이드",
-  "wikiBody.discordTroubleshooting.footerSuffix": "의 FAQ도 확인해보세요."
+  "wikiBody.discordTroubleshooting.footerSuffix": "의 FAQ도 확인해보세요.",
+  "wikiBody.support.title": "문의 · 신고 · 버그 제보",
+  "wikiBody.support.description": "상황에 맞는 채널로 연락해주시면 더 빠르게 도와드릴 수 있어요.",
+  "wikiBody.support.generalHeading": "일반 문의 (contact@owogg.com)",
+  "wikiBody.support.generalBody": "계정 문제, 사용 방법, 기능 제안 등 그 외 모든 문의사항을 보내주세요.",
+  "wikiBody.support.reportHeading": "신고하기 (report@owogg.com)",
+  "wikiBody.support.reportBody": "부정행위, 어뷰징, 부적절한 콘텐츠 등 커뮤니티 가이드라인 위반 사항을 신고해주세요.",
+  "wikiBody.support.bugHeading": "버그 제보 (bug@owogg.com)",
+  "wikiBody.support.bugBody": "게임 오류, 기능 오작동, 화면 깨짐 등 기술적인 문제를 알려주세요. 어떤 게임/페이지에서, 어떤 상황에서 발생했는지 함께 적어주시면 더 빠르게 확인할 수 있어요.",
+  "wikiBody.support.tipsHeading": "공통 팁",
+  "wikiBody.support.tip1": "가능하면 스크린샷을 함께 첨부해주세요.",
+  "wikiBody.support.tip2": "계정 관련 문의는 가입에 사용한 이메일 또는 닉네임을 알려주세요.",
+  "wikiBody.support.tip3": "신고는 대상(닉네임/게시물 등)과 구체적인 상황을 함께 적어주세요.",
+  "wikiBody.support.footerPrefix": "한 곳에서 모든 채널을 확인하고 바로 메일을 보내려면 ",
+  "wikiBody.support.footerLink": "문의하기 페이지",
+  "wikiBody.support.footerSuffix": "를 이용해보세요."
 }
