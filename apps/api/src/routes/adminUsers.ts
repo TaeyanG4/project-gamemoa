@@ -1,7 +1,8 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import {
   AdminUserSearchResponseSchema,
   AdminUserDetailResponseSchema,
+  AdminUserListQuerySchema,
   AdminSuspendUserRequestSchema,
   AdminBanUserRequestSchema,
   AdminScoreSubmissionBlockRequestSchema,
@@ -11,8 +12,9 @@ import {
 } from "@owogg/contracts";
 import { UserModerationUseCaseFailure } from "@owogg/core";
 import { createContainer } from "../container.js";
-import { isTrustedAdminOrigin } from "../auth/admin.js";
+import { isTrustedAdminOrigin, isAdminUserId } from "../auth/admin.js";
 import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
+import { resolveAdminEligibility } from "../auth/adminEligibility.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminUsersRouter = new Hono<ApiEnv>();
@@ -54,19 +56,68 @@ function moderationErrorResponse(err: unknown): { body: unknown; status: 400 | 4
   };
 }
 
-// GET /api/admin/users?query=... — nickname/email substring or exact numeric id.
+/** True when `userId` is a root (ADMIN_USER_IDS) or ACTIVE managed administrator — reused both to
+ * surface `isProtectedAdmin` on list/detail responses and to hard-block suspend/ban server-side,
+ * so an admin account can never be locked out of their own login even by direct API calls. */
+async function isProtectedAdminTarget(
+  c: Context<ApiEnv>,
+  container: ReturnType<typeof createContainer>,
+  userId: number,
+): Promise<boolean> {
+  const { eligible } = await resolveAdminEligibility(
+    userId,
+    c.env.ADMIN_USER_IDS,
+    container.adminAccountUseCases,
+  );
+  return eligible;
+}
+
+// GET /api/admin/users?query=&period=&sort=&page=&pageSize= — blank query lists every user
+// (subject to `period`), so this also powers the plain "browse all users" list, not just search.
 adminUsersRouter.get("/", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
 
-  const query = c.req.query("query")?.trim() ?? "";
-  if (!query) {
-    return c.json(AdminUserSearchResponseSchema.parse({ users: [] }), 200);
+  const parsed = AdminUserListQuerySchema.safeParse({
+    query: c.req.query("query"),
+    period: c.req.query("period"),
+    sort: c.req.query("sort"),
+    page: c.req.query("page"),
+    pageSize: c.req.query("pageSize"),
+  });
+  if (!parsed.success) {
+    return c.json(
+      { error: { code: "INVALID_REQUEST", message: "잘못된 검색/정렬 조건입니다." } },
+      400,
+    );
   }
+  const { query, period, sort, page, pageSize } = parsed.data;
 
-  const { userModerationUseCases } = createContainer(c.env.DB);
-  const users = await userModerationUseCases.searchUsers(query, 20);
-  return c.json(AdminUserSearchResponseSchema.parse({ users }), 200);
+  const container = createContainer(c.env.DB);
+  const [{ users, total }, adminAccounts] = await Promise.all([
+    container.userModerationUseCases.searchUsers({
+      query,
+      period,
+      sort,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    }),
+    container.adminAccountRepo.list(),
+  ]);
+
+  // One admin_accounts scan for the whole page instead of N+1 lookups per row.
+  const activeAdminUserIds = new Set(
+    adminAccounts.filter((a) => a.status === "ACTIVE").map((a) => a.userId),
+  );
+  const usersWithFlag = users.map((u) => ({
+    ...u,
+    isProtectedAdmin: activeAdminUserIds.has(u.id) || isAdminUserId(u.id, c.env.ADMIN_USER_IDS),
+  }));
+
+  return c.json(
+    AdminUserSearchResponseSchema.parse({ users: usersWithFlag, total, page, pageSize }),
+    200,
+  );
 });
 
 // GET /api/admin/users/:userId — detail view: linked providers, game bests, moderation status,
@@ -81,12 +132,13 @@ adminUsersRouter.get("/:userId", async (c) => {
   }
 
   const container = createContainer(c.env.DB);
-  const [user, providers, bests, moderation, auditLog] = await Promise.all([
+  const [user, providers, bests, moderation, auditLog, isProtectedAdmin] = await Promise.all([
     container.userRepo.findById(userId),
     container.userRepo.getOAuthAccounts(userId),
     container.scoreUseCases.getUserBestsFormatted(userId),
     container.userModerationUseCases.getModeration(userId),
     container.userModerationUseCases.getAuditLog(userId),
+    isProtectedAdminTarget(c, container, userId),
   ]);
 
   if (!user) {
@@ -105,6 +157,7 @@ adminUsersRouter.get("/:userId", async (c) => {
     gameBests: bests,
     moderation,
     auditLog,
+    isProtectedAdmin,
   });
   return c.json(response, 200);
 });
@@ -124,9 +177,16 @@ adminUsersRouter.post("/:userId/suspend", async (c) => {
     );
   }
 
+  const container = createContainer(c.env.DB);
+  if (await isProtectedAdminTarget(c, container, userId)) {
+    return c.json(
+      { error: { code: "ADMIN_PROTECTED", message: "관리자 계정은 정지할 수 없습니다." } },
+      403,
+    );
+  }
+
   try {
-    const { userModerationUseCases } = createContainer(c.env.DB);
-    const record = await userModerationUseCases.suspendUser(
+    const record = await container.userModerationUseCases.suspendUser(
       userId,
       admin.userId,
       parsed.data.suspendedUntil,
@@ -151,9 +211,20 @@ adminUsersRouter.post("/:userId/ban", async (c) => {
     return c.json({ error: { code: "INVALID_REQUEST", message: "reason이 필요합니다." } }, 400);
   }
 
+  const container = createContainer(c.env.DB);
+  if (await isProtectedAdminTarget(c, container, userId)) {
+    return c.json(
+      { error: { code: "ADMIN_PROTECTED", message: "관리자 계정은 차단할 수 없습니다." } },
+      403,
+    );
+  }
+
   try {
-    const { userModerationUseCases } = createContainer(c.env.DB);
-    const record = await userModerationUseCases.banUser(userId, admin.userId, parsed.data.reason);
+    const record = await container.userModerationUseCases.banUser(
+      userId,
+      admin.userId,
+      parsed.data.reason,
+    );
     return c.json(UserModerationRecordSchema.parse(record), 200);
   } catch (err) {
     const { body, status } = moderationErrorResponse(err);

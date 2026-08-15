@@ -20,6 +20,8 @@ import {
   AdminScoreActionResponseSchema,
   type AdminAccountRoleValue,
   type AdminAccountStatusValue,
+  type AdminUserPeriod,
+  type AdminUserSort,
 } from "@owogg/contracts";
 import { apiFetch } from "../lib/api/client";
 
@@ -153,11 +155,22 @@ export function postToggleAdminGame(gameId: string, enabled: boolean, reason: st
   });
 }
 
-export function fetchAdminUserSearch(query: string) {
-  return apiFetch(
-    `/api/admin/users?query=${encodeURIComponent(query)}`,
-    AdminUserSearchResponseSchema,
-  );
+export interface AdminUserListParams {
+  query?: string | undefined;
+  period?: AdminUserPeriod | undefined;
+  sort?: AdminUserSort | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+}
+
+export function fetchAdminUserList(params: AdminUserListParams) {
+  const search = new URLSearchParams();
+  if (params.query) search.set("query", params.query);
+  if (params.period) search.set("period", params.period);
+  if (params.sort) search.set("sort", params.sort);
+  if (params.page) search.set("page", String(params.page));
+  if (params.pageSize) search.set("pageSize", String(params.pageSize));
+  return apiFetch(`/api/admin/users?${search.toString()}`, AdminUserSearchResponseSchema);
 }
 
 export function fetchAdminUserDetail(userId: number) {

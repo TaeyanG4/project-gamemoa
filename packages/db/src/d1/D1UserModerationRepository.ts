@@ -4,8 +4,10 @@ import type {
   UserModerationAuditEntry,
   UserModerationAction,
   UserModerationStatus,
-  AdminUserSearchResult,
+  AdminUserSearchOptions,
+  AdminUserSearchPage,
 } from "@owogg/core";
+import { resolveAdminUserPeriodStart } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
 function mapModerationRow(row: Record<string, unknown>): UserModerationRecord {
@@ -91,11 +93,36 @@ export class D1UserModerationRepository implements UserModerationRepository {
     };
   }
 
-  async searchUsers(query: string, limit = 20): Promise<AdminUserSearchResult[]> {
-    const trimmed = query.trim();
+  async searchUsers(options: AdminUserSearchOptions): Promise<AdminUserSearchPage> {
+    const trimmed = (options.query ?? "").trim();
     // Numeric query also matches by exact id — an admin pasting a user id from a leaderboard row
     // is a common enough path to support directly, not just nickname substring search.
     const idMatch = /^\d+$/.test(trimmed) ? Number(trimmed) : null;
+    const periodStart = resolveAdminUserPeriodStart(options.period ?? "all");
+
+    const conditions: string[] = [];
+    const params: unknown[] = [];
+    if (trimmed) {
+      conditions.push(`(u.nickname LIKE ? OR u.email LIKE ? OR u.id = ?)`);
+      params.push(`%${trimmed}%`, `%${trimmed}%`, idMatch);
+    }
+    if (periodStart) {
+      conditions.push(`u.created_at >= ?`);
+      params.push(periodStart);
+    }
+    // Blank query + "all" period is a real state — browsing the full user list, not just an
+    // empty search — so an unconditional WHERE-less scan here is intentional, not a bug.
+    const whereSql = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const orderSql =
+      options.sort === "createdAt_asc"
+        ? "ORDER BY u.created_at ASC, u.id ASC"
+        : "ORDER BY u.created_at DESC, u.id DESC";
+
+    const countRow = await this.db
+      .prepare(`SELECT COUNT(*) as c FROM users u ${whereSql}`)
+      .bind(...params)
+      .first<{ c: number }>();
+    const total = Number(countRow?.c ?? 0);
 
     const res = await this.db
       .prepare(
@@ -103,22 +130,25 @@ export class D1UserModerationRepository implements UserModerationRepository {
                 m.status, m.suspended_until, m.score_submission_blocked
          FROM users u
          LEFT JOIN user_moderation m ON m.user_id = u.id
-         WHERE u.nickname LIKE ? OR u.email LIKE ? OR u.id = ?
-         ORDER BY u.id ASC
-         LIMIT ?`,
+         ${whereSql}
+         ${orderSql}
+         LIMIT ? OFFSET ?`,
       )
-      .bind(`%${trimmed}%`, `%${trimmed}%`, idMatch, limit)
+      .bind(...params, options.limit, options.offset)
       .all<Record<string, unknown>>();
 
-    return (res.results || []).map((row) => ({
-      id: Number(row.id),
-      nickname: String(row.nickname),
-      email: row.email ? String(row.email) : null,
-      createdAt: String(row.created_at),
-      moderationStatus: (row.status ? String(row.status) : "ACTIVE") as UserModerationStatus,
-      suspendedUntil: row.suspended_until ? String(row.suspended_until) : null,
-      scoreSubmissionBlocked: Number(row.score_submission_blocked ?? 0) === 1,
-    }));
+    return {
+      total,
+      users: (res.results || []).map((row) => ({
+        id: Number(row.id),
+        nickname: String(row.nickname),
+        email: row.email ? String(row.email) : null,
+        createdAt: String(row.created_at),
+        moderationStatus: (row.status ? String(row.status) : "ACTIVE") as UserModerationStatus,
+        suspendedUntil: row.suspended_until ? String(row.suspended_until) : null,
+        scoreSubmissionBlocked: Number(row.score_submission_blocked ?? 0) === 1,
+      })),
+    };
   }
 
   async getModeration(userId: number): Promise<UserModerationRecord | null> {

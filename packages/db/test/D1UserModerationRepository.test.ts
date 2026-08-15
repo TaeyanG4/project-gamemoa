@@ -17,6 +17,8 @@ function seedScore(raw: import("node:sqlite").DatabaseSync, userId: number, game
     .run(userId, gameId, new Date().toISOString());
 }
 
+const defaultOptions = { limit: 20, offset: 0 };
+
 test("searchUsers matches nickname substring, email substring, or exact numeric id", async () => {
   const { db, raw } = createSqliteD1(USER_MODERATION_TEST_SCHEMA);
   seedUser(raw, 1, "SpeedRunner");
@@ -24,15 +26,17 @@ test("searchUsers matches nickname substring, email substring, or exact numeric 
   const repo = new D1UserModerationRepository(db);
 
   assert.deepEqual(
-    (await repo.searchUsers("speed")).map((u) => u.id),
+    (await repo.searchUsers({ ...defaultOptions, query: "speed" })).users.map((u) => u.id),
     [1],
   );
   assert.deepEqual(
-    (await repo.searchUsers("otherplayer@example.com")).map((u) => u.id),
+    (await repo.searchUsers({ ...defaultOptions, query: "otherplayer@example.com" })).users.map(
+      (u) => u.id,
+    ),
     [2],
   );
   assert.deepEqual(
-    (await repo.searchUsers("2")).map((u) => u.id),
+    (await repo.searchUsers({ ...defaultOptions, query: "2" })).users.map((u) => u.id),
     [2],
   );
 });
@@ -43,8 +47,60 @@ test("a never-moderated user reports ACTIVE with no row in getModeration", async
   const repo = new D1UserModerationRepository(db);
 
   assert.equal(await repo.getModeration(1), null);
-  const results = await repo.searchUsers("Clean");
-  assert.equal(results[0]?.moderationStatus, "ACTIVE");
+  const { users } = await repo.searchUsers({ ...defaultOptions, query: "Clean" });
+  assert.equal(users[0]?.moderationStatus, "ACTIVE");
+});
+
+test("searchUsers with a blank query lists every user, most-recently-joined first by default", async () => {
+  const { db, raw } = createSqliteD1(USER_MODERATION_TEST_SCHEMA);
+  seedUser(raw, 1, "First");
+  seedUser(raw, 2, "Second");
+  const repo = new D1UserModerationRepository(db);
+
+  const { users, total } = await repo.searchUsers(defaultOptions);
+  assert.equal(total, 2);
+  assert.deepEqual(
+    users.map((u) => u.id),
+    [2, 1],
+  );
+});
+
+test("searchUsers sort=createdAt_asc returns earliest-joined first; limit/offset paginate", async () => {
+  const { db, raw } = createSqliteD1(USER_MODERATION_TEST_SCHEMA);
+  seedUser(raw, 1, "First");
+  seedUser(raw, 2, "Second");
+  seedUser(raw, 3, "Third");
+  const repo = new D1UserModerationRepository(db);
+
+  const ascending = await repo.searchUsers({ limit: 20, offset: 0, sort: "createdAt_asc" });
+  assert.deepEqual(
+    ascending.users.map((u) => u.id),
+    [1, 2, 3],
+  );
+
+  const page = await repo.searchUsers({ limit: 1, offset: 1, sort: "createdAt_asc" });
+  assert.equal(page.total, 3);
+  assert.deepEqual(
+    page.users.map((u) => u.id),
+    [2],
+  );
+});
+
+test("searchUsers period=today excludes users seeded with an earlier created_at", async () => {
+  const { db, raw } = createSqliteD1(USER_MODERATION_TEST_SCHEMA);
+  seedUser(raw, 1, "Old");
+  raw
+    .prepare(`INSERT INTO users (id, nickname, email, created_at) VALUES (2, 'New', 'new@example.com', ?)`)
+    .run(new Date().toISOString());
+  raw.prepare(`UPDATE users SET created_at = '2000-01-01T00:00:00.000Z' WHERE id = 1`).run();
+  const repo = new D1UserModerationRepository(db);
+
+  const { users, total } = await repo.searchUsers({ ...defaultOptions, period: "today" });
+  assert.equal(total, 1);
+  assert.deepEqual(
+    users.map((u) => u.id),
+    [2],
+  );
 });
 
 test("suspendUser sets status/suspendedUntil and writes a SUSPENDED audit entry", async () => {

@@ -217,6 +217,24 @@ export type AdminPaginationQuery = z.infer<typeof AdminPaginationQuerySchema>;
 
 export const UserModerationStatusSchema = z.enum(["ACTIVE", "SUSPENDED", "BANNED"]);
 
+/** "createdAt_desc" = 최근 가입일순 (newest first, default). "createdAt_asc" = 최초 가입일순
+ * (oldest/earliest first). */
+export const AdminUserSortSchema = z.enum(["createdAt_desc", "createdAt_asc"]);
+export type AdminUserSort = z.infer<typeof AdminUserSortSchema>;
+
+/** UTC-calendar-based signup window filter: 오늘/이번주/이번달 가입, or "all" for no filter. */
+export const AdminUserPeriodSchema = z.enum(["all", "today", "week", "month"]);
+export type AdminUserPeriod = z.infer<typeof AdminUserPeriodSchema>;
+
+export const AdminUserListQuerySchema = z.object({
+  query: z.string().trim().optional(),
+  period: AdminUserPeriodSchema.default("all"),
+  sort: AdminUserSortSchema.default("createdAt_desc"),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type AdminUserListQuery = z.infer<typeof AdminUserListQuerySchema>;
+
 export const AdminUserSearchResultSchema = z.object({
   id: z.number().int(),
   nickname: z.string(),
@@ -225,11 +243,17 @@ export const AdminUserSearchResultSchema = z.object({
   moderationStatus: UserModerationStatusSchema,
   suspendedUntil: z.string().nullable(),
   scoreSubmissionBlocked: z.boolean(),
+  /** True when this row is a root (ADMIN_USER_IDS) or ACTIVE managed administrator account — the
+   * client disables suspend/ban for these rows; the server independently refuses the same. */
+  isProtectedAdmin: z.boolean(),
 });
 export type AdminUserSearchResult = z.infer<typeof AdminUserSearchResultSchema>;
 
 export const AdminUserSearchResponseSchema = z.object({
   users: z.array(AdminUserSearchResultSchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
 });
 export type AdminUserSearchResponse = z.infer<typeof AdminUserSearchResponseSchema>;
 
@@ -278,6 +302,8 @@ export const AdminUserDetailResponseSchema = z.object({
   ),
   moderation: UserModerationRecordSchema.nullable(),
   auditLog: z.array(UserModerationAuditEntrySchema),
+  /** See AdminUserSearchResultSchema.isProtectedAdmin. */
+  isProtectedAdmin: z.boolean(),
 });
 export type AdminUserDetailResponse = z.infer<typeof AdminUserDetailResponseSchema>;
 
