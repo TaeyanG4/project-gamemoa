@@ -1,6 +1,6 @@
 import { Link } from "react-router";
-import type { ComponentType } from "react";
-import { Mail, MessageCircleQuestion, Send, Flag, Bug } from "lucide-react";
+import { useState, type ComponentType } from "react";
+import { Mail, MessageCircleQuestion, Copy, CheckCircle2, Flag, Bug } from "lucide-react";
 import { useI18n } from "../features/i18n/I18nContext";
 
 /** Three separate inboxes rather than one, so each kind of message reaches the right place
@@ -25,13 +25,31 @@ function ChannelCard({
   description,
   email,
   emailCta,
+  emailCopiedFeedback,
 }: {
   icon: ComponentType<{ className?: string }>;
   label: string;
   description: string;
   email: string;
   emailCta: string;
+  emailCopiedFeedback: string;
 }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    // A mailto: link depends on the visitor having a default mail client configured — plenty of
+    // browsers/devices don't, and the button silently does nothing when that's the case. Copying
+    // the address instead always works and lets people paste it into whatever mail app they
+    // actually use.
+    try {
+      await navigator.clipboard.writeText(email);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Copy email failed:", err);
+    }
+  };
+
   return (
     <div className="flex flex-col items-start gap-4 rounded-2xl border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
@@ -44,13 +62,14 @@ function ChannelCard({
           <p className="mt-1 text-xs font-bold text-brand-light">{email}</p>
         </div>
       </div>
-      <a
-        href={`mailto:${email}`}
-        className="flex shrink-0 items-center gap-2 rounded-2xl bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand/30 transition-all hover:scale-105"
+      <button
+        type="button"
+        onClick={() => void handleCopy()}
+        className="flex shrink-0 items-center gap-2 rounded-2xl bg-brand px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-brand/30 transition-all hover:scale-105 cursor-pointer"
       >
-        <Send className="h-4 w-4" />
-        {emailCta}
-      </a>
+        {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        {copied ? emailCopiedFeedback : emailCta}
+      </button>
     </div>
   );
 }
@@ -84,6 +103,7 @@ export default function ContactRoute() {
               icon={channel.icon}
               email={channel.email}
               emailCta={t.emailCta}
+              emailCopiedFeedback={t.emailCopiedFeedback}
               {...channelLabels[channel.key]}
             />
           ))}

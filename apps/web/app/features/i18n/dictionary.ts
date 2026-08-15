@@ -1098,6 +1098,7 @@ export interface Dictionary {
     title: string;
     subtitle: string;
     emailCta: string;
+    emailCopiedFeedback: string;
     generalLabel: string;
     generalDesc: string;
     reportLabel: string;
@@ -2346,7 +2347,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       eyebrow: "문의하기",
       title: "무엇을 도와드릴까요?",
       subtitle: "문의 유형에 맞는 채널로 보내주시면 더 빠르게 확인할 수 있어요.",
-      emailCta: "이메일 보내기",
+      emailCta: "이메일 주소 복사",
+      emailCopiedFeedback: "복사됨!",
       generalLabel: "일반 문의",
       generalDesc: "계정, 사용법, 제안 등 그 외 모든 문의",
       reportLabel: "신고하기",
@@ -3619,7 +3621,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       eyebrow: "Contact",
       title: "How can we help?",
       subtitle: "Pick the channel that matches your message — it gets seen faster that way.",
-      emailCta: "Send an email",
+      emailCta: "Copy email address",
+      emailCopiedFeedback: "Copied!",
       generalLabel: "General",
       generalDesc: "Account, how-to, suggestions, anything else",
       reportLabel: "Report",
@@ -4892,7 +4895,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       eyebrow: "お問い合わせ",
       title: "何かお困りですか?",
       subtitle: "内容に合ったチャンネルにお送りいただくと、より早く確認できます。",
-      emailCta: "メールを送る",
+      emailCta: "メールアドレスをコピー",
+      emailCopiedFeedback: "コピーしました！",
       generalLabel: "一般のお問い合わせ",
       generalDesc: "アカウント、使い方、ご提案など",
       reportLabel: "通報",
@@ -6108,7 +6112,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       eyebrow: "联系我们",
       title: "有什么可以帮您?",
       subtitle: "发送到对应的渠道，我们能更快处理您的问题。",
-      emailCta: "发送邮件",
+      emailCta: "复制邮箱地址",
+      emailCopiedFeedback: "已复制！",
       generalLabel: "一般咨询",
       generalDesc: "账号、使用方法、建议等其他问题",
       reportLabel: "举报",
