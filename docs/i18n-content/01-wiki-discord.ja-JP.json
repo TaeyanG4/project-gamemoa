@@ -1,0 +1,232 @@
+{
+  "discordOverview": {
+    "title": "Discord 概要",
+    "description": "OwOGGは常時接続ボットではなく、署名付きHTTP Interactionsで動作します。インストール、アカウント連携、サーバー登録はそれぞれ異なる3つのステップです。",
+    "calloutStrong": "一般ユーザーが Bot Token、Application ID、Public Key を扱う必要はありません。",
+    "calloutBody": " などの値は OwOGG 運営チームのみが GitHub Actions Secret として管理します。",
+    "flowHeading": "全体の流れ",
+    "step1": "Discordに OwOGG アプリを追加します（サーバー管理権限が必要）。",
+    "step2": "選択したサーバーを確認して承認します。",
+    "step3": "OwOGGに戻り、Discordアカウントを連携します。",
+    "step4": "管理権限のあるサーバーを OwOGG コミュニティとして登録します。",
+    "step5": "Discordで /owogg games、/owogg play から開始します。",
+    "cardInstall": "インストール →",
+    "cardInstallDesc": "サーバーにアプリを追加する方法",
+    "cardServerReg": "サーバー登録 →",
+    "cardServerRegDesc": "PUBLIC/UNLISTED/PRIVATE の選択",
+    "cardCommands": "コマンド →",
+    "cardCommandsDesc": "/owogg 全サブコマンド",
+    "cardTroubleshooting": "トラブルシューティング →",
+    "cardTroubleshootingDesc": "よくある症状別の解決法",
+    "footerPrefix": "今すぐインストールを開始するには、",
+    "footerLink": "5ステップインストールガイド",
+    "footerSuffix": "をご利用ください。"
+  },
+  "discordInstall": {
+    "title": "Discordに OwOGG をインストールする",
+    "description": "Discordアプリのインストールは、OwOGGをサーバーで使用するための準備段階です。サーバー登録とは別です。",
+    "calloutStrong": "一般ユーザーが Bot Token を入力する必要はありません。",
+    "calloutBody": " 下記の公式インストールリンクをクリックし、Discordのサーバー選択/承認画面に従うだけです。",
+    "stepsHeading": "手順",
+    "step1": "下の [Discordに OwOGG を追加] ボタンをクリックします。",
+    "step2": "Discordアカウントでログインしていることを確認します。",
+    "step3": "アプリを追加するサーバーを選択します（サーバー管理権限のあるサーバーのみリストに表示されます）。",
+    "step4": "要求された権限を確認して承認します。",
+    "step5": "完了後、OwOGGに戻り、アカウント連携とサーバー登録を進めます。",
+    "buttonLabel": "Discordに OwOGG を追加",
+    "loadingPrefix": "インストールリンクを読み込んでいるか、まだ準備できていません。",
+    "loadingLink": "インストールガイド",
+    "loadingSuffix": "で再度ご確認ください。",
+    "calloutWarningStrong": "アプリのインストール ≠ OwOGG サーバー登録です。",
+    "calloutWarningBodyPrefix": " アプリをインストールしても、サーバーが自動的に OwOGG ディレクトリに公開されるわけではありません。管理者が ",
+    "calloutWarningLink": "サーバー登録",
+    "calloutWarningSuffix": "を別途完了する必要があります。",
+    "footerPrefix": "インストール後の次のステップは ",
+    "footerLink": "アカウント連携",
+    "footerSuffix": "です。"
+  },
+  "discordAccountLink": {
+    "title": "アカウント連携",
+    "description": "Discordアカウントを OwOGG アカウントと連携すると、ボットコマンド（/owogg profile、/owogg play など）でご自身の情報を使用できるようになります。",
+    "methodHeading": "連携方法",
+    "step1": "Discordサーバーで /owogg link コマンドを入力します。",
+    "step2": "ボットが自分にだけ見える（ephemeral）1回限りの連携リンクを返答します。",
+    "step3": "そのリンクをクリックして OwOGG ウェブに移動します。",
+    "step4": "OwOGGにログインしていない場合は、まずログインします。",
+    "step5": "連携確認画面で承認すれば完了です。",
+    "calloutPrefix": "連携リンクは1回限り有効で、一定時間後に失効します。失効した場合や使用済みの場合は、Discordで ",
+    "calloutCode": "/owogg link",
+    "calloutSuffix": "を再実行して新しいリンクを取得してください。",
+    "calloutWarning": "1つの Discord アカウントは、1つの OwOGG アカウントにのみ連携できます。すでに他の OwOGG アカウントに連携されている Discord アカウントで新しく連携することはできません — まずウェブで連携を解除する必要があります。",
+    "footerPrefix": "連携に失敗しますか？ ",
+    "footerLink1": "トラブルシューティングガイド",
+    "footerMid": "をご確認ください。またはウェブから直接 ",
+    "footerLink2": "アカウント連携ページ",
+    "footerSuffix": "を開くことができます。"
+  },
+  "discordServerRegistration": {
+    "title": "サーバー登録",
+    "description": "アプリのインストールとサーバー登録は別です。サーバー登録を完了して初めて、サーバーXP・リーダーボード・サーバー専用ページが有効になります。",
+    "requirementsHeading": "登録要件",
+    "req1": "OwOGG アカウントでログインしている必要があります。",
+    "req2": "登録しようとする Discord サーバーで「サーバー管理（Manage Server）」権限が必要です。",
+    "req3": "OwOGG アプリが該当サーバーにすでにインストールされている必要があります。",
+    "stepsHeading": "登録手順",
+    "step1": "OwOGGにログインした状態で、Discordサーバー登録認証を開始します。",
+    "step2": "Discordが要求する権限（サーバーリストの確認）を承認します。",
+    "step3": "管理可能なサーバーリストから登録するサーバーを選択します。",
+    "step4": "サーバー slug（URL名）と紹介、公開範囲を設定します。",
+    "step5": "登録を完了すると、サーバー専用ページが即座に生成されます。",
+    "buttonLabel": "サーバー登録を開始する",
+    "visibilityHeading": "公開範囲 (Visibility)",
+    "visibilityPublicDesc": "OwOGG サーバーディレクトリと検索に公開されます。",
+    "visibilityUnlistedDesc": "直接リンクでのみアクセス可能で、ディレクトリには公開されません。",
+    "visibilityPrivateDesc": "サーバー管理者のみアクセス可能です。",
+    "calloutStrong": "アプリインストール ≠ サーバー登録。",
+    "calloutBody": " アプリをインストールしたからといって、サーバーが自動的に公開されるわけではありません。必ず上記の手順で直接登録してください。",
+    "footerPrefix": "サーバーがリストにない場合は、",
+    "footerLink": "トラブルシューティングガイド",
+    "footerSuffix": "の「サーバーが登録候補にありません」項目をご確認ください。"
+  },
+  "discordCommands": {
+    "title": "コマンド",
+    "description": "すべての OwOGG Discord コマンドは /owogg のサブコマンドです。",
+    "calloutEphemeral": "表示された応答は、コマンドを実行したユーザーにのみ見える一時的（ephemeral）なメッセージです — チャンネルの他の人には見えません。",
+    "labelWhere": "使用場所",
+    "labelAccountLink": "アカウント連携が必要",
+    "labelGuildRequired": "サーバー登録が必要",
+    "labelArgs": "引数",
+    "labelExample": "例",
+    "labelCommonError": "よくあるエラー: ",
+    "yes": "はい",
+    "no": "いいえ",
+    "footerPrefix": "予想と異なる動作をしますか？ ",
+    "footerLink": "トラブルシューティングガイド",
+    "footerSuffix": "をご確認ください。",
+    "commands": [
+      {
+        "name": "/owogg link",
+        "purpose": "この Discord アカウントを OwOGG アカウントと連携します。",
+        "where": "サーバーチャンネルまたは DM",
+        "args": "なし",
+        "commonError": "すでに連携されている場合は、新しいリンクの代わりに案内メッセージが送信されます。"
+      },
+      {
+        "name": "/owogg profile",
+        "purpose": "連携された OwOGG アカウントのニックネーム、レベル、総 XP を確認します。",
+        "where": "サーバーチャンネルまたは DM",
+        "args": "なし",
+        "commonError": "アカウントが連携されていない場合は、/owogg link の案内が送信されます。"
+      },
+      {
+        "name": "/owogg games",
+        "purpose": "現在 OwOGG でプレイ可能なゲームリストとリンクを確認します。",
+        "where": "サーバーチャンネルまたは DM、ログイン不要",
+        "args": "なし",
+        "commonError": "なし（常に公開応答）"
+      },
+      {
+        "name": "/owogg play",
+        "purpose": "このサーバーに XP が付与される1回限りのゲームプレイリンクを発行します。",
+        "where": "登録済みサーバーチャンネル",
+        "args": "game (任意) — 特定のゲームを指定、省略時はゲームリストへ移動",
+        "commonError": "サーバーが未登録またはアカウント未連携の場合は案内メッセージが送信されます。リンクは15分間、1回のみ有効です。"
+      },
+      {
+        "name": "/owogg rank",
+        "purpose": "このサーバー内での自分の順位とサーバー貢献 XP を確認します。",
+        "where": "登録済みサーバーチャンネル",
+        "args": "なし",
+        "commonError": "アカウント未連携、またはこのサーバーでまだアクティビティがない場合は案内メッセージが送信されます。"
+      },
+      {
+        "name": "/owogg leaderboard",
+        "purpose": "このサーバーの OwOGG XP リーダーボード Top 10 を確認します。",
+        "where": "登録済みサーバーチャンネル",
+        "args": "なし",
+        "commonError": "サーバーが未登録の場合は案内メッセージが送信されます。"
+      },
+      {
+        "name": "/owogg server",
+        "purpose": "このサーバーの全体 XP と週間アクティビティの要約を確認します。",
+        "where": "登録済みサーバーチャンネル",
+        "args": "なし",
+        "commonError": "サーバーが未登録の場合は案内メッセージが送信されます。"
+      }
+    ]
+  },
+  "discordXp": {
+    "title": "サーバー XP の計算方式",
+    "description": "グローバル XP、サーバー別ユーザー XP、サーバーアクティビティ XP は互いに異なる3つの数値です。",
+    "differHeading": "3つの XP の違い",
+    "globalTerm": "一般 OwOGG XP (グローバル)",
+    "globalDesc": " — アカウント全体の累積経験値。プロフィール/全体ランキングに使用されます。",
+    "perGuildTerm": "Discord サーバー別ユーザー XP",
+    "perGuildDescPrefix": " — そのサーバーで ",
+    "perGuildDescCode": "/owogg play",
+    "perGuildDescSuffix": " で作成された有効な完了のみが加算されます。",
+    "guildActivityTerm": "Discord サーバーアクティビティ XP",
+    "guildActivityDesc": " — サーバーメンバー全体が貢献した合計で、サーバーリーダーボード/週間ランキングに使用されます。",
+    "exampleHeading": "例",
+    "exampleBodyPrefix": "Global XP が 25,000 のユーザーが新しく登録された Guild A で ",
+    "exampleBodyCode": "/owogg play",
+    "exampleBodySuffix": " で有効な完了1回(+10)を作成した場合:",
+    "cardGlobalTitle": "グローバル XP",
+    "cardGlobalText": "アカウント全体累積",
+    "cardGuildATitle": "Guild A ユーザー XP",
+    "cardGuildAText": "Aで作成した有効な貢献",
+    "cardGuildBTitle": "Guild B",
+    "cardGuildBText": "既存の XP は自動コピーされません",
+    "calloutNoCopyStrong": "既存のグローバル XP は新しいサーバーに自動的にコピーされません。",
+    "calloutNoCopyBody": " 新しく登録されたサーバーは常に 0 から始まり、そのサーバーで作成された新しい有効なプレイのみが蓄積されます。",
+    "calloutAbuseStrong": "アビューズ防止:",
+    "calloutAbuseBody": " ユーザー × ゲーム × UTC 1日基準のグローバル XP 付与は最大 10回 です。上限に達してもゲームプレイ自体は継続可能ですが、追加 XP は付与されません。1つのプレイイベントは最大1つのサーバーにのみ帰属します — 同じ完了が複数のサーバーに重複して XP を作成することはありません。",
+    "footerPrefix": "サーバーランキングの閲覧方法は ",
+    "footerLink": "ゲームとランキングドキュメント",
+    "footerSuffix": "をご参照ください。"
+  },
+  "discordTroubleshooting": {
+    "title": "トラブルシューティング",
+    "description": "症状から探してください。いかなる場合も一般ユーザーが Bot Token を設定する必要はありません。",
+    "calloutWarning": "以下のどの症状も Bot Token、Application ID、Public Key の入力を要求しません。そのような案内を受けた場合は、公式 OwOGG チャンネルではない可能性があります。",
+    "faqAutocomplete": {
+      "question": "/owogg がオートコンプリートに表示されません",
+      "answerPrefix": "Discord クライアントを再起動するか、サーバーを一度退出して再参加してみてください。それでも表示されない場合は、アプリが実際にこのサーバーにインストールされているかサーバー管理者に確認を依頼してください。OwOGG 運営チーム側では ",
+      "answerCode": "pnpm discord:commands:check",
+      "answerSuffix": " でグローバルコマンドの登録状態を確認できます。"
+    },
+    "faqPlainMessage": {
+      "question": "/owogg link を入力したのに通常のメッセージとして送信されます",
+      "answer": "正常なスラッシュコマンドではなくプレーンテキストとして送信された場合、Discordがコマンドを認識できなかったことを意味します。オートコンプリートのリストから正確に /owogg を選択し、サブコマンドを選択して実行する必要があります。手動でタイピングして送信すると通常のメッセージになります。"
+    },
+    "faqNoResponse": {
+      "question": "アプリケーションが応答しませんでした",
+      "answer": "一時的な遅延やエラーの可能性があります。しばらく経ってから再度お試しください。繰り返される場合は OwOGG サービスのステータスに問題がある可能性があるため、時間を置いて再度ご確認ください。"
+    },
+    "faqAlreadyLinked": {
+      "question": "アカウントがすでに連携されていると表示されます",
+      "answer": "この Discord アカウントがすでに別の OwOGG アカウントと連携されていることを意味します。1つの Discord アカウントは1つの OwOGG アカウントにのみ連携できます。別のアカウントに連携するには、まずウェブ上で既存の連携を解除する必要があります。"
+    },
+    "faqServerNotRegistered": {
+      "question": "/owogg play でサーバー未登録と表示されます",
+      "answerPrefix": "この Discord サーバーはまだ OwOGG コミュニティとして登録されていません。サーバー管理者が ",
+      "answerLink": "サーバー登録",
+      "answerSuffix": "を完了する必要があります。アプリをインストールしただけでは登録されません。"
+    },
+    "faqNotInCandidateList": {
+      "question": "サーバーが登録リスト（候補リスト）にありません",
+      "answer": "登録可能なサーバーリストには、実際に「サーバー管理（Manage Server）」権限を持っているサーバーのみが表示されます。権限があるか、ログインしている Discord アカウントが目的のアカウントであるかご確認ください。"
+    },
+    "faqBotNotVisible": {
+      "question": "ボットが Discord のメンバーリストに表示されません",
+      "answer": "OwOGGは常時接続（Gateway）ボットではなく、署名付き HTTP Interactions 方式で動作します。そのため、メンバーリストに常に「オンライン」と表示されない場合があります — これは正常であり、コマンドの動作には影響ありません。"
+    },
+    "faqBotOffline": {
+      "question": "ボットがオフラインに見えます",
+      "answer": "上記と同じ理由です。HTTP Interactions ベースのアプリは常時接続状態を維持しないため、Discord メンバーリストでオフラインと表示される場合があります。コマンドが正常に実行されていれば問題ありません。"
+    },
+    "footerPrefix": "ここにない問題ですか？ ",
+    "footerLink": "Discord 利用ガイド",
+    "footerSuffix": "の FAQ もご確認ください。"
+  }
+}

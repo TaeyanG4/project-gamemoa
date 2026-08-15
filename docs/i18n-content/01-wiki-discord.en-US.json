@@ -1,0 +1,232 @@
+{
+  "discordOverview": {
+    "title": "Discord Overview",
+    "description": "OwOGG operates via signed HTTP Interactions, not as an always-online bot. Installation, account linking, and server registration are 3 separate steps.",
+    "calloutStrong": "General users do not need to manage Bot Token, Application ID, or Public Key.",
+    "calloutBody": " These values are managed as GitHub Actions Secrets exclusively by the OwOGG operations team.",
+    "flowHeading": "Overall Flow",
+    "step1": "Add the OwOGG app to Discord (requires Manage Server permission).",
+    "step2": "Verify and authorize the selected server.",
+    "step3": "Return to OwOGG and link your Discord account.",
+    "step4": "Register a server you manage as an OwOGG community.",
+    "step5": "Start on Discord with /owogg games and /owogg play.",
+    "cardInstall": "Install →",
+    "cardInstallDesc": "How to add the app to a server",
+    "cardServerReg": "Server Registration →",
+    "cardServerRegDesc": "Choose PUBLIC/UNLISTED/PRIVATE",
+    "cardCommands": "Commands →",
+    "cardCommandsDesc": "All /owogg subcommands",
+    "cardTroubleshooting": "Troubleshooting →",
+    "cardTroubleshootingDesc": "Solutions by common symptom",
+    "footerPrefix": "To start installation right now, use the ",
+    "footerLink": "5-Step Installation Guide",
+    "footerSuffix": "."
+  },
+  "discordInstall": {
+    "title": "Installing OwOGG on Discord",
+    "description": "Installing the Discord app is the preparation step to use OwOGG on your server. It is separate from server registration.",
+    "calloutStrong": "General users do not need to enter a Bot Token.",
+    "calloutBody": " Simply click the official installation link below and follow Discord's server selection and authorization screens.",
+    "stepsHeading": "Installation Steps",
+    "step1": "Click the [Add OwOGG to Discord] button below.",
+    "step2": "Ensure you are logged into your Discord account.",
+    "step3": "Select the server to add the app to (only servers where you have Manage Server permission will appear in the list).",
+    "step4": "Review and authorize the requested permissions.",
+    "step5": "After completion, return to OwOGG to proceed with account linking and server registration.",
+    "buttonLabel": "Add OwOGG to Discord",
+    "loadingPrefix": "The installation link is loading or not ready yet. Please check back in the ",
+    "loadingLink": "Installation Guide",
+    "loadingSuffix": ".",
+    "calloutWarningStrong": "App Installation ≠ OwOGG Server Registration.",
+    "calloutWarningBodyPrefix": " Installing the app does not automatically publish the server to the OwOGG directory. An administrator must complete ",
+    "calloutWarningLink": "Server Registration",
+    "calloutWarningSuffix": " separately.",
+    "footerPrefix": "The next step after installation is ",
+    "footerLink": "Account Linking",
+    "footerSuffix": "."
+  },
+  "discordAccountLink": {
+    "title": "Account Linking",
+    "description": "Linking your Discord account to your OwOGG account enables using your profile info in bot commands (such as /owogg profile, /owogg play).",
+    "methodHeading": "Linking Method",
+    "step1": "Enter the /owogg link command in a Discord server.",
+    "step2": "The bot responds with a one-time linking link visible only to you (ephemeral).",
+    "step3": "Click the link to navigate to the OwOGG web application.",
+    "step4": "If you are not logged into OwOGG, log in first.",
+    "step5": "Authorize on the linking confirmation screen to complete.",
+    "calloutPrefix": "The linking link is one-time use and expires after a set period. If expired or already used, run ",
+    "calloutCode": "/owogg link",
+    "calloutSuffix": " again in Discord to get a new link.",
+    "calloutWarning": "A single Discord account can only be linked to one OwOGG account. If a Discord account is already linked to another OwOGG account, it cannot be newly linked — you must un-link it on the web first.",
+    "footerPrefix": "Having trouble linking? Check the ",
+    "footerLink1": "Troubleshooting Guide",
+    "footerMid": ". Alternatively, you can open the ",
+    "footerLink2": "Account Linking Page",
+    "footerSuffix": " directly on the web."
+  },
+  "discordServerRegistration": {
+    "title": "Server Registration",
+    "description": "App installation and server registration are separate. You must complete server registration to activate server XP, leaderboards, and server-dedicated pages.",
+    "requirementsHeading": "Registration Requirements",
+    "req1": "You must be logged into your OwOGG account.",
+    "req2": "You must have Manage Server permission on the Discord server you wish to register.",
+    "req3": "The OwOGG app must already be installed on that server.",
+    "stepsHeading": "Registration Steps",
+    "step1": "Start Discord server registration authorization while logged into OwOGG.",
+    "step2": "Authorize the permissions requested by Discord (verify server list).",
+    "step3": "Select the server to register from the list of manageable servers.",
+    "step4": "Set the server slug (URL name), description, and visibility.",
+    "step5": "Upon completion, a dedicated server page will be created immediately.",
+    "buttonLabel": "Start Server Registration",
+    "visibilityHeading": "Visibility",
+    "visibilityPublicDesc": "Exposed in the OwOGG server directory and search.",
+    "visibilityUnlistedDesc": "Accessible only via direct link, not exposed in the directory.",
+    "visibilityPrivateDesc": "Accessible only to server administrators.",
+    "calloutStrong": "App Installation ≠ Server Registration.",
+    "calloutBody": " Installing the app does not make the server public automatically. You must register directly following the procedure above.",
+    "footerPrefix": "If your server is not in the list, check the \"Server is not in the candidate list\" section in the ",
+    "footerLink": "Troubleshooting Guide",
+    "footerSuffix": "."
+  },
+  "discordCommands": {
+    "title": "Commands",
+    "description": "All OwOGG Discord commands are subcommands of /owogg.",
+    "calloutEphemeral": "Displayed responses are temporary (ephemeral) messages visible only to the user who ran the command — invisible to others in the channel.",
+    "labelWhere": "Where to Use",
+    "labelAccountLink": "Account Link Required",
+    "labelGuildRequired": "Server Reg. Required",
+    "labelArgs": "Arguments",
+    "labelExample": "Example",
+    "labelCommonError": "Common Error: ",
+    "yes": "Yes",
+    "no": "No",
+    "footerPrefix": "Not working as expected? Check the ",
+    "footerLink": "Troubleshooting Guide",
+    "footerSuffix": ".",
+    "commands": [
+      {
+        "name": "/owogg link",
+        "purpose": "Links this Discord account to an OwOGG account.",
+        "where": "Server channel or DM",
+        "args": "None",
+        "commonError": "If already linked, an informational message is sent instead of a new link."
+      },
+      {
+        "name": "/owogg profile",
+        "purpose": "Checks the nickname, level, and total XP of the linked OwOGG account.",
+        "where": "Server channel or DM",
+        "args": "None",
+        "commonError": "If the account is not linked, a /owogg link prompt is sent."
+      },
+      {
+        "name": "/owogg games",
+        "purpose": "Checks the list of playable games and links currently available on OwOGG.",
+        "where": "Server channel or DM, no login required",
+        "args": "None",
+        "commonError": "None (always responds publicly)"
+      },
+      {
+        "name": "/owogg play",
+        "purpose": "Issues a one-time gameplay link where XP is credited to this server.",
+        "where": "Registered server channel",
+        "args": "game (optional) — Specify a game; if omitted, navigates to game list",
+        "commonError": "An informational message is sent if the server is unregistered or account unlinked. Links are valid once for 15 minutes."
+      },
+      {
+        "name": "/owogg rank",
+        "purpose": "Checks your rank and server-contributed XP within this server.",
+        "where": "Registered server channel",
+        "args": "None",
+        "commonError": "An informational message is sent if account is unlinked or no activity exists in this server yet."
+      },
+      {
+        "name": "/owogg leaderboard",
+        "purpose": "Checks the Top 10 OwOGG XP leaderboard for this server.",
+        "where": "Registered server channel",
+        "args": "None",
+        "commonError": "An informational message is sent if the server is unregistered."
+      },
+      {
+        "name": "/owogg server",
+        "purpose": "Checks total XP and weekly activity summary for this server.",
+        "where": "Registered server channel",
+        "args": "None",
+        "commonError": "An informational message is sent if the server is unregistered."
+      }
+    ]
+  },
+  "discordXp": {
+    "title": "How Server XP is Calculated",
+    "description": "Global XP, Per-Guild User XP, and Guild Activity XP are three distinct numbers.",
+    "differHeading": "The Three Types of XP Differ",
+    "globalTerm": "General OwOGG XP (Global)",
+    "globalDesc": " — Account-wide cumulative experience points. Used for profile and global rankings.",
+    "perGuildTerm": "Per-Discord Server User XP",
+    "perGuildDescPrefix": " — Only valid completions made with ",
+    "perGuildDescCode": "/owogg play",
+    "perGuildDescSuffix": " in that server are accumulated.",
+    "guildActivityTerm": "Discord Server Activity XP",
+    "guildActivityDesc": " — The sum contributed by all server members, used for server leaderboards and weekly rankings.",
+    "exampleHeading": "Example",
+    "exampleBodyPrefix": "When a user with 25,000 Global XP makes 1 valid completion (+10) using ",
+    "exampleBodyCode": "/owogg play",
+    "exampleBodySuffix": " in newly registered Guild A:",
+    "cardGlobalTitle": "Global XP",
+    "cardGlobalText": "Account-wide cumulative",
+    "cardGuildATitle": "Guild A User XP",
+    "cardGuildAText": "Valid contributions made in A",
+    "cardGuildBTitle": "Guild B",
+    "cardGuildBText": "Existing XP is not automatically copied",
+    "calloutNoCopyStrong": "Existing Global XP is not automatically copied to new servers.",
+    "calloutNoCopyBody": " Newly registered servers always start at 0, and only new valid plays made in that server will accumulate.",
+    "calloutAbuseStrong": "Abuse Prevention:",
+    "calloutAbuseBody": " Global XP payout per User × Game × UTC Day is capped at 10 times max. Once the cap is reached, game completion remains possible, but no additional XP is rewarded. A single play event belongs to at most one server — the same completion will not generate XP redundantly across multiple servers.",
+    "footerPrefix": "For instructions on viewing server rankings, refer to the ",
+    "footerLink": "Games & Rankings Documentation",
+    "footerSuffix": "."
+  },
+  "discordTroubleshooting": {
+    "title": "Troubleshooting",
+    "description": "Find solutions by symptom. In no case does a general user need to configure a Bot Token.",
+    "calloutWarning": "None of the symptoms below require entering a Bot Token, Application ID, or Public Key. If prompted for these, it may not be an official OwOGG channel.",
+    "faqAutocomplete": {
+      "question": "/owogg does not show up in autocomplete",
+      "answerPrefix": "Try restarting your Discord client or leaving and re-joining the server. If it still doesn't appear, ask a server administrator to check if the app is actually installed on the server. OwOGG operations team can verify global command registration status via ",
+      "answerCode": "pnpm discord:commands:check",
+      "answerSuffix": "."
+    },
+    "faqPlainMessage": {
+      "question": "Entered /owogg link but it posted as a regular message",
+      "answer": "If sent as plain text instead of a normal slash command, Discord failed to recognize the command. You must select /owogg from the autocomplete list and select the subcommand to execute. Typing it out manually and sending makes it a regular message."
+    },
+    "faqNoResponse": {
+      "question": "The application did not respond",
+      "answer": "This could be a temporary delay or error. Please try again after a moment. If repeated, there may be an issue with OwOGG service status, so please check again later."
+    },
+    "faqAlreadyLinked": {
+      "question": "It says the account is already linked",
+      "answer": "This means your Discord account is already linked to another OwOGG account. A single Discord account can only be linked to one OwOGG account. To link to another account, you must un-link the existing connection on the web first."
+    },
+    "faqServerNotRegistered": {
+      "question": "/owogg play says server is unregistered",
+      "answerPrefix": "This Discord server has not been registered as an OwOGG community yet. A server administrator must complete ",
+      "answerLink": "Server Registration",
+      "answerSuffix": ". Installing the app alone does not register the server."
+    },
+    "faqNotInCandidateList": {
+      "question": "Server is not in the registration list (candidate list)",
+      "answer": "The registrable server list only displays servers where you actually have Manage Server permissions. Verify if you have permissions or if the logged-in Discord account is the intended account."
+    },
+    "faqBotNotVisible": {
+      "question": "Bot is not visible in the Discord member list",
+      "answer": "OwOGG operates via signed HTTP Interactions instead of an always-connected (Gateway) bot. Thus, it may not always display as \"Online\" in the member list — this is normal and does not affect command functionality."
+    },
+    "faqBotOffline": {
+      "question": "Bot appears offline",
+      "answer": "For the same reason above. Apps based on HTTP Interactions do not maintain an always-on connection state, so they may show as offline in the Discord member list. If commands execute normally, this is not an issue."
+    },
+    "footerPrefix": "Problem not listed here? Check the FAQ in the ",
+    "footerLink": "Discord Usage Guide",
+    "footerSuffix": "."
+  }
+}

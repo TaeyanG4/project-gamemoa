@@ -1,53 +1,61 @@
-# OwOGG 아키텍처 및 모노레포 설계 (ARCHITECTURE)
+# OwOGG 시스템 아키텍처 (ARCHITECTURE)
 
-OwOGG는 **pnpm Workspaces** 및 **Turborepo** 기반의 **Clean Monorepo & Game Plugin Architecture**로 설계되었습니다.
+OwOGG는 **pnpm Workspaces** 및 **Turborepo** 기반의 **Modular Monolith & Game Plugin Architecture**로 설계되어 Cloudflare 에지 인프라에서 구동됩니다.
 
 ```text
-owogg/
-├── apps/
-│   ├── web/                     # 플랫폼 쉘 및 웹 앱 (React Router v7 SPA)
-│   │   ├── app/features/auth/   # Single Source of Truth 인증 클라이언트 (Google GIS, Discord OAuth)
-│   │   ├── app/features/catalog/# 동적 게임 카탈로그 및 레지스트리 로더
-│   │   │   └── gameLoaders.generated.ts # 자동 생성된 웹 동적 임포트 로더
-│   │   └── app/features/scores/ # 클라이언트 점수 API 및 저장소 헬퍼
-│   └── api/                     # Hono API 백엔드 (Cloudflare Workers / Node.js portable)
-│       ├── src/container.ts     # API Composition Root (의존성 주입 컨테이너)
-│       ├── src/auth/admin.ts    # 명시적 ADMIN_USER_IDS 서버 권한 가드
-│       ├── src/routes/admin.ts  # 관리자 상태/운영 요약 Thin Controller
-│       ├── src/routes/adminCreators.ts # 보호된 Creator 수동 심사 Thin Controller
-│       └── src/infrastructure/discord/ # Discord HTTP Interactions (Ed25519 서명 검증, 명령어 정의/핸들러) — Gateway 없음
-├── games/
-│   ├── reaction-time/           # 반응속도 테스트 게임 모듈 (@owogg/game-reaction-time)
-│   ├── memory-test/             # 순서 기억력 테스트 게임 모듈 (@owogg/game-memory-test)
-│   └── aim-test/                # 에임 테스트 게임 모듈 (@owogg/game-aim-test)
-├── packages/
-│   ├── contracts/               # Zod 요청/응답 스키마 및 DTO 타입 (@owogg/contracts)
-│   ├── game-sdk/                # 게임 매니페스트 및 호스트 계약 (@owogg/game-sdk)
-│   ├── core/                    # 순수 도메인 엔티티, 유즈케이스 및 포트 (@owogg/core)
-│   │   ├── src/domain/          # 순수 도메인 엔티티 (점수 검증, 진행도/레벨 공식, 도전과제 정의, 닉네임/국가 정책, Featured 자격 정책)
-│   │   ├── src/application/     # 애플리케이션 유즈케이스 (ScoreUseCases, PersonalizationUseCases, IdentityUseCases, AccountMergeUseCases, ProgressionUseCases, AchievementUseCases, ProfileUseCases, DiscordLinkUseCases, CreatorUseCases)
-│   │   ├── src/ports/           # 저장소 포트 인터페이스 (UserRepository, AccountMergeRepository, ProgressionRepository, AchievementRepository, DiscordLinkRepository, CreatorRepository, CreatorReviewRepository 포함)
-│   │   └── src/registry/        # 자동 생성된 도메인 레지스트리 (gameRegistry.generated.ts)
-│   ├── db/                      # Cloudflare D1 저장소 어댑터 및 SQL 마이그레이션 (@owogg/db)
-│   │   └── migrations/         # 0000 초기 스키마, 0002 점수 인증 무결성, 0003 계정 식별(UNIQUE(user_id,provider)), 0004 계정 통합 챌린지, 0005 진행도(XP/레벨/도전과제) + 닉네임/국가 메타데이터, 0006 Discord 계정 연동 챌린지, 0009-0010 Discord 길드/XP, 0010-0011 Creator 파운데이션/지표, 0012 Creator 심사 잡, 0013 수동 심사 감사/14일 재검증
-│   ├── ui/                      # 공통 UI 컴포넌트 및 GameShell 컨테이너 (@owogg/ui)
-│   └── shared/                  # 공통 유틸리티 및 re-export (@owogg/shared)
-├── scripts/
-│   ├── generate-game.ts         # 새 게임 생성 스캐폴딩 CLI (pnpm generate:game <slug>)
-│   ├── generate-game-registry.ts# 빌드 타임 이중 레지스트리 자동 생성기 (pnpm generate:registry)
-│   ├── generate-favicon.ts      # 결정론적 파비콘/PNG/ICO 자산 생성기 (pnpm generate:favicon)
-│   ├── prepare-web-build.ts     # SPA 빌드 준비 스크립트
-│   ├── post-web-build.ts        # 버전 provenance + SPA 셸 파비콘 링크 주입 스크립트
-│   ├── check-registry.ts        # 레지스트리 최신성 및 불변성 검증기 (pnpm registry:check)
-│   └── verify-architecture.ts   # 아키텍처 가드 레이어 경계 검증기 (pnpm architecture:check)
-└── .github/workflows/
-    ├── ci.yml                   # CI 워크플로우 (Install ➔ Format ➔ Lint ➔ Arch ➔ Registry ➔ Typecheck ➔ Test ➔ Build)
-    └── deploy.yml               # CD 워크플로우 (workflow_run ➔ D1 Migrate ➔ API Deploy ➔ Health/Smoke Check)
+                                [ Client Browser ]
+                                        │
+                         ┌──────────────┴──────────────┐
+                         ▼                             ▼
+              [ Apps/Web (React 19) ]      [ Apps/API (Hono) ]
+              React Router v7 SPA           Cloudflare Workers
+                         │                             │
+                         ├─────────────────────────────┤
+                         ▼                             ▼
+               [@owogg/contracts]           [packages/core]
+               Zod Request/Response           Domain/Application
+                         │                             │
+                         └──────────────┬──────────────┘
+                                        ▼
+                                [packages/db]
+                            Cloudflare D1 Adapter
 ```
 
 ---
 
-## 1. 📐 레이어 의존성 아키텍처 (Layer Dependency Architecture)
+## 1. 📂 디렉토리 구조 및 레이어 역할
+
+```text
+owogg/
+├── apps/
+│   ├── web/                     # React 19 + React Router v7 SPA 플랫폼 쉘
+│   │   ├── app/features/auth/   # Single Source of Truth 인증 클라이언트
+│   │   ├── app/features/catalog/# 동적 게임 카탈로그 및 gameLoaders.generated.ts
+│   │   └── app/features/scores/ # 클라이언트 점수 API 및 로컬 캐시 헬퍼
+│   └── api/                     # Hono API 백엔드 (Cloudflare Workers / Node.js 호환)
+│       ├── src/container.ts     # API Composition Root (의존성 주입 컨테이너)
+│       ├── src/auth/admin.ts    # ADMIN_USER_IDS + D1 admin_accounts 권한 가드
+│       ├── src/routes/          # Thin Controllers (점수, 인증, 랭킹, 크리에이터, 관리자)
+│       └── src/infrastructure/  # Discord HTTP Interactions (Ed25519 서명 검증)
+├── games/                       # 독립 미니게임 패키지 (@owogg/game-*)
+│   ├── reaction-time/           # 반응속도 테스트
+│   ├── memory-test/             # 순서 기억력 테스트
+│   ├── aim-test/                # 에임 테스트
+│   └── typing-test/             # 타자 속도 테스트
+├── packages/
+│   ├── contracts/               # Zod 스키마 및 DTO 타입 (API Single Source of Truth)
+│   ├── game-sdk/                # 게임 매니페스트 및 호스트 셸 계약
+│   ├── core/                    # 순수 도메인 로직, 유즈케이스 및 포트 인터페이스
+│   ├── db/                      # Cloudflare D1 Repository 구현체 및 SQL 마이그레이션
+│   ├── ui/                      # 공통 UI 컴포넌트 및 GameShell
+│   └── shared/                  # 공통 상수 및 헬퍼
+├── scripts/                     # Architecture Guard, Registry Generator, 파비콘 생성기
+└── docs/                        # 기술 사양서 및 운영 문서
+```
+
+---
+
+## 2. 📐 레이어 의존성 및 단방향 흐름
 
 ```text
 apps/web ➔ @owogg/contracts & @owogg/game-sdk & @owogg/core
@@ -55,123 +63,50 @@ apps/api ➔ @owogg/contracts & @owogg/core
    ↓
 API Composition Root (apps/api/src/container.ts)
    ↓
-@owogg/core/application (ScoreUseCases) ➔ @owogg/core/domain ➔ @owogg/core/ports
+@owogg/core/application ➔ @owogg/core/domain ➔ @owogg/core/ports
    ↑
-@owogg/db (Cloudflare D1 저장소 어댑터 - 게임 카탈로그 매니페스트와 완전 분리)
+@owogg/db (D1 Repository 어댑터 - 게임 카탈로그 매니페스트와 완전 분리)
 ```
 
-- `apps/api/src/routes`는 세션 인증과 `ADMIN_USER_IDS` 서버 설정을 통과한 뒤에만 Creator 수동 심사 자료를 조회하거나 결정할 수 있습니다.
-- `/api/admin/*`는 매 요청 세션과 안정적인 OwOGG 사용자 ID를 재검증하며, 상태 변경 요청에는 허용된 Origin과 `Cache-Control: no-store`를 적용합니다.
-- `apps/api/src/index.ts`의 단일 Cron 핸들러는 6시간 취득 심사와 14일 Featured 재검증을 별도 repository query와 bounded batch로 실행합니다.
-- `creator_review_audit_log`는 일반 API에서 UPDATE/DELETE하지 않는 append-only 감사 원장입니다.
+---
+
+## 3. 🛡️ 아키텍처 가드 규칙 (Architecture Guard Rules)
+
+`pnpm architecture:check` (`scripts/verify-architecture.ts`), `pnpm registry:check` (`scripts/check-registry.ts`), 및 `pnpm format:check`가 CI에서 자동 검증합니다:
+
+1. **`packages/core` 순수성**: `hono`, `react`, `@cloudflare/*`, `@owogg/db`, 브라우저 API(`window`, `localStorage`), `fetch` 호출 또는 프로덕션 URL을 가질 수 없습니다.
+2. **`packages/contracts` 독립성**: `react`, `hono`, `@owogg/db`를 import할 수 없습니다.
+3. **`apps/web` 격리**: `@owogg/db` 또는 D1 구체 클래스를 직접 import할 수 없습니다.
+4. **`games/*` 격리**: `@owogg/db` 또는 `hono`를 import할 수 없습니다.
+5. **`apps/api/src/routes` DI 강제**: 구체 `D1...Repository`를 직접 인스턴스화하지 않고 `createContainer` DI 컨테이너를 주입받아 사용합니다.
+6. **`packages/db` 디커플링**: `GAME_MANIFEST_MAP`에 의존하지 않으며 게임 정책과 100% 분리된 순수 SQL 실행기 역할만 수행합니다.
+7. **레지스트리 불변성**: `gameRegistry.generated.ts`와 `gameLoaders.generated.ts`는 수동 편집이 금지되며 `pnpm generate:registry`로만 생성됩니다.
 
 ---
 
-## 2. 🛡️ 아키텍처 가드 규칙 (Architecture Guard Rules)
+## 4. 🧩 게임 확장 DX (Game Plugin DX)
 
-`pnpm architecture:check` (`scripts/verify-architecture.ts`), `pnpm registry:check` (`scripts/check-registry.ts`), 및 `pnpm format:check`는 모든 CI 빌드 시 실행되어 아래의 경계 규칙을 자동으로 검증합니다:
+새 게임을 추가할 때 **중앙 플랫폼 코드 수정은 0회**입니다:
 
-1. **`packages/core`**: `hono`, `react`, `@cloudflare/*`, 또는 `@owogg/db`를 import할 수 없습니다.
-2. **`packages/contracts`**: `react`, `hono`, 또는 `@owogg/db`를 import할 수 없습니다.
-3. **`apps/web`**: `@owogg/db` 또는 D1 구체 클래스를 직접 import할 수 없습니다.
-4. **`games/*`**: `@owogg/db` 또는 `hono`를 import할 수 없습니다.
-5. **`apps/api/src/routes`**: 구체 `D1...Repository` 클래스를 직접 생성할 수 없으며, `createContainer` 의존성 주입을 사용해야 합니다.
-6. **`apps/web/package.json`**: `@owogg/db` 또는 구 `@owogg/auth`를 의존성으로 포함할 수 없습니다.
-7. **`packages/core` 순수성**: 브라우저 API (`window`, `localStorage`), HTTP `fetch` 호출, 또는 프로덕션 환경 URL을 가질 수 없습니다.
-8. **`packages/db` 디커플링**: `GAME_MANIFEST_MAP` 또는 `GAME_MANIFESTS`를 import할 수 없으며, D1 저장소는 게임 정책과 100% 분리됩니다.
-9. **레지스트리 최신성 및 불변성**: `gameRegistry.generated.ts`와 `gameLoaders.generated.ts`는 `pnpm generate:registry` 결과와 100% 일치해야 합니다.
+1. `pnpm generate:game <slug>`로 `games/<slug>` 패키지를 자동 생성합니다.
+2. `games/<slug>/src/manifest.ts`에 `export const manifest: GameManifest`를 정의합니다.
+3. `pnpm generate:registry`를 실행하면 도메인 레지스트리 및 웹 동적 로더가 자동 빌드됩니다.
+4. 프론트엔드와 백엔드는 매니페스트 메타데이터를 기반으로 점수 검증, 정렬, 포맷팅, 동적 로딩을 자동 처리합니다.
 
 ---
 
-## 3. 🧩 게임 확장 DX (Game Extensibility DX)
+## 5. ⚡ 인프라 및 프로덕션 스택
 
-새 게임을 추가할 때 **중앙 코드 수정이 전혀 필요하지 않습니다 (0회)**:
-
-1. `pnpm generate:game <game-slug>` 명령어를 통해 `games/<game-slug>` 모듈을 생성합니다.
-2. `src/manifest.ts`에 `export const manifest` (`scoreConfig` 단주, 정렬 방향, 최소/최대값, 접두사, 접미사)를 정의합니다.
-3. `pnpm generate:registry`를 실행하면 도메인 레지스트리(`gameRegistry.generated.ts`)와 웹 로더 레지스트리(`gameLoaders.generated.ts`)가 자동으로 빌드 타임 컴파일됩니다.
-4. 프론트엔드와 백엔드는 매니페스트 메타데이터를 활용하여 점수 검증, 정렬, 웹 동적 임포트, 포맷팅을 자동으로 처리합니다.
-
-### 3.1 확장성 점검 결과 (2026-08-14)
-
-"게임이 무수히 많이 추가되어도 정상 운영되는가"를 점검한 결과:
-
-- **문제 없음**: `registry-builder.ts`의 빌드타임 스캔은 O(n) 순회 + 중복 검사이며, D1 `scores` 테이블은
-  `(game_id, score)`/`(user_id, game_id)` 복합 인덱스가 이미 있어 점수 조회는 게임 수와 무관하게
-  인덱스 조회로 유지됩니다(`packages/db/migrations/0000_initial_schema.sql`). 점수 검증도
-  `GAME_MANIFEST_MAP[gameId]` O(1) 조회입니다.
-- **구조적 한계 (중요)**: 게임 1개 = pnpm 워크스페이스 패키지 1개(고유 `package.json`/`tsconfig`/테스트,
-  turbo 파이프라인에 개별 등록) 구조는 **운영자가 직접 만드는 수십 개 규모의 성장에는 적합하지만,
-  다수 사용자가 제출하는 대규모(수백~수천 개) 게임 카탈로그에는 맞지 않습니다** — 제출마다 새
-  모노레포 패키지 + 코드 리뷰 + CI 태스크가 필요해지기 때문입니다. 따라서 유저 게임 제작 시스템은
-  반드시 **설정/데이터 기반**(기존 엔진의 파라미터 변형을 DB 행으로 저장)이어야 하며, 신규 코드
-  실행이 필요한 형태는 별도의 훨씬 큰 인프라 투자로 취급합니다(`docs/GAME_CREATION_GUIDE.md` 참고).
-- **UI 한계**: `ranking.tsx`의 게임별 필터 칩은 모든 게임을 한 줄에 나열하는 방식이라 게임 수가
-  늘어나면 사용성이 급격히 떨어집니다. 게임별 개별 순위 페이지 + 장르별 분류로 대체할 계획입니다.
-
-### 3.2 플레이 리플레이(녹화/재생) 기능 타당성 조사 (2026-08-14)
-
-"자신의 플레이를 녹화하는 방법이 있는가"를 점검한 결과, **영상 녹화가 아닌 입력 리플레이 방식을
-권장**합니다.
-
-**검토한 방식과 기각 사유:**
-
-- `canvas.captureStream()` + `MediaRecorder`: 현재 4개 게임 전부 `<canvas>`가 아닌 순수 DOM
-  (`div`/`button` + CSS)으로 렌더링되므로 애초에 적용 대상이 없습니다.
-- `getDisplayMedia()`(화면/탭 전체 캡처): 매 실행마다 브라우저 권한 팝업이 뜨는 무거운 UX이고,
-  결과물이 영상(MB 단위)이라 저장 비용도 큽니다. 게임 화면만 깔끔히 잘라내기도 어렵습니다.
-- **입력/이벤트 리플레이(권장)**: 클릭 좌표·키 입력·타임스탬프 같은 이벤트 시퀀스만 기록해 두고,
-  재생 시 실제 게임 컴포넌트를 "리플레이 모드"로 그 이벤트를 그대로 다시 흘려보내는 방식.
-  결과물이 JSON 몇 KB 수준이라 D1에 그대로 저장 가능하고, 화질 열화가 없으며, 무엇보다 **서버가
-  제출된 점수를 리플레이로 재검증할 수 있어 안티치트에도 그대로 활용 가능**합니다(기존
-  `scoreValidation.ts` 도메인 계층과 자연스럽게 연결됨).
-
-**막고 있는 전제조건**: 입력 리플레이가 재현 가능하려면 게임 로직이 **결정적(deterministic)**
-이어야 하는데, 현재 4개 게임 전부 시드 없는 `Math.random()`을 그대로 사용합니다(예:
-`games/aim-test/src/logic.ts`의 타겟 좌표 생성). 리플레이를 만들려면 게임마다 시드 기반 PRNG로
-리팩터링해야 하며, 이건 게임 로직 자체를 건드리는 작업이라 매니페스트 필드 하나 추가하는 것보다
-훨씬 큰 투자입니다.
-
-**결론: 무기한 보류 (운영자 결정, 2026-08-14)**. 조건부 재검토가 아니라 명시적으로 보류
-상태입니다 — 별도의 운영자 재개 결정이 있기 전까지는 백로그 우선순위 재정렬 대상에도 포함하지
-않습니다. `GameManifest.supportsReplay`(기본 `false`) 필드만 인프라로 남겨두고, 실제 착수는
-전적으로 운영자가 다시 꺼낼 때까지 대기합니다. 참고로 착수하게 될 경우의 순서는: 게임 1개를 시드
-PRNG로 전환 → 리플레이 기록/재생 프로토타입 검증 → 나머지 게임 확장.
-
-### 3.3 서버 사이드 이미지 렌더링 — satori + resvg (2026-08-14)
-
-`/owogg rank`·`/owogg profile` 임베드에 실제 렌더링된 랭크 카드 이미지를 추가하면서, 이
-Worker에 처음으로 WASM + 바이너리 에셋(폰트) 번들링이 들어갔습니다. Workers 호환성을
-`wrangler deploy --dry-run`으로 실측 검증했습니다:
-
-- **번들 크기**: 총 업로드 6.4MB(gzip 2.2MB) — resvg WASM(~2.4MB) + 폰트 서브셋(~2.5MB) +
-  satori/yoga(~0.4MB) + 기존 코드. Cloudflare Workers 압축 한도(10MB, 무료 티어도 3MB 이상)
-  대비 여유 있게 통과합니다.
-- **`.wasm` 임포트**: Wrangler 번들러가 네이티브로 이해합니다(`import x from "*.wasm"` →
-  `WebAssembly.Module`) — 별도 `rules` 설정 불필요.
-- **`.ttf` 임포트**: 네이티브 지원이 없어 `wrangler.jsonc`에 `"rules": [{"type": "Data", ...}]`
-  를 명시적으로 추가해야 `ArrayBuffer`로 해석됩니다(`src/types/assets.d.ts`에 대응하는 ambient
-  모듈 선언 필요).
-- **폰트**: Noto Sans KR 변수 폰트(10.4MB)를 Bold 700 단일 웨이트로 인스턴스화한 뒤, 라틴
-  - 전체 현대 한글 음절(`U+AC00-D7A3`) + 기본 문장부호로 서브셋해 2.5MB까지 줄였습니다
-    (`fonttools`/`pyftsubset` 사용, 저장소에는 최종 서브셋 파일만 커밋).
-- **테스트 러너 함정**: `apps/api/src/index.ts`를 임포트해 Hono `app`으로 인프로세스 요청
-  테스트를 하는 기존 테스트 파일들이, 렌더 라우트가 최상위에서 `.wasm`/`.ttf`를 정적
-  임포트하는 순간 전부 깨졌습니다 — 순수 Node(`tsx`) 테스트 러너는 이 확장자를 이해하지
-  못하기 때문입니다(Wrangler 번들러만 이해). 실제 초기화(`ensureInit`)가 호출될 때만
-  동적 `import()`로 지연 로드하도록 바꿔서 해결 — esbuild 기반 Wrangler 번들러는 정적/동적
-  임포트를 동일하게 청크로 처리하므로 실제 배포 동작은 그대로입니다.
-- **satori 사용법**: 이 Worker는 순수 Hono(JSX 툴체인 없음)라 React/JSX를 새로 들이지 않고,
-  satori가 공식 지원하는 "vanilla" 방식(`{type, props: {style, children}}` 순수 객체 트리)을
-  그대로 사용합니다.
-- **알려진 제한**: 아바타 이미지는 V1 범위에서 제외했습니다(닉네임 이니셜 원형 배지로 대체) —
-  Discord CDN에서 아바타를 페치해 data URI로 변환하는 로직은 후속 작업입니다.
+- **Hosting / Compute**: Cloudflare Pages (Web SPA) + Cloudflare Workers (API Serverless)
+- **Database**: Cloudflare D1 (Serverless SQLite with atomic batch transactions)
+- **Security / Crypto**: Web Crypto API (Ed25519 서명 검증, PBKDF2-HMAC-SHA256, Google RS256 JWKS)
+- **Assets**: 결정론적 무의존성 래스터라이저(`scripts/generate-favicon.ts`) 기반 파비콘/PWA 아이콘 세트 생성
 
 ---
 
-## 4. 🧬 계정 식별/통합 및 파비콘 (Identity & Brand)
+## 관련 문서
 
-1. **계정 식별 모델**: Google/Discord 로그인을 기본적으로 별도 OwOGG 계정으로 분리하며, 이메일은 자동 병합 근거가 아닙니다. 정규 식별자는 `provider` + `provider_user_id`이며, `IdentityUseCases`가 연결/연결해제 도메인 규칙(`ACCOUNT_ALREADY_LINKED`, `PROVIDER_ALREADY_LINKED`, `LAST_AUTH_PROVIDER`)을 담당합니다. LOGIN과 LINK 흐름은 명시적으로 분리됩니다.
-2. **Primary Account Wins 통합**: `AccountMergeUseCases` + `AccountMergeRepository`가 단기/일회용 `account_merge_challenges`(마이그레이션 `0004`) 기반 원자 통합을 수행합니다. D1 `batch` 단일 트랜잭션으로 Secondary 게임/개인화/세션 데이터를 삭제하고 Secondary OAuth 식별자를 Primary로 이전한 뒤 Secondary 사용자를 삭제합니다. 기록은 합집합하지 않고 Primary 데이터만 유지합니다.
-3. **Google JWT 검증**: 프로덕션은 `oauth2.googleapis.com/tokeninfo`에 의존하지 않고 Google OpenID JWKS로 로컬 RS256 서명 검증과 `iss`/`aud`/`exp`/`sub` 검증을 수행합니다.
-4. **파비콘**: 캐노니컬 원본은 `apps/web/public/favicon.svg`이며, 결정론적 `scripts/generate-favicon.ts`(의존성 없는 PNG/ICO 인코더 + 초과샘플링 래스터라이저)가 동일 파라메트릭 디자인에서 `favicon.ico`, PNG(16/32/48/180/192/512), `apple-touch-icon.png`, `site.webmanifest`를 생성합니다. SPA `index.html` 셸에 파비콘/애플터치/매니페스트 링크가 주입됩니다. 상세 절차는 `docs/runbooks/oauth-setup.md` 및 `docs/runbooks/account-linking.md`를 참조.
+- **계정 식별/통합 절차**: [`docs/runbooks/account-linking.md`](runbooks/account-linking.md)
+- **소셜 로그인 설정**: [`docs/runbooks/oauth-setup.md`](runbooks/oauth-setup.md)
+- **시점 조사 기록** (확장성 점검, 리플레이 타당성, satori+resvg 렌더링 — 2026-08-14):
+  [`docs/archive/architecture-investigations-2026-08.md`](archive/architecture-investigations-2026-08.md)

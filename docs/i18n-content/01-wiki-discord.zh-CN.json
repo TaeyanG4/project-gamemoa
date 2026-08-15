@@ -1,0 +1,232 @@
+{
+  "discordOverview": {
+    "title": "Discord 概述",
+    "description": "OwOGG 并非常驻 Bot，而是通过带签名的 HTTP Interactions 运行。安装、账号绑定、服务器注册是 3 个不同的步骤。",
+    "calloutStrong": "普通用户无需处理 Bot Token、Application ID 或 Public Key。",
+    "calloutBody": " 这些值仅由 OwOGG 运营团队通过 GitHub Actions Secret 进行管理。",
+    "flowHeading": "整体流程",
+    "step1": "将 OwOGG 应用添加到 Discord（需要服务器管理权限）。",
+    "step2": "确认并授权所选的服务器。",
+    "step3": "返回 OwOGG 并绑定您的 Discord 账号。",
+    "step4": "将您拥有管理权限的服务器注册为 OwOGG 社区。",
+    "step5": "在 Discord 中使用 /owogg games 和 /owogg play 开始体验。",
+    "cardInstall": "前往安装 →",
+    "cardInstallDesc": "将应用添加到服务器的方法",
+    "cardServerReg": "服务器注册 →",
+    "cardServerRegDesc": "选择 PUBLIC/UNLISTED/PRIVATE",
+    "cardCommands": "指令列表 →",
+    "cardCommandsDesc": "/owogg 全部子指令",
+    "cardTroubleshooting": "故障排除 →",
+    "cardTroubleshootingDesc": "按常见症状查看解决方法",
+    "footerPrefix": "若要立即开始安装，请使用 ",
+    "footerLink": "5步安装指南",
+    "footerSuffix": "。"
+  },
+  "discordInstall": {
+    "title": "在 Discord 上安装 OwOGG",
+    "description": "安装 Discord 应用是在服务器上使用 OwOGG 的准备步骤，与服务器注册相互独立。",
+    "calloutStrong": "普通用户无需输入 Bot Token。",
+    "calloutBody": " 只需点击下方官方安装链接，按照 Discord 的服务器选择/授权页面操作即可。",
+    "stepsHeading": "安装步骤",
+    "step1": "点击下方的 [将 OwOGG 添加到 Discord] 按钮。",
+    "step2": "确认已登录您的 Discord 账号。",
+    "step3": "选择要添加应用的服务器（列表中仅显示您拥有“管理服务器”权限的服务器）。",
+    "step4": "检查并授权所请求的权限。",
+    "step5": "完成后返回 OwOGG，继续进行账号绑定和服务器注册。",
+    "buttonLabel": "将 OwOGG 添加到 Discord",
+    "loadingPrefix": "安装链接正在加载或尚未准备就绪，请在 ",
+    "loadingLink": "安装指南",
+    "loadingSuffix": " 中重新确认。",
+    "calloutWarningStrong": "应用安装 ≠ OwOGG 服务器注册。",
+    "calloutWarningBodyPrefix": " 即使安装了应用，服务器也不会自动发布到 OwOGG 目录中。管理员必须单独完成 ",
+    "calloutWarningLink": "服务器注册",
+    "calloutWarningSuffix": "。",
+    "footerPrefix": "安装完成后的下一步是 ",
+    "footerLink": "账号绑定",
+    "footerSuffix": "。"
+  },
+  "discordAccountLink": {
+    "title": "账号绑定",
+    "description": "将 Discord 账号与 OwOGG 账号绑定后，即可在机器人指令（/owogg profile、/owogg play 等）中使用您的个人信息。",
+    "methodHeading": "绑定方法",
+    "step1": "在 Discord 服务器中输入 /owogg link 指令。",
+    "step2": "机器人会返回一个仅您可见（ephemeral）的一次性绑定链接。",
+    "step3": "点击该链接跳转至 OwOGG Web 端。",
+    "step4": "若尚未登录 OwOGG，请先进行登录。",
+    "step5": "在绑定确认页面点击授权即可完成。",
+    "calloutPrefix": "绑定链接为一次性使用，且会在一定时间后过期。如果已过期或已使用，请在 Discord 中重新运行 ",
+    "calloutCode": "/owogg link",
+    "calloutSuffix": " 以获取新链接。",
+    "calloutWarning": "一个 Discord 账号只能绑定一个 OwOGG 账号。如果该 Discord 账号已绑定至其他 OwOGG 账号，则无法重新绑定 — 必须先在 Web 端解绑原账号。",
+    "footerPrefix": "绑定遇到困难？请查看 ",
+    "footerLink1": "故障排除指南",
+    "footerMid": "，或在 Web 端直接打开 ",
+    "footerLink2": "账号绑定页面",
+    "footerSuffix": "。"
+  },
+  "discordServerRegistration": {
+    "title": "服务器注册",
+    "description": "应用安装与服务器注册相互独立。必须完成服务器注册后，才能激活服务器 XP、排行榜及服务器专属页面。",
+    "requirementsHeading": "注册要求",
+    "req1": "必须处于 OwOGG 账号登录状态。",
+    "req2": "在要注册的 Discord 服务器中必须拥有“管理服务器（Manage Server）”权限。",
+    "req3": "OwOGG 应用必须已安装至该服务器。",
+    "stepsHeading": "注册步骤",
+    "step1": "在登录 OwOGG 的状态下，开始 Discord 服务器注册授权。",
+    "step2": "同意 Discord 请求的权限（确认服务器列表）。",
+    "step3": "从可管理的服务器列表中选择要注册的服务器。",
+    "step4": "设置服务器 slug（URL 名称）、简介及公开范围。",
+    "step5": "完成注册后，将立即生成专属服务器页面。",
+    "buttonLabel": "开始注册服务器",
+    "visibilityHeading": "公开范围 (Visibility)",
+    "visibilityPublicDesc": "在 OwOGG 服务器目录和搜索中展示。",
+    "visibilityUnlistedDesc": "仅可通过直接链接访问，不在目录中展示。",
+    "visibilityPrivateDesc": "仅服务器管理员可访问。",
+    "calloutStrong": "应用安装 ≠ 服务器注册。",
+    "calloutBody": " 安装应用并不意味着服务器会自动公开。必须按照上述步骤手动完成注册。",
+    "footerPrefix": "如果服务器不在列表中，请查看 ",
+    "footerLink": "故障排除指南",
+    "footerSuffix": " 中的“服务器不在候选列表中”部分。"
+  },
+  "discordCommands": {
+    "title": "指令",
+    "description": "所有 OwOGG Discord 指令均为 /owogg 的子指令。",
+    "calloutEphemeral": "显示的响应为仅执行指令的用户可见的临时（ephemeral）消息 — 频道中的其他人无法看到。",
+    "labelWhere": "使用位置",
+    "labelAccountLink": "需绑定账号",
+    "labelGuildRequired": "需注册服务器",
+    "labelArgs": "参数",
+    "labelExample": "示例",
+    "labelCommonError": "常见错误：",
+    "yes": "是",
+    "no": "否",
+    "footerPrefix": "运行结果与预期不符？请查看 ",
+    "footerLink": "故障排除指南",
+    "footerSuffix": "。",
+    "commands": [
+      {
+        "name": "/owogg link",
+        "purpose": "将此 Discord 账号与 OwOGG 账号进行绑定。",
+        "where": "服务器频道或私信 (DM)",
+        "args": "无",
+        "commonError": "如果已经绑定，将发送提示消息而非新链接。"
+      },
+      {
+        "name": "/owogg profile",
+        "purpose": "查看已绑定的 OwOGG 账号的昵称、等级和总经验值 (XP)。",
+        "where": "服务器频道或私信 (DM)",
+        "args": "无",
+        "commonError": "如果账号未绑定，将收到 /owogg link 提示。"
+      },
+      {
+        "name": "/owogg games",
+        "purpose": "查看 OwOGG 当前可游玩的游戏列表及链接。",
+        "where": "服务器频道或私信 (DM)，无需登录",
+        "args": "无",
+        "commonError": "无（始终公开响应）"
+      },
+      {
+        "name": "/owogg play",
+        "purpose": "生成一次性游戏链接，游玩获得的 XP 将归属于此服务器。",
+        "where": "已注册的服务器频道",
+        "args": "game (可选) — 指定特定游戏，省略则跳转至游戏列表",
+        "commonError": "如果服务器未注册或账号未绑定，将收到提示消息。链接单次有效，有效期为 15分钟。"
+      },
+      {
+        "name": "/owogg rank",
+        "purpose": "查看您在此服务器内的排名及贡献的服务器 XP。",
+        "where": "已注册的服务器频道",
+        "args": "无",
+        "commonError": "如果账号未绑定或在此服务器中尚无活动，将收到提示消息。"
+      },
+      {
+        "name": "/owogg leaderboard",
+        "purpose": "查看此服务器的 OwOGG XP 排行榜 Top 10。",
+        "where": "已注册的服务器频道",
+        "args": "无",
+        "commonError": "如果服务器未注册，将收到提示消息。"
+      },
+      {
+        "name": "/owogg server",
+        "purpose": "查看此服务器的总 XP 和周活动摘要。",
+        "where": "已注册的服务器频道",
+        "args": "无",
+        "commonError": "如果服务器未注册，将收到提示消息。"
+      }
+    ]
+  },
+  "discordXp": {
+    "title": "服务器 XP 计算方式",
+    "description": "全局 XP、服务器用户 XP、服务器活动 XP 是三个互不相同的数值。",
+    "differHeading": "三种 XP 的区别",
+    "globalTerm": "通用 OwOGG XP (全局)",
+    "globalDesc": " — 账号全站累计经验值。用于个人资料及全局排行榜。",
+    "perGuildTerm": "Discord 服务器用户 XP",
+    "perGuildDescPrefix": " — 仅在该服务器中使用 ",
+    "perGuildDescCode": "/owogg play",
+    "perGuildDescSuffix": " 完成的有效游戏记录才会累计。",
+    "guildActivityTerm": "Discord 服务器活动 XP",
+    "guildActivityDesc": " — 由服务器全体成员贡献的总和，用于服务器排行榜及每周排名。",
+    "exampleHeading": "示例",
+    "exampleBodyPrefix": "当全局 XP 为 25,000 的用户在刚注册的 Guild A 中使用 ",
+    "exampleBodyCode": "/owogg play",
+    "exampleBodySuffix": " 完成 1次 有效游戏 (+10) 时：",
+    "cardGlobalTitle": "全局 XP",
+    "cardGlobalText": "全账号累计",
+    "cardGuildATitle": "Guild A 用户 XP",
+    "cardGuildAText": "在 A 中做出的有效贡献",
+    "cardGuildBTitle": "Guild B",
+    "cardGuildBText": "原有的 XP 不会自动复制",
+    "calloutNoCopyStrong": "原有的全局 XP 不会自动复制到新服务器。",
+    "calloutNoCopyBody": " 新注册的服务器始终从 0 开始，仅记录在该服务器中产生的新有效游戏。",
+    "calloutAbuseStrong": "防刷分机制：",
+    "calloutAbuseBody": " 按“用户 × 游戏 × UTC 每天”计算，全局 XP 发放上限为 10次。达到上限后，虽然仍可正常完成游戏，但不再发放额外的 XP。单次游戏事件最多归属于 1个 服务器 — 同一次完成不会在多个服务器中重复产生 XP。",
+    "footerPrefix": "有关查看服务器排名的说明，请参考 ",
+    "footerLink": "游戏与排名文档",
+    "footerSuffix": "。"
+  },
+  "discordTroubleshooting": {
+    "title": "故障排除",
+    "description": "按症状查找解决方案。在任何情况下，普通用户都无需配置 Bot Token。",
+    "calloutWarning": "以下任何症状均不需要输入 Bot Token、Application ID 或 Public Key。如果您收到此类要求，可能不是 OwOGG 官方渠道。",
+    "faqAutocomplete": {
+      "question": "/owogg 没有出现在自动补全列表中",
+      "answerPrefix": "请尝试重启 Discord 客户端或退出服务器后重新加入。如果仍未出现，请联系服务器管理员确认应用是否已实际安装在该服务器中。OwOGG 运营团队可通过 ",
+      "answerCode": "pnpm discord:commands:check",
+      "answerSuffix": " 查看全局指令注册状态。"
+    },
+    "faqPlainMessage": {
+      "question": "输入 /owogg link 后作为普通消息发送了",
+      "answer": "如果作为纯文本发送而非正常的斜杠指令，说明 Discord 未识别该指令。您必须从自动补全列表中准确选择 /owogg 并选择子指令后再执行。手动完整打出并发送会变成普通消息。"
+    },
+    "faqNoResponse": {
+      "question": "应用程序没有响应",
+      "answer": "这可能是临时延迟或错误。请稍后再试。如果反复出现，可能是 OwOGG 服务状态存在问题，请稍后重新确认。"
+    },
+    "faqAlreadyLinked": {
+      "question": "提示账号已被绑定",
+      "answer": "这意味着此 Discord 账号已与另一个 OwOGG 账号绑定。一个 Discord 账号只能绑定一个 OwOGG 账号。要绑定到其他账号，必须先在 Web 端解绑现有的绑定。"
+    },
+    "faqServerNotRegistered": {
+      "question": "/owogg play 提示服务器未注册",
+      "answerPrefix": "此 Discord 服务器尚未注册为 OwOGG 社区。服务器管理员必须完成 ",
+      "answerLink": "服务器注册",
+      "answerSuffix": "。仅安装应用不会完成注册。"
+    },
+    "faqNotInCandidateList": {
+      "question": "服务器不在注册列表（候选列表）中",
+      "answer": "可注册的服务器列表仅显示您实际拥有“管理服务器 (Manage Server)”权限的服务器。请确认您是否有权限，或当前登录的 Discord 账号是否为目标账号。"
+    },
+    "faqBotNotVisible": {
+      "question": "机器人没有显示在 Discord 成员列表中",
+      "answer": "OwOGG 并非常驻 (Gateway) 机器人，而是通过带签名的 HTTP Interactions 方式运行。因此，成员列表中可能不会始终显示为“在线” — 这是正常现象，不会影响指令的正常运行。"
+    },
+    "faqBotOffline": {
+      "question": "机器人显示为离线",
+      "answer": "原因同上。基于 HTTP Interactions 的应用不保持常驻连接状态，因此在 Discord 成员列表中可能显示为离线。只要指令能正常执行就没有任何问题。"
+    },
+    "footerPrefix": "遇到了此处未列出的问题？请查看 ",
+    "footerLink": "Discord 使用指南",
+    "footerSuffix": " 中的 FAQ。"
+  }
+}

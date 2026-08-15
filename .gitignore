@@ -22,14 +22,15 @@ __pycache__/
 *.pyc
 
 # Internal-only docs (repo is public — work lists, roadmap/strategy, agent instructions,
-# and operational/security runbooks stay local-only, not pushed). Contributor-facing technical
-# docs (ARCHITECTURE.md, I18N.md, CREATOR_SYSTEM.md, DISCORD_*.md) are unaffected and stay public.
+# operational/security runbooks, session logs, and detailed archives of content cut from the
+# public docs stay local-only, not pushed). Contributor-facing technical docs (ARCHITECTURE.md,
+# I18N.md, CREATOR_SYSTEM.md, DISCORD_*.md) are unaffected and stay public.
 docs/WORK_PROGRESS.md
-docs/PROGRESS.md
 docs/ROADMAP.md
-docs/OWOGG_BLUEPRINT.md
 docs/AGENTS.md
 docs/PROGRESSION.md
 docs/ADMIN_GUIDE.md
 docs/PRODUCTION_INTEGRATIONS.md
+docs/logs/
 docs/runbooks/
+docs/archive/

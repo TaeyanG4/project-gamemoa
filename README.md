@@ -145,8 +145,9 @@ owogg/
 ├── scripts/                       # Architecture Guard, Registry Generator, 빌드 스크립트
 └── docs/
     ├── ARCHITECTURE.md            # 레이어 의존성 & 플러그인 아키텍처
-    ├── OWOGG_BLUEPRINT.md         # 전체 시스템 블루프린트
+    ├── WORK_PROGRESS.md           # 현재 작업 현황 및 대기 백로그
     ├── GAME_CREATION_GUIDE.md     # 게임 제작/등록 지침 및 메타데이터 규격
+    ├── GAME_LINEUP.md             # 신규 게임 라인업 및 기획 명세서
     ├── PROGRESSION.md             # XP/레벨/도전과제 설계
     ├── CREATOR_SYSTEM.md          # 크리에이터 인증 & Featured 정책
     ├── DISCORD_INTEGRATION.md     # Discord HTTP Interactions 아키텍처
@@ -157,6 +158,7 @@ owogg/
     ├── MULTIPLAYER_GAME_DESIGN.md # 1:1 실시간 대전 설계 (계획 단계)
     ├── ROADMAP.md                 # 향후 로드맵
     ├── AGENTS.md                  # AI Agent 개발 규칙
+    ├── logs/                      # 세션 작업 로그 및 아카이브
     └── runbooks/
         ├── oauth-setup.md         # 소셜 로그인 설정 런북
         └── account-linking.md     # 계정 연결/통합 런북
