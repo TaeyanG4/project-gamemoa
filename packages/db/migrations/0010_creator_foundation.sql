@@ -1,5 +1,5 @@
 -- Migration 0010: Creator Model Foundation
--- Additive migration for optional Creator profile and platform accounts linked to GAMEMOA users.
+-- Additive migration for optional Creator profile and platform accounts linked to OwOGG users.
 
 CREATE TABLE IF NOT EXISTS creator_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

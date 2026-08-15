@@ -5,7 +5,7 @@
 -- once at least one active row exists, replacing the operability problem of the env-only
 -- ADMIN_LOGIN_USERNAME/ADMIN_PASSWORD_PBKDF2 pair (a GitHub Secret edit per new administrator).
 --
--- Every admin account maps 1:1 to an existing GAMEMOA user (user_id) and the canonical Google
+-- Every admin account maps 1:1 to an existing OwOGG user (user_id) and the canonical Google
 -- OIDC `sub` already linked to that same user via `oauth_accounts` (google) at the time the
 -- account is created — never a freestanding credential, and never authorized by email/nickname.
 --

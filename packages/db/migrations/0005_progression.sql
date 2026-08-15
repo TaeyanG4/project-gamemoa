@@ -1,8 +1,8 @@
 -- Migration: 0005_progression.sql
--- Purpose: Foundation for GAMEMOA progression (XP/Level/Achievements) and centralized
+-- Purpose: Foundation for OwOGG progression (XP/Level/Achievements) and centralized
 -- nickname/country-region profile policy. Additive only; does not touch prior migrations.
 
--- Profile metadata: GAMEMOA nickname is independent from OAuth display name and has its
+-- Profile metadata: OwOGG nickname is independent from OAuth display name and has its
 -- own cooldown. Country/region is self-reported ISO 3166-1 alpha-2 metadata, not verified
 -- nationality, and has its own (longer) cooldown.
 ALTER TABLE users ADD COLUMN country TEXT;

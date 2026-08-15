@@ -7,8 +7,7 @@
   </defs>
   <rect x="0" y="0" width="512" height="512" rx="112" ry="112" fill="url(#bg)" />
   <!-- OwOGG's brand mark — the word "OwO" (two round "O"s + a "w"), tilted diagonally, on the
-       brand-gradient rounded hub — the same background treatment the original gamemoa icon
-       used. The exact shape live-rendered by Header/Footer's <OwoWordmarkIcon>
+       brand-gradient rounded hub. The exact shape live-rendered by Header/Footer's <OwoWordmarkIcon>
        (apps/web/app/components/ui/OwoWordmarkIcon.tsx), not a redrawn approximation. The
        transform composes: rotate(-25, 24, 8) tilts the unrotated letterform around its own
        center, translate(-24,-8) + scale(...) + translate(256,256) then fits that rotated

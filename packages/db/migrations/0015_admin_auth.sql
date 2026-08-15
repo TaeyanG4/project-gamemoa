@@ -7,7 +7,7 @@
 --
 -- Every raw opaque token (challenge token, admin session token) is stored as a SHA-256 hash
 -- only. Every challenge/session row is additionally bound to a hash of the underlying
--- `gamemoa_session` raw token, so an expired/rotated/revoked normal session immediately
+-- `owogg_session` raw token, so an expired/rotated/revoked normal session immediately
 -- invalidates anything built on top of it.
 
 CREATE TABLE IF NOT EXISTS admin_step_up_challenges (

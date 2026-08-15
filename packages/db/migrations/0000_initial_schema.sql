@@ -1,4 +1,4 @@
--- Initial Cloudflare D1 Migration for GAMEMOA
+-- Initial Cloudflare D1 Migration for OwOGG
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
