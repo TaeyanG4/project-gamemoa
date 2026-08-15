@@ -211,14 +211,17 @@ export default function AdminUsersRoute() {
         <h1 className="text-2xl font-black text-text-primary">유저 관리</h1>
         <p className="mt-1 text-xs text-text-muted">
           닉네임/이메일 일부 또는 정확한 사용자 ID로 검색하세요. 정지/밴/점수 관련 조치는 모두
-          사유가 필수이며 감사 로그에 영구 기록됩니다. 관리자 계정은 정지/차단 대상에서
-          자동으로 제외됩니다.
+          사유가 필수이며 감사 로그에 영구 기록됩니다. 관리자 계정은 정지/차단 대상에서 자동으로
+          제외됩니다.
         </p>
       </header>
 
       <section className="space-y-3 rounded-2xl border border-border bg-surface-raised p-4">
         <div className="flex flex-wrap items-end gap-3">
-          <form onSubmit={handleSearchSubmit} className="flex min-w-[220px] flex-1 flex-col gap-1.5">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="flex min-w-[220px] flex-1 flex-col gap-1.5"
+          >
             <span className="text-[11px] font-bold text-text-muted">검색</span>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
@@ -418,7 +421,9 @@ function UserDetailPanel({
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-black text-text-primary">{detail.nickname}</h2>
           <span className="text-xs font-bold text-text-muted">#{detail.id}</span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLE[status]}`}>
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${STATUS_STYLE[status]}`}
+          >
             {STATUS_LABEL[status] ?? status}
           </span>
           {scoreBlocked && (
@@ -432,9 +437,7 @@ function UserDetailPanel({
           {detail.email ?? "이메일 없음"} · 가입일 {detail.createdAt.split("T")[0]} · 연동:{" "}
           {detail.providers.length > 0 ? detail.providers.join(", ") : "없음"}
         </p>
-        {m?.reason && (
-          <p className="mt-1.5 text-[11px] text-text-muted">최근 사유: {m.reason}</p>
-        )}
+        {m?.reason && <p className="mt-1.5 text-[11px] text-text-muted">최근 사유: {m.reason}</p>}
         {status === "SUSPENDED" && m?.suspendedUntil && (
           <p className="mt-1.5 flex items-center gap-1 text-[11px] text-accent-yellow">
             <Clock className="h-3 w-3" />
@@ -573,7 +576,9 @@ function UserDetailPanel({
                   disabled={busy || !scoreBlockReason.trim()}
                   tone="yellow"
                   onClick={() =>
-                    void runAction(() => postScoreSubmissionBlock(detail.id, true, scoreBlockReason))
+                    void runAction(() =>
+                      postScoreSubmissionBlock(detail.id, true, scoreBlockReason),
+                    )
                   }
                 />
               </>
@@ -582,7 +587,9 @@ function UserDetailPanel({
                 label="점수 제출 차단 해제"
                 disabled={busy}
                 tone="green"
-                onClick={() => void runAction(() => postScoreSubmissionBlock(detail.id, false, null))}
+                onClick={() =>
+                  void runAction(() => postScoreSubmissionBlock(detail.id, false, null))
+                }
               />
             )}
           </div>
@@ -630,7 +637,10 @@ function UserDetailPanel({
         ) : (
           <div className="flex flex-col divide-y divide-border/60">
             {detail.auditLog.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between gap-3 py-2.5 text-xs">
+              <div
+                key={entry.id}
+                className="flex items-center justify-between gap-3 py-2.5 text-xs"
+              >
                 <div className="min-w-0">
                   <span className="font-bold text-text-primary">
                     {ACTION_LABEL[entry.action] ?? entry.action}
@@ -669,7 +679,8 @@ function LabeledField({
 }
 
 const ACTION_BUTTON_TONE: Record<string, string> = {
-  yellow: "border-accent-yellow/30 bg-accent-yellow/10 text-accent-yellow hover:bg-accent-yellow/20",
+  yellow:
+    "border-accent-yellow/30 bg-accent-yellow/10 text-accent-yellow hover:bg-accent-yellow/20",
   red: "border-accent-red/30 bg-accent-red/10 text-accent-red hover:bg-accent-red/20",
   green: "border-accent-green/30 bg-accent-green/10 text-accent-green hover:bg-accent-green/20",
   neutral: "border-border bg-surface-raised text-text-primary hover:border-brand",

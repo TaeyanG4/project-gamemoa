@@ -90,7 +90,9 @@ test("searchUsers period=today excludes users seeded with an earlier created_at"
   const { db, raw } = createSqliteD1(USER_MODERATION_TEST_SCHEMA);
   seedUser(raw, 1, "Old");
   raw
-    .prepare(`INSERT INTO users (id, nickname, email, created_at) VALUES (2, 'New', 'new@example.com', ?)`)
+    .prepare(
+      `INSERT INTO users (id, nickname, email, created_at) VALUES (2, 'New', 'new@example.com', ?)`,
+    )
     .run(new Date().toISOString());
   raw.prepare(`UPDATE users SET created_at = '2000-01-01T00:00:00.000Z' WHERE id = 1`).run();
   const repo = new D1UserModerationRepository(db);

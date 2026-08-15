@@ -117,7 +117,12 @@ test("GET /api/admin/users with nothing typed lists the (mocked-empty) full user
     { DB: mock.db, ADMIN_USER_IDS: "1" } as any,
   );
   assert.equal(res.status, 200);
-  const body = (await res.json()) as { users: unknown[]; total: number; page: number; pageSize: number };
+  const body = (await res.json()) as {
+    users: unknown[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
   assert.deepEqual(body.users, []);
   assert.equal(body.total, 0);
   assert.equal(body.page, 1);
