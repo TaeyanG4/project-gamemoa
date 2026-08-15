@@ -1,9 +1,9 @@
 import { useId } from "react";
 
 /** OwOGG's brand mark — the word "OwO" (two round "O"s + a "w"), tilted diagonally, stroked in
- * white on a brand-gradient rounded hub (bg-gradient-to-tr from-brand to-accent-purple) — the
- * same background treatment the original gamemoa icon used. This is the literal shape mirrored
- * by `apps/web/public/favicon.svg` and `scripts/generate-favicon.ts` — keep all three in sync.
+ * white on a brand-gradient rounded hub (bg-gradient-to-tr from-brand to-accent-purple). This is
+ * the literal shape mirrored by `apps/web/public/favicon.svg` and `scripts/generate-favicon.ts`
+ * — keep all three in sync.
  * The gradient id is unique per instance (useId) so rendering this icon more than once on the
  * same page — e.g. Header + Footer — never collides on a shared `#bg` id. */
 export function OwoWordmarkIcon({ className }: { className?: string }) {

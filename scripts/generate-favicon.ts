@@ -10,8 +10,7 @@ import { Buffer } from "node:buffer";
 // This script rasterises the SAME design — OwOGG's brand mark, the literal
 // word "OwO" (two round "O"s + a "w" built from the same line-art convention
 // as Lucide icons) tilted diagonally, stroked in white on a brand-gradient
-// rounded hub (bg-gradient-to-tr from-brand to-accent-purple), the same
-// background treatment the original gamemoa icon used — into PNG / ICO
+// rounded hub (bg-gradient-to-tr from-brand to-accent-purple) — into PNG / ICO
 // fallbacks and writes a web manifest. No external image-processing/SVG-
 // rasterisation dependency is required: PNGs are encoded with the built-in
 // zlib + a hand-written CRC32; pixels are produced by supersampling a
