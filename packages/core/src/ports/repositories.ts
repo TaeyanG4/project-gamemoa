@@ -23,6 +23,10 @@ export interface User {
    * false — see migration 0021_profile_visibility.sql for why. */
   show_favorites?: boolean;
   show_recent_plays?: boolean;
+  /** Independent of login access (SUSPENDED/BANNED users never reach this far — findSession
+   * rejects them first) — an otherwise-ACTIVE user can still be blocked from submitting new
+   * scores. See UserModerationRepository. Defaults to false/absent for untouched accounts. */
+  score_submission_blocked?: boolean;
 }
 
 export interface OAuthAccount {
@@ -94,6 +98,10 @@ export interface SessionRepository {
   createSession(userId: number, ttlDays?: number): Promise<Session>;
   findSession(sessionId: string): Promise<{ session: Session; user: User } | null>;
   deleteSession(sessionId: string): Promise<void>;
+  /** Revokes every active session for a user in one shot — used when an admin suspends/bans a
+   * user, so an already-logged-in browser is kicked out immediately rather than only being
+   * blocked on its next findSession call whenever that happens to occur. */
+  deleteAllSessionsForUser(userId: number): Promise<void>;
 }
 
 export interface ScoreRepository {
@@ -749,4 +757,104 @@ export interface GameSettingsRepository {
     reason: string | null,
     adminId: number,
   ): Promise<GameSettingRecord>;
+}
+
+export interface GamePlayCount {
+  gameId: string;
+  count: number;
+}
+
+/** Read-only aggregation for `/admin/monitoring` — deliberately has no business rules of its
+ * own (no domain invariants to enforce over "how many users were active"), so unlike most
+ * repositories here it's called directly from the route rather than through a UseCases layer,
+ * matching how admin.ts's existing `/overview` route already calls discordGuildRepo directly. */
+export type UserModerationStatus = "ACTIVE" | "SUSPENDED" | "BANNED";
+
+export type UserModerationAction =
+  | "SUSPENDED"
+  | "BANNED"
+  | "UNSUSPENDED"
+  | "SCORE_SUBMISSION_BLOCKED"
+  | "SCORE_SUBMISSION_UNBLOCKED"
+  | "SCORES_RESET"
+  | "SCORES_RESTORED";
+
+export interface UserModerationRecord {
+  userId: number;
+  status: UserModerationStatus;
+  /** Only meaningful when status === 'SUSPENDED'. */
+  suspendedUntil: string | null;
+  scoreSubmissionBlocked: boolean;
+  reason: string | null;
+  updatedByAdminId: number | null;
+  updatedAt: string;
+}
+
+export interface UserModerationAuditEntry {
+  id: number;
+  userId: number;
+  actorAdminId: number;
+  action: UserModerationAction;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AdminUserSearchResult {
+  id: number;
+  nickname: string;
+  email: string | null;
+  createdAt: string;
+  moderationStatus: UserModerationStatus;
+  suspendedUntil: string | null;
+  scoreSubmissionBlocked: boolean;
+}
+
+/**
+ * Suspend/ban (blocks login — enforced by SessionRepository.findSession, not here), an
+ * independent score-submission block (enforced by the scores route), and score reset/restore.
+ * Score reset is a soft-delete (`scores.deleted_at`) specifically so it's reversible — see
+ * migration 0023's comment. Every mutating method here writes exactly one
+ * `user_moderation_audit_log` row; there is no update/delete path for that log anywhere.
+ */
+export interface UserModerationRepository {
+  searchUsers(query: string, limit?: number): Promise<AdminUserSearchResult[]>;
+  getModeration(userId: number): Promise<UserModerationRecord | null>;
+  suspendUser(
+    userId: number,
+    adminId: number,
+    suspendedUntil: string,
+    reason: string,
+  ): Promise<UserModerationRecord>;
+  banUser(userId: number, adminId: number, reason: string): Promise<UserModerationRecord>;
+  /** Clears SUSPENDED or BANNED back to ACTIVE ahead of a suspension's natural expiry. */
+  unsuspendUser(userId: number, adminId: number): Promise<UserModerationRecord>;
+  setScoreSubmissionBlocked(
+    userId: number,
+    adminId: number,
+    blocked: boolean,
+    reason: string | null,
+  ): Promise<UserModerationRecord>;
+  /** Soft-deletes every currently-visible score row for this user. Returns how many were hit so
+   * the admin UI can confirm what just happened. */
+  resetUserScores(
+    userId: number,
+    adminId: number,
+    reason: string | null,
+  ): Promise<{ affectedCount: number }>;
+  /** Un-does resetUserScores — restores every currently soft-deleted row for this user. */
+  restoreUserScores(userId: number, adminId: number): Promise<{ restoredCount: number }>;
+  getAuditLog(userId: number, limit?: number): Promise<UserModerationAuditEntry[]>;
+}
+
+export interface AdminMonitoringRepository {
+  /** Distinct users with at least one xp_events row in the last 1/7 days (rolling window from
+   * "now", not calendar-day/week boundaries — good enough for an operator glance, not billing). */
+  getActiveUserCounts(): Promise<{ dau: number; wau: number }>;
+  /** Score submission counts per game over the last `sinceDays` days, most-played first. */
+  getGamePlayCounts(sinceDays: number): Promise<GamePlayCount[]>;
+  /** Round-trips a trivial query to D1 and times it — the closest this Worker can get to
+   * "D1 query monitoring" on its own; per-query/per-route analytics live in Cloudflare's own
+   * dashboard (Workers Observability / D1 metrics), not something this API can self-report. */
+  checkD1Health(): Promise<{ healthy: boolean; latencyMs: number }>;
 }

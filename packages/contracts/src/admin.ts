@@ -186,8 +186,127 @@ export const AdminOverviewResponseSchema = z.object({
 });
 export type AdminOverviewResponse = z.infer<typeof AdminOverviewResponseSchema>;
 
+export const AdminMonitoringResponseSchema = z.object({
+  activeUsers: z.object({
+    dau: z.number().int().nonnegative(),
+    wau: z.number().int().nonnegative(),
+  }),
+  gamePlayCounts: z.array(
+    z.object({
+      gameId: z.string(),
+      count: z.number().int().nonnegative(),
+    }),
+  ),
+  /** Number of days getGamePlayCounts was scoped to — echoed back so the UI never has to
+   * hardcode what "recent" means server-side. */
+  gamePlayCountsWindowDays: z.number().int().positive(),
+  d1: z.object({
+    healthy: z.boolean(),
+    latencyMs: z.number().nonnegative(),
+  }),
+});
+export type AdminMonitoringResponse = z.infer<typeof AdminMonitoringResponseSchema>;
+
 export const AdminPaginationQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
   offset: z.coerce.number().int().min(0).max(100_000).default(0),
 });
 export type AdminPaginationQuery = z.infer<typeof AdminPaginationQuerySchema>;
+
+// ── User moderation (suspend/ban, score-submission block, score reset/restore) ──
+
+export const UserModerationStatusSchema = z.enum(["ACTIVE", "SUSPENDED", "BANNED"]);
+
+export const AdminUserSearchResultSchema = z.object({
+  id: z.number().int(),
+  nickname: z.string(),
+  email: z.string().nullable(),
+  createdAt: z.string(),
+  moderationStatus: UserModerationStatusSchema,
+  suspendedUntil: z.string().nullable(),
+  scoreSubmissionBlocked: z.boolean(),
+});
+export type AdminUserSearchResult = z.infer<typeof AdminUserSearchResultSchema>;
+
+export const AdminUserSearchResponseSchema = z.object({
+  users: z.array(AdminUserSearchResultSchema),
+});
+export type AdminUserSearchResponse = z.infer<typeof AdminUserSearchResponseSchema>;
+
+export const UserModerationRecordSchema = z.object({
+  userId: z.number().int(),
+  status: UserModerationStatusSchema,
+  suspendedUntil: z.string().nullable(),
+  scoreSubmissionBlocked: z.boolean(),
+  reason: z.string().nullable(),
+  updatedByAdminId: z.number().int().nullable(),
+  updatedAt: z.string(),
+});
+export type UserModerationRecord = z.infer<typeof UserModerationRecordSchema>;
+
+export const UserModerationAuditEntrySchema = z.object({
+  id: z.number().int(),
+  userId: z.number().int(),
+  actorAdminId: z.number().int(),
+  action: z.enum([
+    "SUSPENDED",
+    "BANNED",
+    "UNSUSPENDED",
+    "SCORE_SUBMISSION_BLOCKED",
+    "SCORE_SUBMISSION_UNBLOCKED",
+    "SCORES_RESET",
+    "SCORES_RESTORED",
+  ]),
+  reason: z.string().nullable(),
+  metadata: z.record(z.unknown()).nullable(),
+  createdAt: z.string(),
+});
+export type UserModerationAuditEntry = z.infer<typeof UserModerationAuditEntrySchema>;
+
+export const AdminUserDetailResponseSchema = z.object({
+  id: z.number().int(),
+  nickname: z.string(),
+  email: z.string().nullable(),
+  createdAt: z.string(),
+  providers: z.array(z.string()),
+  gameBests: z.array(
+    z.object({
+      gameId: z.string(),
+      score: z.number(),
+      formattedScore: z.string(),
+    }),
+  ),
+  moderation: UserModerationRecordSchema.nullable(),
+  auditLog: z.array(UserModerationAuditEntrySchema),
+});
+export type AdminUserDetailResponse = z.infer<typeof AdminUserDetailResponseSchema>;
+
+export const AdminSuspendUserRequestSchema = z.object({
+  suspendedUntil: z.string(),
+  reason: z.string().min(1),
+});
+export type AdminSuspendUserRequest = z.infer<typeof AdminSuspendUserRequestSchema>;
+
+export const AdminBanUserRequestSchema = z.object({
+  reason: z.string().min(1),
+});
+export type AdminBanUserRequest = z.infer<typeof AdminBanUserRequestSchema>;
+
+export const AdminScoreSubmissionBlockRequestSchema = z.object({
+  blocked: z.boolean(),
+  reason: z.string().nullable().optional(),
+});
+export type AdminScoreSubmissionBlockRequest = z.infer<
+  typeof AdminScoreSubmissionBlockRequestSchema
+>;
+
+export const AdminResetScoresRequestSchema = z.object({
+  reason: z.string().min(1),
+});
+export type AdminResetScoresRequest = z.infer<typeof AdminResetScoresRequestSchema>;
+
+export const AdminScoreActionResponseSchema = z.object({
+  affectedCount: z.number().int().nonnegative().optional(),
+  restoredCount: z.number().int().nonnegative().optional(),
+});
+export type AdminScoreActionResponse = z.infer<typeof AdminScoreActionResponseSchema>;

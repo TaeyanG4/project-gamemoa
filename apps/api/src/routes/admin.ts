@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { AdminOverviewResponseSchema } from "@owogg/contracts";
+import { AdminOverviewResponseSchema, AdminMonitoringResponseSchema } from "@owogg/contracts";
 import { createContainer } from "../container.js";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
@@ -60,6 +60,33 @@ adminRouter.get("/overview", async (c) => {
       CHZZK: adapters.CHZZK.isConfigured(),
       SOOP: adapters.SOOP.isConfigured(),
     },
+  });
+  return c.json(response);
+});
+
+// 7 days keeps the "recent activity" read close to the WAU window above it, without a query
+// param to plumb through yet — extend this to an optional `?days=` if that's ever needed.
+const GAME_PLAY_COUNTS_WINDOW_DAYS = 7;
+
+// GET /api/admin/monitoring — read-only operational snapshot (DAU/WAU, per-game play counts
+// over the last week, D1 reachability). No write paths, so unlike most admin.ts endpoints this
+// doesn't go through a UseCases layer — see AdminMonitoringRepository's doc comment.
+adminRouter.get("/monitoring", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+
+  const container = createContainer(c.env.DB);
+  const [activeUsers, gamePlayCounts, d1] = await Promise.all([
+    container.adminMonitoringRepo.getActiveUserCounts(),
+    container.adminMonitoringRepo.getGamePlayCounts(GAME_PLAY_COUNTS_WINDOW_DAYS),
+    container.adminMonitoringRepo.checkD1Health(),
+  ]);
+
+  const response = AdminMonitoringResponseSchema.parse({
+    activeUsers,
+    gamePlayCounts,
+    gamePlayCountsWindowDays: GAME_PLAY_COUNTS_WINDOW_DAYS,
+    d1,
   });
   return c.json(response);
 });

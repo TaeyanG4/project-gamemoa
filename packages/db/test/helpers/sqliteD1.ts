@@ -72,7 +72,9 @@ CREATE TABLE scores (
   game_id TEXT NOT NULL,
   score INTEGER NOT NULL,
   difficulty TEXT NOT NULL DEFAULT 'normal',
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,
+  deleted_by_admin_id INTEGER
 );
 
 CREATE TABLE creator_profiles (
@@ -113,6 +115,54 @@ CREATE TABLE user_progress (
 );
 `;
 
+/** Schema for D1SessionRepository's moderation-gate behavior (migration 0023) against a real
+ * SQLite engine — the existing sessionRepository.test.ts uses a hand-rolled substring-matching
+ * mock that doesn't actually validate the LEFT JOIN user_moderation SQL runs, so this schema
+ * exists specifically to exercise the real query. */
+export const SESSION_MODERATION_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  avatar_url TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  country TEXT,
+  nickname_updated_at TEXT,
+  country_updated_at TEXT,
+  locale TEXT,
+  current_streak INTEGER NOT NULL DEFAULT 0,
+  longest_streak INTEGER NOT NULL DEFAULT 0,
+  last_active_date TEXT
+);
+
+CREATE TABLE oauth_accounts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  provider TEXT NOT NULL,
+  provider_user_id TEXT NOT NULL,
+  provider_email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE sessions (
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE user_moderation (
+  user_id INTEGER PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  suspended_until TEXT,
+  score_submission_blocked INTEGER NOT NULL DEFAULT 0,
+  reason TEXT,
+  updated_by_admin_id INTEGER,
+  updated_at TEXT NOT NULL
+);
+`;
+
 /** Schema for admin step-up authentication repository tests (migration 0015). */
 export const ADMIN_AUTH_TEST_SCHEMA = `
 CREATE TABLE admin_step_up_challenges (
@@ -141,6 +191,34 @@ CREATE TABLE admin_login_attempts (
   user_id INTEGER NOT NULL,
   success INTEGER NOT NULL,
   created_at TEXT NOT NULL
+);
+`;
+
+/** Schema for admin monitoring repository tests (DAU/WAU + per-game play counts, migration
+ * 0022's indexes aren't needed for correctness here — SQLite doesn't require them to run the
+ * same query, only to run it fast). */
+export const ADMIN_MONITORING_TEST_SCHEMA = `
+CREATE TABLE xp_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  amount INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  game_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  nickname TEXT NOT NULL DEFAULT '게스트',
+  avatar_url TEXT,
+  game_id TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,
+  deleted_by_admin_id INTEGER
 );
 `;
 
@@ -175,6 +253,48 @@ CREATE TABLE admin_account_audit_log (
   actor_admin_id INTEGER,
   target_admin_id INTEGER,
   action TEXT NOT NULL,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL
+);
+`;
+
+/** Schema for D1UserModerationRepository tests (migration 0023). */
+export const USER_MODERATION_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  nickname TEXT NOT NULL DEFAULT '게스트',
+  avatar_url TEXT,
+  game_id TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,
+  deleted_by_admin_id INTEGER
+);
+
+CREATE TABLE user_moderation (
+  user_id INTEGER PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  suspended_until TEXT,
+  score_submission_blocked INTEGER NOT NULL DEFAULT 0,
+  reason TEXT,
+  updated_by_admin_id INTEGER,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE user_moderation_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  actor_admin_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  reason TEXT,
   metadata_json TEXT,
   created_at TEXT NOT NULL
 );

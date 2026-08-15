@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   AdminMeResponseSchema,
   AdminOverviewResponseSchema,
+  AdminMonitoringResponseSchema,
   AdminGoogleStepUpResponseSchema,
   AdminLoginResponseSchema,
   AdminBootstrapRequestSchema,
@@ -13,6 +14,10 @@ import {
   AdminAccountAuditListResponseSchema,
   AdminGameListResponseSchema,
   AdminGameToggleResponseSchema,
+  AdminUserSearchResponseSchema,
+  AdminUserDetailResponseSchema,
+  UserModerationRecordSchema,
+  AdminScoreActionResponseSchema,
   type AdminAccountRoleValue,
   type AdminAccountStatusValue,
 } from "@owogg/contracts";
@@ -39,6 +44,10 @@ export function fetchAdminMe() {
 
 export function fetchAdminOverview() {
   return apiFetch("/api/admin/overview", AdminOverviewResponseSchema);
+}
+
+export function fetchAdminMonitoring() {
+  return apiFetch("/api/admin/monitoring", AdminMonitoringResponseSchema);
 }
 
 export function postAdminGoogleStepUp(credential: string) {
@@ -141,5 +150,56 @@ export function postToggleAdminGame(gameId: string, enabled: boolean, reason: st
   return apiFetch(`/api/admin/games/${gameId}/toggle`, AdminGameToggleResponseSchema, {
     method: "POST",
     body: JSON.stringify({ enabled, reason }),
+  });
+}
+
+export function fetchAdminUserSearch(query: string) {
+  return apiFetch(
+    `/api/admin/users?query=${encodeURIComponent(query)}`,
+    AdminUserSearchResponseSchema,
+  );
+}
+
+export function fetchAdminUserDetail(userId: number) {
+  return apiFetch(`/api/admin/users/${userId}`, AdminUserDetailResponseSchema);
+}
+
+export function postSuspendUser(userId: number, suspendedUntil: string, reason: string) {
+  return apiFetch(`/api/admin/users/${userId}/suspend`, UserModerationRecordSchema, {
+    method: "POST",
+    body: JSON.stringify({ suspendedUntil, reason }),
+  });
+}
+
+export function postBanUser(userId: number, reason: string) {
+  return apiFetch(`/api/admin/users/${userId}/ban`, UserModerationRecordSchema, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function postUnsuspendUser(userId: number) {
+  return apiFetch(`/api/admin/users/${userId}/unsuspend`, UserModerationRecordSchema, {
+    method: "POST",
+  });
+}
+
+export function postScoreSubmissionBlock(userId: number, blocked: boolean, reason: string | null) {
+  return apiFetch(`/api/admin/users/${userId}/score-submission-block`, UserModerationRecordSchema, {
+    method: "POST",
+    body: JSON.stringify({ blocked, reason }),
+  });
+}
+
+export function postResetUserScores(userId: number, reason: string) {
+  return apiFetch(`/api/admin/users/${userId}/reset-scores`, AdminScoreActionResponseSchema, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export function postRestoreUserScores(userId: number) {
+  return apiFetch(`/api/admin/users/${userId}/restore-scores`, AdminScoreActionResponseSchema, {
+    method: "POST",
   });
 }

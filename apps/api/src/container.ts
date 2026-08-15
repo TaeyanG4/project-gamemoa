@@ -13,6 +13,8 @@ import {
   D1AdminAuthRepository,
   D1AdminAccountRepository,
   D1GameSettingsRepository,
+  D1AdminMonitoringRepository,
+  D1UserModerationRepository,
 } from "@owogg/db";
 import {
   ScoreUseCases,
@@ -31,6 +33,7 @@ import {
   AdminAuthUseCases,
   AdminAccountUseCases,
   GameSettingsUseCases,
+  UserModerationUseCases,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -45,6 +48,8 @@ import {
   type AdminAuthRepository,
   type AdminAccountRepository,
   type GameSettingsRepository,
+  type AdminMonitoringRepository,
+  type UserModerationRepository,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -63,6 +68,8 @@ export interface AppContainer {
   adminAuthRepo: AdminAuthRepository;
   adminAccountRepo: AdminAccountRepository;
   gameSettingsRepo: GameSettingsRepository;
+  adminMonitoringRepo: AdminMonitoringRepository;
+  userModerationRepo: UserModerationRepository;
 
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
@@ -80,6 +87,7 @@ export interface AppContainer {
   adminAuthUseCases: AdminAuthUseCases;
   adminAccountUseCases: AdminAccountUseCases;
   gameSettingsUseCases: GameSettingsUseCases;
+  userModerationUseCases: UserModerationUseCases;
 }
 
 export function createContainer(db: D1Database): AppContainer {
@@ -97,6 +105,8 @@ export function createContainer(db: D1Database): AppContainer {
   const adminAuthRepo = new D1AdminAuthRepository(db);
   const adminAccountRepo = new D1AdminAccountRepository(db);
   const gameSettingsRepo = new D1GameSettingsRepository(db);
+  const adminMonitoringRepo = new D1AdminMonitoringRepository(db);
+  const userModerationRepo = new D1UserModerationRepository(db);
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -118,6 +128,11 @@ export function createContainer(db: D1Database): AppContainer {
   const adminAuthUseCases = new AdminAuthUseCases(adminAuthRepo);
   const adminAccountUseCases = new AdminAccountUseCases(adminAccountRepo, adminAuthRepo);
   const gameSettingsUseCases = new GameSettingsUseCases(gameSettingsRepo);
+  const userModerationUseCases = new UserModerationUseCases(
+    userModerationRepo,
+    sessionRepo,
+    userRepo,
+  );
 
   return {
     userRepo,
@@ -134,6 +149,8 @@ export function createContainer(db: D1Database): AppContainer {
     adminAuthRepo,
     adminAccountRepo,
     gameSettingsRepo,
+    adminMonitoringRepo,
+    userModerationRepo,
 
     scoreUseCases,
     personalizationUseCases,
@@ -151,6 +168,7 @@ export function createContainer(db: D1Database): AppContainer {
     adminAuthUseCases,
     adminAccountUseCases,
     gameSettingsUseCases,
+    userModerationUseCases,
   };
 }
 

@@ -411,6 +411,48 @@ test("admin overview is denied for non-admin and is cache-disabled for an admin"
   assert.equal("ADMIN_USER_IDS" in body, false);
 });
 
+test("admin monitoring is denied for non-admin and returns a well-shaped snapshot for an admin", async () => {
+  const nonAdmin = createAdminDb({ userId: 7 });
+  const denied = await app.request(
+    "/api/admin/monitoring",
+    {
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+      },
+    },
+    { DB: nonAdmin.db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(denied.status, 403);
+
+  const admin = createAdminDb({ userId: 1 });
+  const allowed = await app.request(
+    "/api/admin/monitoring",
+    {
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+      },
+    },
+    { DB: admin.db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(allowed.status, 200);
+  assert.equal(allowed.headers.get("Cache-Control"), "no-store");
+  const body = (await allowed.json()) as {
+    activeUsers: { dau: number; wau: number };
+    gamePlayCounts: unknown[];
+    gamePlayCountsWindowDays: number;
+    d1: { healthy: boolean; latencyMs: number };
+  };
+  // The shared mock DB above doesn't stub xp_events/scores rows (this endpoint is new; its own
+  // SQL correctness is covered against a real SQLite engine in
+  // packages/db/test/D1AdminMonitoringRepository.test.ts) — this test only asserts the route
+  // wires the response into the documented shape and enforces the same auth gate as /overview.
+  assert.equal(body.activeUsers.dau, 0);
+  assert.equal(body.activeUsers.wau, 0);
+  assert.deepEqual(body.gamePlayCounts, []);
+  assert.equal(body.gamePlayCountsWindowDays, 7);
+  assert.equal(body.d1.healthy, true);
+});
+
 test("admin mutations require a trusted Origin even with an authenticated admin session", async () => {
   const mock = createAdminDb({ userId: 1 });
   const res = await app.request(

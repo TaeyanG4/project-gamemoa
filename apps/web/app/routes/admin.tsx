@@ -707,6 +707,18 @@ function AdminDashboard({
         >
           <Gamepad2 className="h-3.5 w-3.5" /> 게임 관리
         </Link>
+        <Link
+          to="/admin/monitoring"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+        >
+          <Activity className="h-3.5 w-3.5" /> 운영 모니터링
+        </Link>
+        <Link
+          to="/admin/users"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+        >
+          <Users className="h-3.5 w-3.5" /> 유저 관리
+        </Link>
         {role === "SUPERADMIN" && (
           <Link
             to="/admin/accounts"
