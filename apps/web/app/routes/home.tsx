@@ -92,10 +92,14 @@ export default function Home() {
               {dict.home.recentPlaysTitle}
             </h3>
           </div>
+          {/* maxRows=1 — this section is a "what you were just playing" preview, not a full
+              listing (that's what /profile's recent-plays view is for), so it stays to one row
+              regardless of how many columns are currently selected. */}
           <GameGrid
             games={recentGames}
             mobileColumns={mobileColumns}
             desktopColumns={desktopColumns}
+            maxRows={1}
           />
         </section>
       )}
@@ -109,10 +113,13 @@ export default function Home() {
               {dict.home.favoritesTitle}
             </h3>
           </div>
+          {/* maxRows=2 — same idea as recent plays, just a slightly bigger preview since
+              favorites are a more deliberate signal than "recently opened". */}
           <GameGrid
             games={favoriteGames}
             mobileColumns={mobileColumns}
             desktopColumns={desktopColumns}
+            maxRows={2}
           />
         </section>
       )}

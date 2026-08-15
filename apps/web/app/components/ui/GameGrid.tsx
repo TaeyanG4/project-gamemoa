@@ -30,14 +30,35 @@ interface GameGridProps {
   mobileColumns: MobileColumns;
   desktopColumns: DesktopColumns;
   emptyMessage?: React.ReactNode;
+  /** Clips the grid to exactly this many visual rows regardless of column count — used by the
+   * home page's 최근 플레이(1 row)/즐겨찾기(2 rows) sections so they read as a compact preview
+   * rather than a full section, without needing to know how many columns are currently active
+   * (2/3/4 on mobile, 4/5/6 on desktop) to compute an item-count slice. Pure CSS: an explicit
+   * `grid-template-rows` sizes the rows we want visible normally, `grid-auto-rows: 0` collapses
+   * any further (implicit) rows the extra items would otherwise auto-place into, and
+   * overflow-hidden clips the residual. Omit for the full, unclipped grid (e.g. /games). */
+  maxRows?: 1 | 2;
 }
 
 /** Shared grid used by every page that lists game cards (home sections, /games catalog). Keeping
  * this in one place is what lets the column-count switchers and future layout tweaks apply
  * everywhere at once as the game catalog grows, instead of drifting per-page. */
-export function GameGrid({ games, mobileColumns, desktopColumns, emptyMessage }: GameGridProps) {
+export function GameGrid({
+  games,
+  mobileColumns,
+  desktopColumns,
+  emptyMessage,
+  maxRows,
+}: GameGridProps) {
+  const rowClampClass =
+    maxRows === 1
+      ? "[grid-template-rows:repeat(1,auto)] [grid-auto-rows:0] overflow-hidden"
+      : maxRows === 2
+        ? "[grid-template-rows:repeat(2,auto)] [grid-auto-rows:0] overflow-hidden"
+        : "";
+
   return (
-    <div className={GRID_CLASSES[mobileColumns][desktopColumns]}>
+    <div className={`${GRID_CLASSES[mobileColumns][desktopColumns]} ${rowClampClass}`}>
       {games.map((game) => (
         <GameCard key={game.slug} {...game} />
       ))}

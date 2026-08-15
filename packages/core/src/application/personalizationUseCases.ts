@@ -12,6 +12,11 @@ export interface PersonalizationState {
   recentPlays: { gameId: string; lastPlayedAt: string }[];
 }
 
+/** Unreachable today (the catalog has 4 games total), but favorites are meant to hold up once
+ * user-submitted games ship (see docs/GAME_CREATION_GUIDE.md's user-game-registration design) —
+ * cheap to cap now rather than needing to retrofit a limit once it's actually possible to hit. */
+export const MAX_FAVORITES = 50;
+
 export class PersonalizationUseCases {
   constructor(private repo: PersonalizationRepository) {}
 
@@ -32,6 +37,15 @@ export class PersonalizationUseCases {
     if (!isPublishedGame(gameId)) {
       throw new Error(`Invalid or unpublished game ID: ${gameId}`);
     }
+
+    // addFavorite is idempotent at the repo layer (INSERT OR IGNORE) — re-favoriting an
+    // already-favorited game must stay a no-op even when already at the cap, so the count check
+    // only applies to genuinely NEW favorites.
+    const current = await this.repo.getFavorites(userId);
+    if (!current.includes(gameId) && current.length >= MAX_FAVORITES) {
+      throw new Error(`FAVORITE_LIMIT_REACHED: max ${MAX_FAVORITES} favorites`);
+    }
+
     await this.repo.addFavorite(userId, gameId);
   }
 

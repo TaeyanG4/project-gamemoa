@@ -1,6 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PersonalizationUseCases } from "../src/application/personalizationUseCases.js";
+import {
+  PersonalizationUseCases,
+  MAX_FAVORITES,
+} from "../src/application/personalizationUseCases.js";
 import type { PersonalizationRepository } from "../src/ports/repositories.js";
 
 class MemoryPersonalizationRepository implements PersonalizationRepository {
@@ -81,6 +84,29 @@ test("PersonalizationUseCases handles recent plays deduplication and limit", asy
   const state = await useCases.getPersonalizationState(1);
   assert.equal(state.recentPlays.length, 2);
   assert.equal(state.recentPlays[0].gameId, "reaction-time");
+});
+
+test("PersonalizationUseCases rejects a new favorite once at the cap, but re-favoriting an existing one still no-ops", async () => {
+  const repo = new MemoryPersonalizationRepository();
+  const useCases = new PersonalizationUseCases(repo);
+
+  // Seed MAX_FAVORITES entries directly (bypasses isPublishedGame — the catalog only has 4 real
+  // games today, so this is the only way to exercise a cap that's otherwise unreachable).
+  repo.favorites.set(1, new Set(Array.from({ length: MAX_FAVORITES }, (_, i) => `fake-game-${i}`)));
+
+  // A genuinely new favorite is rejected once at the cap.
+  await assert.rejects(async () => {
+    await useCases.addFavorite(1, "reaction-time");
+  }, /FAVORITE_LIMIT_REACHED/);
+
+  const state = await useCases.getPersonalizationState(1);
+  assert.equal(state.favoriteGameIds.length, 0); // all seeded ids are unpublished, filtered out
+
+  // Re-adding a favorite that's already in the set stays a no-op even at the cap.
+  repo.favorites.get(1)!.add("aim-test");
+  await useCases.addFavorite(1, "aim-test");
+  const afterReadd = await repo.getFavorites(1);
+  assert.equal(afterReadd.filter((id) => id === "aim-test").length, 1);
 });
 
 test("PersonalizationUseCases imports guest recent plays but NOT guest favorites", async () => {

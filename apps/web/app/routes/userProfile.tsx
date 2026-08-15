@@ -137,7 +137,11 @@ export default function UserProfileRoute() {
     })
     .filter((entry): entry is { game: (typeof gameManifests)[number]; lastPlayedAt: string } =>
       Boolean(entry),
-    );
+    )
+    // The profile page is a snapshot, not a full history — cap at 8 even though the API can
+    // return up to 12 (getPersonalizationState's own limit), same "preview, not a full listing"
+    // reasoning as the home page's row-clamped sections.
+    .slice(0, 8);
 
   const gameRecords = data.gameBests
     .map((best) => {
