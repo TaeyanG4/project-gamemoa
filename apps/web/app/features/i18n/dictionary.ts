@@ -287,6 +287,7 @@ export interface Dictionary {
     checkingInstallLink: string;
     installLinkUnavailable: string;
     installNote: string;
+    installStatusHint: string;
     step2Title: string;
     step2Description: string;
     checking: string;
@@ -323,30 +324,11 @@ export interface Dictionary {
     installCta: string;
     installLinkHint: string;
     serverDirectoryCta: string;
-    stepsAriaLabel: string;
-    step1Title: string;
-    step1Text: string;
-    step2Title: string;
-    step2Text: string;
-    step3Title: string;
-    step3Text: string;
-    installGuideTitle: string;
-    installGuideP1: string;
-    installGuideP2: string;
-    installGuideP3: string;
-    accountGuideTitle: string;
-    accountStep1Prefix: string;
-    accountStep1Suffix: string;
-    accountStep2: string;
-    accountStep3: string;
-    openLinkPageCta: string;
-    registerTitle: string;
-    registerSubtitle: string;
-    registerStep1: string;
-    registerStep2: string;
-    registerStep3: string;
-    registerStep4: string;
-    registerDirectoryCta: string;
+    heroSetupCta: string;
+    onboardingEyebrow: string;
+    onboardingTitle: string;
+    onboardingBody: string;
+    onboardingCta: string;
     xpTitle: string;
     xpSubtitle: string;
     xpGlobalTitle: string;
@@ -724,12 +706,9 @@ export interface Dictionary {
       description: string;
       calloutStrong: string;
       calloutBody: string;
-      stepsHeading: string;
-      step1: string;
-      step2: string;
-      step3: string;
-      step4: string;
-      step5: string;
+      checklistPrefix: string;
+      checklistLink: string;
+      checklistSuffix: string;
       buttonLabel: string;
       loadingPrefix: string;
       loadingLink: string;
@@ -1389,6 +1368,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         "설치 링크가 아직 준비되지 않았습니다. 서버 관리자에게 공식 설치 링크를 문의하세요.",
       installNote:
         "Discord 앱 설치는 OwOGG 서버 등록(3단계)과 다릅니다 — 설치만으로 서버가 자동 등록되지 않습니다.",
+      installStatusHint:
+        "이 배지는 설치 여부를 자동으로 확인할 수 없어 항상 이렇게 표시됩니다 — 이미 설치했다면 정상이며, 서버 멤버 목록에 OwOGG가 보이면 설치가 완료된 것입니다.",
       step2Title: "Discord 계정 연결",
       step2Description:
         "Discord 봇 명령어에서 본인 OwOGG 정보를 사용할 수 있도록 계정을 연결합니다.",
@@ -1429,32 +1410,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       installCta: "Discord에 추가",
       installLinkHint: "설치 링크는 서버 관리자 안내를 확인하세요",
       serverDirectoryCta: "서버 디렉토리",
-      stepsAriaLabel: "Discord 이용 핵심 단계",
-      step1Title: "서버에 설치",
-      step1Text: "Discord 앱 설치는 서버 사용 준비 단계입니다.",
-      step2Title: "서버를 등록",
-      step2Text: "관리 가능한 길드를 확인한 뒤 공개 여부를 직접 선택합니다.",
-      step3Title: "게임을 시작",
-      step3Text: "/owogg play 링크로 유효한 활동을 서버에 귀속합니다.",
-      installGuideTitle: "서버에 설치하기",
-      installGuideP1:
-        "Discord Developer Portal에서 앱의 Installation 설정을 확인한 뒤 실제 설치 링크로 서버에 추가합니다.",
-      installGuideP2:
-        "설치 링크가 화면에 없으면 저장소가 권한이나 애플리케이션 설정을 확인할 수 없는 상태입니다. 임의 URL을 사용하지 말고 서버 운영자에게 공식 설치 링크를 요청하세요.",
-      installGuideP3: "앱 설치만으로 OwOGG 공개 디렉토리에 서버가 게시되지 않습니다.",
-      accountGuideTitle: "계정 연결하기",
-      accountStep1Prefix: "Discord에서",
-      accountStep1Suffix: "실행",
-      accountStep2: "응답의 1회용 링크 열기",
-      accountStep3: "OwOGG 로그인 후 연결 확인",
-      openLinkPageCta: "연결 페이지 열기",
-      registerTitle: "서버 등록하기",
-      registerSubtitle: "관리자는 다음 순서로 OwOGG 서버 공간을 만듭니다.",
-      registerStep1: "OwOGG 로그인",
-      registerStep2: "공식 Discord 권한 확인",
-      registerStep3: "길드 선택과 slug 설정",
-      registerStep4: "PUBLIC / UNLISTED / PRIVATE 선택",
-      registerDirectoryCta: "서버 디렉토리에서 시작",
+      heroSetupCta: "5단계 설치 가이드",
+      onboardingEyebrow: "ONBOARDING",
+      onboardingTitle: "설치·계정 연결·서버 등록이 아직인가요?",
+      onboardingBody:
+        "설치부터 계정 연결, 서버 등록까지 5단계 진행 상태를 실시간 체크리스트에서 확인하고 바로 이어서 진행할 수 있습니다.",
+      onboardingCta: "5단계 설치 가이드 열기",
       xpTitle: "서버 XP가 계산되는 방식",
       xpSubtitle: "글로벌 XP와 서버 XP는 같은 숫자를 복사하는 구조가 아닙니다.",
       xpGlobalTitle: "글로벌 XP",
@@ -1876,12 +1837,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         calloutStrong: "일반 사용자는 Bot Token을 입력할 필요가 없습니다.",
         calloutBody:
           " 아래 공식 설치 링크를 클릭하고 Discord의 서버 선택/승인 화면만 따라가면 됩니다.",
-        stepsHeading: "설치 순서",
-        step1: "아래 [Discord에 OwOGG 추가] 버튼을 클릭합니다.",
-        step2: "Discord 계정으로 로그인되어 있는지 확인합니다.",
-        step3: "앱을 추가할 서버를 선택합니다 (서버 관리 권한이 있는 서버만 목록에 보입니다).",
-        step4: "요청된 권한을 확인하고 승인합니다.",
-        step5: "완료 후 OwOGG로 돌아와 계정 연결과 서버 등록을 진행합니다.",
+        checklistPrefix: "설치부터 계정 연결, 서버 등록까지 진행 상황을 실시간으로 확인하려면 ",
+        checklistLink: "5단계 설치 가이드",
+        checklistSuffix: "를 이용하세요.",
         buttonLabel: "Discord에 OwOGG 추가",
         loadingPrefix: "설치 링크를 불러오는 중이거나 아직 준비되지 않았습니다.",
         loadingLink: "설치 가이드",
@@ -2645,6 +2603,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         "The install link isn't ready yet. Ask your server admin for the official install link.",
       installNote:
         "Installing the Discord app is different from registering your server on OwOGG (step 3) — installation alone doesn't auto-register your server.",
+      installStatusHint:
+        "This badge can't be checked automatically, so it always looks like this — that's normal even if you've already installed it. If OwOGG shows up in your server's member list, installation is complete.",
       step2Title: "Link Your Discord Account",
       step2Description: "Link your account so bot commands can look up your own OwOGG info.",
       checking: "Checking...",
@@ -2685,33 +2645,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       installCta: "Add to Discord",
       installLinkHint: "Check with your server admin for the install link",
       serverDirectoryCta: "Server directory",
-      stepsAriaLabel: "Key steps for using Discord",
-      step1Title: "Install to a server",
-      step1Text: "Installing the Discord app is the setup step for using it on a server.",
-      step2Title: "Register the server",
-      step2Text: "Check the guilds you can manage, then choose visibility yourself.",
-      step3Title: "Start playing",
-      step3Text: "Use the /owogg play link to attribute valid activity to the server.",
-      installGuideTitle: "Installing to a server",
-      installGuideP1:
-        "Check the app's Installation settings in the Discord Developer Portal, then add it to your server with the real install link.",
-      installGuideP2:
-        "If the install link isn't shown, the app can't verify permissions or configuration. Don't use an arbitrary URL — ask your server operator for the official install link.",
-      installGuideP3:
-        "Installing the app alone does not publish your server to the public OwOGG directory.",
-      accountGuideTitle: "Linking your account",
-      accountStep1Prefix: "Run",
-      accountStep1Suffix: "on Discord",
-      accountStep2: "Open the one-time link in the response",
-      accountStep3: "Confirm the link after logging in to OwOGG",
-      openLinkPageCta: "Open the linking page",
-      registerTitle: "Registering a server",
-      registerSubtitle: "Admins create a OwOGG server space in the following order.",
-      registerStep1: "Log in to OwOGG",
-      registerStep2: "Confirm official Discord permissions",
-      registerStep3: "Choose a guild and set a slug",
-      registerStep4: "Choose PUBLIC / UNLISTED / PRIVATE",
-      registerDirectoryCta: "Start from the server directory",
+      heroSetupCta: "5-step setup guide",
+      onboardingEyebrow: "ONBOARDING",
+      onboardingTitle: "Haven't finished installing, linking, or registering yet?",
+      onboardingBody:
+        "Track install, account linking, and server registration in one live 5-step checklist, and pick up right where you left off.",
+      onboardingCta: "Open the 5-step setup guide",
       xpTitle: "How server XP is calculated",
       xpSubtitle: "Global XP and server XP are not the same number copied around.",
       xpGlobalTitle: "Global XP",
@@ -3144,13 +3083,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         calloutStrong: "Regular users never need to enter a Bot Token.",
         calloutBody:
           " Just click the official install link below and follow Discord's server-select/authorize screen.",
-        stepsHeading: "Install steps",
-        step1: "Click the [Add OwOGG to Discord] button below.",
-        step2: "Make sure you're signed in to your Discord account.",
-        step3:
-          "Choose the server to add the app to (only servers where you have Manage Server permission appear in the list).",
-        step4: "Review and authorize the requested permissions.",
-        step5: "Once done, return to OwOGG to link your account and register your server.",
+        checklistPrefix:
+          "To track install, account linking, and server registration in real time, use the ",
+        checklistLink: "5-step setup guide",
+        checklistSuffix: ".",
         buttonLabel: "Add OwOGG to Discord",
         loadingPrefix: "The install link is still loading, or isn't ready yet.",
         loadingLink: "Install guide",
@@ -3923,6 +3859,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         "インストールリンクがまだ準備できていません。サーバー管理者に公式インストールリンクを確認してください。",
       installNote:
         "Discordアプリのインストールと、OwOGGサーバー登録（3ステップ目）は異なります — インストールだけではサーバーが自動登録されません。",
+      installStatusHint:
+        "このバッジは自動で確認できないため常にこの表示になります — すでにインストール済みでも正常です。サーバーのメンバー一覧にOwOGGが表示されていればインストールは完了しています。",
       step2Title: "Discordアカウント連携",
       step2Description:
         "Discordのボットコマンドで自分のOwOGG情報を使えるようアカウントを連携します。",
@@ -3963,33 +3901,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       installCta: "Discordに追加",
       installLinkHint: "インストールリンクはサーバー管理者の案内を確認してください",
       serverDirectoryCta: "サーバーディレクトリ",
-      stepsAriaLabel: "Discord利用の主要ステップ",
-      step1Title: "サーバーにインストール",
-      step1Text: "Discordアプリのインストールはサーバー利用の準備段階です。",
-      step2Title: "サーバーを登録",
-      step2Text: "管理可能なギルドを確認したうえで、公開設定を自分で選びます。",
-      step3Title: "ゲームを開始",
-      step3Text: "/owogg play のリンクで有効な活動をサーバーに紐づけます。",
-      installGuideTitle: "サーバーにインストールする",
-      installGuideP1:
-        "Discord Developer Portalでアプリのインストール設定を確認したうえで、実際のインストールリンクからサーバーに追加します。",
-      installGuideP2:
-        "画面にインストールリンクが表示されない場合、権限やアプリケーション設定を確認できない状態です。任意のURLは使わず、サーバー運営者に公式インストールリンクを問い合わせてください。",
-      installGuideP3:
-        "アプリのインストールだけではOwOGG公開ディレクトリにサーバーは掲載されません。",
-      accountGuideTitle: "アカウントを連携する",
-      accountStep1Prefix: "Discordで",
-      accountStep1Suffix: "を実行",
-      accountStep2: "返信された1回限りのリンクを開く",
-      accountStep3: "OwOGGにログインして連携を確認",
-      openLinkPageCta: "連携ページを開く",
-      registerTitle: "サーバーを登録する",
-      registerSubtitle: "管理者は次の順序でOwOGGサーバー空間を作成します。",
-      registerStep1: "OwOGGにログイン",
-      registerStep2: "公式Discord権限を確認",
-      registerStep3: "ギルドの選択とslugの設定",
-      registerStep4: "PUBLIC / UNLISTED / PRIVATEの選択",
-      registerDirectoryCta: "サーバーディレクトリから始める",
+      heroSetupCta: "5ステップセットアップガイド",
+      onboardingEyebrow: "ONBOARDING",
+      onboardingTitle: "インストール・アカウント連携・サーバー登録はお済みですか？",
+      onboardingBody:
+        "インストールからアカウント連携、サーバー登録までの5ステップの進捗をリアルタイムのチェックリストで確認し、続きからすぐ再開できます。",
+      onboardingCta: "5ステップセットアップガイドを開く",
       xpTitle: "サーバーXPの計算方法",
       xpSubtitle: "グローバルXPとサーバーXPは同じ数値をコピーする仕組みではありません。",
       xpGlobalTitle: "グローバルXP",
@@ -4417,13 +4334,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         calloutStrong: "一般ユーザーがBot Tokenを入力する必要はありません。",
         calloutBody:
           " 以下の公式インストールリンクをクリックし、Discordのサーバー選択・承認画面に従うだけです。",
-        stepsHeading: "インストール手順",
-        step1: "下の[DiscordにOwOGGを追加]ボタンをクリックします。",
-        step2: "Discordアカウントにログインしているか確認します。",
-        step3:
-          "アプリを追加するサーバーを選択します（サーバー管理権限があるサーバーのみ一覧に表示されます）。",
-        step4: "要求された権限を確認して承認します。",
-        step5: "完了後、OwOGGに戻ってアカウント連携とサーバー登録を進めます。",
+        checklistPrefix:
+          "インストールからアカウント連携、サーバー登録までの進捗をリアルタイムで確認するには",
+        checklistLink: "5ステップセットアップガイド",
+        checklistSuffix: "をご利用ください。",
         buttonLabel: "DiscordにOwOGGを追加",
         loadingPrefix: "インストールリンクを読み込み中か、まだ準備ができていません。",
         loadingLink: "インストールガイド",
@@ -5186,6 +5100,8 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       installLinkUnavailable: "安装链接尚未准备好，请向服务器管理员咨询官方安装链接。",
       installNote:
         "安装 Discord 应用与注册 OwOGG 服务器（第 3 步）不同——仅安装并不会自动注册服务器。",
+      installStatusHint:
+        "该徽章无法自动确认安装状态，因此始终显示为此样式——即使你已经安装也是正常现象。如果服务器成员列表中出现了 OwOGG，说明安装已经完成。",
       step2Title: "关联 Discord 账户",
       step2Description: "关联账户后即可在 Discord 机器人命令中使用你的 OwOGG 信息。",
       checking: "正在确认...",
@@ -5224,32 +5140,12 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       installCta: "添加到 Discord",
       installLinkHint: "请向服务器管理员咨询安装链接",
       serverDirectoryCta: "服务器目录",
-      stepsAriaLabel: "使用 Discord 的核心步骤",
-      step1Title: "安装到服务器",
-      step1Text: "安装 Discord 应用是使用服务器功能的准备步骤。",
-      step2Title: "注册服务器",
-      step2Text: "确认可管理的服务器后，自行选择是否公开。",
-      step3Title: "开始游戏",
-      step3Text: "通过 /owogg play 链接将有效活动归属到服务器。",
-      installGuideTitle: "安装到服务器",
-      installGuideP1:
-        "在 Discord 开发者门户确认应用的 Installation 设置后，通过真实的安装链接添加到服务器。",
-      installGuideP2:
-        "如果画面上没有安装链接，说明应用无法确认权限或应用配置。请勿使用随意的 URL，应向服务器运营者索取官方安装链接。",
-      installGuideP3: "仅安装应用不会使服务器出现在 OwOGG 公开目录中。",
-      accountGuideTitle: "关联账户",
-      accountStep1Prefix: "在 Discord 中执行",
-      accountStep1Suffix: "",
-      accountStep2: "打开回复中的一次性链接",
-      accountStep3: "登录 OwOGG 后确认关联",
-      openLinkPageCta: "打开关联页面",
-      registerTitle: "注册服务器",
-      registerSubtitle: "管理员按以下顺序创建 OwOGG 服务器空间。",
-      registerStep1: "登录 OwOGG",
-      registerStep2: "确认官方 Discord 权限",
-      registerStep3: "选择服务器并设置 slug",
-      registerStep4: "选择 PUBLIC / UNLISTED / PRIVATE",
-      registerDirectoryCta: "从服务器目录开始",
+      heroSetupCta: "5 步安装指南",
+      onboardingEyebrow: "ONBOARDING",
+      onboardingTitle: "还没有完成安装、关联账户或注册服务器？",
+      onboardingBody:
+        "在实时清单中查看安装、账户关联、服务器注册这 5 个步骤的进度，并直接从中断处继续。",
+      onboardingCta: "打开 5 步安装指南",
       xpTitle: "服务器 XP 的计算方式",
       xpSubtitle: "全局 XP 与服务器 XP 并非复制同一数值。",
       xpGlobalTitle: "全局 XP",
@@ -5652,12 +5548,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         description: "安装 Discord 应用是在服务器中使用 OwOGG 前的准备步骤，与服务器注册是分开的。",
         calloutStrong: "普通用户无需输入 Bot Token。",
         calloutBody: " 只需点击下方的官方安装链接，并按照 Discord 的服务器选择/授权界面操作即可。",
-        stepsHeading: "安装步骤",
-        step1: "点击下方的[将 OwOGG 添加到 Discord]按钮。",
-        step2: "确认已登录 Discord 账户。",
-        step3: "选择要添加应用的服务器（列表中只显示您拥有服务器管理权限的服务器）。",
-        step4: "确认并授权所请求的权限。",
-        step5: "完成后返回 OwOGG，继续进行账户连接和服务器注册。",
+        checklistPrefix: "如需实时查看安装、账户关联、服务器注册的进度，请使用",
+        checklistLink: "5 步安装指南",
+        checklistSuffix: "。",
         buttonLabel: "将 OwOGG 添加到 Discord",
         loadingPrefix: "安装链接正在加载中，或尚未就绪。",
         loadingLink: "安装指南",

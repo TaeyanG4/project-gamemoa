@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ExternalLink } from "lucide-react";
-import { WikiLayout, WikiCallout, WikiSteps } from "../components/wiki/WikiLayout";
+import { WikiLayout, WikiCallout } from "../components/wiki/WikiLayout";
 import { fetchDiscordBotStatusApi } from "../features/discord/api";
 import { useI18n } from "../features/i18n/I18nContext";
 
@@ -31,11 +31,7 @@ export default function WikiDiscordInstallRoute() {
       </WikiCallout>
 
       <section>
-        <h2 className="text-lg font-black text-text-primary">{t.stepsHeading}</h2>
-        <div className="mt-3">
-          <WikiSteps steps={[t.step1, t.step2, t.step3, t.step4, t.step5]} />
-        </div>
-        <div className="mt-4">
+        <div>
           {installUrl ? (
             <a
               href={installUrl}
@@ -55,6 +51,13 @@ export default function WikiDiscordInstallRoute() {
             </p>
           )}
         </div>
+        <p className="mt-3 text-xs text-text-muted">
+          {t.checklistPrefix}
+          <Link to="/discord/setup" className="font-bold text-brand-light hover:underline">
+            {t.checklistLink}
+          </Link>
+          {t.checklistSuffix}
+        </p>
       </section>
 
       <WikiCallout tone="warning">

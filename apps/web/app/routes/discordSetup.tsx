@@ -119,6 +119,7 @@ export default function DiscordSetupRoute() {
             </p>
           )}
           <p className="mt-2 text-[11px] text-text-muted">{dict.discordSetup.installNote}</p>
+          <p className="mt-1 text-[11px] text-text-muted">{dict.discordSetup.installStatusHint}</p>
         </SetupStep>
 
         <SetupStep

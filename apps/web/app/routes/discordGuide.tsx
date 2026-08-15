@@ -6,9 +6,7 @@ import {
   CircleHelp,
   ExternalLink,
   Gamepad2,
-  Link2,
-  Server,
-  ShieldCheck,
+  ListChecks,
   Trophy,
   Zap,
 } from "lucide-react";
@@ -89,97 +87,39 @@ export default function DiscordGuideRoute() {
             >
               {dict.discordGuide.serverDirectoryCta} <ArrowRight className="h-4 w-4" />
             </Link>
+            <Link
+              to="/discord/setup"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-300/30 bg-indigo-300/10 px-4 py-2.5 text-xs font-bold text-indigo-100 hover:bg-indigo-300/20 focus:outline-none focus:ring-2 focus:ring-white"
+            >
+              <ListChecks className="h-4 w-4" /> {dict.discordGuide.heroSetupCta}
+            </Link>
           </div>
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-3" aria-label={dict.discordGuide.stepsAriaLabel}>
-        <StepCard
-          number="01"
-          icon={<Server />}
-          title={dict.discordGuide.step1Title}
-          text={dict.discordGuide.step1Text}
-        />
-        <StepCard
-          number="02"
-          icon={<ShieldCheck />}
-          title={dict.discordGuide.step2Title}
-          text={dict.discordGuide.step2Text}
-        />
-        <StepCard
-          number="03"
-          icon={<Gamepad2 />}
-          title={dict.discordGuide.step3Title}
-          text={dict.discordGuide.step3Text}
-        />
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-2">
-        <GuideCard
-          icon={<Server className="h-5 w-5" />}
-          eyebrow="SERVER"
-          title={dict.discordGuide.installGuideTitle}
-        >
-          <p>{dict.discordGuide.installGuideP1}</p>
-          <p className="mt-3">{dict.discordGuide.installGuideP2}</p>
-          <p className="mt-3">{dict.discordGuide.installGuideP3}</p>
-        </GuideCard>
-        <GuideCard
-          icon={<Link2 className="h-5 w-5" />}
-          eyebrow="ACCOUNT"
-          title={dict.discordGuide.accountGuideTitle}
-        >
-          <ol className="space-y-2 text-sm text-text-secondary">
-            <li>
-              <b className="text-text-primary">1.</b> {dict.discordGuide.accountStep1Prefix}{" "}
-              <code>/owogg link</code> {dict.discordGuide.accountStep1Suffix}
-            </li>
-            <li>
-              <b className="text-text-primary">2.</b> {dict.discordGuide.accountStep2}
-            </li>
-            <li>
-              <b className="text-text-primary">3.</b> {dict.discordGuide.accountStep3}
-            </li>
-          </ol>
-          <Link
-            to="/discord/link"
-            className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-brand-light hover:underline"
-          >
-            {dict.discordGuide.openLinkPageCta} <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </GuideCard>
-      </section>
-
-      <section className="rounded-2xl border border-border bg-surface-raised p-5 md:p-7">
+      {/* Install / account-link / server-registration are covered step-by-step (with live
+          status) by /discord/setup — this page stays a reference (commands, XP math, ranking,
+          FAQ) instead of restating the same instructions, so the two pages don't drift apart. */}
+      <section className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-indigo-400/20 bg-indigo-500/5 p-5 md:flex-row md:items-center md:p-7">
         <div className="flex items-start gap-3">
-          <Server className="mt-0.5 h-5 w-5 shrink-0 text-brand-light" />
+          <ListChecks className="mt-0.5 h-5 w-5 shrink-0 text-brand-light" />
           <div>
-            <h2 className="text-xl font-black text-text-primary">
-              {dict.discordGuide.registerTitle}
+            <p className="text-[10px] font-black tracking-[0.18em] text-brand-light">
+              {dict.discordGuide.onboardingEyebrow}
+            </p>
+            <h2 className="mt-1 text-lg font-black text-text-primary">
+              {dict.discordGuide.onboardingTitle}
             </h2>
-            <p className="mt-2 text-sm leading-relaxed text-text-muted">
-              {dict.discordGuide.registerSubtitle}
+            <p className="mt-1 text-sm leading-relaxed text-text-muted">
+              {dict.discordGuide.onboardingBody}
             </p>
           </div>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            dict.discordGuide.registerStep1,
-            dict.discordGuide.registerStep2,
-            dict.discordGuide.registerStep3,
-            dict.discordGuide.registerStep4,
-          ].map((item, index) => (
-            <div key={item} className="rounded-xl bg-surface p-4">
-              <span className="text-xs font-black text-brand-light">0{index + 1}</span>
-              <p className="mt-2 text-sm font-bold text-text-primary">{item}</p>
-            </div>
-          ))}
-        </div>
         <Link
-          to="/discord/servers"
-          className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light focus:outline-none focus:ring-2 focus:ring-brand"
+          to="/discord/setup"
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light focus:outline-none focus:ring-2 focus:ring-brand"
         >
-          {dict.discordGuide.registerDirectoryCta} <ArrowRight className="h-4 w-4" />
+          {dict.discordGuide.onboardingCta} <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </section>
 
@@ -284,29 +224,6 @@ export default function DiscordGuideRoute() {
         </Link>
       </footer>
     </div>
-  );
-}
-
-function StepCard({
-  number,
-  icon,
-  title,
-  text,
-}: {
-  number: string;
-  icon: React.ReactNode;
-  title: string;
-  text: string;
-}) {
-  return (
-    <article className="rounded-2xl border border-border bg-surface-raised p-5">
-      <div className="flex items-center justify-between text-brand-light">
-        <span className="text-xs font-black">{number}</span>
-        {icon}
-      </div>
-      <h2 className="mt-5 text-lg font-black text-text-primary">{title}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-text-muted">{text}</p>
-    </article>
   );
 }
 
