@@ -21,7 +21,6 @@ import { getLocalizedGameContent } from "../features/catalog/localizedGameConten
 import { localizedDifficultyLabel } from "../features/catalog/difficultyLabels";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
 import { XIcon } from "../components/ui/XIcon";
-import { DiscordIcon } from "../components/ui/DiscordIcon";
 import type { Dictionary } from "../features/i18n/dictionary";
 import type { LeaderRecord } from "@owogg/contracts";
 import {
@@ -201,16 +200,17 @@ export default function GamePlay() {
     };
   }, [result, manifest, slug, selectedDifficultyId]);
 
-  // Share Result — scoped to X (official web intent), Discord (no web intent exists, so this
-  // copies formatted text to paste manually), and a screenshot-copy of the result card. Web
-  // Share API / Instagram / TikTok deliberately dropped from this pass (operator decision).
-  // All three now attach the screenshot by default (see captureScreenshotBlob) rather than only
-  // the dedicated screenshot button — X/Discord have no API for a page to attach an arbitrary
-  // image to a compose window, so "attach by default" means "copy it to the clipboard so the
-  // user can paste it in", which is the most a web page is allowed to do.
+  // Share Result — scoped to X (official web intent) and a screenshot-copy of the result card.
+  // A dedicated Discord button used to sit here too, but it only ever copied the same text a
+  // Discord message would need — functionally identical to the screenshot-copy button once that
+  // button started including the share text alongside the image, so it was dropped as redundant
+  // rather than kept as a second "copy" action with a different icon. Web Share API / Instagram
+  // / TikTok remain out of scope (operator decision). X still attaches the screenshot by default
+  // (see captureScreenshotBlob) — X has no API for a page to attach an arbitrary image to its
+  // compose window, so "attach by default" means "copy it to the clipboard so the user can
+  // paste it in", which is the most a web page is allowed to do.
   const shareCardRef = useRef<HTMLDivElement>(null);
   const [xShareState, setXShareState] = useState<"idle" | "sharing" | "shared">("idle");
-  const [discordCopied, setDiscordCopied] = useState(false);
   const [screenshotState, setScreenshotState] = useState<
     "idle" | "copying" | "copied" | "downloaded" | "error"
   >("idle");
@@ -254,39 +254,6 @@ export default function GamePlay() {
     setTimeout(() => setXShareState("idle"), 4000);
   }, [buildShareText, captureScreenshotBlob, slug]);
 
-  const handleShareDiscord = useCallback(async () => {
-    const shareText = buildShareText();
-    if (!shareText || !navigator.clipboard) return;
-    const shareUrl = `${window.location.origin}/games/${slug}`;
-    const fullText = `${shareText} ${shareUrl}`;
-
-    // A single ClipboardItem can carry multiple representations of the same copy — Discord's
-    // paste handler picks the image when one is present (attaches it as a file), so this is the
-    // only way to get "text + screenshot" into one paste action instead of two separate copies.
-    if (typeof window.ClipboardItem !== "undefined") {
-      try {
-        const blob = await captureScreenshotBlob();
-        if (blob) {
-          await navigator.clipboard.write([
-            new ClipboardItem({
-              "image/png": blob,
-              "text/plain": new Blob([fullText], { type: "text/plain" }),
-            }),
-          ]);
-          setDiscordCopied(true);
-          setTimeout(() => setDiscordCopied(false), 2500);
-          return;
-        }
-      } catch (err) {
-        console.error("Combined image+text copy failed, falling back to text-only:", err);
-      }
-    }
-
-    await navigator.clipboard.writeText(fullText);
-    setDiscordCopied(true);
-    setTimeout(() => setDiscordCopied(false), 2500);
-  }, [buildShareText, captureScreenshotBlob, slug]);
-
   const handleCopyScreenshot = useCallback(async () => {
     setScreenshotState("copying");
     try {
@@ -294,7 +261,18 @@ export default function GamePlay() {
       if (!blob) throw new Error("html-to-image returned no blob");
 
       if (navigator.clipboard && typeof window.ClipboardItem !== "undefined") {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        // A single ClipboardItem can carry multiple representations of the same copy — Discord's
+        // (and most chat apps') paste handler picks the image when one is present (attaches it
+        // as a file) while still making the share text available to anything that reads
+        // text/plain instead, so one copy covers both "paste an image" and "paste a message"
+        // without the user needing a second, separate action for text.
+        const shareText = buildShareText();
+        const shareUrl = `${window.location.origin}/games/${slug}`;
+        const items: Record<string, Blob> = { "image/png": blob };
+        if (shareText) {
+          items["text/plain"] = new Blob([`${shareText} ${shareUrl}`], { type: "text/plain" });
+        }
+        await navigator.clipboard.write([new ClipboardItem(items)]);
         setScreenshotState("copied");
       } else {
         // Clipboard image writes aren't universally supported (older browsers, some mobile
@@ -315,7 +293,7 @@ export default function GamePlay() {
     } finally {
       setTimeout(() => setScreenshotState("idle"), 2500);
     }
-  }, [captureScreenshotBlob, slug]);
+  }, [captureScreenshotBlob, buildShareText, slug]);
 
   const { recordRecentPlay } = usePersonalization();
 
@@ -656,12 +634,12 @@ export default function GamePlay() {
                       </div>
                     )}
 
-                    {/* Share row — icon-only (X's official wordmark, Discord's brand mark, a
-                        plain copy icon for the screenshot action) with a native title tooltip
-                        standing in for the text labels these used to carry. A brief checkmark
-                        swap is the only per-button feedback now that there's no label text to
-                        change; the X button additionally gets a one-line hint below the row
-                        since "screenshot copied, paste it yourself" needs actual explaining. */}
+                    {/* Share row — icon-only (X's official wordmark, a plain copy icon for the
+                        screenshot+text action) with a native title tooltip standing in for the
+                        text labels these used to carry. A brief checkmark swap is the only
+                        per-button feedback now that there's no label text to change; the X
+                        button additionally gets a one-line hint below the row since "screenshot
+                        copied, paste it yourself" needs actual explaining. */}
                     <div className="flex items-center justify-center gap-3">
                       <button
                         type="button"
@@ -674,19 +652,6 @@ export default function GamePlay() {
                           <CheckCircle2 className="h-5 w-5 text-emerald-400" />
                         ) : (
                           <XIcon className="h-5 w-5" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleShareDiscord()}
-                        title={dict.gamePlay.shareDiscordCta}
-                        aria-label={dict.gamePlay.shareDiscordCta}
-                        className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
-                      >
-                        {discordCopied ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                        ) : (
-                          <DiscordIcon className="h-5 w-5" />
                         )}
                       </button>
                       <button

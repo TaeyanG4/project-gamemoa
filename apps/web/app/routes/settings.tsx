@@ -430,14 +430,14 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3">
           <Link
             to={`/users/${user.id}`}
-            className="flex items-center gap-2 px-6 py-2.5 bg-surface border border-border rounded-2xl font-bold text-xs text-text-secondary hover:text-text-primary hover:border-brand/40 transition-all"
+            className="flex items-center gap-2 px-6 py-2.5 bg-surface border border-border rounded-2xl font-bold text-xs text-text-secondary hover:text-text-primary hover:border-brand/40 transition-all whitespace-nowrap shrink-0"
           >
             <ExternalLink className="w-4 h-4" />
             <span>{dict.profile.viewProfileCta}</span>
           </Link>
           <button
             onClick={() => void logout()}
-            className="flex items-center gap-2 px-6 py-2.5 bg-accent-red/10 text-accent-red border border-accent-red/30 rounded-2xl font-bold text-xs hover:bg-accent-red/20 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-6 py-2.5 bg-accent-red/10 text-accent-red border border-accent-red/30 rounded-2xl font-bold text-xs hover:bg-accent-red/20 transition-all cursor-pointer whitespace-nowrap shrink-0"
           >
             <LogOut className="w-4 h-4" />
             <span>{dict.profile.logout}</span>

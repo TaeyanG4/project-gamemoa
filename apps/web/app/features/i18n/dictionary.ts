@@ -31,14 +31,15 @@ export interface Dictionary {
    * until hovered), so these labels are on-screen by default for every mobile visitor. */
   sidebar: {
     openMenuAria: string;
-    navHeading: string;
     mobileMenuTitle: string;
     home: string;
     allGames: string;
     popularGames: string;
-    reactionBrain: string;
     rankingRecords: string;
-    tagline: string;
+    /** Divider label between the game-related nav group and everything else (Discord hub,
+     * changelog) — games always come first, this heading marks where "the rest" starts. */
+    otherHeading: string;
+    discordHub: string;
     /** Divider label above the drawer's secondary actions (favorites/Discord servers/language) —
      * the items narrow phones can't fit in the header itself. See Header.tsx's comment for why
      * this split exists. */
@@ -1107,14 +1108,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     sidebar: {
       openMenuAria: "메뉴 열기",
-      navHeading: "탐색 메뉴",
       mobileMenuTitle: "메뉴",
       home: "홈",
       allGames: "전체 게임",
       popularGames: "인기 게임",
-      reactionBrain: "순발력 & 두뇌",
       rankingRecords: "랭킹 & 기록",
-      tagline: "웹 게임 100% 무설치",
+      otherHeading: "기타",
+      discordHub: "Discord",
       moreHeading: "더보기",
       favorites: "즐겨찾기",
       discordServers: "등록된 디스코드 서버",
@@ -2334,14 +2334,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     sidebar: {
       openMenuAria: "Open menu",
-      navHeading: "Navigation",
       mobileMenuTitle: "Menu",
       home: "Home",
       allGames: "All Games",
       popularGames: "Popular Games",
-      reactionBrain: "Reaction & Brain",
       rankingRecords: "Ranking & Records",
-      tagline: "100% no-install web games",
+      otherHeading: "Other",
+      discordHub: "Discord",
       moreHeading: "More",
       favorites: "Favorites",
       discordServers: "Registered Discord Servers",
@@ -3582,14 +3581,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     sidebar: {
       openMenuAria: "メニューを開く",
-      navHeading: "ナビゲーション",
       mobileMenuTitle: "メニュー",
       home: "ホーム",
       allGames: "全ゲーム",
       popularGames: "人気ゲーム",
-      reactionBrain: "反射神経＆頭脳",
       rankingRecords: "ランキング＆記録",
-      tagline: "インストール不要のWebゲーム100%",
+      otherHeading: "その他",
+      discordHub: "Discord",
       moreHeading: "もっと見る",
       favorites: "お気に入り",
       discordServers: "登録済みDiscordサーバー",
@@ -4831,14 +4829,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
     },
     sidebar: {
       openMenuAria: "打开菜单",
-      navHeading: "导航菜单",
       mobileMenuTitle: "菜单",
       home: "首页",
       allGames: "全部游戏",
       popularGames: "热门游戏",
-      reactionBrain: "反应力和益智",
       rankingRecords: "排行榜和记录",
-      tagline: "100% 免安装网页游戏",
+      otherHeading: "其他",
+      discordHub: "Discord",
       moreHeading: "更多",
       favorites: "收藏",
       discordServers: "已注册的 Discord 服务器",
