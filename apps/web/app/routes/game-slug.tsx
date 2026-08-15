@@ -14,6 +14,7 @@ import {
   extractPlayTokenFromLocation,
   fetchLeaderboardApi,
 } from "../features/scores/api";
+import { getReactionTierById } from "@owogg/shared";
 import { useAuth } from "../features/auth";
 import { usePersonalization } from "../features/personalization";
 import { useI18n } from "../features/i18n/I18nContext";
@@ -58,6 +59,12 @@ function formatMetadataValue(key: string, value: unknown): string {
   return String(value);
 }
 
+// Metadata keys that get their own dedicated presentation elsewhere in the result screen (e.g.
+// "tier" renders as a colored badge below the score, "rounds" is the raw per-round ms array used
+// only for the tier calculation) or aren't meaningful to show as a raw key/value pair ("mode" is
+// an internal typing-test mode id, e.g. "ko-short") — kept out of the generic key/value grid.
+const METADATA_GRID_EXCLUDED_KEYS = new Set(["tier", "rounds", "mode"]);
+
 export default function GamePlay() {
   const params = useParams();
   const navigate = useNavigate();
@@ -69,6 +76,12 @@ export default function GamePlay() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<GameResult | null>(null);
+  // Reaction-time only: badge derived from metadata.tier (see games/reaction-time/src/game.tsx).
+  // Other games don't set this metadata key, so this stays undefined for them.
+  const resultTier = useMemo(() => {
+    const tierId = result?.metadata?.tier;
+    return typeof tierId === "string" ? getReactionTierById(tierId) : undefined;
+  }, [result]);
 
   // Attempt Lifecycle State & Auth Eligibility
   const [attemptKey, setAttemptKey] = useState<number>(0);
@@ -508,28 +521,44 @@ export default function GamePlay() {
                         ? dict.gamePlay.finalScoreLabel
                         : dict.gamePlay.deviceBestLabel}
                     </p>
-                    <p className="text-5xl font-black text-brand mb-4">
+                    <p className="text-5xl font-black text-brand mb-1">
                       {formatScore(result.score, manifest?.scoreConfig)}
                     </p>
 
-                    {/* Metadata Formatters */}
-                    {result.metadata && Object.keys(result.metadata).length > 0 && (
-                      <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/80">
-                        {Object.entries(result.metadata).map(([key, value]) => (
-                          <div
-                            key={key}
-                            className="bg-surface/50 p-2.5 rounded-xl border border-border/40"
-                          >
-                            <p className="text-xs text-text-muted font-bold mb-0.5">
-                              {formatMetadataKey(key, dict.gamePlay)}
-                            </p>
-                            <p className="font-extrabold text-text-primary text-sm">
-                              {formatMetadataValue(key, value)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                    {resultTier && (
+                      <span
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-black text-white shadow-md"
+                        style={{
+                          backgroundImage: `linear-gradient(to right, ${resultTier.colorFrom}, ${resultTier.colorTo})`,
+                        }}
+                      >
+                        {resultTier.label}
+                      </span>
                     )}
+
+                    {/* Metadata Formatters */}
+                    {result.metadata &&
+                      Object.entries(result.metadata).filter(
+                        ([key]) => !METADATA_GRID_EXCLUDED_KEYS.has(key),
+                      ).length > 0 && (
+                        <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/80">
+                          {Object.entries(result.metadata)
+                            .filter(([key]) => !METADATA_GRID_EXCLUDED_KEYS.has(key))
+                            .map(([key, value]) => (
+                              <div
+                                key={key}
+                                className="bg-surface/50 p-2.5 rounded-xl border border-border/40"
+                              >
+                                <p className="text-xs text-text-muted font-bold mb-0.5">
+                                  {formatMetadataKey(key, dict.gamePlay)}
+                                </p>
+                                <p className="font-extrabold text-text-primary text-sm">
+                                  {formatMetadataValue(key, value)}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      )}
 
                     <p className="mt-6 text-[10px] font-bold uppercase tracking-wider text-text-muted">
                       owogg.com

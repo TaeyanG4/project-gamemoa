@@ -7,6 +7,9 @@ import {
   calculateTypingResult,
   computeSegmentStats,
   getRandomPassage,
+  getPassageForMode,
+  TYPING_MODES,
+  TYPING_MODE_LABELS,
 } from "../src/logic.js";
 
 test("calculateWpm returns 0 for 0 duration or 0 correct characters", () => {
@@ -66,6 +69,35 @@ test("whitespace in target passages contains standard spaces for word boundary s
   assert.equal(words[1], "quick");
   assert.equal(words[2], "brown");
   assert.equal(words[3], "fox");
+});
+
+test("TYPING_MODES has exactly one label for each mode (ko-short/ko-long/en-quote/en-word)", () => {
+  assert.deepEqual([...TYPING_MODES].sort(), ["en-quote", "en-word", "ko-long", "ko-short"].sort());
+  for (const mode of TYPING_MODES) {
+    assert.ok(TYPING_MODE_LABELS[mode], `missing label for mode "${mode}"`);
+  }
+});
+
+test("getPassageForMode returns non-empty Korean text for ko-short and ko-long", () => {
+  const short = getPassageForMode("ko-short", 0);
+  const long = getPassageForMode("ko-long", 0);
+  assert.ok(short.length > 0);
+  assert.ok(long.length > 0);
+  // Long-form passages should read as longer than short ones by construction.
+  assert.ok(long.length > short.length);
+});
+
+test("getPassageForMode falls back to the existing English quote pool for en-quote", () => {
+  assert.equal(getPassageForMode("en-quote", 0), getRandomPassage(0));
+});
+
+test("getPassageForMode generates a fresh space-separated word run for en-word", () => {
+  const passage = getPassageForMode("en-word");
+  const words = passage.split(" ");
+  assert.ok(words.length > 10, "word mode should produce many words for a 60s round");
+  for (const word of words) {
+    assert.ok(word.length > 0, "word mode should not produce empty tokens/double spaces");
+  }
 });
 
 test("computeSegmentStats after Backspace correction computes clean stats for corrected input", () => {

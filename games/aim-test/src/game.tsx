@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { GameProps } from "@owogg/game-sdk";
 import { Target, RotateCcw, Play } from "lucide-react";
 import {
@@ -9,8 +9,15 @@ import {
   type TargetPercentagePos,
 } from "./logic.js";
 
+// 3 → 2 → 1 → "GO!" — each step holds for COUNTDOWN_STEP_MS, except the final "GO!" beat which
+// holds for a shorter GO_HOLD_MS before the round actually starts.
+const COUNTDOWN_STEP_MS = 700;
+const GO_HOLD_MS = 500;
+
 export function Game({ runtime }: GameProps) {
-  const [phase, setPhase] = useState<"ready" | "playing" | "finished">("ready");
+  const [phase, setPhase] = useState<"ready" | "countdown" | "playing" | "finished">("ready");
+  // 3, 2, 1, then 0 stands for the "GO!" beat right before the round starts.
+  const [countdown, setCountdown] = useState<3 | 2 | 1 | 0>(3);
   const [targetCount, setTargetCount] = useState(0);
   const [targetPos, setTargetPos] = useState<TargetPercentagePos>({ xPercent: 50, yPercent: 50 });
   const [totalMs, setTotalMs] = useState<number | null>(null);
@@ -20,7 +27,7 @@ export function Game({ runtime }: GameProps) {
 
   const startTimeRef = useRef<number>(0);
 
-  const handleStart = useCallback(() => {
+  const beginRound = useCallback(() => {
     setPhase("playing");
     setTargetCount(1);
     setTargetPos(generateRandomPercentagePos());
@@ -28,6 +35,25 @@ export function Game({ runtime }: GameProps) {
     startTimeRef.current = Date.now();
     runtime.emit({ type: "game_started", at: Date.now() });
   }, [runtime]);
+
+  const handleStart = useCallback(() => {
+    setCountdown(3);
+    setPhase("countdown");
+  }, []);
+
+  // Drives the 3 → 2 → 1 → GO! sequence once handleStart puts us in the "countdown" phase.
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    const delay = countdown === 0 ? GO_HOLD_MS : COUNTDOWN_STEP_MS;
+    const timer = setTimeout(() => {
+      if (countdown === 0) {
+        beginRound();
+      } else {
+        setCountdown((prev) => (prev - 1) as 2 | 1 | 0);
+      }
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [phase, countdown, beginRound]);
 
   const handleTargetClick = useCallback(() => {
     if (phase !== "playing") return;
@@ -95,6 +121,19 @@ export function Game({ runtime }: GameProps) {
               <Play className="w-5 h-5 fill-current" />
               <span>테스트 시작</span>
             </button>
+          </div>
+        )}
+
+        {phase === "countdown" && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 backdrop-blur-sm z-10">
+            <span
+              key={countdown}
+              className={`font-black text-white animate-in zoom-in-50 fade-in duration-300 ${
+                countdown === 0 ? "text-6xl text-brand-light" : "text-8xl"
+              }`}
+            >
+              {countdown === 0 ? "GO!" : countdown}
+            </span>
           </div>
         )}
 

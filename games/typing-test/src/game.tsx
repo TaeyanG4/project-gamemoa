@@ -1,22 +1,27 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { GameProps } from "@owogg/game-sdk";
 import {
-  getRandomPassage,
+  getPassageForMode,
   calculateTypingResult,
   computeSegmentStats,
+  TYPING_MODES,
+  TYPING_MODE_LABELS,
+  type TypingMode,
   type TypingResult,
 } from "./logic.js";
 import { manifest } from "./manifest.js";
 
-type GameStatus = "ready" | "typing" | "finished";
+// "select" (language/length picker) happens once, before the first keystroke starts the timer —
+// same 60-second round as before, just with a mode chosen up front instead of always English.
+type GameStatus = "select" | "ready" | "typing" | "finished";
 
 const TEST_DURATION_SECONDS = 60;
 
 export function Game({ runtime }: GameProps) {
-  const [passageIndex, setPassageIndex] = useState<number>(0);
-  const [targetText, setTargetText] = useState<string>(() => getRandomPassage(0));
+  const [mode, setMode] = useState<TypingMode | null>(null);
+  const [targetText, setTargetText] = useState<string>("");
   const [typedText, setTypedText] = useState<string>("");
-  const [status, setStatus] = useState<GameStatus>("ready");
+  const [status, setStatus] = useState<GameStatus>("select");
   const [timeLeft, setTimeLeft] = useState<number>(TEST_DURATION_SECONDS);
   const [startTime, setStartTime] = useState<number | null>(null);
 
@@ -27,12 +32,18 @@ export function Game({ runtime }: GameProps) {
 
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Focus input automatically on mount
+  // Focus input automatically once a mode is picked (there's nothing to type during "select")
   useEffect(() => {
-    if (status !== "finished") {
+    if (status !== "finished" && status !== "select") {
       inputRef.current?.focus();
     }
   }, [status]);
+
+  const handleSelectMode = useCallback((selected: TypingMode) => {
+    setMode(selected);
+    setTargetText(getPassageForMode(selected, 0));
+    setStatus("ready");
+  }, []);
 
   // Complete game & submit score via runtime
   const handleCompleteGame = useCallback(
@@ -63,13 +74,14 @@ export function Game({ runtime }: GameProps) {
           incorrectChars: finalResult.incorrectChars,
           totalTypedChars: finalResult.totalTypedChars,
           durationMs: finalResult.durationMs,
+          mode: mode ?? undefined,
         },
         clientStartedAt: startTime ?? now - elapsedMs,
         clientEndedAt: now,
       });
       runtime.emit({ type: "game_completed", at: now });
     },
-    [runtime, startTime, cumulativeCorrect, cumulativeIncorrect, cumulativeTyped],
+    [runtime, startTime, cumulativeCorrect, cumulativeIncorrect, cumulativeTyped, mode],
   );
 
   // 60-second Timer Loop
@@ -119,9 +131,7 @@ export function Game({ runtime }: GameProps) {
       setCumulativeTyped((prev) => prev + segment.totalTypedChars);
 
       // Advance to next passage segment without stopping timer
-      const nextIdx = (passageIndex + 1) % 4;
-      setPassageIndex(nextIdx);
-      setTargetText(getRandomPassage(nextIdx));
+      setTargetText(getPassageForMode(mode ?? "en-quote"));
       setTypedText("");
       return;
     }
@@ -138,6 +148,30 @@ export function Game({ runtime }: GameProps) {
     cumulativeTyped + currentSegment.totalTypedChars,
     currentElapsedMs,
   );
+
+  // Language/length picker shown once, before the timer or any passage exists.
+  if (status === "select") {
+    return (
+      <div className="flex flex-col items-center justify-center w-full max-w-2xl mx-auto p-4 md:p-8 select-none font-sans text-center">
+        <h3 className="text-2xl font-black text-text-primary mb-2">타자 속도 테스트</h3>
+        <p className="text-sm text-text-muted mb-8">
+          언어와 지문 길이를 선택하면 60초 테스트가 시작됩니다.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
+          {TYPING_MODES.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => handleSelectMode(m)}
+              className="px-6 py-5 bg-surface-raised hover:bg-surface-overlay border border-border/80 hover:border-brand/60 rounded-2xl font-extrabold text-text-primary transition-all cursor-pointer shadow-lg hover:-translate-y-0.5"
+            >
+              {TYPING_MODE_LABELS[m]}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

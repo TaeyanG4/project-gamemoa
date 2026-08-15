@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { GameProps } from "@owogg/game-sdk";
+import { getReactionTier } from "@owogg/shared";
 import {
   type RoundState,
   INITIAL_ROUND_STATE,
@@ -67,7 +68,7 @@ export function Game({ runtime }: GameProps) {
             sessionId: runtime.sessionId,
             score: avgMs,
             durationMs: Date.now() - (roundState.startedAt ?? Date.now()),
-            metadata: { rounds: newResults },
+            metadata: { rounds: newResults, tier: getReactionTier(avgMs).id },
             clientStartedAt: roundState.startedAt ?? Date.now(),
             clientEndedAt: Date.now(),
           });
