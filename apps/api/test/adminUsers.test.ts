@@ -105,7 +105,7 @@ test("GET /api/admin/users?query= returns an empty result set for an admin, not 
   assert.deepEqual(body.users, []);
 });
 
-test("GET /api/admin/users?query= with nothing typed short-circuits to an empty list without querying", async () => {
+test("GET /api/admin/users with nothing typed lists the (mocked-empty) full user page with pagination meta", async () => {
   const mock = createAdminDb(1);
   const res = await app.request(
     "/api/admin/users",
@@ -117,8 +117,16 @@ test("GET /api/admin/users?query= with nothing typed short-circuits to an empty 
     { DB: mock.db, ADMIN_USER_IDS: "1" } as any,
   );
   assert.equal(res.status, 200);
-  const body = (await res.json()) as { users: unknown[] };
+  const body = (await res.json()) as {
+    users: unknown[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
   assert.deepEqual(body.users, []);
+  assert.equal(body.total, 0);
+  assert.equal(body.page, 1);
+  assert.equal(body.pageSize, 20);
 });
 
 test("GET /api/admin/users/:userId returns USER_NOT_FOUND for an id the mock DB has no row for", async () => {
@@ -184,6 +192,29 @@ test("POST /api/admin/users/:userId/suspend rejects an unknown user with USER_NO
   assert.equal(res.status, 404);
   const body = (await res.json()) as { error: { code: string } };
   assert.equal(body.error.code, "USER_NOT_FOUND");
+});
+
+test("POST /api/admin/users/:userId/suspend on a protected (ADMIN_USER_IDS) admin account is rejected with ADMIN_PROTECTED", async () => {
+  const mock = createAdminDb(1);
+  const res = await app.request(
+    "/api/admin/users/1/suspend",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({
+        suspendedUntil: new Date(Date.now() + 86400000).toISOString(),
+        reason: "test",
+      }),
+    },
+    { DB: mock.db, ADMIN_USER_IDS: "1", ...LOCALHOST_ENV } as any,
+  );
+  assert.equal(res.status, 403);
+  const body = (await res.json()) as { error: { code: string } };
+  assert.equal(body.error.code, "ADMIN_PROTECTED");
 });
 
 test("POST /api/admin/users/:userId/ban without a reason is rejected before touching the DB", async () => {

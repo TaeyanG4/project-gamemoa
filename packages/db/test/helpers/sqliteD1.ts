@@ -299,3 +299,87 @@ CREATE TABLE user_moderation_audit_log (
   created_at TEXT NOT NULL
 );
 `;
+
+/** Schema for D1GameDeveloperRepository / D1SandboxGameRepository tests (migration 0024). */
+export const SANDBOX_GAMES_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE game_developers (
+  user_id INTEGER PRIMARY KEY,
+  granted_by_admin_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE game_developer_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_user_id INTEGER NOT NULL,
+  actor_admin_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE sandbox_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  developer_user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  short_description TEXT,
+  description TEXT,
+  genre TEXT NOT NULL,
+  xp_per_completion INTEGER NOT NULL DEFAULT 0,
+  score_unit TEXT,
+  score_direction TEXT,
+  score_min INTEGER,
+  score_max INTEGER,
+  score_display_prefix TEXT,
+  score_display_suffix TEXT,
+  visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+  live_version_id INTEGER,
+  review_slot INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT NULL),
+  CHECK (review_slot IS NULL OR review_slot IN (1, 2))
+);
+
+CREATE UNIQUE INDEX idx_sandbox_games_review_slot
+  ON sandbox_games(developer_user_id, review_slot)
+  WHERE review_slot IS NOT NULL;
+
+CREATE TABLE sandbox_game_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id INTEGER NOT NULL,
+  object_key TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  bundle_bytes INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+  reviewed_by_admin_id INTEGER,
+  reviewed_at TEXT,
+  reject_reason TEXT,
+  uploaded_at TEXT NOT NULL,
+  publish_status TEXT NOT NULL DEFAULT 'UPLOADED',
+  publish_error TEXT,
+  published_at TEXT,
+  manifest_key TEXT,
+  published_size_bytes INTEGER,
+  file_count INTEGER
+);
+
+CREATE TABLE sandbox_game_review_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id INTEGER NOT NULL,
+  version_id INTEGER,
+  actor_admin_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  reason TEXT,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL
+);
+`;

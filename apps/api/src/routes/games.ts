@@ -1,5 +1,8 @@
 import { Hono } from "hono";
-import { PublicGameAvailabilityResponseSchema } from "@owogg/contracts";
+import {
+  PublicGameAvailabilityResponseSchema,
+  SandboxGamePublicDetailSchema,
+} from "@owogg/contracts";
 import { createContainer } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import type { ApiEnv } from "./auth.js";
@@ -24,4 +27,29 @@ gamesRouter.get("/availability", edgeCache({ ttlSeconds: 60 }), async (c) => {
   const disabledGameIds = await gameSettingsUseCases.getDisabledGameIds();
 
   return c.json(PublicGameAvailabilityResponseSchema.parse({ disabledGameIds }), 200);
+});
+
+// GET /api/games/sandbox/:slug — public, no auth. The one piece of sandbox-game metadata a
+// player-facing page needs (title/description/genre) before they hit PLAY, without exposing
+// anything review/publish-internal. Reuses resolveLiveVersion — the exact same PUBLIC +
+// live-version gate the actual bundle-serving routes use (apps/api/src/routes/gameServing.ts) —
+// so this can never say "found" for a game a player couldn't actually then go play. Same
+// can't-distinguish-unknown-from-private 404 shape as everywhere else in the sandbox game surface.
+gamesRouter.get("/sandbox/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
+  if (!c.env?.DB) return c.text("Not Found", 404);
+
+  const { sandboxGameUseCases } = createContainer(c.env.DB);
+  const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
+  if (!resolved) return c.text("Not Found", 404);
+
+  return c.json(
+    SandboxGamePublicDetailSchema.parse({
+      slug: resolved.game.slug,
+      title: resolved.game.title,
+      shortDescription: resolved.game.shortDescription,
+      description: resolved.game.description,
+      genre: resolved.game.genre,
+    }),
+    200,
+  );
 });

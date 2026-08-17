@@ -34,7 +34,7 @@ function createFakeModerationRepo(): UserModerationRepository & {
   return {
     records,
     async searchUsers() {
-      return [];
+      return { users: [], total: 0 };
     },
     async getModeration(userId) {
       return records.get(userId) ?? null;

@@ -9,7 +9,8 @@
     }
   },
   "dependencies": {
-    "@owogg/core": "workspace:*"
+    "@owogg/core": "workspace:*",
+    "aws4fetch": "^1.0.20"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

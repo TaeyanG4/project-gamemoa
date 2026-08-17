@@ -11,3 +11,32 @@ export function getApiUrl(): string {
 }
 
 export const API_URL = getApiUrl();
+
+/**
+ * Origin that serves uploaded sandbox game bundles. Deliberately a *different* host from the main
+ * site: everything inside a game iframe is third-party code, and a separate origin is what makes
+ * the browser treat it as such (no access to owogg.com's cookies, storage, or DOM) rather than
+ * relying on the iframe attributes alone.
+ *
+ * Configured, never hardcoded to one hostname, so moving games onto a fully separate registrable
+ * domain later (the stronger isolation — a sibling subdomain still shares a parent domain, so it
+ * can be reached by a `document.domain`-style or cookie-scope mistake) is an env change rather
+ * than a code change. Falls back to the API origin because that Worker is what serves `/play/*`
+ * today; a dedicated host simply routes to the same Worker.
+ */
+export function getGameOrigin(): string {
+  if (typeof window !== "undefined") {
+    const envUrl = (import.meta as unknown as { env?: { VITE_GAME_ORIGIN?: string } }).env
+      ?.VITE_GAME_ORIGIN;
+    if (envUrl) return envUrl;
+  }
+  return API_URL;
+}
+
+export const GAME_ORIGIN = getGameOrigin();
+
+/** URL a sandbox game is played from. Resolves the game's current live version server-side, so the
+ * caller never needs to know version ids. */
+export function sandboxGamePlayUrl(slug: string): string {
+  return `${GAME_ORIGIN.replace(/\/+$/, "")}/play/${encodeURIComponent(slug)}`;
+}

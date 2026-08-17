@@ -14,3 +14,10 @@ export * from "./d1/D1AdminAccountRepository.js";
 export * from "./d1/D1GameSettingsRepository.js";
 export * from "./d1/D1AdminMonitoringRepository.js";
 export * from "./d1/D1UserModerationRepository.js";
+export * from "./d1/D1GameDeveloperRepository.js";
+export * from "./d1/D1SandboxGameRepository.js";
+export * from "./storage/BackblazeB2GameBundleRepository.js";
+export * from "./storage/UnconfiguredGameBundleRepository.js";
+// R2GameBundleRepository (packages/db/src/storage/R2GameBundleRepository.ts) is intentionally
+// NOT exported here — it's dormant (see the file's own header comment) and not part of this
+// package's active surface. Import it by path directly if it's ever revived.

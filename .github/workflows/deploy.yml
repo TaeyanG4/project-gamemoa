@@ -34,6 +34,47 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Sandbox game bundles must only ever be reachable from the dedicated game-hosting host
+      # (see apps/api/src/routes/gameServing.ts's origin guard) — GAME_ORIGIN/VITE_GAME_ORIGIN
+      # missing or malformed must fail this deploy loudly, not silently ship a Worker that falls
+      # back to serving sandbox UGC from api.owogg.com. A production deploy proceeding with the
+      # wrong origin is a real security regression, not a cosmetic misconfiguration, so this is a
+      # hard gate rather than a warning.
+      - name: Validate Production Game Origins
+        run: |
+          set -e
+          fail=0
+          check_url() {
+            local name="$1"
+            local value="$2"
+            if [ -z "$value" ]; then
+              echo "::error::$name is not set (repository variable missing)"
+              fail=1
+              return
+            fi
+            case "$value" in
+              https://*) ;;
+              *)
+                echo "::error::$name ('$value') must be an https:// URL"
+                fail=1
+                ;;
+            esac
+          }
+          check_url "GAME_ORIGIN" "$GAME_ORIGIN"
+          check_url "VITE_GAME_ORIGIN" "$VITE_GAME_ORIGIN"
+          if [ "$GAME_ORIGIN" != "$VITE_GAME_ORIGIN" ]; then
+            echo "::error::GAME_ORIGIN ($GAME_ORIGIN) and VITE_GAME_ORIGIN ($VITE_GAME_ORIGIN) must match — the API's origin guard and the web build's iframe src must agree on one host."
+            fail=1
+          fi
+          if [ "$fail" = "1" ]; then
+            echo "::error::Production game-origin configuration is invalid — see docs/GAME_CREATION_GUIDE.md §3.8/§7. Set both repository variables to the connected game-hosting domain (currently https://play.owogg.com) before deploying."
+            exit 1
+          fi
+          echo "✅ GAME_ORIGIN and VITE_GAME_ORIGIN both set to $GAME_ORIGIN"
+        env:
+          GAME_ORIGIN: ${{ vars.GAME_ORIGIN }}
+          VITE_GAME_ORIGIN: ${{ vars.VITE_GAME_ORIGIN }}
+
       - name: Apply D1 Migrations to Production
         run: pnpm d1:migrate:prod
         env:
@@ -49,6 +90,17 @@ jobs:
           # Creator provider client IDs/redirect URIs are non-secret and optional — OwOGG must
           # still deploy when some (or all) are unconfigured (`|| ''`). Client secrets/API keys go
           # through `secrets:` below, never `--var`.
+          #
+          # B2_ENDPOINT/B2_REGION/B2_BUCKET_NAME/B2_KEY_ID/B2_APPLICATION_KEY and GAME_ORIGIN's own
+          # existence (as a Secret vs. plain Variable, however an operator first set it via the
+          # Dashboard) are DELIBERATELY absent from this list, and from `secrets:` below — nothing
+          # in this deploy step manages them. That is safe, not an oversight: `wrangler deploy
+          # --help` confirms secrets are never deleted by any deployment, with or without
+          # `--keep-vars` (not used here — the intentional, "everything this Worker needs is listed
+          # right here" alternative to it). GAME_ORIGIN *is* explicitly listed below, though, because
+          # unlike a secret it IS a plain var, and plain vars not present in this `--var` list ARE
+          # deleted on every deploy that omits `--keep-vars` — which is exactly the loss this line
+          # exists to prevent for a value an operator may have first set by hand via the Dashboard.
           command: >-
             deploy
             --var COMMIT_SHA:${{ github.event.workflow_run.head_sha }}
@@ -59,6 +111,7 @@ jobs:
             DISCORD_INSTALL_URL:${{ vars.DISCORD_INSTALL_URL || '' }}
             DISCORD_COMMAND_SYNC_ENABLED:${{ vars.DISCORD_COMMAND_SYNC_ENABLED || 'false' }}
             FRONTEND_URL:${{ vars.FRONTEND_URL }}
+            GAME_ORIGIN:${{ vars.GAME_ORIGIN }}
             ADMIN_USER_IDS:${{ vars.ADMIN_USER_IDS || '' }}
             ADMIN_LOGIN_USERNAME:${{ vars.ADMIN_LOGIN_USERNAME || '' }}
             CREATOR_ENABLED_PROVIDERS:${{ vars.CREATOR_ENABLED_PROVIDERS || '' }}
@@ -125,6 +178,7 @@ jobs:
           COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
           VITE_API_URL: ${{ vars.VITE_API_URL || 'https://api.owogg.com' }}
+          VITE_GAME_ORIGIN: ${{ vars.VITE_GAME_ORIGIN }}
 
       - name: Deploy Web Frontend
         uses: cloudflare/wrangler-action@v3

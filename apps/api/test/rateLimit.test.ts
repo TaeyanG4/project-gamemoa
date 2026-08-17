@@ -90,3 +90,57 @@ test("unauthenticated callers fall back to keying on client IP", async () => {
 
   assert.equal(keys[0], "test:ip:203.0.113.7");
 });
+
+// ── selectable binding (game-upload uses its own, stricter limiter) ──────────
+
+function appWithNamedBinding(
+  bindingName: string,
+  limiter?: unknown,
+  otherEnv: Record<string, unknown> = {},
+) {
+  const app = new Hono();
+  app.post("/upload", rateLimit({ name: "game-upload", binding: bindingName }), (c) =>
+    c.json({ ok: true }),
+  );
+  return (headers: Record<string, string> = {}) =>
+    app.request("/upload", { method: "POST", headers }, {
+      [bindingName]: limiter,
+      ...otherEnv,
+    } as never);
+}
+
+test("rateLimit checks the binding named by `binding`, not the default RATE_LIMITER", async () => {
+  const app = new Hono();
+  app.post(
+    "/upload",
+    rateLimit({ name: "game-upload", binding: "GAME_UPLOAD_RATE_LIMITER" }),
+    (c) => c.json({ ok: true }),
+  );
+
+  // A RATE_LIMITER binding present but GAME_UPLOAD_RATE_LIMITER absent must NOT protect this
+  // route — the whole point of a separate binding is that score-submit's limit doesn't leak in.
+  const res = await app.request("/upload", { method: "POST" }, {
+    RATE_LIMITER: { limit: async () => ({ success: false }) },
+  } as never);
+  assert.equal(res.status, 200, "an unrelated binding must not be consulted");
+});
+
+test("a distinctly-bound limiter rejecting a request 429s the same way as the default binding", async () => {
+  const request = appWithNamedBinding("GAME_UPLOAD_RATE_LIMITER", {
+    limit: async () => ({ success: false }),
+  });
+  const res = await request();
+  assert.equal(res.status, 429);
+});
+
+test("the game-upload limiter key is prefixed distinctly from score-submit's", async () => {
+  const keys: string[] = [];
+  const request = appWithNamedBinding("GAME_UPLOAD_RATE_LIMITER", {
+    limit: async ({ key }: { key: string }) => {
+      keys.push(key);
+      return { success: true };
+    },
+  });
+  await request({ "CF-Connecting-IP": "203.0.113.7" });
+  assert.equal(keys[0], "game-upload:ip:203.0.113.7");
+});

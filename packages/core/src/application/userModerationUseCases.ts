@@ -2,7 +2,8 @@ import type {
   UserModerationRepository,
   UserModerationRecord,
   UserModerationAuditEntry,
-  AdminUserSearchResult,
+  AdminUserSearchOptions,
+  AdminUserSearchPage,
   SessionRepository,
   UserRepository,
 } from "../ports/repositories.js";
@@ -38,8 +39,8 @@ export class UserModerationUseCases {
     private userRepo: UserRepository,
   ) {}
 
-  async searchUsers(query: string, limit?: number): Promise<AdminUserSearchResult[]> {
-    return this.moderationRepo.searchUsers(query, limit);
+  async searchUsers(options: AdminUserSearchOptions): Promise<AdminUserSearchPage> {
+    return this.moderationRepo.searchUsers(options);
   }
 
   async getModeration(userId: number): Promise<UserModerationRecord | null> {

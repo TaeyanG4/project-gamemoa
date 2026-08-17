@@ -92,6 +92,24 @@ test("ScoreUseCases - submitScore validates score payload before persistence", a
   assert.equal(validRes.saved?.score, 250);
 });
 
+test("ScoreUseCases - submitScore rejects a game id absent from the built-in registry and never persists it (2026-08-17 beta hardening)", async () => {
+  const repo = new FakeScoreRepository();
+  const useCases = new ScoreUseCases(repo);
+
+  // A sandbox game slug (or any other unrecognized id) — score submission for these is explicitly
+  // unsupported, not silently accepted under a loose bound. No row saved means no XP either,
+  // since progression is only recorded off an *accepted* submission in the route layer.
+  const res = await useCases.submitScore({
+    userId: 101,
+    gameId: "some-sandbox-game-slug",
+    score: 100,
+    nickname: "Tester",
+  });
+  assert.equal(res.valid, false);
+  assert.equal(res.saved, undefined);
+  assert.equal(repo.scores.length, 0);
+});
+
 test("ScoreUseCases - getLeaderboard respects manifest ordering direction", async () => {
   const repo = new FakeScoreRepository();
   const useCases = new ScoreUseCases(repo);

@@ -113,10 +113,15 @@ export function validateScoreByManifest(gameId: string, score: number): { valid:
   }
 
   const manifest = GAME_MANIFEST_MAP[gameId];
-  if (!manifest || !manifest.scoreConfig) {
-    if (score > 1000000) {
-      return { valid: false, reason: "허용 범위를 초과한 점수입니다." };
-    }
+  if (!manifest) {
+    // Deliberately not an "accept anything under a million" fallback (2026-08-17 beta hardening)
+    // - that let ANY unrecognized game id, sandbox games included, submit an arbitrary score with
+    // almost no bounds check, since sandbox games are never in this static registry. Sandbox game
+    // score submission is explicitly unsupported until a dedicated DB-backed validation path is
+    // built for it - this is that decision enforced, not a gap.
+    return { valid: false, reason: "지원하지 않는 게임입니다." };
+  }
+  if (!manifest.scoreConfig) {
     return { valid: true };
   }
 

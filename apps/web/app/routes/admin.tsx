@@ -719,6 +719,18 @@ function AdminDashboard({
         >
           <Users className="h-3.5 w-3.5" /> 유저 관리
         </Link>
+        <Link
+          to="/admin/sandbox-games"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+        >
+          <Gamepad2 className="h-3.5 w-3.5" /> 제작 게임 심사
+        </Link>
+        <Link
+          to="/admin/game-developers"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+        >
+          <UserCog className="h-3.5 w-3.5" /> 게임 제작자 임명
+        </Link>
         {role === "SUPERADMIN" && (
           <Link
             to="/admin/accounts"

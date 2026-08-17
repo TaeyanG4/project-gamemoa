@@ -30,6 +30,18 @@
       "namespace_id": "1001",
       "simple": { "limit": 30, "period": 60 },
     },
+    // Separate, much stricter binding for sandbox game bundle uploads (2026-08-17 beta hardening)
+    // — deliberately NOT reusing RATE_LIMITER above with a different `name` prefix, because a
+    // Cloudflare rate-limit binding's numeric limit is fixed per binding, not per logical
+    // namespace: sharing RATE_LIMITER would mean uploads inherit score-submission's 30/60s, which
+    // is far too permissive for an operation that costs real B2 writes and decompression CPU per
+    // call. This is a capacity/abuse guard only, not the submission quota's source of truth — see
+    // SANDBOX_GAME_POLICY.MAX_CONCURRENT_REVIEW_SLOTS (a real DB invariant) for that.
+    {
+      "name": "GAME_UPLOAD_RATE_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 2, "period": 60 },
+    },
   ],
   "triggers": {
     "crons": ["0 */6 * * *"],

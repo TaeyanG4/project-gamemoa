@@ -1,3 +1,5 @@
+import type { AdminUserSearchPeriod, AdminUserSearchSort } from "../domain/adminUserQuery.js";
+
 export interface User {
   id: number;
   nickname: string;
@@ -810,6 +812,22 @@ export interface AdminUserSearchResult {
   scoreSubmissionBlocked: boolean;
 }
 
+export interface AdminUserSearchOptions {
+  /** Nickname/email substring or exact numeric id. Empty/omitted lists every user (subject to
+   * `period`), which is what powers the plain "browse all users" list, not just ad-hoc search. */
+  query?: string | undefined;
+  period?: AdminUserSearchPeriod | undefined;
+  sort?: AdminUserSearchSort | undefined;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminUserSearchPage {
+  users: AdminUserSearchResult[];
+  /** Total rows matching `query`/`period`, ignoring `limit`/`offset` — for page-count UI. */
+  total: number;
+}
+
 /**
  * Suspend/ban (blocks login — enforced by SessionRepository.findSession, not here), an
  * independent score-submission block (enforced by the scores route), and score reset/restore.
@@ -818,7 +836,7 @@ export interface AdminUserSearchResult {
  * `user_moderation_audit_log` row; there is no update/delete path for that log anywhere.
  */
 export interface UserModerationRepository {
-  searchUsers(query: string, limit?: number): Promise<AdminUserSearchResult[]>;
+  searchUsers(options: AdminUserSearchOptions): Promise<AdminUserSearchPage>;
   getModeration(userId: number): Promise<UserModerationRecord | null>;
   suspendUser(
     userId: number,
