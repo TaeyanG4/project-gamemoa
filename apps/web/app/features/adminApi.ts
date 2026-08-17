@@ -18,10 +18,18 @@ import {
   AdminUserDetailResponseSchema,
   UserModerationRecordSchema,
   AdminScoreActionResponseSchema,
+  GameDeveloperListResponseSchema,
+  GameDeveloperRecordSchema,
+  SandboxGameReviewQueueResponseSchema,
+  SandboxGameVersionRecordSchema,
+  SandboxGameRecordSchema,
+  SandboxGameDetailResponseSchema,
   type AdminAccountRoleValue,
   type AdminAccountStatusValue,
   type AdminUserPeriod,
   type AdminUserSort,
+  type SandboxGameMetadataUpdateRequest,
+  type SandboxGameVisibility,
 } from "@owogg/contracts";
 import { apiFetch } from "../lib/api/client";
 
@@ -214,5 +222,67 @@ export function postResetUserScores(userId: number, reason: string) {
 export function postRestoreUserScores(userId: number) {
   return apiFetch(`/api/admin/users/${userId}/restore-scores`, AdminScoreActionResponseSchema, {
     method: "POST",
+  });
+}
+
+// ── Game developers (upload permission, V1 invite-only) ──
+
+export function fetchGameDevelopers() {
+  return apiFetch("/api/admin/game-developers", GameDeveloperListResponseSchema);
+}
+
+export function postGrantGameDeveloper(userId: number) {
+  return apiFetch("/api/admin/game-developers", GameDeveloperRecordSchema, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export function postRevokeGameDeveloper(userId: number) {
+  return apiFetch(`/api/admin/game-developers/${userId}/revoke`, GameDeveloperRecordSchema, {
+    method: "POST",
+  });
+}
+
+// ── Sandbox games (review queue, publish, generalized metadata) ──
+
+export function fetchSandboxReviewQueue(page = 1, pageSize = 20) {
+  return apiFetch(
+    `/api/admin/sandbox-games/review-queue?page=${page}&pageSize=${pageSize}`,
+    SandboxGameReviewQueueResponseSchema,
+  );
+}
+
+export function fetchAdminSandboxGameDetail(id: number) {
+  return apiFetch(`/api/admin/sandbox-games/${id}`, SandboxGameDetailResponseSchema);
+}
+
+export function postApproveSandboxVersion(versionId: number) {
+  return apiFetch(
+    `/api/admin/sandbox-games/versions/${versionId}/approve`,
+    SandboxGameVersionRecordSchema,
+    { method: "POST" },
+  );
+}
+
+export function postRejectSandboxVersion(versionId: number, reason: string) {
+  return apiFetch(
+    `/api/admin/sandbox-games/versions/${versionId}/reject`,
+    SandboxGameVersionRecordSchema,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+}
+
+export function patchSandboxGameMetadata(id: number, input: SandboxGameMetadataUpdateRequest) {
+  return apiFetch(`/api/admin/sandbox-games/${id}/metadata`, SandboxGameRecordSchema, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function patchSandboxGameVisibility(id: number, visibility: SandboxGameVisibility) {
+  return apiFetch(`/api/admin/sandbox-games/${id}/visibility`, SandboxGameRecordSchema, {
+    method: "PATCH",
+    body: JSON.stringify({ visibility }),
   });
 }

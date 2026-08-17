@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { useAuth } from "../features/auth";
 import { useI18n } from "../features/i18n/I18nContext";
 import { Link, useNavigate, useSearchParams } from "react-router";
@@ -16,6 +16,13 @@ import {
   EyeOff,
   Video,
   CheckCircle2,
+  Code2,
+  Gamepad2,
+  Plus,
+  ShieldCheck,
+  Upload,
+  UserCog,
+  XCircle,
 } from "lucide-react";
 import {
   fetchConnectedProviders,
@@ -33,12 +40,22 @@ import {
   fetchMyCreatorProfileApi,
   fetchCreatorProvidersApi,
 } from "../features/creators/creatorApi";
+import {
+  fetchDevMe,
+  fetchMyGames,
+  createDevGame,
+  uploadDevGameVersion,
+  withdrawDevGameSubmission,
+  countActiveSubmissions,
+} from "../features/devApi";
 import { COUNTRY_OPTIONS } from "../lib/countries";
 import type {
   ConnectedProvider,
   SocialProvider,
   CreateMergeChallengeResponse,
   CreatorProfileDto,
+  DevMeResponse,
+  SandboxGameRecord,
 } from "@owogg/contracts";
 import type { CreatorPlatformType } from "@owogg/core";
 import { ApiClientError } from "../lib/api";
@@ -100,6 +117,26 @@ export default function SettingsPage() {
     SOOP: { configured: false },
   });
 
+  // "개발" 탭 — admin 또는 임명된 게임 제작자에게만 노출 (docs/GAME_CREATION_GUIDE.md §3.6).
+  const [devMe, setDevMe] = useState<DevMeResponse | null>(null);
+  const [myGames, setMyGames] = useState<SandboxGameRecord[] | null>(null);
+  const [devError, setDevError] = useState<string | null>(null);
+  const [newGameSlug, setNewGameSlug] = useState("");
+  const [newGameTitle, setNewGameTitle] = useState("");
+  const [newGameGenre, setNewGameGenre] = useState("");
+  const [creatingGame, setCreatingGame] = useState(false);
+  const [uploadingGameId, setUploadingGameId] = useState<number | null>(null);
+  const [withdrawingGameId, setWithdrawingGameId] = useState<number | null>(null);
+
+  const refreshMyGames = useCallback(async () => {
+    try {
+      const res = await fetchMyGames();
+      setMyGames(res.games);
+    } catch {
+      setMyGames([]);
+    }
+  }, []);
+
   const refreshCreatorProfile = useCallback(async () => {
     try {
       const res = await fetchMyCreatorProfileApi();
@@ -146,8 +183,23 @@ export default function SettingsPage() {
       void fetchPublicProfileApi(user.id)
         .then((data) => setVisibility(data.visibilitySettings))
         .catch(() => setVisibility(null));
+      // "개발" 탭 gate — devMe stays null (section hidden) on any failure, including a plain
+      // 401 for a user who was never authenticated in the first place.
+      void fetchDevMe()
+        .then((res) => {
+          setDevMe(res);
+          if (res.isGameDeveloper) void refreshMyGames();
+        })
+        .catch(() => setDevMe(null));
     }
-  }, [isAuthenticated, user, refreshConnected, refreshCreatorProfile, refreshCreatorProviders]);
+  }, [
+    isAuthenticated,
+    user,
+    refreshConnected,
+    refreshCreatorProfile,
+    refreshCreatorProviders,
+    refreshMyGames,
+  ]);
 
   // Handle Discord link and Creator verify redirect status params
   useEffect(() => {
@@ -353,6 +405,60 @@ export default function SettingsPage() {
       setStatusMessage(dict.profile.visibilityUpdateFailed);
     } finally {
       setVisibilityBusyField(null);
+    }
+  };
+
+  const handleCreateGame = async (e: FormEvent) => {
+    e.preventDefault();
+    if (creatingGame || !newGameSlug.trim() || !newGameTitle.trim() || !newGameGenre.trim()) return;
+    setCreatingGame(true);
+    setDevError(null);
+    try {
+      await createDevGame({
+        slug: newGameSlug.trim(),
+        title: newGameTitle.trim(),
+        genre: newGameGenre.trim(),
+      });
+      setNewGameSlug("");
+      setNewGameTitle("");
+      setNewGameGenre("");
+      await refreshMyGames();
+    } catch (err) {
+      setDevError(err instanceof Error ? err.message : "게임 등록에 실패했습니다.");
+    } finally {
+      setCreatingGame(false);
+    }
+  };
+
+  const handleUploadVersion = async (gameId: number, file: File) => {
+    setUploadingGameId(gameId);
+    setDevError(null);
+    try {
+      await uploadDevGameVersion(gameId, file);
+      setStatusMessage("번들이 업로드되었습니다. 관리자 심사 후 승인되면 공개할 수 있습니다.");
+      await refreshMyGames();
+    } catch (err) {
+      setDevError(err instanceof Error ? err.message : "업로드에 실패했습니다.");
+    } finally {
+      setUploadingGameId(null);
+    }
+  };
+
+  // Frees the review slot this game is holding (see SANDBOX_GAME_POLICY.MAX_CONCURRENT_REVIEW_SLOTS)
+  // by withdrawing its pending version — the slot becomes immediately available for a new submission.
+  const handleWithdraw = async (gameId: number) => {
+    if (withdrawingGameId !== null) return;
+    if (!window.confirm("심사 중인 제출을 철회할까요? 철회하면 슬롯이 즉시 반환됩니다.")) return;
+    setWithdrawingGameId(gameId);
+    setDevError(null);
+    try {
+      await withdrawDevGameSubmission(gameId);
+      setStatusMessage("제출을 철회했습니다. 심사 슬롯이 반환되었습니다.");
+      await refreshMyGames();
+    } catch (err) {
+      setDevError(err instanceof Error ? err.message : "철회에 실패했습니다.");
+    } finally {
+      setWithdrawingGameId(null);
     }
   };
 
@@ -770,6 +876,183 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* 개발 — admin 또는 임명된 게임 제작자에게만 노출. V1은 임명제라 기존 유저는 이 섹션
+          자체를 보지 못한다 (docs/GAME_CREATION_GUIDE.md §3.6). */}
+      {devMe && (devMe.isGameDeveloper || devMe.isAdmin) && (
+        <div className="flex flex-col gap-5 rounded-3xl border border-border bg-surface-raised p-6 shadow-xl md:p-8">
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Code2 className="h-5 w-5 text-brand" />
+              <h2 className="text-xl font-bold text-text-primary">개발</h2>
+              {devMe.isGameDeveloper && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    countActiveSubmissions(myGames ?? []) >= 2
+                      ? "bg-accent-yellow/10 text-accent-yellow"
+                      : "bg-surface-overlay text-text-muted"
+                  }`}
+                >
+                  심사 슬롯 {countActiveSubmissions(myGames ?? [])}/2 사용 중
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-text-muted">
+              샌드박스 게임 업로드/관리 도구입니다. 업로드한 게임은 관리자 심사(승인) 후에도 기본은
+              비공개이며, 관리자가 별도로 공개 전환해야 서비스가 시작됩니다. 동시에 심사 대기 가능한
+              제출은 최대 2건이며, 승인/거절/철회되면 슬롯이 반환됩니다.
+            </p>
+          </div>
+
+          {devMe.isAdmin && (
+            <div className="flex flex-wrap gap-2">
+              <Link
+                to="/admin/game-developers"
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+              >
+                <UserCog className="h-3.5 w-3.5" /> 게임 제작자 임명 관리
+              </Link>
+              <Link
+                to="/admin/sandbox-games"
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" /> 게임 심사/공개 관리
+              </Link>
+            </div>
+          )}
+
+          {devError && (
+            <p className="rounded-xl border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-[11px] font-semibold text-accent-red">
+              {devError}
+            </p>
+          )}
+
+          {devMe.isGameDeveloper && (
+            <>
+              <form
+                onSubmit={(e) => void handleCreateGame(e)}
+                className="grid grid-cols-1 gap-2 rounded-2xl bg-surface p-4 sm:grid-cols-3"
+              >
+                <input
+                  type="text"
+                  value={newGameSlug}
+                  onChange={(e) => setNewGameSlug(e.target.value)}
+                  placeholder="슬러그 (예: my-shooter)"
+                  className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
+                />
+                <input
+                  type="text"
+                  value={newGameTitle}
+                  onChange={(e) => setNewGameTitle(e.target.value)}
+                  placeholder="게임 이름"
+                  className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
+                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newGameGenre}
+                    onChange={(e) => setNewGameGenre(e.target.value)}
+                    placeholder="장르 (예: 슈터)"
+                    className="min-w-0 flex-1 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
+                  />
+                  <button
+                    type="submit"
+                    disabled={
+                      creatingGame ||
+                      !newGameSlug.trim() ||
+                      !newGameTitle.trim() ||
+                      !newGameGenre.trim()
+                    }
+                    className="flex shrink-0 items-center gap-1 rounded-xl bg-brand px-3 py-2 text-xs font-bold text-white hover:bg-brand-light disabled:opacity-50"
+                  >
+                    {creatingGame ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
+                    등록
+                  </button>
+                </div>
+              </form>
+
+              <div className="flex flex-col divide-y divide-border/60">
+                {(myGames ?? []).length === 0 ? (
+                  <p className="py-3 text-center text-xs text-text-muted">
+                    아직 등록한 게임이 없습니다.
+                  </p>
+                ) : (
+                  (myGames ?? []).map((g) => (
+                    <div key={g.id} className="flex items-center justify-between gap-3 py-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Gamepad2 className="h-4 w-4 shrink-0 text-brand-light" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-text-primary">
+                            {g.title}{" "}
+                            <span className="text-[10px] font-bold text-text-muted">#{g.id}</span>
+                          </p>
+                          <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-muted">
+                            <span
+                              className={`rounded-full px-1.5 py-0.5 font-bold ${
+                                g.visibility === "PUBLIC"
+                                  ? "bg-accent-green/10 text-accent-green"
+                                  : "bg-surface-overlay text-text-muted"
+                              }`}
+                            >
+                              {g.visibility === "PUBLIC" ? "공개" : "비공개"}
+                            </span>
+                            <span>{g.liveVersionId ? "승인된 버전 있음" : "승인 전"}</span>
+                            {g.reviewSlot !== null && (
+                              <span className="rounded-full bg-accent-yellow/10 px-1.5 py-0.5 font-bold text-accent-yellow">
+                                심사 대기 중 (슬롯 {g.reviewSlot})
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {g.reviewSlot !== null && (
+                          <button
+                            type="button"
+                            onClick={() => void handleWithdraw(g.id)}
+                            disabled={withdrawingGameId !== null}
+                            className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-muted hover:border-accent-red hover:text-accent-red disabled:opacity-50"
+                          >
+                            {withdrawingGameId === g.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5" />
+                            )}
+                            철회
+                          </button>
+                        )}
+                        <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand">
+                          {uploadingGameId === g.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Upload className="h-3.5 w-3.5" />
+                          )}
+                          버전 업로드
+                          <input
+                            type="file"
+                            accept=".zip"
+                            className="hidden"
+                            disabled={uploadingGameId !== null}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = "";
+                              if (file) void handleUploadVersion(g.id, file);
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

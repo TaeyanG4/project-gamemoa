@@ -1,0 +1,80 @@
+import {
+  DevMeResponseSchema,
+  SandboxGameListResponseSchema,
+  SandboxGameDetailResponseSchema,
+  SandboxGameRecordSchema,
+  SandboxGameVersionRecordSchema,
+  type SandboxGameCreateRequest,
+} from "@owogg/contracts";
+import { apiFetch } from "../lib/api/client";
+import { API_URL } from "../lib/api/config";
+import { ApiClientError } from "../lib/api";
+
+/** Developer-facing sandbox game API (the settings "개발" tab). Plain-session-gated on the
+ * server (apps/api/src/routes/devGames.ts) — never requires the admin step-up flow. */
+
+export function fetchDevMe() {
+  return apiFetch("/api/dev/me", DevMeResponseSchema);
+}
+
+export function fetchMyGames() {
+  return apiFetch("/api/dev/games", SandboxGameListResponseSchema);
+}
+
+export function fetchDevGameDetail(id: number) {
+  return apiFetch(`/api/dev/games/${id}`, SandboxGameDetailResponseSchema);
+}
+
+export function createDevGame(input: SandboxGameCreateRequest) {
+  return apiFetch("/api/dev/games", SandboxGameRecordSchema, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** Withdraws a not-yet-decided submission, freeing the review slot it was holding (see
+ * SANDBOX_GAME_POLICY.MAX_CONCURRENT_REVIEW_SLOTS). A 409 SUBMISSION_LIMIT_REACHED from
+ * createDevGame is the caller's cue that this — or waiting for a decision — is needed first. */
+export function withdrawDevGameSubmission(gameId: number) {
+  return apiFetch(`/api/dev/games/${gameId}/withdraw`, SandboxGameRecordSchema, {
+    method: "POST",
+  });
+}
+
+/** Games still occupying one of this developer's limited concurrent review slots — derived
+ * client-side from the same list `fetchMyGames` already returns, rather than a dedicated summary
+ * endpoint (see SandboxGameRecordSchema.reviewSlot). */
+export function countActiveSubmissions(games: Array<{ reviewSlot: 1 | 2 | null }>): number {
+  return games.filter((g) => g.reviewSlot !== null).length;
+}
+
+/** Bundle upload is multipart, not JSON — bypasses apiFetch's JSON Content-Type default. */
+export async function uploadDevGameVersion(gameId: number, file: File) {
+  const form = new FormData();
+  form.append("bundle", file);
+
+  const res = await fetch(`${API_URL}/api/dev/games/${gameId}/versions`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+
+  if (!res.ok) {
+    let detail: string | undefined;
+    let code: string | undefined;
+    try {
+      const body = (await res.json()) as { error?: { code?: string; message?: string } };
+      detail = body.error?.message;
+      code = body.error?.code;
+    } catch {
+      // ignore parse failure — fall back to a generic message below
+    }
+    throw new ApiClientError("HttpError", detail || `업로드에 실패했습니다. (HTTP ${res.status})`, {
+      status: res.status,
+      ...(code ? { code } : {}),
+    });
+  }
+
+  const json = await res.json();
+  return SandboxGameVersionRecordSchema.parse(json);
+}
