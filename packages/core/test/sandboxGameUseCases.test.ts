@@ -1,0 +1,1598 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  SandboxGameUseCases,
+  SandboxGameUseCaseFailure,
+} from "../src/application/sandboxGameUseCases.js";
+import { GameBundlePublisher } from "../src/application/gameBundlePublisher.js";
+import type {
+  SandboxGameRepository,
+  SandboxGameRecord,
+  SandboxGameVersionRecord,
+  SandboxGameMetadataInput,
+  SandboxGamePublishStatus,
+  GameBundleStorageRepository,
+  BundleArchiveReader,
+} from "../src/ports/sandboxGames.js";
+import { SANDBOX_GAME_POLICY } from "../src/domain/sandboxGames.js";
+import type { SandboxGameBundleManifest } from "../src/domain/sandboxGameBundle.js";
+
+// The zip container format itself is an infrastructure detail behind the BundleArchiveReader port,
+// so these tests inject archive *contents* directly. Real zip bytes (and therefore fflate) are
+// exercised end to end in apps/api/test/gameServing.test.ts and publishPipeline.test.ts.
+function bytes(text: string): Uint8Array {
+  return new TextEncoder().encode(text);
+}
+
+const MINIMAL_BUNDLE: Record<string, Uint8Array> = {
+  "index.html": bytes("<h1>hi</h1>"),
+  "Build/game.wasm": bytes("\0asm fake"),
+};
+
+function createFakeArchiveReader(
+  entries: Record<string, Uint8Array> = MINIMAL_BUNDLE,
+): BundleArchiveReader & {
+  entries: Record<string, Uint8Array>;
+  malformed: boolean;
+  /** When set, readMetadata() reports these declared sizes instead of the real entry byte
+   * lengths — lets a test simulate an archive whose central directory claims a huge decompressed
+   * size while never actually materializing bytes that large (see the zip-bomb preflight test). */
+  declaredSizeOverride: Record<string, number> | null;
+  /** When set, readMetadata() reports these compressed sizes instead of matching declaredSize 1:1
+   * — lets a test exercise the compression-ratio guard specifically (as opposed to the flat
+   * total-size cap), which a 1:1 ratio would never trigger. */
+  compressedSizeOverride: Record<string, number> | null;
+  readCalls: number;
+} {
+  return {
+    entries,
+    malformed: false,
+    declaredSizeOverride: null,
+    compressedSizeOverride: null,
+    readCalls: 0,
+    readMetadata() {
+      if (this.malformed) throw new Error("not a zip");
+      return Object.entries(this.entries).map(([path, bytes]) => {
+        const declaredSize = this.declaredSizeOverride?.[path] ?? bytes.byteLength;
+        return {
+          path,
+          declaredSize,
+          // Defaults to matching declaredSize (a 1:1, always-plausible ratio) so tests that don't
+          // care about the ratio guard never trip it by accident.
+          compressedSize: this.compressedSizeOverride?.[path] ?? declaredSize,
+        };
+      });
+    },
+    read() {
+      this.readCalls++;
+      if (this.malformed) throw new Error("not a zip");
+      return this.entries;
+    },
+  };
+}
+
+function createFakeRepo(): SandboxGameRepository & {
+  games: Map<number, SandboxGameRecord>;
+  versions: Map<number, SandboxGameVersionRecord>;
+  auditActions: string[];
+} {
+  const games = new Map<number, SandboxGameRecord>();
+  const versions = new Map<number, SandboxGameVersionRecord>();
+  const auditActions: string[] = [];
+  let nextGameId = 1;
+  let nextVersionId = 1;
+
+  return {
+    games,
+    versions,
+    auditActions,
+    async findById(id) {
+      return games.get(id) ?? null;
+    },
+    async findBySlug(slug) {
+      return [...games.values()].find((g) => g.slug === slug) ?? null;
+    },
+    async listByDeveloper(developerUserId) {
+      return [...games.values()].filter((g) => g.developerUserId === developerUserId);
+    },
+    async listPublic() {
+      return [...games.values()].filter((g) => g.visibility === "PUBLIC");
+    },
+    async create(input) {
+      // Mirrors D1SandboxGameRepository.create's contract: atomically pick the lowest slot (1 or
+      // 2) not already held by this developer, or return null if both are taken. A single-threaded
+      // Map can't reproduce the race the real UNIQUE INDEX guards against — that invariant is
+      // proven against real SQLite in packages/db/test/D1SandboxGameRepository.test.ts — this only
+      // needs to match the *contract* so use-case-level tests can exercise SUBMISSION_LIMIT_REACHED.
+      const takenSlots = new Set(
+        [...games.values()]
+          .filter((g) => g.developerUserId === input.developerUserId && g.reviewSlot !== null)
+          .map((g) => g.reviewSlot),
+      );
+      const slot = !takenSlots.has(1) ? 1 : !takenSlots.has(2) ? 2 : null;
+      if (slot === null) return null;
+
+      const id = nextGameId++;
+      const record: SandboxGameRecord = {
+        id,
+        slug: input.slug,
+        developerUserId: input.developerUserId,
+        title: input.title,
+        shortDescription: input.shortDescription,
+        description: input.description,
+        genre: input.genre,
+        xpPerCompletion: 0,
+        scoreUnit: null,
+        scoreDirection: null,
+        scoreMin: null,
+        scoreMax: null,
+        scoreDisplayPrefix: null,
+        scoreDisplaySuffix: null,
+        visibility: "PRIVATE",
+        liveVersionId: null,
+        reviewSlot: slot,
+        createdAt: input.nowIso,
+        updatedAt: input.nowIso,
+      };
+      games.set(id, record);
+      return record;
+    },
+    async releaseReviewSlot(id, nowIso) {
+      const existing = games.get(id);
+      if (!existing) throw new Error("not found");
+      const updated = { ...existing, reviewSlot: null, updatedAt: nowIso };
+      games.set(id, updated);
+      return updated;
+    },
+    async updateMetadata(id, input: SandboxGameMetadataInput, nowIso) {
+      const existing = games.get(id);
+      if (!existing) throw new Error("not found");
+      const updated = { ...existing, ...input, updatedAt: nowIso } as SandboxGameRecord;
+      games.set(id, updated);
+      return updated;
+    },
+    async setVisibility(id, visibility, nowIso) {
+      const existing = games.get(id);
+      if (!existing) throw new Error("not found");
+      const updated = { ...existing, visibility, updatedAt: nowIso };
+      games.set(id, updated);
+      return updated;
+    },
+    async setLiveVersion(id, versionId, nowIso) {
+      const existing = games.get(id);
+      if (!existing) throw new Error("not found");
+      const updated = { ...existing, liveVersionId: versionId, updatedAt: nowIso };
+      games.set(id, updated);
+      return updated;
+    },
+    async createVersion(input) {
+      const id = nextVersionId++;
+      const record: SandboxGameVersionRecord = {
+        id,
+        gameId: input.gameId,
+        objectKey: input.objectKey,
+        contentHash: input.contentHash,
+        bundleBytes: input.bundleBytes,
+        status: "PENDING_REVIEW",
+        reviewedByAdminId: null,
+        reviewedAt: null,
+        rejectReason: null,
+        uploadedAt: input.nowIso,
+        publishStatus: "UPLOADED",
+        publishError: null,
+        publishedAt: null,
+        manifestKey: null,
+        publishedSizeBytes: null,
+        fileCount: null,
+      };
+      versions.set(id, record);
+      return record;
+    },
+    async setVersionPublishState(id, state) {
+      const existing = versions.get(id);
+      if (!existing) throw new Error("not found");
+      const updated: SandboxGameVersionRecord = { ...existing, ...state };
+      versions.set(id, updated);
+      return updated;
+    },
+    async findVersionById(id) {
+      return versions.get(id) ?? null;
+    },
+    async listVersionsByGame(gameId) {
+      return [...versions.values()].filter((v) => v.gameId === gameId);
+    },
+    async listPendingVersions(limit, offset) {
+      const pending = [...versions.values()].filter((v) => v.status === "PENDING_REVIEW");
+      return { total: pending.length, versions: pending.slice(offset, offset + limit) };
+    },
+    async decideVersion(id, status, adminId, reason, nowIso) {
+      const existing = versions.get(id);
+      if (!existing) throw new Error("not found");
+      const updated: SandboxGameVersionRecord = {
+        ...existing,
+        status,
+        reviewedByAdminId: adminId,
+        reviewedAt: nowIso,
+        rejectReason: reason,
+      };
+      versions.set(id, updated);
+      return updated;
+    },
+    async withdrawVersion(id) {
+      const existing = versions.get(id);
+      if (!existing) throw new Error("not found");
+      if (existing.status !== "PENDING_REVIEW") return existing;
+      const updated: SandboxGameVersionRecord = { ...existing, status: "WITHDRAWN" };
+      versions.set(id, updated);
+      return updated;
+    },
+    async appendReviewAudit(entry) {
+      auditActions.push(entry.action);
+    },
+    async listReviewAudit() {
+      return [];
+    },
+  };
+}
+
+function createFakeStorage(): GameBundleStorageRepository & {
+  objects: Map<string, { bytes: Uint8Array; contentType: string; contentEncoding?: string }>;
+  putKeys: string[];
+  deletedKeys: string[];
+  /** When set, a putObject whose key contains this substring throws — used to simulate a publish
+   * that dies part-way through, which is the failure mode partial-publish safety exists for. */
+  failPutContaining?: string;
+} {
+  return {
+    objects: new Map(),
+    putKeys: [],
+    deletedKeys: [],
+    async putObject(input) {
+      if (this.failPutContaining && input.key.includes(this.failPutContaining)) {
+        throw new Error(`simulated storage failure for ${input.key}`);
+      }
+      const raw =
+        input.bytes instanceof Uint8Array
+          ? input.bytes
+          : new Uint8Array(input.bytes as ArrayBuffer);
+      this.putKeys.push(input.key);
+      this.objects.set(input.key, {
+        bytes: raw,
+        contentType: input.contentType,
+        ...(input.contentEncoding ? { contentEncoding: input.contentEncoding } : {}),
+      });
+    },
+    async getObject(key) {
+      const found = this.objects.get(key);
+      if (!found) return null;
+      return found.bytes.buffer.slice(
+        found.bytes.byteOffset,
+        found.bytes.byteOffset + found.bytes.byteLength,
+      ) as ArrayBuffer;
+    },
+    async deleteObject(key) {
+      this.deletedKeys.push(key);
+      this.objects.delete(key);
+    },
+  };
+}
+
+function createUseCases(entries?: Record<string, Uint8Array>) {
+  const repo = createFakeRepo();
+  const storage = createFakeStorage();
+  const archives = createFakeArchiveReader(entries);
+  const publisher = new GameBundlePublisher(repo, storage, archives);
+  const useCases = new SandboxGameUseCases(repo, storage, publisher);
+  return { useCases, repo, storage, archives, publisher };
+}
+
+async function createGameWithLiveVersion(entries?: Record<string, Uint8Array>) {
+  const ctx = createUseCases(entries);
+  const game = await ctx.useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await ctx.useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+  await ctx.useCases.decideVersion({
+    versionId: version.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+  await ctx.useCases.setVisibility(game.id, 99, "PUBLIC");
+  return { ...ctx, game, version };
+}
+
+// ── existing catalog/review invariants ───────────────────────────────────────
+
+test("createGame rejects an invalid slug", async () => {
+  const { useCases } = createUseCases();
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: "AB", // too short, and uppercase
+        developerUserId: 1,
+        title: "Game",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_SLUG",
+  );
+});
+
+test("createGame rejects a duplicate slug", async () => {
+  const { useCases } = createUseCases();
+  await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: "my-game",
+        developerUserId: 2,
+        title: "Other",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
+});
+
+test("uploadVersion rejects a non-owner, non-admin caller with NOT_OWNER", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 2,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "NOT_OWNER",
+  );
+});
+
+test("uploadVersion allows an admin to upload on the developer's behalf", async () => {
+  const { useCases, storage } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 999,
+    isAdmin: true,
+    bytes: new ArrayBuffer(10),
+  });
+  assert.equal(version.status, "PENDING_REVIEW");
+  assert.ok(storage.putKeys.some((k) => k.startsWith(`uploads/${game.id}/`)));
+});
+
+test("uploadVersion rejects a bundle over the size cap without ever touching storage", async () => {
+  const { useCases, storage } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(SANDBOX_GAME_POLICY.MAX_BUNDLE_BYTES + 1),
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_TOO_LARGE",
+  );
+  assert.equal(storage.putKeys.length, 0);
+});
+
+test("setVisibility to PUBLIC is rejected until a version has been approved", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () => useCases.setVisibility(game.id, 99, "PUBLIC"),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "NO_APPROVED_VERSION",
+  );
+
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+  await useCases.decideVersion({
+    versionId: version.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+
+  const published = await useCases.setVisibility(game.id, 99, "PUBLIC");
+  assert.equal(published.visibility, "PUBLIC");
+});
+
+test("decideVersion(APPROVED) sets the game's live_version_id", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+
+  await useCases.decideVersion({
+    versionId: version.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+
+  assert.equal(repo.games.get(game.id)?.liveVersionId, version.id);
+});
+
+test("decideVersion(REJECTED) requires a non-empty reason", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.decideVersion({
+        versionId: version.id,
+        adminId: 99,
+        decision: "REJECTED",
+        reason: "  ",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "REASON_REQUIRED",
+  );
+});
+
+test("decideVersion is final — a second decision on the same version is rejected with ALREADY_DECIDED", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+
+  await useCases.decideVersion({
+    versionId: version.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+  await assert.rejects(
+    () =>
+      useCases.decideVersion({
+        versionId: version.id,
+        adminId: 99,
+        decision: "REJECTED",
+        reason: "changed my mind",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "ALREADY_DECIDED",
+  );
+});
+
+test("updateMetadata rejects an out-of-policy title without writing anything", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "" }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_TITLE",
+  );
+  assert.equal(repo.games.get(game.id)?.title, "Game");
+});
+
+test("uploadVersion cleans up the orphaned storage object when the D1 write fails after a successful put", async () => {
+  const repo = createFakeRepo();
+  const storage = createFakeStorage();
+  const dbFailure = new Error("D1 write failed");
+  const publisher = new GameBundlePublisher(repo, storage, createFakeArchiveReader());
+  const useCases = new SandboxGameUseCases(
+    {
+      ...repo,
+      async createVersion(): Promise<SandboxGameVersionRecord> {
+        throw dbFailure;
+      },
+    },
+    storage,
+    publisher,
+  );
+
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    dbFailure,
+  );
+  assert.equal(storage.deletedKeys.length, 1);
+  assert.match(storage.deletedKeys[0]!, new RegExp(`^uploads/${game.id}/[0-9a-f]{64}\\.zip$`));
+});
+
+// ── publish pipeline ─────────────────────────────────────────────────────────
+
+test("uploadVersion publishes each bundle file as its own versioned object and reaches READY", async () => {
+  const { useCases, storage, game, version } = await createGameWithLiveVersion();
+
+  assert.equal(version.publishStatus, "READY");
+  assert.equal(version.fileCount, 2);
+  assert.ok(storage.putKeys.includes(`games/${game.id}/${version.id}/index.html`));
+  assert.ok(storage.putKeys.includes(`games/${game.id}/${version.id}/Build/game.wasm`));
+});
+
+test("publishing writes a manifest listing every file with its size and content type", async () => {
+  const { storage, game, version } = await createGameWithLiveVersion();
+
+  const manifestKey = `games/${game.id}/${version.id}/.owogg-manifest.json`;
+  assert.equal(version.manifestKey, manifestKey);
+  const stored = storage.objects.get(manifestKey);
+  assert.ok(stored);
+  const manifest = JSON.parse(new TextDecoder().decode(stored.bytes)) as SandboxGameBundleManifest;
+
+  assert.equal(manifest.gameId, game.id);
+  assert.equal(manifest.versionId, version.id);
+  assert.equal(manifest.entry, "index.html");
+  assert.equal(manifest.fileCount, 2);
+  assert.equal(manifest.contentHash, version.contentHash);
+  const wasm = manifest.files.find((f) => f.path === "Build/game.wasm");
+  assert.equal(wasm?.contentType, "application/wasm");
+  assert.equal(wasm?.size, bytes("\0asm fake").byteLength);
+  assert.equal(manifest.totalSize, version.publishedSizeBytes);
+});
+
+test("uploadVersion rejects a bundle with no index.html at its root", async () => {
+  const { useCases } = createUseCases({ "readme.txt": bytes("no game here") });
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_MISSING_ENTRY",
+  );
+});
+
+test("uploadVersion rejects a path-traversal entry and stores nothing at all", async () => {
+  const { useCases, storage } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "../../etc/passwd": bytes("nope"),
+  });
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_INVALID_PATH",
+  );
+  // Validation runs on the in-memory upload, before the source archive is stored or a row exists.
+  assert.equal(storage.putKeys.length, 0);
+  assert.equal(storage.objects.size, 0);
+});
+
+test("uploadVersion rejects an absolute path entry", async () => {
+  const { useCases } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "/etc/hosts": bytes("nope"),
+  });
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_INVALID_PATH",
+  );
+});
+
+test("uploadVersion rejects a bundle whose decompressed size exceeds the extracted cap", async () => {
+  // One entry just over the cap — the compressed upload is a tiny ArrayBuffer, which is exactly
+  // the zip-bomb shape MAX_EXTRACTED_BUNDLE_BYTES guards against.
+  const { useCases } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "big.data": new Uint8Array(SANDBOX_GAME_POLICY.MAX_EXTRACTED_BUNDLE_BYTES + 1),
+  });
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_EXTRACTED_TOO_LARGE",
+  );
+});
+
+test("an oversized *declared* size is rejected from archive metadata alone, before any full decompression is attempted", async () => {
+  // The actual entry bytes here are tiny — if the code only checked size after decompressing
+  // (the old behavior), this upload would sail through. declaredSizeOverride simulates a central
+  // directory claiming a huge decompressed size regardless of what the fake's real bytes are, so
+  // this test can tell "rejected from metadata" apart from "rejected after materializing bytes".
+  const { useCases, archives } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "big.data": bytes("tiny"),
+  });
+  archives.declaredSizeOverride = {
+    "index.html": 11,
+    "big.data": SANDBOX_GAME_POLICY.MAX_EXTRACTED_BUNDLE_BYTES + 1,
+  };
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_EXTRACTED_TOO_LARGE",
+  );
+  assert.equal(
+    archives.readCalls,
+    0,
+    "full decompression (readCalls) must never run once metadata alone is over the cap",
+  );
+});
+
+test("an implausible compression ratio is rejected even when the declared total stays under the flat size cap", async () => {
+  // A single small entry claiming to decompress at ~10000:1 from a tiny compressed size — under
+  // the flat 50MiB total-size cap on its own, but far beyond what DEFLATE can physically produce
+  // from that many compressed bytes (see MAX_PLAUSIBLE_COMPRESSION_RATIO). This is the guard that
+  // exists specifically because "under the flat cap" alone isn't the whole memory-safety story —
+  // see FflateBundleArchiveReader's header comment for why a lying *total* can't smuggle memory
+  // past what's already checked, and why an implausible *ratio* is the residual thing worth
+  // catching early instead of paying for a long decode loop.
+  const { useCases, archives } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "suspicious.data": bytes("tiny"),
+  });
+  archives.compressedSizeOverride = { "suspicious.data": 100 };
+  archives.declaredSizeOverride = { "suspicious.data": 100 * 1200 + 1 }; // just over the ratio cap
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_EXTRACTED_TOO_LARGE",
+  );
+  assert.equal(
+    archives.readCalls,
+    0,
+    "an implausible ratio must be caught before full decompression",
+  );
+});
+
+test("a well-compressed but plausible entry (well under the ratio ceiling) is not rejected by the ratio guard", async () => {
+  // Legitimate assets — e.g. a large solid-color texture or a repetitive data table — can
+  // genuinely compress very well. The ratio guard must not treat "compresses nicely" as suspicious
+  // on its own; it exists to catch ratios DEFLATE cannot physically produce, not merely high ones.
+  const { useCases, archives } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "texture.data": bytes("real bytes"),
+  });
+  archives.compressedSizeOverride = { "texture.data": 1000 };
+  archives.declaredSizeOverride = { "texture.data": 1000 * 500 }; // 500:1 — well under the 1200:1 ceiling
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+  assert.equal(version.publishStatus, "READY");
+});
+
+test("an oversized declared file count is rejected from archive metadata alone, before any full decompression is attempted", async () => {
+  const entries: Record<string, Uint8Array> = { "index.html": bytes("<h1>hi</h1>") };
+  const declaredSizeOverride: Record<string, number> = {};
+  for (let i = 0; i <= SANDBOX_GAME_POLICY.MAX_BUNDLE_FILE_COUNT; i++) {
+    // Real bytes stay tiny; only the declared count is large, so a pass here can only mean the
+    // code counted from metadata, not from materialized entries.
+    entries[`assets/file-${i}.txt`] = bytes("x");
+    declaredSizeOverride[`assets/file-${i}.txt`] = 1;
+  }
+  const { useCases, archives } = createUseCases(entries);
+  archives.declaredSizeOverride = declaredSizeOverride;
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_TOO_MANY_FILES",
+  );
+  assert.equal(archives.readCalls, 0);
+});
+
+test("a path-traversal entry reported only in metadata is rejected before any full decompression", async () => {
+  const { useCases, archives } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "safe.txt": bytes("ok"),
+  });
+  // Simulate the traversal entry only showing up in the central directory listing, distinct from
+  // whatever the fake's `entries` dict (used by the never-reached full read()) contains.
+  const originalMetadata = archives.readMetadata.bind(archives);
+  archives.readMetadata = () => [
+    ...originalMetadata(),
+    { path: "../../etc/passwd", declaredSize: 4 },
+  ];
+
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_INVALID_PATH",
+  );
+  assert.equal(archives.readCalls, 0);
+});
+
+test("a malformed archive is rejected at the metadata stage, without ever calling the full reader", async () => {
+  const { useCases, archives } = createUseCases();
+  archives.malformed = true;
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_MALFORMED",
+  );
+  assert.equal(archives.readCalls, 0);
+});
+
+test("uploadVersion rejects a bundle with more files than the entry-count cap", async () => {
+  const many: Record<string, Uint8Array> = { "index.html": bytes("<h1>hi</h1>") };
+  for (let i = 0; i <= SANDBOX_GAME_POLICY.MAX_BUNDLE_FILE_COUNT; i++) {
+    many[`assets/file-${i}.txt`] = bytes("x");
+  }
+  const { useCases } = createUseCases(many);
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_TOO_MANY_FILES",
+  );
+});
+
+test("uploadVersion rejects a malformed archive with BUNDLE_MALFORMED", async () => {
+  const { useCases, archives } = createUseCases();
+  archives.malformed = true;
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_MALFORMED",
+  );
+});
+
+test("publishing unwraps a single top-level wrapping folder so index.html lands at the root", async () => {
+  const { game, version, storage } = await createGameWithLiveVersion({
+    "MyGame/index.html": bytes("<h1>wrapped</h1>"),
+    "MyGame/Build/game.wasm": bytes("\0asm"),
+  });
+
+  assert.equal(version.publishStatus, "READY");
+  assert.ok(storage.putKeys.includes(`games/${game.id}/${version.id}/index.html`));
+  assert.ok(storage.putKeys.includes(`games/${game.id}/${version.id}/Build/game.wasm`));
+  assert.ok(!storage.putKeys.some((k) => k.includes("MyGame/")));
+});
+
+test("a publish that fails part-way leaves the version non-READY with a recorded error", async () => {
+  const { useCases, storage, repo } = createUseCases({
+    "index.html": bytes("<h1>hi</h1>"),
+    "Build/game.wasm": bytes("\0asm"),
+  });
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  storage.failPutContaining = "game.wasm";
+
+  await assert.rejects(() =>
+    useCases.uploadVersion({
+      gameId: game.id,
+      actingUserId: 1,
+      isAdmin: false,
+      bytes: new ArrayBuffer(10),
+    }),
+  );
+
+  const version = [...repo.versions.values()].at(-1);
+  assert.equal(version?.publishStatus, "FAILED");
+  assert.ok(version?.publishError);
+  assert.equal(version?.manifestKey, null);
+  // No manifest was written, so nothing claims this partial set of objects is a complete version.
+  assert.ok(!storage.putKeys.some((k) => k.endsWith(".owogg-manifest.json")));
+});
+
+test("a version left non-READY by a failed publish cannot be approved or made live", async () => {
+  const { useCases, storage, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  storage.failPutContaining = "index.html";
+  await assert.rejects(() =>
+    useCases.uploadVersion({
+      gameId: game.id,
+      actingUserId: 1,
+      isAdmin: false,
+      bytes: new ArrayBuffer(10),
+    }),
+  );
+  const failed = [...repo.versions.values()].at(-1)!;
+
+  await assert.rejects(
+    () =>
+      useCases.decideVersion({
+        versionId: failed.id,
+        adminId: 99,
+        decision: "APPROVED",
+        reason: null,
+      }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "VERSION_NOT_PUBLISHED",
+  );
+  // ...and the game therefore never gained a live version at all.
+  assert.equal(repo.games.get(game.id)?.liveVersionId, null);
+
+  await assert.rejects(
+    () => useCases.setLiveVersion(game.id, 99, failed.id),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "VERSION_NOT_APPROVED",
+  );
+});
+
+test("a failed publish can be recovered by republishing from the stored source archive", async () => {
+  const { useCases, storage, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  storage.failPutContaining = "index.html";
+  await assert.rejects(() =>
+    useCases.uploadVersion({
+      gameId: game.id,
+      actingUserId: 1,
+      isAdmin: false,
+      bytes: new ArrayBuffer(10),
+    }),
+  );
+  const failed = [...repo.versions.values()].at(-1)!;
+  assert.equal(failed.publishStatus, "FAILED");
+
+  // The source archive survived the failed publish, so no re-upload is needed.
+  delete storage.failPutContaining;
+  const republished = await useCases.republishVersion(failed.id);
+  assert.equal(republished.publishStatus, "READY");
+  assert.ok(storage.putKeys.includes(`games/${game.id}/${failed.id}/index.html`));
+});
+
+test("two versions of the same game publish to completely independent object paths", async () => {
+  const { useCases, storage, game, version: v1 } = await createGameWithLiveVersion();
+  const v2 = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(20), // different bytes -> different hash -> different source key
+  });
+
+  assert.notEqual(v1.id, v2.id);
+  assert.ok(storage.objects.has(`games/${game.id}/${v1.id}/index.html`));
+  assert.ok(storage.objects.has(`games/${game.id}/${v2.id}/index.html`));
+  // The earlier version's objects are untouched — which is what makes rollback free.
+  assert.ok(!storage.deletedKeys.some((k) => k.includes(`/${v1.id}/`)));
+});
+
+// ── live version switching / rollback ────────────────────────────────────────
+
+test("setLiveVersion switches the live version and records an audit entry, without re-uploading", async () => {
+  const { useCases, repo, storage, game, version: v1 } = await createGameWithLiveVersion();
+  const v2 = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(20),
+  });
+  await useCases.decideVersion({
+    versionId: v2.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+  assert.equal(repo.games.get(game.id)?.liveVersionId, v2.id);
+
+  const putsBefore = storage.putKeys.length;
+  const rolledBack = await useCases.setLiveVersion(game.id, 99, v1.id);
+
+  assert.equal(rolledBack.liveVersionId, v1.id);
+  assert.equal(storage.putKeys.length, putsBefore, "rollback must not re-upload any object");
+  assert.ok(repo.auditActions.includes("LIVE_VERSION_CHANGED"));
+});
+
+test("setLiveVersion refuses a version belonging to a different game", async () => {
+  const { useCases, version } = await createGameWithLiveVersion();
+  const other = await useCases.createGame({
+    slug: "other-game",
+    developerUserId: 1,
+    title: "Other",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () => useCases.setLiveVersion(other.id, 99, version.id),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "VERSION_NOT_FOUND",
+  );
+});
+
+test("setLiveVersion refuses a version that has not been approved", async () => {
+  const { useCases, game } = await createGameWithLiveVersion();
+  const pending = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(20),
+  });
+
+  await assert.rejects(
+    () => useCases.setLiveVersion(game.id, 99, pending.id),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "VERSION_NOT_APPROVED",
+  );
+});
+
+// ── public serving resolution ────────────────────────────────────────────────
+
+test("resolveLiveVersion returns the live version for a released game", async () => {
+  const { useCases, game, version } = await createGameWithLiveVersion();
+  const resolved = await useCases.resolveLiveVersion("my-game");
+  assert.equal(resolved?.game.id, game.id);
+  assert.equal(resolved?.version.id, version.id);
+});
+
+test("resolveLiveVersion returns null for an unknown slug and for a PRIVATE game alike", async () => {
+  const { useCases, game } = await createGameWithLiveVersion();
+  assert.equal(await useCases.resolveLiveVersion("no-such-game"), null);
+
+  await useCases.setVisibility(game.id, 99, "PRIVATE");
+  assert.equal(await useCases.resolveLiveVersion("my-game"), null);
+});
+
+test("resolvePublishedFile serves a published object with its resolved content type", async () => {
+  const { useCases, game, version } = await createGameWithLiveVersion();
+  const file = await useCases.resolvePublishedFile({
+    gameId: game.id,
+    versionId: version.id,
+    path: "Build/game.wasm",
+  });
+
+  assert.equal(file?.contentType, "application/wasm");
+  assert.equal(file?.published, true);
+  assert.equal(new TextDecoder().decode(file!.bytes), "\0asm fake");
+});
+
+test("resolvePublishedFile refuses any version of a PRIVATE game", async () => {
+  const { useCases, game, version } = await createGameWithLiveVersion();
+  await useCases.setVisibility(game.id, 99, "PRIVATE");
+
+  assert.equal(
+    await useCases.resolvePublishedFile({
+      gameId: game.id,
+      versionId: version.id,
+      path: "index.html",
+    }),
+    null,
+  );
+});
+
+test("isVersionServable matches resolvePublishedFile's own gate: true only for a PUBLIC game's APPROVED version", async () => {
+  const { useCases, game, version } = await createGameWithLiveVersion();
+  assert.equal(await useCases.isVersionServable(game.id, version.id), true);
+
+  await useCases.setVisibility(game.id, 99, "PRIVATE");
+  assert.equal(
+    await useCases.isVersionServable(game.id, version.id),
+    false,
+    "a takedown (PRIVATE) must flip this immediately",
+  );
+});
+
+test("isVersionServable is false for a version belonging to a different game", async () => {
+  const { useCases, version } = await createGameWithLiveVersion();
+  const other = await useCases.createGame({
+    slug: "other-game",
+    developerUserId: 1,
+    title: "Other",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  assert.equal(await useCases.isVersionServable(other.id, version.id), false);
+});
+
+test("isVersionServable is false for a PENDING_REVIEW version even on a PUBLIC game", async () => {
+  const { useCases, game } = await createGameWithLiveVersion();
+  const pending = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(20),
+  });
+  assert.equal(await useCases.isVersionServable(game.id, pending.id), false);
+});
+
+test("resolvePublishedFile still serves a version that is no longer live, so a rollback can't break a session mid-play", async () => {
+  const { useCases, game, version: v1 } = await createGameWithLiveVersion();
+  const v2 = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(20),
+  });
+  await useCases.decideVersion({
+    versionId: v2.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+
+  const stillServed = await useCases.resolvePublishedFile({
+    gameId: game.id,
+    versionId: v1.id,
+    path: "index.html",
+  });
+  assert.equal(stillServed?.published, true);
+});
+
+test("resolvePublishedFile falls back to the source archive when a published object is missing", async () => {
+  const { useCases, storage, game, version } = await createGameWithLiveVersion();
+
+  // Simulate the published object being unavailable — the safety net kept for the transition away
+  // from request-time unzipping.
+  storage.objects.delete(`games/${game.id}/${version.id}/index.html`);
+
+  const file = await useCases.resolvePublishedFile({
+    gameId: game.id,
+    versionId: version.id,
+    path: "index.html",
+  });
+  assert.equal(file?.published, false, "should be flagged as served from the archive fallback");
+  assert.equal(new TextDecoder().decode(file!.bytes), "<h1>hi</h1>");
+});
+
+test("resolvePublishedFile returns null when neither the published object nor the source archive is available", async () => {
+  const { useCases, storage, game, version } = await createGameWithLiveVersion();
+  storage.objects.clear();
+
+  assert.equal(
+    await useCases.resolvePublishedFile({
+      gameId: game.id,
+      versionId: version.id,
+      path: "index.html",
+    }),
+    null,
+  );
+});
+
+test("deletePublishedVersion removes exactly the objects the manifest lists, leaving the source archive", async () => {
+  const { publisher, storage, repo, game, version } = await createGameWithLiveVersion();
+
+  await publisher.deletePublishedVersion(repo.versions.get(version.id)!);
+
+  assert.ok(!storage.objects.has(`games/${game.id}/${version.id}/index.html`));
+  assert.ok(!storage.objects.has(`games/${game.id}/${version.id}/Build/game.wasm`));
+  assert.ok(!storage.objects.has(`games/${game.id}/${version.id}/.owogg-manifest.json`));
+  assert.ok(storage.objects.has(version.objectKey), "source archive must survive");
+
+  const after: SandboxGamePublishStatus | undefined = repo.versions.get(version.id)?.publishStatus;
+  assert.equal(after, "FAILED");
+});
+
+// ── review-slot quota ─────────────────────────────────────────────────────────
+
+test("createGame claims a review slot, visible on the returned record", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  assert.equal(game.reviewSlot, 1);
+});
+
+test("a third concurrent submission is rejected with SUBMISSION_LIMIT_REACHED", async () => {
+  const { useCases } = createUseCases();
+  const create = (slug: string) =>
+    useCases.createGame({
+      slug,
+      developerUserId: 1,
+      title: "Game",
+      shortDescription: null,
+      description: null,
+      genre: "puzzle",
+    });
+
+  await create("game-1");
+  await create("game-2");
+
+  await assert.rejects(
+    () => create("game-3"),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "SUBMISSION_LIMIT_REACHED",
+  );
+});
+
+test("this is not a lifetime cap: a decided game frees its slot for an unlimited number of future submissions", async () => {
+  const { useCases } = createUseCases();
+  for (let i = 0; i < 5; i++) {
+    const game = await useCases.createGame({
+      slug: `game-${i}`,
+      developerUserId: 1,
+      title: "Game",
+      shortDescription: null,
+      description: null,
+      genre: "puzzle",
+    });
+    const version = await useCases.uploadVersion({
+      gameId: game.id,
+      actingUserId: 1,
+      isAdmin: false,
+      bytes: new ArrayBuffer(10),
+    });
+    // Decide it immediately so the next iteration's createGame has a free slot again.
+    await useCases.decideVersion({
+      versionId: version.id,
+      adminId: 99,
+      decision: i % 2 === 0 ? "APPROVED" : "REJECTED",
+      reason: i % 2 === 0 ? null : "no",
+    });
+  }
+  // If this ran, 5 games were created sequentially by one developer despite a 2-slot cap —
+  // proving the cap bounds *concurrently open* submissions, not lifetime game count.
+});
+
+test("this is not a cap on total approved games: multiple already-approved games coexist without occupying slots", async () => {
+  const { useCases, repo } = createUseCases();
+  const approvedIds: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    const game = await useCases.createGame({
+      slug: `game-${i}`,
+      developerUserId: 1,
+      title: "Game",
+      shortDescription: null,
+      description: null,
+      genre: "puzzle",
+    });
+    const version = await useCases.uploadVersion({
+      gameId: game.id,
+      actingUserId: 1,
+      isAdmin: false,
+      bytes: new ArrayBuffer(10),
+    });
+    await useCases.decideVersion({
+      versionId: version.id,
+      adminId: 99,
+      decision: "APPROVED",
+      reason: null,
+    });
+    approvedIds.push(game.id);
+  }
+  for (const id of approvedIds) {
+    assert.equal(repo.games.get(id)?.reviewSlot, null, "an approved game must not hold a slot");
+  }
+  // A 4th and 5th concurrent NEW submission still succeed, since none of the 3 approved games
+  // hold a slot anymore.
+  await useCases.createGame({
+    slug: "game-4",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.createGame({
+    slug: "game-5",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+});
+
+test("REJECTED also releases the review slot, not just APPROVED", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+  await useCases.decideVersion({
+    versionId: version.id,
+    adminId: 99,
+    decision: "REJECTED",
+    reason: "no good",
+  });
+  assert.equal(repo.games.get(game.id)?.reviewSlot, null);
+});
+
+test("withdrawSubmission releases the slot and marks the pending version WITHDRAWN", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+
+  const withdrawn = await useCases.withdrawSubmission({ gameId: game.id, actingUserId: 1 });
+  assert.equal(withdrawn.reviewSlot, null);
+  assert.equal(repo.versions.get(version.id)?.status, "WITHDRAWN");
+});
+
+test("withdrawSubmission frees the slot for a new submission", async () => {
+  const { useCases } = createUseCases();
+  const g1 = await useCases.createGame({
+    slug: "game-1",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.createGame({
+    slug: "game-2",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.withdrawSubmission({ gameId: g1.id, actingUserId: 1 });
+
+  const g3 = await useCases.createGame({
+    slug: "game-3",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  assert.equal(g3.reviewSlot, 1);
+});
+
+test("withdrawSubmission rejects a non-owner", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () => useCases.withdrawSubmission({ gameId: game.id, actingUserId: 999 }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "NOT_OWNER",
+  );
+});
+
+test("withdrawSubmission on a game with no open slot is rejected with NOTHING_TO_WITHDRAW", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+  await useCases.decideVersion({
+    versionId: version.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+
+  await assert.rejects(
+    () => useCases.withdrawSubmission({ gameId: game.id, actingUserId: 1 }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "NOTHING_TO_WITHDRAW",
+  );
+});
+
+test("different developers have independent review-slot budgets", async () => {
+  const { useCases } = createUseCases();
+  const create = (slug: string, developerUserId: number) =>
+    useCases.createGame({
+      slug,
+      developerUserId,
+      title: "Game",
+      shortDescription: null,
+      description: null,
+      genre: "puzzle",
+    });
+
+  await create("dev-a-1", 1);
+  await create("dev-a-2", 1);
+  // Developer 1 is now at their limit — developer 2 is unaffected.
+  const b1 = await create("dev-b-1", 2);
+  assert.equal(b1.reviewSlot, 1);
+});

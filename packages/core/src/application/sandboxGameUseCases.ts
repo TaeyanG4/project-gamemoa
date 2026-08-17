@@ -1,0 +1,583 @@
+import type {
+  SandboxGameRepository,
+  SandboxGameRecord,
+  SandboxGameVersionRecord,
+  SandboxGameReviewAuditEntry,
+  SandboxGameMetadataInput,
+  SandboxGamePendingVersionsPage,
+  GameBundleStorageRepository,
+} from "../ports/sandboxGames.js";
+import type { SandboxGameVisibility } from "../domain/sandboxGames.js";
+import {
+  SANDBOX_GAME_POLICY,
+  isValidSandboxGameSlug,
+  canSetVisibilityPublic,
+  isPublishedVersion,
+} from "../domain/sandboxGames.js";
+import {
+  sourceArchiveObjectKey,
+  publishedObjectKey,
+  resolveBundleContentType,
+  SANDBOX_BUNDLE_REJECTIONS,
+  SandboxBundleRejectionError,
+  type SandboxBundleRejection,
+} from "../domain/sandboxGameBundle.js";
+import { sha256Hex } from "../domain/contentHash.js";
+import type { GameBundlePublisher } from "./gameBundlePublisher.js";
+
+export type SandboxGameUseCaseError =
+  | "GAME_NOT_FOUND"
+  | "VERSION_NOT_FOUND"
+  | "SLUG_TAKEN"
+  | "INVALID_SLUG"
+  | "INVALID_TITLE"
+  | "NOT_OWNER"
+  | "BUNDLE_TOO_LARGE"
+  | "BUNDLE_EMPTY"
+  | "ALREADY_DECIDED"
+  | "REASON_REQUIRED"
+  | "NO_APPROVED_VERSION"
+  /** A version whose files aren't fully published cannot be approved, made live, or served from
+   * its immutable path — see GameBundlePublisher. */
+  | "VERSION_NOT_PUBLISHED"
+  | "VERSION_NOT_APPROVED"
+  | "PUBLISH_FAILED"
+  /** The developer already has MAX_CONCURRENT_REVIEW_SLOTS games awaiting their first review
+   * decision — see createGame. */
+  | "SUBMISSION_LIMIT_REACHED"
+  /** withdrawSubmission was called on a game with no open slot and no pending version — there is
+   * nothing left to withdraw. */
+  | "NOTHING_TO_WITHDRAW"
+  | SandboxBundleRejection;
+
+export class SandboxGameUseCaseFailure extends Error {
+  constructor(public readonly code: SandboxGameUseCaseError) {
+    super(code);
+  }
+}
+
+/** Bundle rejections are raised deep in the pure domain layer (which has no reason to know about
+ * this class), so they are translated here into the single failure type the route layer maps. */
+function asFailure(err: unknown): never {
+  if (err instanceof SandboxBundleRejectionError) {
+    throw new SandboxGameUseCaseFailure(err.code);
+  }
+  throw err;
+}
+
+function isBundleRejectionCode(code: SandboxGameUseCaseError): boolean {
+  return (SANDBOX_BUNDLE_REJECTIONS as readonly string[]).includes(code);
+}
+
+function validateTitle(title: string): string {
+  const trimmed = title.trim();
+  if (
+    trimmed.length < SANDBOX_GAME_POLICY.MIN_TITLE_LENGTH ||
+    trimmed.length > SANDBOX_GAME_POLICY.MAX_TITLE_LENGTH
+  ) {
+    throw new SandboxGameUseCaseFailure("INVALID_TITLE");
+  }
+  return trimmed;
+}
+
+/** What the game-serving routes need to answer one request, resolved in one place so the
+ * "is this actually live to the public?" rule can't drift between routes. */
+export interface ServableBundleFile {
+  bytes: ArrayBuffer;
+  contentType: string;
+  contentEncoding?: string | undefined;
+  /** True when this came from the version's published objects (the normal path); false when it
+   * was recovered by decompressing the source archive (the migration fallback). */
+  published: boolean;
+}
+
+/**
+ * Orchestrates the sandbox game catalog: developer-facing create/upload, admin-facing review
+ * (approve/reject a version) and publish (visibility toggle) + metadata adjustment. Ownership and
+ * admin-eligibility gating happen at the route layer (matching how admin eligibility is checked
+ * in apps/api/src/auth/, not in core use cases elsewhere in this codebase) — this layer enforces
+ * the domain invariants: title/slug validity, one-time slug uniqueness, bundle size limits,
+ * "a version decision is final", "visibility can only go PUBLIC once a version is APPROVED", and
+ * "only a fully-published version may be served or promoted".
+ */
+export class SandboxGameUseCases {
+  constructor(
+    private repo: SandboxGameRepository,
+    private storage: GameBundleStorageRepository,
+    private publisher: GameBundlePublisher,
+  ) {}
+
+  async getById(id: number): Promise<SandboxGameRecord | null> {
+    return this.repo.findById(id);
+  }
+
+  async listMine(developerUserId: number): Promise<SandboxGameRecord[]> {
+    return this.repo.listByDeveloper(developerUserId);
+  }
+
+  async listPublic(): Promise<SandboxGameRecord[]> {
+    return this.repo.listPublic();
+  }
+
+  async listVersions(gameId: number): Promise<SandboxGameVersionRecord[]> {
+    return this.repo.listVersionsByGame(gameId);
+  }
+
+  async listPendingReview(limit: number, offset: number): Promise<SandboxGamePendingVersionsPage> {
+    return this.repo.listPendingVersions(limit, offset);
+  }
+
+  async getReviewAudit(gameId: number, limit = 50): Promise<SandboxGameReviewAuditEntry[]> {
+    return this.repo.listReviewAudit(gameId, limit);
+  }
+
+  async createGame(input: {
+    slug: string;
+    developerUserId: number;
+    title: string;
+    shortDescription: string | null;
+    description: string | null;
+    genre: string;
+  }): Promise<SandboxGameRecord> {
+    const slug = input.slug.trim().toLowerCase();
+    if (!isValidSandboxGameSlug(slug)) throw new SandboxGameUseCaseFailure("INVALID_SLUG");
+    const title = validateTitle(input.title);
+
+    const existing = await this.repo.findBySlug(slug);
+    if (existing) throw new SandboxGameUseCaseFailure("SLUG_TAKEN");
+
+    // repo.create claims a review slot atomically as part of the same insert (see
+    // D1SandboxGameRepository.create) — null here means both of this developer's
+    // MAX_CONCURRENT_REVIEW_SLOTS were already occupied by other still-undecided submissions.
+    const created = await this.repo.create({
+      slug,
+      developerUserId: input.developerUserId,
+      title,
+      shortDescription: input.shortDescription,
+      description: input.description,
+      genre: input.genre.trim(),
+      nowIso: new Date().toISOString(),
+    });
+    if (!created) throw new SandboxGameUseCaseFailure("SUBMISSION_LIMIT_REACHED");
+    return created;
+  }
+
+  /**
+   * Uploads a new bundle version for an existing game. `actingUserId`/`isAdmin` decide
+   * ownership: the game's own developer, or any admin (e.g. uploading on a developer's behalf —
+   * see docs/GAME_CREATION_GUIDE.md §3.6's "최후 수단"), may upload. Every new version starts
+   * PENDING_REVIEW regardless of whether an earlier version on the same game was already
+   * approved — the previously-approved version keeps serving until this one is decided.
+   *
+   * Order matters and is deliberate:
+   *   1. size limits, then full archive validation — all on the in-memory upload, so an invalid
+   *      bundle costs zero storage writes and creates zero rows;
+   *   2. store the source archive;
+   *   3. insert the version row (best-effort source cleanup if that fails);
+   *   4. publish the individual objects.
+   *
+   * Publishing happens here rather than at approval time so that reviewers can actually play the
+   * exact build they're reviewing, and so approving is a cheap metadata flip rather than a
+   * long-running storage operation.
+   */
+  async uploadVersion(input: {
+    gameId: number;
+    actingUserId: number;
+    isAdmin: boolean;
+    bytes: ArrayBuffer;
+    contentType?: string | undefined;
+  }): Promise<SandboxGameVersionRecord> {
+    const game = await this.repo.findById(input.gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    if (!input.isAdmin && game.developerUserId !== input.actingUserId) {
+      throw new SandboxGameUseCaseFailure("NOT_OWNER");
+    }
+    if (input.bytes.byteLength === 0) throw new SandboxGameUseCaseFailure("BUNDLE_EMPTY");
+    if (input.bytes.byteLength > SANDBOX_GAME_POLICY.MAX_BUNDLE_BYTES) {
+      throw new SandboxGameUseCaseFailure("BUNDLE_TOO_LARGE");
+    }
+
+    const prepared = (() => {
+      try {
+        return this.publisher.prepare(input.bytes);
+      } catch (err) {
+        return asFailure(err);
+      }
+    })();
+
+    const contentHash = await sha256Hex(input.bytes);
+    const objectKey = sourceArchiveObjectKey(game.id, contentHash);
+    await this.storage.putObject({
+      key: objectKey,
+      bytes: input.bytes,
+      contentType: input.contentType ?? "application/zip",
+    });
+
+    let version: SandboxGameVersionRecord;
+    try {
+      version = await this.repo.createVersion({
+        gameId: game.id,
+        objectKey,
+        contentHash,
+        bundleBytes: input.bytes.byteLength,
+        nowIso: new Date().toISOString(),
+      });
+    } catch (err) {
+      // Best-effort cleanup, not a distributed transaction: if the D1 write fails after the
+      // archive already landed in storage, delete it rather than leaving an orphan nobody will
+      // ever reference. Safe because source keys are content-addressed (same bytes -> same key) —
+      // the only way this could delete an object another version still needs is two *different*
+      // uploads producing byte-identical archives at the exact moment one of them fails to write
+      // its DB row, an acceptable residual risk rather than one worth a reference-count column.
+      // Swallow the delete's own failure so the original DB error is what the caller sees.
+      await this.storage.deleteObject(objectKey).catch(() => {});
+      throw err;
+    }
+
+    // A publish failure here leaves a real, valid version row that simply isn't servable yet
+    // (FAILED), recoverable with republishVersion — so it is surfaced as its own error rather than
+    // undoing the upload the developer just paid for.
+    return this.publishOrFail(version, prepared);
+  }
+
+  /** Storage-level publish failures become a single typed code. The underlying provider message is
+   * deliberately not propagated to the caller — it is already recorded on the version's
+   * `publishError` for operators, and a raw provider error can carry request URLs an end user has
+   * no business seeing. */
+  private async publishOrFail(
+    version: SandboxGameVersionRecord,
+    prepared: ReturnType<GameBundlePublisher["prepare"]>,
+  ): Promise<SandboxGameVersionRecord> {
+    try {
+      return await this.publisher.publish({
+        version,
+        prepared,
+        nowIso: new Date().toISOString(),
+      });
+    } catch {
+      throw new SandboxGameUseCaseFailure("PUBLISH_FAILED");
+    }
+  }
+
+  /**
+   * Re-runs publishing for an existing version from its stored source archive — the recovery path
+   * for a version left FAILED/PUBLISHING by a transient storage error, without asking the
+   * developer to re-upload. Idempotent: published objects are immutable, so rewriting them stores
+   * identical bytes.
+   */
+  async republishVersion(versionId: number): Promise<SandboxGameVersionRecord> {
+    const version = await this.repo.findVersionById(versionId);
+    if (!version) throw new SandboxGameUseCaseFailure("VERSION_NOT_FOUND");
+
+    const archive = await this.storage.getObject(version.objectKey);
+    if (!archive) throw new SandboxGameUseCaseFailure("PUBLISH_FAILED");
+
+    const prepared = (() => {
+      try {
+        return this.publisher.prepare(archive);
+      } catch (err) {
+        return asFailure(err);
+      }
+    })();
+
+    return this.publishOrFail(version, prepared);
+  }
+
+  /**
+   * Developer self-service withdrawal of their own not-yet-decided submission — the counterpart to
+   * an admin's APPROVED/REJECTED decision, releasing the same review slot. Withdraws every
+   * still-PENDING_REVIEW version of the game (in practice at most one, but this doesn't assume
+   * that) and always releases the slot, even if — defensively — there happened to be no pending
+   * version (e.g. a game created but never uploaded to yet): a game only reaches here with a
+   * non-null reviewSlot if it hasn't been decided, so "nothing pending, but still holding a slot"
+   * is exactly the case releasing it is for.
+   */
+  async withdrawSubmission(input: {
+    gameId: number;
+    actingUserId: number;
+  }): Promise<SandboxGameRecord> {
+    const game = await this.repo.findById(input.gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    if (game.developerUserId !== input.actingUserId) {
+      throw new SandboxGameUseCaseFailure("NOT_OWNER");
+    }
+    if (game.reviewSlot === null) throw new SandboxGameUseCaseFailure("NOTHING_TO_WITHDRAW");
+
+    const versions = await this.repo.listVersionsByGame(game.id);
+    const pending = versions.filter((v) => v.status === "PENDING_REVIEW");
+    for (const version of pending) {
+      await this.repo.withdrawVersion(version.id);
+    }
+
+    const nowIso = new Date().toISOString();
+    await this.repo.releaseReviewSlot(game.id, nowIso);
+    await this.repo.appendReviewAudit({
+      gameId: game.id,
+      versionId: null,
+      actorAdminId: input.actingUserId,
+      action: "SUBMISSION_WITHDRAWN",
+      reason: null,
+      metadata: { withdrawnVersionIds: pending.map((v) => v.id) },
+      nowIso,
+    });
+
+    const updated = await this.repo.findById(game.id);
+    if (!updated) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    return updated;
+  }
+
+  async decideVersion(input: {
+    versionId: number;
+    adminId: number;
+    decision: "APPROVED" | "REJECTED";
+    reason: string | null;
+  }): Promise<SandboxGameVersionRecord> {
+    const version = await this.repo.findVersionById(input.versionId);
+    if (!version) throw new SandboxGameUseCaseFailure("VERSION_NOT_FOUND");
+    if (version.status !== "PENDING_REVIEW") {
+      throw new SandboxGameUseCaseFailure("ALREADY_DECIDED");
+    }
+    if (input.decision === "REJECTED" && !input.reason?.trim()) {
+      throw new SandboxGameUseCaseFailure("REASON_REQUIRED");
+    }
+    // Approving is what makes a version eligible to go live, so a version that isn't fully
+    // published must not get there: a partial publish would otherwise become a live game missing
+    // some of its files. Rejecting stays possible regardless — an admin must always be able to
+    // turn down content, whether or not its files happen to be in place.
+    if (input.decision === "APPROVED" && !isPublishedVersion(version.publishStatus)) {
+      throw new SandboxGameUseCaseFailure("VERSION_NOT_PUBLISHED");
+    }
+
+    const nowIso = new Date().toISOString();
+    const reason = input.reason?.trim() || null;
+    const decided = await this.repo.decideVersion(
+      version.id,
+      input.decision,
+      input.adminId,
+      reason,
+      nowIso,
+    );
+
+    if (input.decision === "APPROVED") {
+      await this.repo.setLiveVersion(version.gameId, version.id, nowIso);
+    }
+
+    // Terminal decision on this version — release the developer's review slot regardless of
+    // whether this was actually the version holding it (releaseReviewSlot is a no-op once already
+    // null), so a game re-uploaded after its first decision never re-consumes a slot on a later
+    // re-review.
+    await this.repo.releaseReviewSlot(version.gameId, nowIso);
+
+    await this.repo.appendReviewAudit({
+      gameId: version.gameId,
+      versionId: version.id,
+      actorAdminId: input.adminId,
+      action: input.decision === "APPROVED" ? "VERSION_APPROVED" : "VERSION_REJECTED",
+      reason,
+      metadata: null,
+      nowIso,
+    });
+
+    return decided;
+  }
+
+  /**
+   * Points a game at a different already-approved, already-published version — the rollback (and
+   * roll-forward) switch. Costs one D1 update and re-uploads nothing: every version keeps its own
+   * immutable object prefix, so the previous build is still sitting in storage untouched.
+   */
+  async setLiveVersion(
+    gameId: number,
+    adminId: number,
+    versionId: number,
+  ): Promise<SandboxGameRecord> {
+    const game = await this.repo.findById(gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+
+    const version = await this.repo.findVersionById(versionId);
+    if (!version || version.gameId !== gameId) {
+      throw new SandboxGameUseCaseFailure("VERSION_NOT_FOUND");
+    }
+    if (version.status !== "APPROVED") throw new SandboxGameUseCaseFailure("VERSION_NOT_APPROVED");
+    if (!isPublishedVersion(version.publishStatus)) {
+      throw new SandboxGameUseCaseFailure("VERSION_NOT_PUBLISHED");
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = await this.repo.setLiveVersion(gameId, versionId, nowIso);
+    await this.repo.appendReviewAudit({
+      gameId,
+      versionId,
+      actorAdminId: adminId,
+      action: "LIVE_VERSION_CHANGED",
+      reason: null,
+      metadata: { versionId, previousVersionId: game.liveVersionId },
+      nowIso,
+    });
+    return updated;
+  }
+
+  async updateMetadata(
+    gameId: number,
+    adminId: number,
+    input: SandboxGameMetadataInput,
+  ): Promise<SandboxGameRecord> {
+    const game = await this.repo.findById(gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    if (input.title !== undefined) validateTitle(input.title);
+
+    const nowIso = new Date().toISOString();
+    const updated = await this.repo.updateMetadata(gameId, input, nowIso);
+    await this.repo.appendReviewAudit({
+      gameId,
+      versionId: null,
+      actorAdminId: adminId,
+      action: "METADATA_CHANGED",
+      reason: null,
+      metadata: input as unknown as Record<string, unknown>,
+      nowIso,
+    });
+    return updated;
+  }
+
+  async setVisibility(
+    gameId: number,
+    adminId: number,
+    visibility: SandboxGameVisibility,
+  ): Promise<SandboxGameRecord> {
+    const game = await this.repo.findById(gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    if (visibility === "PUBLIC" && !canSetVisibilityPublic(game.liveVersionId !== null)) {
+      throw new SandboxGameUseCaseFailure("NO_APPROVED_VERSION");
+    }
+
+    const nowIso = new Date().toISOString();
+    const updated = await this.repo.setVisibility(gameId, visibility, nowIso);
+    await this.repo.appendReviewAudit({
+      gameId,
+      versionId: null,
+      actorAdminId: adminId,
+      action: "VISIBILITY_CHANGED",
+      reason: null,
+      metadata: { visibility },
+      nowIso,
+    });
+    return updated;
+  }
+
+  // ── Public serving ─────────────────────────────────────────────────────────
+  //
+  // Everything below answers requests from anonymous players. All of it returns null rather than
+  // throwing for "not available", and deliberately cannot distinguish "no such game" from
+  // "exists but private" — a probe must not be able to enumerate unreleased games.
+
+  /**
+   * Resolves what `/play/:slug` should hand a player: the game plus its live version, only when
+   * the game is actually released. Null for an unknown slug, a PRIVATE game, a game with no live
+   * version, or (defensively — the DB CHECK constraint should prevent it) a dangling live id.
+   */
+  async resolveLiveVersion(
+    slug: string,
+  ): Promise<{ game: SandboxGameRecord; version: SandboxGameVersionRecord } | null> {
+    const game = await this.repo.findBySlug(slug);
+    if (!game || game.visibility !== "PUBLIC" || game.liveVersionId === null) return null;
+    const version = await this.repo.findVersionById(game.liveVersionId);
+    if (!version || version.gameId !== game.id) return null;
+    return { game, version };
+  }
+
+  /**
+   * Cheap, D1-only up-front gate for `/games/:gameId/:versionId/*`: true only when the game is
+   * currently PUBLIC and this specific version is APPROVED — the same condition
+   * resolvePublishedFile enforces, split out so a caller can check it *without* also paying for
+   * resolvePublishedFile's object-storage read.
+   *
+   * This exists specifically so the route layer can gate access to the byte cache with a
+   * short-lived availability check, independent of how long the actual asset bytes stay cached at
+   * the edge. Published assets are cached as effectively-immutable (a year) because the *bytes*
+   * for a given gameId+versionId never change — but "is this version still allowed to be served
+   * at all" is a mutable fact (an admin can flip visibility to PRIVATE at any time), and that fact
+   * must not be allowed to go stale for as long as the bytes do. Route layer:
+   * `availability gate (this, short TTL) → byte cache (long TTL) → object storage`.
+   */
+  async isVersionServable(gameId: number, versionId: number): Promise<boolean> {
+    const game = await this.repo.findById(gameId);
+    if (!game || game.visibility !== "PUBLIC") return false;
+    const version = await this.repo.findVersionById(versionId);
+    return Boolean(version && version.gameId === game.id && version.status === "APPROVED");
+  }
+
+  /**
+   * Resolves one file of one specific version for the immutable `/games/:gameId/:versionId/*`
+   * path. Requires the game to be PUBLIC and the version to be approved and fully published —
+   * but not to be the *current* live version, so that switching or rolling back a live version
+   * doesn't yank assets out from under players mid-session, and so year-long immutable caching of
+   * a versioned URL stays truthful.
+   *
+   * Falls back to decompressing the source archive when a published object is missing. That is the
+   * migration path away from request-time unzipping (and a safety net if objects are ever lost):
+   * the fast path is a plain CDN-cacheable object read, and this only runs when that read comes up
+   * empty. See docs/WORK_PROGRESS.md for the decision to keep it until real engine builds are
+   * verified end to end.
+   */
+  async resolvePublishedFile(input: {
+    gameId: number;
+    versionId: number;
+    path: string;
+  }): Promise<ServableBundleFile | null> {
+    const game = await this.repo.findById(input.gameId);
+    if (!game || game.visibility !== "PUBLIC") return null;
+
+    const version = await this.repo.findVersionById(input.versionId);
+    if (!version || version.gameId !== game.id || version.status !== "APPROVED") return null;
+
+    if (isPublishedVersion(version.publishStatus)) {
+      const bytes = await this.storage.getObject(
+        publishedObjectKey(game.id, version.id, input.path),
+      );
+      if (bytes) {
+        const { contentType, contentEncoding } = resolveBundleContentType(input.path);
+        return { bytes, contentType, contentEncoding, published: true };
+      }
+    }
+
+    return this.readFromSourceArchive(version, input.path);
+  }
+
+  /** Legacy/fallback read: decompress the source archive and pull one file out of it. Shares the
+   * publisher's validation and single-root unwrapping, so a file resolves to exactly the same path
+   * here as it does when published — there is no second, subtly-different path resolver. */
+  private async readFromSourceArchive(
+    version: SandboxGameVersionRecord,
+    path: string,
+  ): Promise<ServableBundleFile | null> {
+    const archive = await this.storage.getObject(version.objectKey);
+    if (!archive) return null;
+
+    let prepared;
+    try {
+      prepared = this.publisher.prepare(archive);
+    } catch {
+      return null;
+    }
+
+    const file = prepared.files.find((f) => f.path === path);
+    if (!file) return null;
+
+    return {
+      bytes: file.bytes.buffer.slice(
+        file.bytes.byteOffset,
+        file.bytes.byteOffset + file.bytes.byteLength,
+      ) as ArrayBuffer,
+      contentType: file.contentType,
+      contentEncoding: file.contentEncoding,
+      published: false,
+    };
+  }
+}
+
+/** Route layers use this to decide whether a failure is the developer's bundle being unacceptable
+ * (a 4xx they can fix) rather than a server-side problem. */
+export function isBundleRejectionFailure(err: unknown): boolean {
+  return err instanceof SandboxGameUseCaseFailure && isBundleRejectionCode(err.code);
+}

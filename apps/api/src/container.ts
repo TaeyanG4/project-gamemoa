@@ -15,6 +15,11 @@ import {
   D1GameSettingsRepository,
   D1AdminMonitoringRepository,
   D1UserModerationRepository,
+  D1GameDeveloperRepository,
+  D1SandboxGameRepository,
+  BackblazeB2GameBundleRepository,
+  UnconfiguredGameBundleRepository,
+  type BackblazeB2Config,
 } from "@owogg/db";
 import {
   ScoreUseCases,
@@ -34,6 +39,9 @@ import {
   AdminAccountUseCases,
   GameSettingsUseCases,
   UserModerationUseCases,
+  GameDeveloperUseCases,
+  SandboxGameUseCases,
+  GameBundlePublisher,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -50,8 +58,12 @@ import {
   type GameSettingsRepository,
   type AdminMonitoringRepository,
   type UserModerationRepository,
+  type GameDeveloperRepository,
+  type SandboxGameRepository,
+  type GameBundleStorageRepository,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
+import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
 
 export interface AppContainer {
   userRepo: UserRepository;
@@ -70,6 +82,13 @@ export interface AppContainer {
   gameSettingsRepo: GameSettingsRepository;
   adminMonitoringRepo: AdminMonitoringRepository;
   userModerationRepo: UserModerationRepository;
+  gameDeveloperRepo: GameDeveloperRepository;
+  sandboxGameRepo: SandboxGameRepository;
+  gameBundleStorageRepo: GameBundleStorageRepository;
+  /** True only when a complete Backblaze B2 config was passed to createContainer — routes should
+   * check this (rather than try/catch-ing putBundle) to return a clean 503 before touching the
+   * use case. */
+  gameBundlesConfigured: boolean;
 
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
@@ -88,9 +107,24 @@ export interface AppContainer {
   adminAccountUseCases: AdminAccountUseCases;
   gameSettingsUseCases: GameSettingsUseCases;
   userModerationUseCases: UserModerationUseCases;
+  gameDeveloperUseCases: GameDeveloperUseCases;
+  sandboxGameUseCases: SandboxGameUseCases;
+  gameBundlePublisher: GameBundlePublisher;
 }
 
-export function createContainer(db: D1Database): AppContainer {
+/**
+ * `b2Config` is the optional Backblaze B2 credential/endpoint bundle (B2_ENDPOINT/B2_REGION/
+ * B2_BUCKET_NAME/B2_KEY_ID/B2_APPLICATION_KEY — see apps/api/src/routes/auth.ts's ApiEnv and
+ * apps/api/src/routes/devGames.ts's `readB2Config`), absent in any environment that hasn't set
+ * those secrets yet. Unlike the R2 binding this replaced, B2 access is plain HTTPS (via
+ * aws4fetch) rather than a Cloudflare binding declared in wrangler.jsonc — so there is no
+ * resource that must exist before `wrangler deploy` will succeed; an unconfigured environment
+ * just boots with uploads disabled. Every other dependency this container needs is D1-only; B2
+ * config is the one exception, threaded through explicitly rather than via `c.env` reads
+ * scattered across routes, so there is exactly one place that decides what "unconfigured" means
+ * (UnconfiguredGameBundleRepository, see packages/db/src/storage).
+ */
+export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): AppContainer {
   const userRepo = new D1UserRepository(db);
   const sessionRepo = new D1SessionRepository(db);
   const scoreRepo = new D1ScoreRepository(db);
@@ -107,6 +141,11 @@ export function createContainer(db: D1Database): AppContainer {
   const gameSettingsRepo = new D1GameSettingsRepository(db);
   const adminMonitoringRepo = new D1AdminMonitoringRepository(db);
   const userModerationRepo = new D1UserModerationRepository(db);
+  const gameDeveloperRepo = new D1GameDeveloperRepository(db);
+  const sandboxGameRepo = new D1SandboxGameRepository(db);
+  const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
+    ? new BackblazeB2GameBundleRepository(b2Config)
+    : new UnconfiguredGameBundleRepository();
 
   const scoreUseCases = new ScoreUseCases(scoreRepo);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -133,6 +172,17 @@ export function createContainer(db: D1Database): AppContainer {
     sessionRepo,
     userRepo,
   );
+  const gameDeveloperUseCases = new GameDeveloperUseCases(gameDeveloperRepo, userRepo);
+  const gameBundlePublisher = new GameBundlePublisher(
+    sandboxGameRepo,
+    gameBundleStorageRepo,
+    new FflateBundleArchiveReader(),
+  );
+  const sandboxGameUseCases = new SandboxGameUseCases(
+    sandboxGameRepo,
+    gameBundleStorageRepo,
+    gameBundlePublisher,
+  );
 
   return {
     userRepo,
@@ -151,6 +201,10 @@ export function createContainer(db: D1Database): AppContainer {
     gameSettingsRepo,
     adminMonitoringRepo,
     userModerationRepo,
+    gameDeveloperRepo,
+    sandboxGameRepo,
+    gameBundleStorageRepo,
+    gameBundlesConfigured: Boolean(b2Config),
 
     scoreUseCases,
     personalizationUseCases,
@@ -169,6 +223,9 @@ export function createContainer(db: D1Database): AppContainer {
     adminAccountUseCases,
     gameSettingsUseCases,
     userModerationUseCases,
+    gameDeveloperUseCases,
+    sandboxGameUseCases,
+    gameBundlePublisher,
   };
 }
 

@@ -1,0 +1,438 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { app } from "../src/index.js";
+import { hashSessionToken } from "@owogg/db";
+
+// Auth-gating + routing smoke tests for /api/dev/* and /api/admin/game-developers,
+// /api/admin/sandbox-games. The underlying business logic (slug validation, review/visibility
+// invariants, session revocation-equivalents) already has thorough coverage against real SQLite
+// and in-memory fakes — see packages/db/test/D1SandboxGameRepository.test.ts,
+// packages/db/test/D1GameDeveloperRepository.test.ts, packages/core/test/sandboxGameUseCases.test.ts,
+// packages/core/test/gameDeveloperUseCases.test.ts. This file only confirms the route layer
+// enforces the right auth boundary and doesn't crash when wired end to end.
+const OWOGG_SESSION_RAW_TOKEN = "valid_session";
+const OWOGG_SESSION_TOKEN_HASH = await hashSessionToken(OWOGG_SESSION_RAW_TOKEN);
+
+function createDb(options: { userId: number; isDeveloper?: boolean }) {
+  const { userId, isDeveloper = false } = options;
+  function statement(query: string) {
+    let values: unknown[] = [];
+    return {
+      query,
+      bind(...bound: unknown[]) {
+        values = bound;
+        return this;
+      },
+      async first<T>() {
+        if (query.includes("JOIN users u ON s.user_id = u.id")) {
+          return {
+            session_id: "valid_session",
+            user_id: userId,
+            expires_at: new Date(Date.now() + 86400000).toISOString(),
+            session_created_at: new Date().toISOString(),
+            nickname: "player",
+            email: "player@example.com",
+            avatar_url: null,
+            user_created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as T;
+        }
+        if (query.includes("FROM game_developers WHERE user_id")) {
+          if (!isDeveloper) return null;
+          return {
+            user_id: userId,
+            granted_by_admin_id: 1,
+            status: "ACTIVE",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as T;
+        }
+        if (query.includes("FROM admin_accounts WHERE user_id")) {
+          return null; // never a managed admin in these tests
+        }
+        return null;
+      },
+      async all<T>() {
+        return { results: [] } as { results: T[] };
+      },
+      async run() {
+        return { success: true, meta: { changes: 0 } };
+      },
+    };
+  }
+
+  return {
+    db: {
+      prepare(query: string) {
+        return statement(query);
+      },
+      async batch(statements: Array<ReturnType<typeof statement>>) {
+        return statements.map(() => ({ success: true, meta: { changes: 0 } }));
+      },
+    },
+  };
+}
+
+test("GET /api/dev/me returns 401 without a session", async () => {
+  const res = await app.request("/api/dev/me", {}, {
+    DB: createDb({ userId: 1 }).db,
+    ADMIN_USER_IDS: "",
+  } as any);
+  assert.equal(res.status, 401);
+});
+
+test("GET /api/dev/me reports isGameDeveloper=false / isAdmin=false for a plain user", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: false });
+  const res = await app.request(
+    "/api/dev/me",
+    { headers: { Cookie: "owogg_session=valid_session" } },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { isGameDeveloper: boolean; isAdmin: boolean };
+  assert.equal(body.isGameDeveloper, false);
+  assert.equal(body.isAdmin, false);
+});
+
+test("GET /api/dev/me reports isGameDeveloper=true for an ACTIVE game_developers row", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: true });
+  const res = await app.request(
+    "/api/dev/me",
+    { headers: { Cookie: "owogg_session=valid_session" } },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { isGameDeveloper: boolean };
+  assert.equal(body.isGameDeveloper, true);
+});
+
+test("POST /api/dev/games is rejected for a non-developer with FORBIDDEN, not a crash", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: false });
+  const res = await app.request(
+    "/api/dev/games",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ slug: "my-game", title: "My Game", genre: "puzzle" }),
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
+test("POST /api/dev/games/:id/versions returns 503 GAME_BUNDLES_NOT_CONFIGURED when B2 config is absent", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: true });
+  const res = await app.request(
+    "/api/dev/games/1/versions",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session",
+        Origin: "http://localhost:5173",
+      },
+      body: new FormData(),
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 503);
+  const body = (await res.json()) as { error: { code: string } };
+  assert.equal(body.error.code, "GAME_BUNDLES_NOT_CONFIGURED");
+});
+
+test("POST /api/dev/games/:id/versions treats a partial B2 config (one of five values missing) as unconfigured", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: true });
+  const res = await app.request(
+    "/api/dev/games/1/versions",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session",
+        Origin: "http://localhost:5173",
+      },
+      body: new FormData(),
+    },
+    {
+      DB: db,
+      ADMIN_USER_IDS: "1",
+      FRONTEND_URL: "http://localhost:5173",
+      B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
+      B2_REGION: "us-west-004",
+      B2_BUCKET_NAME: "owogg-game-bundles",
+      B2_KEY_ID: "someKeyId",
+      // B2_APPLICATION_KEY intentionally omitted
+    } as any,
+  );
+  assert.equal(res.status, 503);
+});
+
+test("POST /api/dev/games/:id/versions with a complete B2 config gets past the 503 gate (fails later, on the missing file field, not on config)", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: true });
+  const res = await app.request(
+    "/api/dev/games/1/versions",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session",
+        Origin: "http://localhost:5173",
+      },
+      body: new FormData(), // no "bundle" field
+    },
+    {
+      DB: db,
+      ADMIN_USER_IDS: "1",
+      FRONTEND_URL: "http://localhost:5173",
+      B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
+      B2_REGION: "us-west-004",
+      B2_BUCKET_NAME: "owogg-game-bundles",
+      B2_KEY_ID: "someKeyId",
+      B2_APPLICATION_KEY: "someApplicationKey",
+    } as any,
+  );
+  assert.equal(res.status, 400);
+  const body = (await res.json()) as { error: { code: string } };
+  assert.equal(body.error.code, "INVALID_REQUEST");
+});
+
+test("GET /api/admin/game-developers is denied for non-admin", async () => {
+  const { db } = createDb({ userId: 7 });
+  const res = await app.request(
+    "/api/admin/game-developers",
+    { headers: { Cookie: "owogg_session=valid_session; owogg_admin_session=none" } },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
+test("GET /api/admin/sandbox-games/review-queue is denied for non-admin", async () => {
+  const { db } = createDb({ userId: 7 });
+  const res = await app.request(
+    "/api/admin/sandbox-games/review-queue",
+    { headers: { Cookie: "owogg_session=valid_session; owogg_admin_session=none" } },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
+// ── review-slot quota over the real route/use-case/repository chain ──────────
+//
+// Separate fake DB from createDb() above: these tests need sandbox_games rows to actually behave
+// like they do against real SQLite (INSERT ... SELECT for slot claiming, read-back by slug), which
+// createDb()'s generic `changes: 0` stub can't express.
+
+function createDevGamesDb(options: { existingGames?: Array<{ slug: string; reviewSlot: 1 | 2 }> }) {
+  const games = new Map(
+    (options.existingGames ?? []).map((g, i) => [
+      g.slug,
+      {
+        id: i + 1,
+        slug: g.slug,
+        developer_user_id: 7,
+        title: g.slug,
+        short_description: null,
+        description: null,
+        genre: "puzzle",
+        xp_per_completion: 0,
+        score_unit: null,
+        score_direction: null,
+        score_min: null,
+        score_max: null,
+        score_display_prefix: null,
+        score_display_suffix: null,
+        visibility: "PRIVATE",
+        live_version_id: null,
+        review_slot: g.reviewSlot,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+    ]),
+  );
+  let nextId = games.size + 1;
+
+  function statement(query: string) {
+    let values: unknown[] = [];
+    return {
+      bind(...bound: unknown[]) {
+        values = bound;
+        return this;
+      },
+      async first<T>() {
+        if (query.includes("JOIN users u ON s.user_id = u.id")) {
+          return {
+            session_id: "valid_session",
+            user_id: 7,
+            expires_at: new Date(Date.now() + 86400000).toISOString(),
+            session_created_at: new Date().toISOString(),
+            nickname: "dev",
+            email: "dev@example.com",
+            avatar_url: null,
+            user_created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as T;
+        }
+        if (query.includes("FROM game_developers WHERE user_id")) {
+          return {
+            user_id: 7,
+            granted_by_admin_id: 1,
+            status: "ACTIVE",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as T;
+        }
+        if (query.includes("FROM admin_accounts WHERE user_id")) return null;
+        if (query.includes("FROM sandbox_games WHERE slug")) {
+          return (games.get(String(values[0])) ?? null) as T;
+        }
+        if (query.includes("FROM sandbox_games WHERE id")) {
+          const match = [...games.values()].find((g) => g.id === Number(values[0]));
+          return (match ?? null) as T;
+        }
+        return null;
+      },
+      async all<T>() {
+        return { results: [] } as { results: T[] };
+      },
+      async run() {
+        if (query.includes("INSERT INTO sandbox_games")) {
+          // Mirrors the real slot-claiming logic closely enough for a route-level smoke test: the
+          // full atomicity guarantee is proven against real SQLite in
+          // packages/db/test/D1SandboxGameRepository.test.ts.
+          const taken = new Set([...games.values()].map((g) => g.review_slot).filter(Boolean));
+          const slot = !taken.has(1) ? 1 : !taken.has(2) ? 2 : null;
+          if (slot === null) return { success: true, meta: { changes: 0 } };
+
+          const [slug, , title, shortDescription, description, genre] = values as [
+            string,
+            number,
+            string,
+            string | null,
+            string | null,
+            string,
+          ];
+          games.set(slug, {
+            id: nextId++,
+            slug,
+            developer_user_id: 7,
+            title,
+            short_description: shortDescription,
+            description,
+            genre,
+            xp_per_completion: 0,
+            score_unit: null,
+            score_direction: null,
+            score_min: null,
+            score_max: null,
+            score_display_prefix: null,
+            score_display_suffix: null,
+            visibility: "PRIVATE",
+            live_version_id: null,
+            review_slot: slot,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          return { success: true, meta: { changes: 1 } };
+        }
+        if (query.includes("UPDATE sandbox_games SET review_slot = NULL")) {
+          const game = [...games.values()].find((g) => g.id === Number(values[1]));
+          if (game) game.review_slot = null;
+          return { success: true, meta: { changes: game ? 1 : 0 } };
+        }
+        return { success: true, meta: { changes: 0 } };
+      },
+    };
+  }
+
+  return {
+    db: {
+      prepare(query: string) {
+        return statement(query);
+      },
+      async batch(statements: Array<ReturnType<typeof statement>>) {
+        return statements.map(() => ({ success: true, meta: { changes: 0 } }));
+      },
+    },
+  };
+}
+
+test("POST /api/dev/games succeeds and reports the claimed review slot", async () => {
+  const { db } = createDevGamesDb({});
+  const res = await app.request(
+    "/api/dev/games",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ slug: "my-first-game", title: "My Game", genre: "puzzle" }),
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 201);
+  const body = (await res.json()) as { reviewSlot: number | null };
+  assert.equal(body.reviewSlot, 1);
+});
+
+test("POST /api/dev/games returns 409 SUBMISSION_LIMIT_REACHED once both review slots are held", async () => {
+  const { db } = createDevGamesDb({
+    existingGames: [
+      { slug: "existing-1", reviewSlot: 1 },
+      { slug: "existing-2", reviewSlot: 2 },
+    ],
+  });
+  const res = await app.request(
+    "/api/dev/games",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ slug: "one-too-many", title: "My Game", genre: "puzzle" }),
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 409);
+  const body = (await res.json()) as { error: { code: string } };
+  assert.equal(body.error.code, "SUBMISSION_LIMIT_REACHED");
+});
+
+test("POST /api/dev/games/:id/withdraw releases the slot so a new submission can succeed", async () => {
+  const { db } = createDevGamesDb({
+    existingGames: [
+      { slug: "existing-1", reviewSlot: 1 },
+      { slug: "existing-2", reviewSlot: 2 },
+    ],
+  });
+  const withdraw = await app.request(
+    "/api/dev/games/1/withdraw",
+    {
+      method: "POST",
+      headers: { Cookie: "owogg_session=valid_session", Origin: "http://localhost:5173" },
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(withdraw.status, 200);
+  const withdrawnBody = (await withdraw.json()) as { reviewSlot: number | null };
+  assert.equal(withdrawnBody.reviewSlot, null);
+
+  const res = await app.request(
+    "/api/dev/games",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ slug: "now-it-fits", title: "My Game", genre: "puzzle" }),
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 201);
+});

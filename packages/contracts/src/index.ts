@@ -13,4 +13,6 @@ export * from "./creator.js";
 export * from "./creatorAdmin.js";
 export * from "./admin.js";
 export * from "./gameSettings.js";
+export * from "./gameDevelopers.js";
+export * from "./sandboxGames.js";
 export * from "./i18n.js";

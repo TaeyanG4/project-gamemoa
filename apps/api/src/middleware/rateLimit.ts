@@ -31,12 +31,18 @@ export interface RateLimitBinding {
  * account from flooding regardless of how many IPs it rotates through, and it avoids collectively
  * throttling everyone behind a shared NAT/campus/mobile-carrier egress IP — which keying on IP
  * alone would do.
+ *
+ * `binding` selects *which* Cloudflare rate-limit binding to enforce against (default
+ * `RATE_LIMITER`) — a binding's numeric limit is fixed at deploy time (see wrangler.jsonc), so two
+ * endpoints that need genuinely different limits (e.g. 30/min for score submission vs. 2/min for
+ * game bundle uploads) need two separate bindings, not two `name` prefixes on one. `name` remains
+ * the logical key prefix within whichever binding is chosen, for log/metric readability.
  */
-export function rateLimit(options: { name: string }): MiddlewareHandler<ApiEnv> {
-  const { name } = options;
+export function rateLimit(options: { name: string; binding?: string }): MiddlewareHandler<ApiEnv> {
+  const { name, binding = "RATE_LIMITER" } = options;
 
   return async (c, next) => {
-    const limiter = (c.env as unknown as { RATE_LIMITER?: RateLimitBinding })?.RATE_LIMITER;
+    const limiter = (c.env as unknown as Record<string, RateLimitBinding | undefined>)?.[binding];
     if (!limiter) {
       await next();
       return;

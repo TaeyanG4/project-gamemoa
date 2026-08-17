@@ -53,6 +53,23 @@ async function requireAuth(
 export type ApiEnv = {
   Bindings: {
     DB: D1Database;
+    /** Backblaze B2 (S3-compatible) storage for sandbox game bundles (migration 0024) — all four
+     * optional so an environment that hasn't set them up yet still boots; upload routes 503
+     * cleanly instead (see devGames.ts's `readB2Config`). Plain `wrangler secret put` values, not
+     * a Cloudflare binding — no wrangler.jsonc entry required. See
+     * docs/GAME_CREATION_GUIDE.md §3.2/§3.8, docs/GAME_UPLOAD_GUIDE.md. */
+    B2_ENDPOINT?: string;
+    B2_REGION?: string;
+    B2_BUCKET_NAME?: string;
+    B2_KEY_ID?: string;
+    B2_APPLICATION_KEY?: string;
+    /** Hostname sandbox game bundles are allowed to be served from in production (e.g.
+     * `https://play.owogg.com`) — see routes/gameServing.ts's host guard. Absent means "no
+     * dedicated domain connected yet", which fails CLOSED for anything but localhost: sandbox UGC
+     * must never be reachable via api.owogg.com (2026-08-17 beta hardening). Set with a plain
+     * `wrangler secret put GAME_ORIGIN` once play.owogg.com is connected — not a binding, no
+     * wrangler.jsonc entry required, same reasoning as the B2_* values above. */
+    GAME_ORIGIN?: string;
     GOOGLE_CLIENT_ID?: string;
     DISCORD_CLIENT_ID?: string;
     DISCORD_CLIENT_SECRET?: string;
