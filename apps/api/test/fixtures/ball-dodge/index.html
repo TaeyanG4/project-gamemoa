@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>공 피하기</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!--
+      OwOGG 샌드박스 게임 파이프라인 검증용 최소 테스트 게임입니다.
+      재미를 위한 게임이 아니라, 업로드 -> 심사 -> 배포(B2) -> play.owogg.com iframe 실행까지
+      전체 경로가 실제로 동작하는지 확인하기 위한 순수 정적 HTML/CSS/JS 게임입니다.
+
+      의도적으로 포함하지 않은 것: localStorage/IndexedDB, fetch/WebSocket, ServiceWorker/WebWorker,
+      외부 이미지/폰트/CDN, OwOGG API 호출, 점수 제출, 인증, postMessage 기반 보상 연동.
+      이 게임은 완전히 독립적으로, 네트워크 없이 브라우저 안에서만 동작합니다.
+    -->
+    <div id="app">
+      <div id="hud">
+        <span id="timer">0.0초</span>
+      </div>
+      <canvas id="game"></canvas>
+      <div id="overlay">
+        <h1>공 피하기</h1>
+        <p>WASD 또는 방향키로 이동하세요. 화면 가장자리에서 공이 날아옵니다.</p>
+        <p class="hint">모바일: 화면을 터치한 채로 드래그하면 이동합니다.</p>
+        <button id="startButton" type="button">시작</button>
+      </div>
+      <div id="gameOver" class="hidden">
+        <h1>GAME OVER</h1>
+        <p id="finalTime">생존 시간: 0.0초</p>
+        <button id="restartButton" type="button">다시 시작</button>
+      </div>
+    </div>
+    <script src="game.js"></script>
+  </body>
+</html>
