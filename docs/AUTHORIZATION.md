@@ -61,6 +61,7 @@ gameCreator.hasAccess === true`(평범한 유저이면서 게임 크리에이터
 | `users.score_moderation` | 점수 제출 차단 + 점수 초기화/복원                         |
 | `games.moderate`         | 내장 게임 강제 비활성화(킬 스위치)                        |
 | `sandbox_games.review`   | 업로드된 게임 버전 심사(승인/반려/공개 전환)              |
+| `sandbox_games.delete`   | 게임 소프트 삭제 — `review`보다 강한 조치, 별도 권한([`GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md) §3.6.3) |
 | `game_creators.manage`   | Game Creator 프로그램 직접 임명/해제 + 신청 심사          |
 | `streamers.review`       | Streamer Featured 배지 수동 심사                          |
 | `system.monitor`         | 운영 모니터링 대시보드(DAU/WAU, D1 상태)                  |
@@ -82,6 +83,7 @@ gameCreator.hasAccess === true`(평범한 유저이면서 게임 크리에이터
 | `users.score_moderation` |    ✅    |    ❌     |        ❌        |
 | `games.moderate`         |    ✅    |    ❌     |        ❌        |
 | `sandbox_games.review`   |    ✅    |    ✅     |        ❌        |
+| `sandbox_games.delete`   |    ✅    |    ❌     |        ❌        |
 | `game_creators.manage`   |    ✅    |    ❌     |        ❌        |
 | `streamers.review`       |    ✅    |    ✅     |        ❌        |
 | `system.monitor`         |    ✅    |    ❌     |        ✅        |
