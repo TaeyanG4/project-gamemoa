@@ -63,7 +63,14 @@ app.use(
       return allowedFrontend;
     },
     credentials: true,
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    // PATCH was missing here — every PATCH route in the API (admin sandbox-game visibility/
+    // metadata, admin account role/permission edits, Discord guild settings, profile nickname/
+    // country) would fail CORS preflight from a real browser and surface as an opaque "Failed to
+    // fetch", never reaching the server at all (so no amount of server-side logging could have
+    // caught it — this is purely a browser-enforced preflight rejection). 2026-08-18 production
+    // bug report: the sandbox-game visibility toggle was the first PATCH call anyone actually
+    // clicked through a real browser since this cors() config was written.
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
   }),
 );
