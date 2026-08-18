@@ -2,6 +2,13 @@
 
 이 문서는 크리에이터(스트리머/유튜버) 채널 소유권 검증 모델, 4개 플랫폼 OAuth API 규격, Featured 심사 엔진 및 감사 원장 아키텍처를 정의합니다.
 
+> 이 문서의 "크리에이터"는 전부 **STREAMER**를 가리킵니다(방송 채널 인증) — 게임을 만드는
+> **GAME_CREATOR**(별도 프로그램, [`docs/GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md) §3)와는
+> 다른 축입니다. 두 프로그램이 Staff Role(ADMIN/OPERATOR 등 운영 역할)과 어떻게 다른지, 왜 같은
+> "크리에이터"라는 단어를 단독으로 쓰지 않는지는 [`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §7을
+> 참고하세요. 이 문서 자체의 명명(`creator_profiles`, `CreatorUseCases` 등)은 이 기능이 저장소에
+> 먼저 존재했던 레거시 명명이라 그대로 유지합니다.
+
 ---
 
 ## 1. 🎯 크리에이터 채널 소유권 검증 (Verification Model)

@@ -10,11 +10,15 @@ import {
   AdminScoreActionResponseSchema,
   UserModerationRecordSchema,
 } from "@owogg/contracts";
-import { UserModerationUseCaseFailure } from "@owogg/core";
+import { UserModerationUseCaseFailure, isProtectedStaffRole } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin, isAdminUserId } from "../auth/admin.js";
-import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
-import { resolveAdminEligibility } from "../auth/adminEligibility.js";
+import {
+  requireElevatedAdmin,
+  isElevatedAdminResponse,
+  requirePermission,
+} from "../auth/adminSession.js";
+import { resolveAdminEligibility, resolveEffectiveStaffRole } from "../auth/adminEligibility.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminUsersRouter = new Hono<ApiEnv>();
@@ -56,20 +60,24 @@ function moderationErrorResponse(err: unknown): { body: unknown; status: 400 | 4
   };
 }
 
-/** True when `userId` is a root (ADMIN_USER_IDS) or ACTIVE managed administrator — reused both to
- * surface `isProtectedAdmin` on list/detail responses and to hard-block suspend/ban server-side,
- * so an admin account can never be locked out of their own login even by direct API calls. */
+/** True when `userId` resolves to the top Staff Role (ADMIN — root ADMIN_USER_IDS or a managed
+ * admin_accounts row with role ADMIN; see domain/staffRoles.ts's isProtectedStaffRole). Reused
+ * both to surface `isProtectedAdmin` on list/detail responses and to hard-block suspend/ban
+ * server-side, so a protected ADMIN can never be locked out of their own login even by direct API
+ * calls. Deliberately narrower than "any elevated admin" — an OPERATOR/MODERATOR/SYSTEM_DEVELOPER
+ * is not protected here (see docs/AUTHORIZATION.md's "Protected ADMIN" section for why this is a
+ * Staff-Role-specific guarantee, not a general one). */
 async function isProtectedAdminTarget(
   c: Context<ApiEnv>,
   container: ReturnType<typeof createContainer>,
   userId: number,
 ): Promise<boolean> {
-  const { eligible } = await resolveAdminEligibility(
+  const eligibility = await resolveAdminEligibility(
     userId,
     c.env.ADMIN_USER_IDS,
     container.adminAccountUseCases,
   );
-  return eligible;
+  return isProtectedStaffRole(resolveEffectiveStaffRole(eligibility));
 }
 
 // GET /api/admin/users?query=&period=&sort=&page=&pageSize= — blank query lists every user
@@ -77,6 +85,8 @@ async function isProtectedAdminTarget(
 adminUsersRouter.get("/", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.view");
+  if (denied) return denied;
 
   const parsed = AdminUserListQuerySchema.safeParse({
     query: c.req.query("query"),
@@ -125,6 +135,8 @@ adminUsersRouter.get("/", async (c) => {
 adminUsersRouter.get("/:userId", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.view");
+  if (denied) return denied;
 
   const userId = Number(c.req.param("userId"));
   if (!Number.isInteger(userId) || userId <= 0) {
@@ -166,6 +178,8 @@ adminUsersRouter.get("/:userId", async (c) => {
 adminUsersRouter.post("/:userId/suspend", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.suspend");
+  if (denied) return denied;
 
   const userId = Number(c.req.param("userId"));
   const body = await c.req.json().catch(() => ({}));
@@ -203,6 +217,8 @@ adminUsersRouter.post("/:userId/suspend", async (c) => {
 adminUsersRouter.post("/:userId/ban", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.ban");
+  if (denied) return denied;
 
   const userId = Number(c.req.param("userId"));
   const body = await c.req.json().catch(() => ({}));
@@ -236,6 +252,8 @@ adminUsersRouter.post("/:userId/ban", async (c) => {
 adminUsersRouter.post("/:userId/unsuspend", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.suspend");
+  if (denied) return denied;
 
   const userId = Number(c.req.param("userId"));
   try {
@@ -253,6 +271,8 @@ adminUsersRouter.post("/:userId/unsuspend", async (c) => {
 adminUsersRouter.post("/:userId/score-submission-block", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.score_moderation");
+  if (denied) return denied;
 
   const userId = Number(c.req.param("userId"));
   const body = await c.req.json().catch(() => ({}));
@@ -280,6 +300,8 @@ adminUsersRouter.post("/:userId/score-submission-block", async (c) => {
 adminUsersRouter.post("/:userId/reset-scores", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.score_moderation");
+  if (denied) return denied;
 
   const userId = Number(c.req.param("userId"));
   const body = await c.req.json().catch(() => ({}));
@@ -307,6 +329,8 @@ adminUsersRouter.post("/:userId/reset-scores", async (c) => {
 adminUsersRouter.post("/:userId/restore-scores", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "users.score_moderation");
+  if (denied) return denied;
 
   const userId = Number(c.req.param("userId"));
   try {

@@ -69,7 +69,7 @@ function createDb() {
             updated_at: new Date().toISOString(),
           } as T;
         }
-        if (query.includes("FROM game_developers WHERE user_id")) {
+        if (query.includes("FROM game_creator_access WHERE user_id")) {
           return {
             user_id: 7,
             granted_by_admin_id: 1,

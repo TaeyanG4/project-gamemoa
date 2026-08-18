@@ -4,6 +4,7 @@ import {
   AdminAccountUseCases,
   AdminAccountUseCaseFailure,
 } from "../src/application/adminAccountUseCases.js";
+import type { Permission } from "../src/domain/staffRoles.js";
 import type {
   AdminAccountRepository,
   AdminAccountRecord,
@@ -11,22 +12,26 @@ import type {
 } from "../src/ports/adminAccounts.js";
 import type { AdminAuthRepository } from "../src/ports/adminAuth.js";
 
-// Minimal in-memory fakes — this suite exercises the *application-level invariants* (final
-// SUPERADMIN protection, duplicate checks, bootstrap gating, session revocation side effects),
-// not SQL — see packages/db/test/D1AdminAccountRepository.test.ts for the real-SQLite coverage.
+// Minimal in-memory fakes — this suite exercises the *application-level invariants* (top-ADMIN
+// protection, self-modification lockout, duplicate checks, bootstrap gating, permission
+// delegation, session revocation side effects), not SQL — see
+// packages/db/test/D1AdminAccountRepository.test.ts for the real-SQLite coverage.
 
 function createFakeRepo(): AdminAccountRepository & {
   rows: AdminAccountRecord[];
   audit: AdminAccountAuditEntry[];
+  permissions: Map<number, Set<Permission>>;
 } {
   const rows: AdminAccountRecord[] = [];
   const audit: AdminAccountAuditEntry[] = [];
+  const permissions = new Map<number, Set<Permission>>();
   let nextId = 1;
   let nextAuditId = 1;
 
   return {
     rows,
     audit,
+    permissions,
     async countActive() {
       return rows.filter((r) => r.status === "ACTIVE").length;
     },
@@ -95,6 +100,17 @@ function createFakeRepo(): AdminAccountRepository & {
     async listAudit(limit) {
       return [...audit].reverse().slice(0, limit);
     },
+    async grantPermission(accountId, permission) {
+      const set = permissions.get(accountId) ?? new Set<Permission>();
+      set.add(permission);
+      permissions.set(accountId, set);
+    },
+    async revokePermission(accountId, permission) {
+      permissions.get(accountId)?.delete(permission);
+    },
+    async listPermissions(accountId) {
+      return [...(permissions.get(accountId) ?? [])];
+    },
   };
 }
 
@@ -127,25 +143,25 @@ function createFakeAuthRepo(): AdminAuthRepository & { revokedForUser: number[] 
   };
 }
 
-test("bootstrapFirstSuperadmin succeeds once, then rejects when an active account already exists", async () => {
+test("bootstrapFirstAdmin succeeds once, then rejects when an active account already exists", async () => {
   const repo = createFakeRepo();
   const authRepo = createFakeAuthRepo();
   const useCases = new AdminAccountUseCases(repo, authRepo);
 
-  const account = await useCases.bootstrapFirstSuperadmin({
+  const account = await useCases.bootstrapFirstAdmin({
     userId: 1,
     googleSub: "sub-1",
     username: "root-admin",
     passwordHash: "hash",
   });
-  assert.equal(account.role, "SUPERADMIN");
+  assert.equal(account.role, "ADMIN");
   assert.equal(account.mustChangePassword, true);
   assert.equal(repo.audit.length, 1);
   assert.equal(repo.audit[0]?.action, "ADMIN_CREATED");
 
   await assert.rejects(
     () =>
-      useCases.bootstrapFirstSuperadmin({
+      useCases.bootstrapFirstAdmin({
         userId: 2,
         googleSub: "sub-2",
         username: "second-root",
@@ -161,7 +177,7 @@ test("createAdmin rejects duplicate userId/username/googleSub", async () => {
   const authRepo = createFakeAuthRepo();
   const useCases = new AdminAccountUseCases(repo, authRepo);
 
-  const superadmin = await useCases.bootstrapFirstSuperadmin({
+  const admin = await useCases.bootstrapFirstAdmin({
     userId: 1,
     googleSub: "sub-1",
     username: "root-admin",
@@ -171,12 +187,12 @@ test("createAdmin rejects duplicate userId/username/googleSub", async () => {
   await assert.rejects(
     () =>
       useCases.createAdmin({
-        actorAdminId: superadmin.id,
+        actorAdminId: admin.id,
         userId: 1, // duplicate OwOGG user
         googleSub: "sub-x",
         username: "other-name",
         passwordHash: "hash",
-        role: "ADMIN",
+        role: "OPERATOR",
       }),
     (err: unknown) =>
       err instanceof AdminAccountUseCaseFailure && err.code === "USER_ALREADY_ADMIN",
@@ -185,12 +201,12 @@ test("createAdmin rejects duplicate userId/username/googleSub", async () => {
   await assert.rejects(
     () =>
       useCases.createAdmin({
-        actorAdminId: superadmin.id,
+        actorAdminId: admin.id,
         userId: 2,
         googleSub: "sub-x",
         username: "root-admin", // duplicate username
         passwordHash: "hash",
-        role: "ADMIN",
+        role: "OPERATOR",
       }),
     (err: unknown) => err instanceof AdminAccountUseCaseFailure && err.code === "USERNAME_TAKEN",
   );
@@ -198,24 +214,24 @@ test("createAdmin rejects duplicate userId/username/googleSub", async () => {
   await assert.rejects(
     () =>
       useCases.createAdmin({
-        actorAdminId: superadmin.id,
+        actorAdminId: admin.id,
         userId: 2,
         googleSub: "sub-1", // duplicate google sub
         username: "other-name",
         passwordHash: "hash",
-        role: "ADMIN",
+        role: "OPERATOR",
       }),
     (err: unknown) =>
       err instanceof AdminAccountUseCaseFailure && err.code === "GOOGLE_SUB_ALREADY_ADMIN",
   );
 });
 
-test("setStatus/setRole refuse to disable or demote the last active SUPERADMIN", async () => {
+test("setStatus/setRole refuse to touch the caller's OWN account (self-lockout guard)", async () => {
   const repo = createFakeRepo();
   const authRepo = createFakeAuthRepo();
   const useCases = new AdminAccountUseCases(repo, authRepo);
 
-  const superadmin = await useCases.bootstrapFirstSuperadmin({
+  const admin = await useCases.bootstrapFirstAdmin({
     userId: 1,
     googleSub: "sub-1",
     username: "root-admin",
@@ -225,33 +241,96 @@ test("setStatus/setRole refuse to disable or demote the last active SUPERADMIN",
   await assert.rejects(
     () =>
       useCases.setStatus({
-        actorAdminId: superadmin.id,
-        targetAdminId: superadmin.id,
+        actorAdminId: admin.id,
+        targetAdminId: admin.id,
         status: "DISABLED",
       }),
-    (err: unknown) => err instanceof AdminAccountUseCaseFailure && err.code === "LAST_SUPERADMIN",
+    (err: unknown) =>
+      err instanceof AdminAccountUseCaseFailure && err.code === "CANNOT_MODIFY_SELF",
   );
   await assert.rejects(
     () =>
       useCases.setRole({
-        actorAdminId: superadmin.id,
-        targetAdminId: superadmin.id,
-        role: "ADMIN",
+        actorAdminId: admin.id,
+        targetAdminId: admin.id,
+        role: "OPERATOR",
       }),
-    (err: unknown) => err instanceof AdminAccountUseCaseFailure && err.code === "LAST_SUPERADMIN",
+    (err: unknown) =>
+      err instanceof AdminAccountUseCaseFailure && err.code === "CANNOT_MODIFY_SELF",
   );
 
-  // A second SUPERADMIN makes the demotion/disable of either individual one now safe.
+  // A second ADMIN acting on the FIRST (not itself) can freely demote it — self-lockout is
+  // specifically about the actor's own account, not "the last ADMIN" (see the next test for that
+  // separate protection).
   const second = await useCases.createAdmin({
-    actorAdminId: superadmin.id,
+    actorAdminId: admin.id,
     userId: 2,
     googleSub: "sub-2",
-    username: "second-root",
+    username: "second-admin",
     passwordHash: "hash",
-    role: "SUPERADMIN",
+    role: "ADMIN",
   });
-  await useCases.setRole({ actorAdminId: superadmin.id, targetAdminId: second.id, role: "ADMIN" });
-  assert.equal((await repo.findById(second.id))?.role, "ADMIN");
+  await useCases.setRole({ actorAdminId: second.id, targetAdminId: admin.id, role: "OPERATOR" });
+  assert.equal((await repo.findById(admin.id))?.role, "OPERATOR");
+});
+
+test("setStatus/setRole refuse to disable or demote the last active ADMIN, even by a different actor", async () => {
+  const repo = createFakeRepo();
+  const authRepo = createFakeAuthRepo();
+  const useCases = new AdminAccountUseCases(repo, authRepo);
+
+  const admin = await useCases.bootstrapFirstAdmin({
+    userId: 1,
+    googleSub: "sub-1",
+    username: "root-admin",
+    passwordHash: "hash",
+  });
+  // A non-ADMIN account acting as the (distinct) actor id — realistic callers always pass the
+  // route layer's own managed account id, but the use case itself only cares that actor !==
+  // target here, so an OPERATOR's id is enough to isolate this from the self-lockout guard.
+  const operator = await useCases.createAdmin({
+    actorAdminId: admin.id,
+    userId: 2,
+    googleSub: "sub-2",
+    username: "operator",
+    passwordHash: "hash",
+    role: "OPERATOR",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.setStatus({
+        actorAdminId: operator.id,
+        targetAdminId: admin.id,
+        status: "DISABLED",
+      }),
+    (err: unknown) => err instanceof AdminAccountUseCaseFailure && err.code === "LAST_ADMIN",
+  );
+  await assert.rejects(
+    () =>
+      useCases.setRole({
+        actorAdminId: operator.id,
+        targetAdminId: admin.id,
+        role: "OPERATOR",
+      }),
+    (err: unknown) => err instanceof AdminAccountUseCaseFailure && err.code === "LAST_ADMIN",
+  );
+
+  // A second ADMIN makes the demotion/disable of either individual one now safe.
+  const secondAdmin = await useCases.createAdmin({
+    actorAdminId: admin.id,
+    userId: 3,
+    googleSub: "sub-3",
+    username: "second-admin",
+    passwordHash: "hash",
+    role: "ADMIN",
+  });
+  await useCases.setRole({
+    actorAdminId: operator.id,
+    targetAdminId: secondAdmin.id,
+    role: "OPERATOR",
+  });
+  assert.equal((await repo.findById(secondAdmin.id))?.role, "OPERATOR");
 });
 
 test("changeOwnPassword clears must_change_password and revokes this user's other sessions", async () => {
@@ -259,7 +338,7 @@ test("changeOwnPassword clears must_change_password and revokes this user's othe
   const authRepo = createFakeAuthRepo();
   const useCases = new AdminAccountUseCases(repo, authRepo);
 
-  const account = await useCases.bootstrapFirstSuperadmin({
+  const account = await useCases.bootstrapFirstAdmin({
     userId: 1,
     googleSub: "sub-1",
     username: "root-admin",
@@ -284,31 +363,31 @@ test("resetPassword forces must_change_password=true and revokes the target's se
   const authRepo = createFakeAuthRepo();
   const useCases = new AdminAccountUseCases(repo, authRepo);
 
-  const superadmin = await useCases.bootstrapFirstSuperadmin({
+  const admin = await useCases.bootstrapFirstAdmin({
     userId: 1,
     googleSub: "sub-1",
     username: "root-admin",
     passwordHash: "hash",
   });
   await useCases.changeOwnPassword({
-    accountId: superadmin.id,
+    accountId: admin.id,
     userId: 1,
     newPasswordHash: "hash2",
   });
 
   const target = await useCases.createAdmin({
-    actorAdminId: superadmin.id,
+    actorAdminId: admin.id,
     userId: 2,
     googleSub: "sub-2",
     username: "other-admin",
     passwordHash: "hash",
-    role: "ADMIN",
+    role: "OPERATOR",
   });
   await useCases.changeOwnPassword({ accountId: target.id, userId: 2, newPasswordHash: "hash3" });
   assert.equal((await repo.findById(target.id))?.mustChangePassword, false);
 
   await useCases.resetPassword({
-    actorAdminId: superadmin.id,
+    actorAdminId: admin.id,
     targetAdminId: target.id,
     newPasswordHash: "temp-hash",
   });
@@ -317,4 +396,60 @@ test("resetPassword forces must_change_password=true and revokes the target's se
   assert.equal(updated?.mustChangePassword, true);
   assert.equal(updated?.passwordHash, "temp-hash");
   assert.ok(authRepo.revokedForUser.includes(2));
+});
+
+test("grantPermission/revokePermission/listPermissions round-trip, and roles.manage is never delegable", async () => {
+  const repo = createFakeRepo();
+  const authRepo = createFakeAuthRepo();
+  const useCases = new AdminAccountUseCases(repo, authRepo);
+
+  const admin = await useCases.bootstrapFirstAdmin({
+    userId: 1,
+    googleSub: "sub-1",
+    username: "root-admin",
+    passwordHash: "hash",
+  });
+  const target = await useCases.createAdmin({
+    actorAdminId: admin.id,
+    userId: 2,
+    googleSub: "sub-2",
+    username: "system-dev",
+    passwordHash: "hash",
+    role: "SYSTEM_DEVELOPER",
+  });
+
+  assert.deepEqual(await useCases.listPermissions(target.id), []);
+
+  await useCases.grantPermission({
+    actorAdminId: admin.id,
+    targetAdminId: target.id,
+    permission: "admin.center.access",
+  });
+  assert.deepEqual(await useCases.listPermissions(target.id), ["admin.center.access"]);
+
+  // Idempotent — granting twice doesn't duplicate or error.
+  await useCases.grantPermission({
+    actorAdminId: admin.id,
+    targetAdminId: target.id,
+    permission: "admin.center.access",
+  });
+  assert.deepEqual(await useCases.listPermissions(target.id), ["admin.center.access"]);
+
+  await useCases.revokePermission({
+    actorAdminId: admin.id,
+    targetAdminId: target.id,
+    permission: "admin.center.access",
+  });
+  assert.deepEqual(await useCases.listPermissions(target.id), []);
+
+  await assert.rejects(
+    () =>
+      useCases.grantPermission({
+        actorAdminId: admin.id,
+        targetAdminId: target.id,
+        permission: "roles.manage",
+      }),
+    (err: unknown) =>
+      err instanceof AdminAccountUseCaseFailure && err.code === "PERMISSION_NOT_DELEGABLE",
+  );
 });

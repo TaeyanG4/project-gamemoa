@@ -2,19 +2,20 @@
 
 이 문서는 OwOGG의 Cloudflare D1(서버리스 SQLite) 스키마 전체 — 테이블 구조, ERD, 설계 관례 —
 와 트래픽/데이터량이 크게 늘어날 때의 확장성 점검 결과를 정리합니다. 마이그레이션 원문은
-[`packages/db/migrations/`](../packages/db/migrations/)(`0000`~`0023`)이 유일한 원천이며, 이
+[`packages/db/migrations/`](../packages/db/migrations/)(`0000`~`0025`)이 유일한 원천이며, 이
 문서는 그 요약입니다 — 실제 컬럼/제약조건은 항상 마이그레이션 파일을 기준으로 확인하세요.
 
-> ⚠️ **프로덕션 배포 상태(2026-08-15 `wrangler d1 execute ... d1_migrations` 실측)**: 이 문서는
-> 저장소의 마이그레이션 전체(`0000`~`0023`, 로컬 D1 기준)를 설명합니다. 프로덕션 `owogg-d1`은
-> 현재 `0021_profile_visibility.sql`까지만 적용된 상태이며, `0022`(모니터링 인덱스)와
-> `0023`(`user_moderation`/`user_moderation_audit_log`, `scores` 소프트 삭제 컬럼)은 아직 코드가
-> 커밋/배포되지 않아 미적용입니다. `.github/workflows/deploy.yml`이 `pnpm d1:migrate:prod`를 API
-> 배포보다 먼저 실행하므로 정상적인 `git push` → CI/CD 경로로 배포하면 자동으로 따라잡히지만,
-> **이 두 마이그레이션에 의존하는 코드(`/admin/monitoring`, `/admin/users`,
-> `D1SessionRepository`의 `user_moderation` LEFT JOIN)를 CI/CD를 건너뛰고 수동 배포하면 안 됩니다**
-> — `user_moderation` 테이블이 없는 프로덕션에 그 코드가 나가면 로그인 세션 조회(`findSession`)
-> 자체가 매 요청 실패합니다.
+> ⚠️ **프로덕션 배포 상태**: `.github/workflows/deploy.yml`이 `pnpm d1:migrate:prod`를 API 배포
+> 보다 먼저 실행하므로, `main` 브랜치로 병합되어 정상적인 CI/CD 경로를 탄 마이그레이션은 배포
+> 시점에 자동으로 프로덕션에 반영됩니다. **이 문서 작성 시점 기준으로 `main`에는 `0024`
+> (`sandbox_games.sql`)까지 병합·배포되어 있습니다.** `0025`
+> (`staff_roles_and_game_creator_program.sql` — 이 문서가 §1.6/§2.6/§6에서 설명하는 Staff
+> Role·게임 크리에이터 신청 스키마)는 **이 작업이 진행된 브랜치에만 존재하며, 아직 `main`에
+> 병합되거나 프로덕션에 배포되지 않았습니다** — 병합/배포 전 검증 결과는
+> [`docs/AUTHORIZATION.md`](AUTHORIZATION.md)와 함께 별도 보고서로 전달됩니다. CI/CD를 건너뛴
+> 수동 배포는 하지 마세요 — 이전 마이그레이션들에 의존하는 코드(`/admin/monitoring`,
+> `/admin/users`, `D1SessionRepository`의 `user_moderation` LEFT JOIN 등)가 순서를 건너뛴
+> 프로덕션에 나가면 요청이 실패할 수 있습니다.
 
 ---
 
@@ -30,20 +31,22 @@
   `packages/db/src/d1/D1*Repository.ts`(실제 SQL) 순서로만 접근합니다
   (`docs/ARCHITECTURE.md` 참고). 게임 카탈로그 정책(`GAME_MANIFEST_MAP`)은 D1 레이어와 100%
   분리되어 있습니다.
-- **현재 24개 마이그레이션**(`0000`~`0023`)이 아래 8개 도메인 영역, 총 28개 테이블을 구성합니다
-  (2026-08-15 `wrangler d1 execute ... sqlite_master`로 로컬 D1 실측 검증 — `sqlite_sequence`,
-  `d1_migrations`, `_cf_METADATA` 같은 SQLite/D1 내부 테이블은 제외한 애플리케이션 테이블 수).
+- **현재 26개 마이그레이션**(`0000`~`0025`)이 아래 9개 도메인 영역, 총 35개 테이블을 구성합니다.
 
-| 영역            | 마이그레이션                   | 테이블                                                                                                                                                              |
-| :-------------- | :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 계정/인증       | `0000`, `0003`, `0004`         | `users`, `oauth_accounts`, `sessions`, `account_merge_challenges`                                                                                                   |
-| 점수/진행도(XP) | `0000`, `0002`, `0005`, `0020` | `scores`, `xp_events`, `user_progress`, `user_achievements`                                                                                                         |
-| 개인화          | `0001`                         | `user_favorites`, `user_recent_plays`                                                                                                                               |
-| Discord         | `0006`~`0009`                  | `discord_link_challenges`, `discord_guilds`, `discord_guild_managers`, `discord_server_registration_challenges`, `discord_play_contexts`, `discord_guild_xp_events` |
-| Creator         | `0010`~`0014`                  | `creator_profiles`, `creator_platform_accounts`, `creator_review_jobs`, `creator_review_audit_log`                                                                  |
-| 관리자 인증     | `0015`, `0016`                 | `admin_step_up_challenges`, `admin_sessions`, `admin_login_attempts`, `admin_accounts`, `admin_account_audit_log`                                                   |
-| 게임 운영       | `0019`                         | `game_settings`                                                                                                                                                     |
-| 유저 제재       | `0023`                         | `user_moderation`, `user_moderation_audit_log`                                                                                                                      |
+| 영역                         | 마이그레이션                   | 테이블                                                                                                                                                                               |
+| :--------------------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 계정/인증                    | `0000`, `0003`, `0004`         | `users`, `oauth_accounts`, `sessions`, `account_merge_challenges`                                                                                                                    |
+| 점수/진행도(XP)              | `0000`, `0002`, `0005`, `0020` | `scores`, `xp_events`, `user_progress`, `user_achievements`                                                                                                                          |
+| 개인화                       | `0001`                         | `user_favorites`, `user_recent_plays`                                                                                                                                                |
+| Discord                      | `0006`~`0009`                  | `discord_link_challenges`, `discord_guilds`, `discord_guild_managers`, `discord_server_registration_challenges`, `discord_play_contexts`, `discord_guild_xp_events`                  |
+| Creator (STREAMER)           | `0010`~`0014`                  | `creator_profiles`, `creator_platform_accounts`, `creator_review_jobs`, `creator_review_audit_log`                                                                                   |
+| 관리자 인증 & Staff Role     | `0015`, `0016`, `0025`         | `admin_step_up_challenges`, `admin_sessions`, `admin_login_attempts`, `admin_accounts`, `admin_account_audit_log`, `admin_permission_grants`                                         |
+| 게임 운영                    | `0019`                         | `game_settings`                                                                                                                                                                      |
+| 유저 제재                    | `0023`                         | `user_moderation`, `user_moderation_audit_log`                                                                                                                                       |
+| 샌드박스 게임 (GAME_CREATOR) | `0024`, `0025`                 | `sandbox_games`, `sandbox_game_versions`, `sandbox_game_review_audit_log`, `game_creator_access`(구 `game_developers`), `game_creator_access_audit_log`, `game_creator_applications` |
+
+각 행이 나타내는 실제 축(Staff Role / Program / 인증)의 개념적 구분은
+[`docs/AUTHORIZATION.md`](AUTHORIZATION.md)를 참고하세요 — 이 문서는 스키마만 다룹니다.
 
 ---
 
@@ -250,7 +253,7 @@ erDiagram
 
 `creator_review_audit_log`는 UPDATE/DELETE 트리거로 보호되는 append-only 감사 원장입니다.
 
-### 2.5 관리자 인증 & 유저 제재
+### 2.5 관리자 인증 & Staff Role & 유저 제재
 
 ```mermaid
 erDiagram
@@ -260,6 +263,7 @@ erDiagram
     users ||--o| admin_accounts : "1:1"
     admin_accounts ||--o{ admin_account_audit_log : "actor"
     admin_accounts ||--o{ admin_account_audit_log : "target"
+    admin_accounts ||--o{ admin_permission_grants : "개별 권한 위임"
     users ||--o| user_moderation : "1:1, 없으면 ACTIVE"
     users ||--o{ user_moderation_audit_log : ""
 
@@ -268,8 +272,14 @@ erDiagram
         int user_id FK "UNIQUE, 1:1"
         text google_sub UK
         text username UK
-        text role "SUPERADMIN/ADMIN"
+        text role "ADMIN/OPERATOR/MODERATOR/SYSTEM_DEVELOPER (0025)"
         text status "ACTIVE/DISABLED"
+    }
+    admin_permission_grants {
+        int id PK
+        int account_id FK "UNIQUE(account_id,permission)"
+        text permission "0025, 예: admin.center.access"
+        int granted_by_admin_id
     }
     admin_sessions {
         int id PK
@@ -295,8 +305,74 @@ erDiagram
 ```
 
 `ADMIN_USER_IDS`(서버 설정, DB 밖)가 root 자격의 최종 근거이며, `admin_accounts`는 그 위에
-얹힌 일상 운영용 계정 계층입니다(`docs/ADMIN_GUIDE.md`). `user_moderation`은 `game_settings`와
+얹힌 일상 운영용 계정 계층입니다. `admin_accounts.role`은 마이그레이션 `0025`에서 `SUPERADMIN`/
+`ADMIN` 2단계로부터 이관되었습니다([`AUTHORIZATION.md`](AUTHORIZATION.md) §11에 매핑 규칙과
+안전성 검증 전체 기록). `admin_permission_grants`는 역할의 기본 권한 번들 밖의
+권한을 계정별로 추가 위임할 때만 행이 생깁니다 — 위 표의 다른 "override 있을 때만 행 존재"
+패턴들과 같습니다. Staff Role 전체 모델(역할별 기본 번들, `admin.center.access` 위임, Protected
+ADMIN)은 [`docs/AUTHORIZATION.md`](AUTHORIZATION.md) 참고. `user_moderation`은 `game_settings`와
 같은 "override가 있을 때만 행이 존재" 패턴 — 정지 이력이 없는 유저는 행 자체가 없습니다.
+
+### 2.6 샌드박스 게임 & 게임 크리에이터(GAME_CREATOR) 프로그램
+
+```mermaid
+erDiagram
+    users ||--o| game_creator_access : "1:1, granted_by_admin_id"
+    game_creator_access ||--o{ game_creator_access_audit_log : ""
+    users ||--o{ game_creator_applications : ""
+    users ||--o{ sandbox_games : "developer_user_id"
+    sandbox_games ||--o{ sandbox_game_versions : "불변 버전"
+    sandbox_games ||--o{ sandbox_game_review_audit_log : ""
+    sandbox_game_versions ||--o{ sandbox_game_review_audit_log : ""
+
+    game_creator_access {
+        int user_id PK "FK users.id, 1:1"
+        int granted_by_admin_id
+        text status "ACTIVE/REVOKED"
+    }
+    game_creator_applications {
+        int id PK
+        int user_id FK
+        text status "PENDING/APPROVED/REJECTED/WITHDRAWN"
+        text message
+        int reviewed_by_admin_id
+        text reject_reason
+    }
+    sandbox_games {
+        int id PK
+        text slug UK "scores.game_id로 그대로 사용"
+        int developer_user_id FK
+        text status "DRAFT/PENDING_REVIEW/APPROVED/REJECTED/DISABLED"
+        int live_version_id "현재 서빙 중인 버전"
+        int review_slot "NULL|1|2, 제작자당 동시 심사 2개"
+    }
+    sandbox_game_versions {
+        int id PK
+        int game_id FK
+        text object_key "B2 원본 ZIP 키"
+        text content_hash
+        text status "PENDING_REVIEW/APPROVED/REJECTED"
+        text publish_status "UPLOADED/PUBLISHING/READY/FAILED"
+    }
+    sandbox_game_review_audit_log {
+        int id PK
+        int game_id FK
+        int version_id FK
+        int reviewer_admin_id
+        text action "APPROVED/REJECTED/DISABLED/METADATA_CHANGED"
+    }
+```
+
+`game_creator_access`/`game_creator_access_audit_log`는 마이그레이션 `0024`가 만든
+`game_developers`/`game_developer_audit_log`를 `0025`가 **이름만** 바꾼 테이블입니다(행 데이터
+이동 없음). `game_creator_applications`(신규, `0025`)는 관리자 직접 임명을 대체하지 않는 **병행
+경로**이며, `WHERE status = 'PENDING'` 부분 UNIQUE 인덱스로 유저당 동시 대기 신청 1개만
+허용합니다 — `sandbox_games.review_slot`이 제작자당 동시 심사 2개를 강제하는 것과 동일한 "DB
+불변식으로 경합 방지" 패턴입니다. GAME_CREATOR 프로그램 전체 모델(임명 vs 신청, 향후 OwO Plus
+연동 지점)은 [`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §5~§6, 업로드/심사/호스팅 파이프라인
+상세는 [`docs/GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md) §3 참고. 정확한 컬럼 전체는
+[`packages/db/migrations/0024_sandbox_games.sql`](../packages/db/migrations/0024_sandbox_games.sql)이
+원천입니다(위 ERD는 핵심 컬럼만 발췌).
 
 ---
 
@@ -349,6 +425,8 @@ erDiagram
 - **Creator 심사 엔진 내부 동작**:
   [`docs/archive/creator-system-review-engine-detail.md`](archive/creator-system-review-engine-detail.md)
 - **관리자 인증 구조**: [`docs/ADMIN_GUIDE.md`](ADMIN_GUIDE.md)
+- **Staff Role / 권한 / GAME_CREATOR·STREAMER 프로그램 모델**: [`docs/AUTHORIZATION.md`](AUTHORIZATION.md)
+- **샌드박스 게임 업로드/심사/호스팅 파이프라인**: [`docs/GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md) §3
 - **마이그레이션 원문**: [`packages/db/migrations/`](../packages/db/migrations/)
 - **확장성/트래픽 점검 상세**(운영진 전용):
   `docs/archive/database-scalability-review-2026-08.md`

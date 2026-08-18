@@ -7,27 +7,72 @@ import {
   LogOut,
   Trophy,
   Settings as SettingsIcon,
+  ShieldCheck,
+  ServerCog,
+  Gamepad2,
+  Video,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../features/auth";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { LanguageSelector } from "../ui/LanguageSelector";
 import { OwoWordmarkIcon } from "../ui/OwoWordmarkIcon";
 import { RegisteredServersMenu } from "../ui/RegisteredServersMenu";
 import { useClickOutside } from "../../hooks/useClickOutside";
+import { fetchMyAccess } from "../../features/myAccess";
+import type { MyAccessResponse, StaffRoleValue } from "@owogg/contracts";
 
 interface HeaderProps {
   onToggleMobileSidebar: () => void;
 }
 
+/** Staff Role → profile-dropdown center entry. One entry at most, since `staffRole` is a single
+ * nullable value (a person's managed admin_accounts row has exactly one role) — see
+ * docs/AUTHORIZATION.md and packages/core/src/domain/staffRoles.ts. Kept as a plain lookup rather
+ * than a switch so a missing case fails loudly (unmapped role falls through to `undefined`,
+ * i.e. no entry, rather than crashing the header). */
+const STAFF_CENTER_ENTRIES: Record<
+  StaffRoleValue,
+  { to: string; label: string; Icon: typeof ShieldCheck }
+> = {
+  ADMIN: { to: "/admin", label: "관리자 센터", Icon: ShieldCheck },
+  OPERATOR: { to: "/ops", label: "운영 센터", Icon: ShieldCheck },
+  MODERATOR: { to: "/mod", label: "모더레이션", Icon: ShieldCheck },
+  SYSTEM_DEVELOPER: { to: "/system-dev", label: "시스템 개발", Icon: ServerCog },
+};
+
 export function Header({ onToggleMobileSidebar }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [myAccess, setMyAccess] = useState<MyAccessResponse | null>(null);
   const navigate = useNavigate();
   const { user, isAuthenticated, openLoginModal, logout } = useAuth();
   const { dict } = useI18n();
   const userDropdownRef = useRef<HTMLDivElement>(null);
   useClickOutside(userDropdownRef, () => setShowUserDropdown(false), showUserDropdown);
+
+  // Drives the role/program-specific dropdown entries below (Staff Role center, Game Creator
+  // center/apply, Streamer center — see docs/AUTHORIZATION.md). One extra request per session per
+  // login, not per dropdown-open. A plain USER gets back staffRole: null and both programs false,
+  // so nothing extra renders for them — frontend display only follows what the backend actually
+  // grants; it is never itself the authorization check (see routes' requirePermission calls).
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setMyAccess(null);
+      return;
+    }
+    let cancelled = false;
+    fetchMyAccess()
+      .then((res) => {
+        if (!cancelled) setMyAccess(res);
+      })
+      .catch(() => {
+        if (!cancelled) setMyAccess(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +80,21 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
       navigate(`/games?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
+
+  const staffCenter = myAccess?.staffRole ? STAFF_CENTER_ENTRIES[myAccess.staffRole] : null;
+  const gameCreator = myAccess?.gameCreator;
+  const showGameCreatorEntry =
+    !!gameCreator &&
+    (gameCreator.hasAccess || gameCreator.canApply || gameCreator.applicationStatus === "PENDING");
+  const gameCreatorLabel = !gameCreator
+    ? ""
+    : gameCreator.hasAccess
+      ? "게임 크리에이터 센터"
+      : gameCreator.applicationStatus === "PENDING"
+        ? "게임 크리에이터 신청 확인"
+        : "게임 크리에이터 신청";
+  const showStreamerEntry = !!myAccess?.streamer.isVerified;
+  const showAccessSection = !!staffCenter || showGameCreatorEntry || showStreamerEntry;
 
   return (
     <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-surface/90 border-b border-border/80 transition-all select-none">
@@ -187,6 +247,48 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
                     <Trophy className="w-4 h-4 text-accent-yellow" />
                     <span>{dict.nav.ranking}</span>
                   </Link>
+
+                  {/* Staff Role / Game Creator / Streamer entry points — each independently
+                      gated on the /api/me/access response, per docs/AUTHORIZATION.md. Backend
+                      authorization is the real gate; this only decides what's worth showing. */}
+                  {showAccessSection && (
+                    <>
+                      <div className="my-1 border-t border-border/40" />
+
+                      {staffCenter && (
+                        <Link
+                          to={staffCenter.to}
+                          onClick={() => setShowUserDropdown(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
+                        >
+                          <staffCenter.Icon className="w-4 h-4 text-brand-light" />
+                          <span>{staffCenter.label}</span>
+                        </Link>
+                      )}
+
+                      {showGameCreatorEntry && (
+                        <Link
+                          to="/game-creator"
+                          onClick={() => setShowUserDropdown(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
+                        >
+                          <Gamepad2 className="w-4 h-4 text-brand-light" />
+                          <span>{gameCreatorLabel}</span>
+                        </Link>
+                      )}
+
+                      {showStreamerEntry && (
+                        <Link
+                          to="/settings#streamer-center"
+                          onClick={() => setShowUserDropdown(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-text-primary hover:bg-surface-overlay transition-colors"
+                        >
+                          <Video className="w-4 h-4 text-brand-light" />
+                          <span>스트리머 센터</span>
+                        </Link>
+                      )}
+                    </>
+                  )}
 
                   <button
                     onClick={() => {

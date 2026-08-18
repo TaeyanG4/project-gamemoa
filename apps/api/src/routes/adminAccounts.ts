@@ -8,6 +8,8 @@ import {
   AdminAccountRoleChangeRequestSchema,
   AdminAccountPasswordResetRequestSchema,
   AdminAccountAuditListResponseSchema,
+  PermissionGrantRequestSchema,
+  PermissionSchema,
 } from "@owogg/contracts";
 import {
   evaluateAdminPasswordPolicy,
@@ -56,8 +58,12 @@ function failureMessage(code: AdminAccountUseCaseFailure["code"]): string {
       return "해당 Google 계정은 이미 다른 관리자 계정에 연결되어 있습니다.";
     case "NOT_FOUND":
       return "대상 관리자 계정을 찾을 수 없습니다.";
-    case "LAST_SUPERADMIN":
-      return "마지막 SUPERADMIN은 비활성화하거나 강등할 수 없습니다.";
+    case "LAST_ADMIN":
+      return "마지막 ADMIN은 비활성화하거나 강등할 수 없습니다.";
+    case "CANNOT_MODIFY_SELF":
+      return "자기 자신의 권한은 이 화면에서 변경할 수 없습니다.";
+    case "PERMISSION_NOT_DELEGABLE":
+      return "이 권한은 위임할 수 없습니다.";
   }
 }
 
@@ -150,15 +156,12 @@ function toSummary(account: AdminAccountRecord, nickname: string, selfUserId: nu
   };
 }
 
-// GET /api/admin/accounts — SUPERADMIN only.
+// GET /api/admin/accounts — ADMIN only.
 adminAccountsRouter.get("/accounts", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
-  if (admin.account?.role !== "SUPERADMIN") {
-    return c.json(
-      { error: { code: "FORBIDDEN", message: "SUPERADMIN만 접근할 수 있습니다." } },
-      403,
-    );
+  if (admin.account?.role !== "ADMIN") {
+    return c.json({ error: { code: "FORBIDDEN", message: "ADMIN만 접근할 수 있습니다." } }, 403);
   }
 
   const { adminAccountUseCases, userRepo } = createContainer(c.env.DB);
@@ -173,15 +176,12 @@ adminAccountsRouter.get("/accounts", async (c) => {
   return c.json(AdminAccountListResponseSchema.parse({ accounts: summaries }));
 });
 
-// GET /api/admin/accounts/audit — SUPERADMIN only, safe append-only audit trail.
+// GET /api/admin/accounts/audit — ADMIN only, safe append-only audit trail.
 adminAccountsRouter.get("/accounts/audit", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
-  if (admin.account?.role !== "SUPERADMIN") {
-    return c.json(
-      { error: { code: "FORBIDDEN", message: "SUPERADMIN만 접근할 수 있습니다." } },
-      403,
-    );
+  if (admin.account?.role !== "ADMIN") {
+    return c.json({ error: { code: "FORBIDDEN", message: "ADMIN만 접근할 수 있습니다." } }, 403);
   }
 
   const { adminAccountUseCases } = createContainer(c.env.DB);
@@ -189,17 +189,14 @@ adminAccountsRouter.get("/accounts/audit", async (c) => {
   return c.json(AdminAccountAuditListResponseSchema.parse({ entries }));
 });
 
-// POST /api/admin/accounts — SUPERADMIN only. Creates an administrator bound to an EXISTING
+// POST /api/admin/accounts — ADMIN only. Creates an administrator bound to an EXISTING
 // OwOGG user whose Google identity is derived from that user's already-linked oauth_accounts
 // row — a Google sub is never accepted as free-text client input.
 adminAccountsRouter.post("/accounts", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
-  if (admin.account?.role !== "SUPERADMIN") {
-    return c.json(
-      { error: { code: "FORBIDDEN", message: "SUPERADMIN만 접근할 수 있습니다." } },
-      403,
-    );
+  if (admin.account?.role !== "ADMIN") {
+    return c.json({ error: { code: "FORBIDDEN", message: "ADMIN만 접근할 수 있습니다." } }, 403);
   }
 
   const rawBody = await c.req.json().catch(() => ({}));
@@ -269,26 +266,28 @@ adminAccountsRouter.post("/accounts", async (c) => {
   }
 });
 
-interface SuperadminActor {
+interface ManagedAdminActor {
   actorAdminId: number;
 }
 
-function isResponse(value: Response | SuperadminActor): value is Response {
+function isResponse(value: Response | ManagedAdminActor): value is Response {
   return value instanceof Response;
 }
 
-async function requireSuperadminTarget(
+/** Requires a genuine MANAGED ADMIN account specifically — not merely `admin.role === "ADMIN"`,
+ * which a root-only ADMIN_USER_IDS admin (no admin_accounts row at all) also resolves to. Account
+ * management (creating/disabling/reassigning other administrators) stays gated on having gone
+ * through the real bootstrap/creation flow, same as before this migration — a break-glass root
+ * identity with no managed row has no `account.id` to attribute these actions to. */
+async function requireManagedAdminTarget(
   c: Parameters<typeof requireElevatedAdmin>[0],
   targetId: number,
-): Promise<Response | SuperadminActor> {
+): Promise<Response | ManagedAdminActor> {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
   const account = admin.account;
-  if (!account || account.role !== "SUPERADMIN") {
-    return c.json(
-      { error: { code: "FORBIDDEN", message: "SUPERADMIN만 접근할 수 있습니다." } },
-      403,
-    );
+  if (!account || account.role !== "ADMIN") {
+    return c.json({ error: { code: "FORBIDDEN", message: "ADMIN만 접근할 수 있습니다." } }, 403);
   }
   if (!Number.isSafeInteger(targetId) || targetId <= 0) {
     return c.json({ error: { code: "INVALID_REQUEST", message: "잘못된 요청입니다." } }, 400);
@@ -296,10 +295,10 @@ async function requireSuperadminTarget(
   return { actorAdminId: account.id };
 }
 
-// PATCH /api/admin/accounts/:id/status — enable/disable (SUPERADMIN only).
+// PATCH /api/admin/accounts/:id/status — enable/disable (ADMIN only).
 adminAccountsRouter.patch("/accounts/:id/status", async (c) => {
   const targetId = Number(c.req.param("id"));
-  const actor = await requireSuperadminTarget(c, targetId);
+  const actor = await requireManagedAdminTarget(c, targetId);
   if (isResponse(actor)) return actor;
 
   const rawBody = await c.req.json().catch(() => ({}));
@@ -330,10 +329,10 @@ adminAccountsRouter.patch("/accounts/:id/status", async (c) => {
   }
 });
 
-// PATCH /api/admin/accounts/:id/role — change role (SUPERADMIN only).
+// PATCH /api/admin/accounts/:id/role — change role (ADMIN only).
 adminAccountsRouter.patch("/accounts/:id/role", async (c) => {
   const targetId = Number(c.req.param("id"));
-  const actor = await requireSuperadminTarget(c, targetId);
+  const actor = await requireManagedAdminTarget(c, targetId);
   if (isResponse(actor)) return actor;
 
   const rawBody = await c.req.json().catch(() => ({}));
@@ -365,10 +364,10 @@ adminAccountsRouter.patch("/accounts/:id/role", async (c) => {
 });
 
 // POST /api/admin/accounts/:id/reset-password — issue a new temporary password for another
-// administrator (SUPERADMIN only). Always forces a change on next login.
+// administrator (ADMIN only). Always forces a change on next login.
 adminAccountsRouter.post("/accounts/:id/reset-password", async (c) => {
   const targetId = Number(c.req.param("id"));
-  const actor = await requireSuperadminTarget(c, targetId);
+  const actor = await requireManagedAdminTarget(c, targetId);
   if (isResponse(actor)) return actor;
 
   const rawBody = await c.req.json().catch(() => ({}));
@@ -424,10 +423,10 @@ adminAccountsRouter.post("/accounts/:id/reset-password", async (c) => {
   }
 });
 
-// POST /api/admin/accounts/:id/revoke-sessions — SUPERADMIN only.
+// POST /api/admin/accounts/:id/revoke-sessions — ADMIN only.
 adminAccountsRouter.post("/accounts/:id/revoke-sessions", async (c) => {
   const targetId = Number(c.req.param("id"));
-  const actor = await requireSuperadminTarget(c, targetId);
+  const actor = await requireManagedAdminTarget(c, targetId);
   if (isResponse(actor)) return actor;
 
   const { adminAccountUseCases } = createContainer(c.env.DB);
@@ -435,6 +434,95 @@ adminAccountsRouter.post("/accounts/:id/revoke-sessions", async (c) => {
     await adminAccountUseCases.revokeSessions({
       actorAdminId: actor.actorAdminId,
       targetAdminId: targetId,
+    });
+    return c.json({ success: true });
+  } catch (err) {
+    if (err instanceof AdminAccountUseCaseFailure) {
+      return c.json(
+        { error: { code: err.code, message: failureMessage(err.code) } },
+        failureStatus(err.code),
+      );
+    }
+    throw err;
+  }
+});
+
+// ── Individual permission delegation (migration 0025) ────────────────────────
+//
+// e.g. granting a trusted SYSTEM_DEVELOPER `admin.center.access` without making them a full
+// OPERATOR. Gated the same way as the rest of this file (a genuine managed ADMIN account, not
+// merely root eligibility) rather than via requirePermission("roles.manage") — see
+// requireManagedAdminTarget's doc comment for why account management stays on this stricter gate.
+
+// GET /api/admin/accounts/:id/permissions
+adminAccountsRouter.get("/accounts/:id/permissions", async (c) => {
+  const targetId = Number(c.req.param("id"));
+  const actor = await requireManagedAdminTarget(c, targetId);
+  if (isResponse(actor)) return actor;
+
+  const { adminAccountUseCases } = createContainer(c.env.DB);
+  const target = await adminAccountUseCases.getById(targetId);
+  if (!target) {
+    return c.json(
+      { error: { code: "NOT_FOUND", message: "대상 관리자 계정을 찾을 수 없습니다." } },
+      404,
+    );
+  }
+  const permissions = await adminAccountUseCases.listPermissions(targetId);
+  return c.json({ permissions });
+});
+
+// POST /api/admin/accounts/:id/permissions — grant one individual permission.
+adminAccountsRouter.post("/accounts/:id/permissions", async (c) => {
+  const targetId = Number(c.req.param("id"));
+  const actor = await requireManagedAdminTarget(c, targetId);
+  if (isResponse(actor)) return actor;
+
+  const rawBody = await c.req.json().catch(() => ({}));
+  const parsed = PermissionGrantRequestSchema.safeParse(rawBody);
+  if (!parsed.success) {
+    return c.json(
+      { error: { code: "INVALID_REQUEST", message: "요청 본문이 올바르지 않습니다." } },
+      400,
+    );
+  }
+
+  const { adminAccountUseCases } = createContainer(c.env.DB);
+  try {
+    await adminAccountUseCases.grantPermission({
+      actorAdminId: actor.actorAdminId,
+      targetAdminId: targetId,
+      permission: parsed.data.permission,
+    });
+    return c.json({ success: true });
+  } catch (err) {
+    if (err instanceof AdminAccountUseCaseFailure) {
+      return c.json(
+        { error: { code: err.code, message: failureMessage(err.code) } },
+        failureStatus(err.code),
+      );
+    }
+    throw err;
+  }
+});
+
+// DELETE /api/admin/accounts/:id/permissions/:permission — revoke one individual permission.
+adminAccountsRouter.delete("/accounts/:id/permissions/:permission", async (c) => {
+  const targetId = Number(c.req.param("id"));
+  const actor = await requireManagedAdminTarget(c, targetId);
+  if (isResponse(actor)) return actor;
+
+  const parsedPermission = PermissionSchema.safeParse(c.req.param("permission"));
+  if (!parsedPermission.success) {
+    return c.json({ error: { code: "INVALID_REQUEST", message: "알 수 없는 권한입니다." } }, 400);
+  }
+
+  const { adminAccountUseCases } = createContainer(c.env.DB);
+  try {
+    await adminAccountUseCases.revokePermission({
+      actorAdminId: actor.actorAdminId,
+      targetAdminId: targetId,
+      permission: parsedPermission.data,
     });
     return c.json({ success: true });
   } catch (err) {

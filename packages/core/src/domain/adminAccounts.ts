@@ -7,10 +7,15 @@
  * (see domain/adminAuth.ts / isAdminUserId). This module governs the account model that becomes
  * the ONGOING administrator authority once at least one active row exists — so operators never
  * need a GitHub Secret edit to add a new administrator after the first one.
+ *
+ * `role` is a {@link StaffRole} (see domain/staffRoles.ts) — a managed admin_accounts row is how a
+ * Staff Role becomes a real, authenticated (Google step-up + password) identity. Re-exported here
+ * as `AdminAccountRole` purely so existing call sites importing that name keep working; the two
+ * are the same type, not independently maintained.
  */
 
-export const ADMIN_ACCOUNT_ROLES = ["SUPERADMIN", "ADMIN"] as const;
-export type AdminAccountRole = (typeof ADMIN_ACCOUNT_ROLES)[number];
+export type { StaffRole as AdminAccountRole } from "./staffRoles.js";
+export { STAFF_ROLES as ADMIN_ACCOUNT_ROLES } from "./staffRoles.js";
 
 export const ADMIN_ACCOUNT_STATUSES = ["ACTIVE", "DISABLED"] as const;
 export type AdminAccountStatus = (typeof ADMIN_ACCOUNT_STATUSES)[number];
@@ -23,6 +28,8 @@ export const ADMIN_ACCOUNT_AUDIT_ACTIONS = [
   "PASSWORD_CHANGED",
   "PASSWORD_RESET",
   "SESSIONS_REVOKED",
+  "PERMISSION_GRANTED",
+  "PERMISSION_REVOKED",
 ] as const;
 export type AdminAccountAuditAction = (typeof ADMIN_ACCOUNT_AUDIT_ACTIONS)[number];
 
@@ -51,7 +58,7 @@ export interface AdminPasswordPolicyResult {
 }
 
 /** Centralized new-admin-password policy — reused by bootstrap, self password change, and
- * SUPERADMIN password reset so the rule never drifts between entry points. */
+ * ADMIN-issued password reset so the rule never drifts between entry points. */
 export function evaluateAdminPasswordPolicy(
   input: AdminPasswordPolicyInput,
 ): AdminPasswordPolicyResult {

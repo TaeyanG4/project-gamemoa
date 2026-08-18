@@ -6,14 +6,14 @@ import { clearGoogleJwksCache } from "../src/infrastructure/oauth/google.ts";
 import { createSqliteD1 } from "../../../packages/db/test/helpers/sqliteD1.js";
 
 // Route-level tests for the managed admin-account model (migration 0016) using a real SQLite
-// engine, exercising SUPERADMIN-only account management and the "eligibility purely via a
+// engine, exercising ADMIN-only account management and the "eligibility purely via a
 // managed account, no ADMIN_USER_IDS membership" invariant (docs/ADMIN_GUIDE.md §15).
 
 const GOOGLE_JWKS_URI = "https://www.googleapis.com/oauth2/v3/certs";
 const CLIENT_ID = "test-google-client-id.apps.googleusercontent.com";
-const SUPERADMIN_USER_ID = 1;
-const SUPERADMIN_GOOGLE_SUB = "superadmin-google-sub";
-const SUPERADMIN_SESSION_RAW = "superadmin_session_token";
+const ROOT_ADMIN_USER_ID = 1;
+const ROOT_ADMIN_GOOGLE_SUB = "root-admin-google-sub";
+const ROOT_ADMIN_SESSION_RAW = "root_admin_session_token";
 
 const OTHER_USER_ID = 2;
 const OTHER_GOOGLE_SUB = "other-user-google-sub";
@@ -22,8 +22,8 @@ const OTHER_SESSION_RAW = "other_user_session_token";
 // Synthetic local-SQLite fixture values only — never real credentials, never used against any
 // real deployment. Named constants (not inline literals) so nothing here reads as an actual
 // secret to a human or a scanner.
-const SUPERADMIN_TEST_USERNAME = "e2e-superadmin-fixture-user";
-const SUPERADMIN_TEST_PASSWORD = "e2e-superadmin-fixture-pw-000-not-real";
+const ROOT_ADMIN_TEST_USERNAME = "e2e-root-admin-fixture-user";
+const ROOT_ADMIN_TEST_PASSWORD = "e2e-root-admin-fixture-pw-000-not-real";
 const ROTATED_TEST_PASSWORD = "e2e-rotated-fixture-pw-000-not-real";
 const SECOND_ADMIN_TEST_PASSWORD = "e2e-second-admin-fixture-pw-000-not-real";
 
@@ -176,6 +176,14 @@ CREATE TABLE admin_account_audit_log (
   metadata_json TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE admin_permission_grants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  permission TEXT NOT NULL,
+  granted_by_admin_id INTEGER,
+  created_at TEXT NOT NULL,
+  UNIQUE (account_id, permission)
+);
 `;
 
 function extractCookie(res: Response, name: string): string | null {
@@ -194,7 +202,7 @@ async function seedFixtures(raw: import("node:sqlite").DatabaseSync) {
   const now = new Date().toISOString();
   const expires = new Date(Date.now() + 86_400_000).toISOString();
   for (const [userId, sessionRaw, googleSub, nickname] of [
-    [SUPERADMIN_USER_ID, SUPERADMIN_SESSION_RAW, SUPERADMIN_GOOGLE_SUB, "RootAdmin"],
+    [ROOT_ADMIN_USER_ID, ROOT_ADMIN_SESSION_RAW, ROOT_ADMIN_GOOGLE_SUB, "RootAdmin"],
     [OTHER_USER_ID, OTHER_SESSION_RAW, OTHER_GOOGLE_SUB, "SecondAdmin"],
   ] as const) {
     raw
@@ -211,21 +219,21 @@ async function seedFixtures(raw: import("node:sqlite").DatabaseSync) {
   }
 }
 
-async function setupWithSuperadmin() {
+async function setupWithRootAdmin() {
   const { db, raw } = createSqliteD1(FULL_SCHEMA);
   await seedFixtures(raw);
   const env = {
     DB: db,
-    ADMIN_USER_IDS: String(SUPERADMIN_USER_ID), // only the root operator — OTHER_USER_ID is deliberately absent
+    ADMIN_USER_IDS: String(ROOT_ADMIN_USER_ID), // only the root operator — OTHER_USER_ID is deliberately absent
     GOOGLE_CLIENT_ID: CLIENT_ID,
     FRONTEND_URL: "http://localhost:5173",
   };
   return { env, raw };
 }
 
-async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: KeyObject) {
-  const sessionCookie = `owogg_session=${SUPERADMIN_SESSION_RAW}`;
-  const idToken = buildJwt(privateKey, freshGooglePayload(SUPERADMIN_GOOGLE_SUB));
+async function elevateToRootAdmin(env: Record<string, unknown>, privateKey: KeyObject) {
+  const sessionCookie = `owogg_session=${ROOT_ADMIN_SESSION_RAW}`;
+  const idToken = buildJwt(privateKey, freshGooglePayload(ROOT_ADMIN_GOOGLE_SUB));
   const stepUpRes = await app.request(
     "/api/admin/auth/google",
     {
@@ -250,9 +258,9 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
         Origin: "http://localhost:5173",
       },
       body: JSON.stringify({
-        username: SUPERADMIN_TEST_USERNAME,
-        password: SUPERADMIN_TEST_PASSWORD,
-        passwordConfirm: SUPERADMIN_TEST_PASSWORD,
+        username: ROOT_ADMIN_TEST_USERNAME,
+        password: ROOT_ADMIN_TEST_PASSWORD,
+        passwordConfirm: ROOT_ADMIN_TEST_PASSWORD,
       }),
     },
     env as any,
@@ -261,7 +269,7 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
   const authedCookie = `${sessionCookie}; owogg_admin_session=${adminSessionCookie}`;
 
   // Bootstrap always forces a password change (must_change_password=true) — clear it so the
-  // returned cookie can exercise sensitive SUPERADMIN-only routes, exactly like the real flow.
+  // returned cookie can exercise sensitive ADMIN-only routes, exactly like the real flow.
   const changeRes = await app.request(
     "/api/admin/settings/password",
     {
@@ -272,7 +280,7 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
         Origin: "http://localhost:5173",
       },
       body: JSON.stringify({
-        currentPassword: SUPERADMIN_TEST_PASSWORD,
+        currentPassword: ROOT_ADMIN_TEST_PASSWORD,
         newPassword: ROTATED_TEST_PASSWORD,
         newPasswordConfirm: ROTATED_TEST_PASSWORD,
       }),
@@ -283,21 +291,21 @@ async function elevateToSuperadmin(env: Record<string, unknown>, privateKey: Key
   return `${sessionCookie}; owogg_admin_session=${rotatedAdminSessionCookie}`;
 }
 
-test("SUPERADMIN can create an ADMIN for another linked OwOGG user; response never leaks passwordHash/googleSub; the new admin can independently authenticate with no ADMIN_USER_IDS membership", async () => {
+test("ADMIN can create another ADMIN for a linked OwOGG user; response never leaks passwordHash/googleSub; the new admin can independently authenticate with no ADMIN_USER_IDS membership", async () => {
   clearGoogleJwksCache();
   const { privateKey, publicJwk } = createRsaKeySet();
   const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
   jwks.install();
   try {
-    const { env } = await setupWithSuperadmin();
-    const superadminCookie = await elevateToSuperadmin(env, privateKey);
+    const { env } = await setupWithRootAdmin();
+    const rootAdminCookie = await elevateToRootAdmin(env, privateKey);
 
     const createRes = await app.request(
       "/api/admin/accounts",
       {
         method: "POST",
         headers: {
-          Cookie: superadminCookie,
+          Cookie: rootAdminCookie,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -360,7 +368,9 @@ test("SUPERADMIN can create an ADMIN for another linked OwOGG user; response nev
       mustChangePassword: true,
     });
 
-    // But this new ADMIN (not SUPERADMIN) cannot manage other admin accounts.
+    // But this second ADMIN account (created via the API, not root-eligible) still requires its
+    // own completed step-up + rotated password before it can manage other admin accounts —
+    // it just did step-up + login above, but never rotated its forced temporary password.
     const otherAdminSessionCookie = extractCookie(otherLogin, "owogg_admin_session");
     const deniedList = await app.request(
       "/api/admin/accounts",
@@ -383,20 +393,20 @@ test("creating an admin for a user with no linked Google account is rejected", a
   const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
   jwks.install();
   try {
-    const { env, raw } = await setupWithSuperadmin();
+    const { env, raw } = await setupWithRootAdmin();
     // Add a third user with no google oauth_accounts row.
     const now = new Date().toISOString();
     raw
       .prepare(`INSERT INTO users (id, nickname, created_at, updated_at) VALUES (?, ?, ?, ?)`)
       .run(3, "NoGoogleUser", now, now);
 
-    const superadminCookie = await elevateToSuperadmin(env, privateKey);
+    const rootAdminCookie = await elevateToRootAdmin(env, privateKey);
     const res = await app.request(
       "/api/admin/accounts",
       {
         method: "POST",
         headers: {
-          Cookie: superadminCookie,
+          Cookie: rootAdminCookie,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -416,18 +426,26 @@ test("creating an admin for a user with no linked Google account is rejected", a
   }
 });
 
-test("the sole active SUPERADMIN cannot be disabled or demoted", async () => {
+// A lone ADMIN acting through the real HTTP/session chain is necessarily acting on THEMSELVES
+// here (nobody else can reach these endpoints — requireManagedAdminTarget itself requires a
+// managed ADMIN account), so this exercises the self-lockout guard (CANNOT_MODIFY_SELF), which
+// fires before the separate last-active-ADMIN count check ever runs. The last-ADMIN check on a
+// genuinely different actor is exercised directly at the use-case level instead — see
+// packages/core/test/adminAccountUseCases.test.ts, since it's not reachable through this HTTP
+// chain (an actor who could act on a different, sole remaining ADMIN would themselves have to be
+// a second ADMIN, at which point the target is no longer "the last one").
+test("a lone ADMIN cannot disable or demote themselves (self-lockout guard)", async () => {
   clearGoogleJwksCache();
   const { privateKey, publicJwk } = createRsaKeySet();
   const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
   jwks.install();
   try {
-    const { env } = await setupWithSuperadmin();
-    const superadminCookie = await elevateToSuperadmin(env, privateKey);
+    const { env } = await setupWithRootAdmin();
+    const rootAdminCookie = await elevateToRootAdmin(env, privateKey);
 
     const listRes = await app.request(
       "/api/admin/accounts",
-      { headers: { Cookie: superadminCookie } },
+      { headers: { Cookie: rootAdminCookie } },
       env as any,
     );
     const accounts = ((await listRes.json()) as { accounts: Array<{ id: number }> }).accounts;
@@ -438,7 +456,7 @@ test("the sole active SUPERADMIN cannot be disabled or demoted", async () => {
       {
         method: "PATCH",
         headers: {
-          Cookie: superadminCookie,
+          Cookie: rootAdminCookie,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -447,43 +465,43 @@ test("the sole active SUPERADMIN cannot be disabled or demoted", async () => {
       env as any,
     );
     assert.equal(disableRes.status, 409);
-    assert.equal((await disableRes.json()).error.code, "LAST_SUPERADMIN");
+    assert.equal((await disableRes.json()).error.code, "CANNOT_MODIFY_SELF");
 
     const demoteRes = await app.request(
       `/api/admin/accounts/${selfId}/role`,
       {
         method: "PATCH",
         headers: {
-          Cookie: superadminCookie,
+          Cookie: rootAdminCookie,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
-        body: JSON.stringify({ role: "ADMIN" }),
+        body: JSON.stringify({ role: "OPERATOR" }),
       },
       env as any,
     );
     assert.equal(demoteRes.status, 409);
-    assert.equal((await demoteRes.json()).error.code, "LAST_SUPERADMIN");
+    assert.equal((await demoteRes.json()).error.code, "CANNOT_MODIFY_SELF");
   } finally {
     jwks.restore();
   }
 });
 
-test("audit log records ADMIN_CREATED for both bootstrap and SUPERADMIN-created admins", async () => {
+test("audit log records ADMIN_CREATED for both bootstrap and ADMIN-created admins", async () => {
   clearGoogleJwksCache();
   const { privateKey, publicJwk } = createRsaKeySet();
   const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
   jwks.install();
   try {
-    const { env } = await setupWithSuperadmin();
-    const superadminCookie = await elevateToSuperadmin(env, privateKey);
+    const { env } = await setupWithRootAdmin();
+    const rootAdminCookie = await elevateToRootAdmin(env, privateKey);
 
     await app.request(
       "/api/admin/accounts",
       {
         method: "POST",
         headers: {
-          Cookie: superadminCookie,
+          Cookie: rootAdminCookie,
           "Content-Type": "application/json",
           Origin: "http://localhost:5173",
         },
@@ -499,7 +517,7 @@ test("audit log records ADMIN_CREATED for both bootstrap and SUPERADMIN-created 
 
     const auditRes = await app.request(
       "/api/admin/accounts/audit",
-      { headers: { Cookie: superadminCookie } },
+      { headers: { Cookie: rootAdminCookie } },
       env as any,
     );
     assert.equal(auditRes.status, 200);
@@ -507,6 +525,247 @@ test("audit log records ADMIN_CREATED for both bootstrap and SUPERADMIN-created 
     const createdCount = entries.filter((e) => e.action === "ADMIN_CREATED").length;
     assert.equal(createdCount, 2); // bootstrap + this create
     assert.equal(JSON.stringify(entries).includes(SECOND_ADMIN_TEST_PASSWORD), false);
+  } finally {
+    jwks.restore();
+  }
+});
+
+// ── Individual permission delegation (migration 0025) ────────────────────────
+
+/** Completes Google step-up + username/password login + forced password rotation for a
+ * non-root managed admin (OTHER_USER_ID), mirroring elevateToRootAdmin's shape but via the
+ * login endpoint instead of bootstrap — a managed account created by POST /api/admin/accounts
+ * is never bootstrapped, it logs in. Returns a cookie string ready for sensitive routes (no
+ * must_change_password left pending), the same way elevateToRootAdmin does for the root account. */
+async function elevateSecondAdmin(env: Record<string, unknown>, privateKey: KeyObject) {
+  const sessionCookie = `owogg_session=${OTHER_SESSION_RAW}`;
+  const idToken = buildJwt(privateKey, freshGooglePayload(OTHER_GOOGLE_SUB));
+  const stepUpRes = await app.request(
+    "/api/admin/auth/google",
+    {
+      method: "POST",
+      headers: {
+        Cookie: sessionCookie,
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ credential: idToken }),
+    },
+    env as any,
+  );
+  const stepUpCookie = extractCookie(stepUpRes, "owogg_admin_stepup");
+  const loginRes = await app.request(
+    "/api/admin/auth/login",
+    {
+      method: "POST",
+      headers: {
+        Cookie: `${sessionCookie}; owogg_admin_stepup=${stepUpCookie}`,
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ username: "second-admin", password: SECOND_ADMIN_TEST_PASSWORD }),
+    },
+    env as any,
+  );
+  const adminSessionCookie = extractCookie(loginRes, "owogg_admin_session");
+  const authedCookie = `${sessionCookie}; owogg_admin_session=${adminSessionCookie}`;
+
+  const changeRes = await app.request(
+    "/api/admin/settings/password",
+    {
+      method: "POST",
+      headers: {
+        Cookie: authedCookie,
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({
+        currentPassword: SECOND_ADMIN_TEST_PASSWORD,
+        newPassword: ROTATED_TEST_PASSWORD,
+        newPasswordConfirm: ROTATED_TEST_PASSWORD,
+      }),
+    },
+    env as any,
+  );
+  const rotatedCookie = extractCookie(changeRes, "owogg_admin_session");
+  return `${sessionCookie}; owogg_admin_session=${rotatedCookie}`;
+}
+
+test("ADMIN grants and revokes an individual permission on a managed OPERATOR account; roles.manage is rejected as non-delegable", async () => {
+  clearGoogleJwksCache();
+  const { privateKey, publicJwk } = createRsaKeySet();
+  const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
+  jwks.install();
+  try {
+    const { env } = await setupWithRootAdmin();
+    const rootAdminCookie = await elevateToRootAdmin(env, privateKey);
+
+    const createRes = await app.request(
+      "/api/admin/accounts",
+      {
+        method: "POST",
+        headers: {
+          Cookie: rootAdminCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          userId: OTHER_USER_ID,
+          username: "second-admin",
+          password: SECOND_ADMIN_TEST_PASSWORD,
+          role: "OPERATOR",
+        }),
+      },
+      env as any,
+    );
+    assert.equal(createRes.status, 201);
+    const targetId = ((await createRes.json()) as { id: number }).id;
+
+    // Starts empty — system.dev.access isn't part of OPERATOR's default bundle (staffRoles.ts),
+    // so this individual grant is the only way this account would ever get it.
+    const emptyList = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      { headers: { Cookie: rootAdminCookie } },
+      env as any,
+    );
+    assert.equal(emptyList.status, 200);
+    assert.deepEqual((await emptyList.json()) as { permissions: string[] }, { permissions: [] });
+
+    const grantRes = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      {
+        method: "POST",
+        headers: {
+          Cookie: rootAdminCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({ permission: "system.dev.access" }),
+      },
+      env as any,
+    );
+    assert.equal(grantRes.status, 200);
+
+    const afterGrant = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      { headers: { Cookie: rootAdminCookie } },
+      env as any,
+    );
+    assert.deepEqual((await afterGrant.json()) as { permissions: string[] }, {
+      permissions: ["system.dev.access"],
+    });
+
+    // roles.manage must never be delegable, even by an ADMIN acting on a managed account.
+    const grantRolesManage = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      {
+        method: "POST",
+        headers: {
+          Cookie: rootAdminCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({ permission: "roles.manage" }),
+      },
+      env as any,
+    );
+    assert.equal(grantRolesManage.status, 409);
+    const grantRolesManageBody = (await grantRolesManage.json()) as { error: { code: string } };
+    assert.equal(grantRolesManageBody.error.code, "PERMISSION_NOT_DELEGABLE");
+
+    const revokeRes = await app.request(
+      `/api/admin/accounts/${targetId}/permissions/system.dev.access`,
+      { method: "DELETE", headers: { Cookie: rootAdminCookie, Origin: "http://localhost:5173" } },
+      env as any,
+    );
+    assert.equal(revokeRes.status, 200);
+
+    const afterRevoke = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      { headers: { Cookie: rootAdminCookie } },
+      env as any,
+    );
+    assert.deepEqual((await afterRevoke.json()) as { permissions: string[] }, { permissions: [] });
+  } finally {
+    jwks.restore();
+  }
+});
+
+test("a managed OPERATOR (not ADMIN) is denied on every permission-delegation endpoint (403 FORBIDDEN)", async () => {
+  clearGoogleJwksCache();
+  const { privateKey, publicJwk } = createRsaKeySet();
+  const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
+  jwks.install();
+  try {
+    const { env } = await setupWithRootAdmin();
+    const rootAdminCookie = await elevateToRootAdmin(env, privateKey);
+
+    const createRes = await app.request(
+      "/api/admin/accounts",
+      {
+        method: "POST",
+        headers: {
+          Cookie: rootAdminCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({
+          userId: OTHER_USER_ID,
+          username: "second-admin",
+          password: SECOND_ADMIN_TEST_PASSWORD,
+          role: "OPERATOR",
+        }),
+      },
+      env as any,
+    );
+    const targetId = ((await createRes.json()) as { id: number }).id;
+    const operatorCookie = await elevateSecondAdmin(env, privateKey);
+
+    const listRes = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      { headers: { Cookie: operatorCookie } },
+      env as any,
+    );
+    assert.equal(listRes.status, 403);
+
+    const grantRes = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      {
+        method: "POST",
+        headers: {
+          Cookie: operatorCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({ permission: "system.dev.access" }),
+      },
+      env as any,
+    );
+    assert.equal(grantRes.status, 403);
+
+    // Even an OPERATOR granting a permission to THEMSELVES is denied — permission delegation
+    // stays an ADMIN-only capability, not something any managed account can self-serve.
+    const selfGrantRes = await app.request(
+      `/api/admin/accounts/${targetId}/permissions`,
+      {
+        method: "POST",
+        headers: {
+          Cookie: operatorCookie,
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+        },
+        body: JSON.stringify({ permission: "admin.center.access" }),
+      },
+      env as any,
+    );
+    assert.equal(selfGrantRes.status, 403);
+
+    const revokeRes = await app.request(
+      `/api/admin/accounts/${targetId}/permissions/system.dev.access`,
+      { method: "DELETE", headers: { Cookie: operatorCookie, Origin: "http://localhost:5173" } },
+      env as any,
+    );
+    assert.equal(revokeRes.status, 403);
   } finally {
     jwks.restore();
   }

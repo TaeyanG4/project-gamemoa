@@ -8,7 +8,7 @@
 > 임의 코드를 샌드박스에서 실행하는 번들 업로드 방식으로 대체됩니다.
 >
 > **구현 현황 (2026-08-15)**: DB 스키마(§3.7), 관리자 임명/심사/공개 API, 설정 페이지 "개발" 탭
-> (업로드), `/admin/game-developers`(임명), `/admin/sandbox-games`(심사+메타데이터+공개 전환)는
+> (업로드), `/admin/game-creators`(임명), `/admin/sandbox-games`(심사+메타데이터+공개 전환)는
 > **구현 완료**. 저장소 계정 프로비저닝·번들 서빙 Worker·별도 게임 호스팅 도메인(§3.8)은 **실제
 > 계정 작업이 필요해 아직 미착수** — 그 전까지 업로드는 `503 GAME_BUNDLES_NOT_CONFIGURED`로
 > 안전하게 거부됩니다. 제작자용 실사용 안내는
@@ -23,7 +23,27 @@
 > 추상화돼 있었기 때문에 DB 스키마·리뷰/버전 워크플로우·API 계약은 전혀 바뀌지 않았습니다 —
 > `sandbox_game_versions`의 저장 키 컬럼명만 provider-neutral하게 `object_key`로
 > 정리했습니다(마이그레이션 0024가 아직 배포 전이라 안전하게 rename). Cloudflare는 그대로
-> compute/CDN으로 계속 사용합니다 — B2는 오직 Game Developer 게임 파일 저장 용도입니다.
+> compute/CDN으로 계속 사용합니다 — B2는 오직 Game Creator 게임 파일 저장 용도입니다.
+>
+> **2026-08-18 용어/권한 모델 정리: `game_developers` → `game_creator_access`, 셀프서비스 신청
+> 추가**: 이 섹션(§3) 전체가 서술하는 업로드/심사/호스팅 파이프라인, 20MiB/50MiB/300개 파일
+> 제한, 제작자당 동시 심사 2개 슬롯, B2 저장 구조는 **전혀 바뀌지 않았습니다.** 바뀐 것은 이
+> 기능을 쓸 수 있는 사람을 가리키는 이름과, 그 자격을 얻는 경로뿐입니다:
+>
+> - 업로드 권한 테이블 `game_developers`는 `game_creator_access`로 **이름만 변경**되었습니다(행
+>   데이터는 전혀 이동하지 않는 순수 rename). 이 문서 §3.6/§3.7의 `game_developers`는 이제
+>   `game_creator_access`를 가리킵니다.
+> - 관리자 직접 임명 경로(§3.6)는 그대로지만 라우트가 `/admin/game-developers` →
+>   `/admin/game-creators`로 이름을 바꿨습니다.
+> - **신규**: 관리자 임명 없이도 유저가 직접 신청할 수 있는 셀프서비스 신청 절차
+>   (`game_creator_applications`, `POST /api/dev/apply`)가 추가되었습니다 — 기존 임명 경로를
+>   대체하는 게 아니라 병행되는 두 번째 입구입니다.
+> - 이 프로그램의 정식 명칭은 이제 **GAME_CREATOR**이며, "게임 제작자"는 그대로 자연어
+>   표기로 씁니다. Staff Role(ADMIN/OPERATOR/MODERATOR/SYSTEM_DEVELOPER — OwOGG 플랫폼을 만드는
+>   내부 인력)과는 완전히 다른 축이라는 점, 신청/승인 흐름, 향후 OwO Plus 연동 지점은 전부
+>   [`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §5~§6에 정리되어 있습니다 — 이 문서(§3)는 업로드/
+>   심사/호스팅의 **기술적** 설계에, `AUTHORIZATION.md`는 **누가 이 기능을 쓸 수 있는가**에
+>   집중하도록 역할을 나눴습니다.
 
 ---
 
@@ -253,18 +273,27 @@ GPU 인스턴스, 게임 화면 비디오 스트리밍, 서버에서의 WASM 대
   제거하고 미등록 게임은 전부 거부로 바꿔, sandbox 게임 리더보드(위 DB 조회 기반 확장)가 실제로
   구현되기 전까지는 점수 제출 자체가 막힙니다 — "애매하게 열어두지 않는다"는 원칙에 따른 선택입니다.
 
-### 3.6 제작 권한 — V1은 임명제 (2026-08-15 확정)
+### 3.6 제작 권한 — 승인제 (2026-08-15 확정, 2026-08-18 신청 경로 추가)
 
-- **V1은 운영자가 지정한 게임 제작자(`game_developers`)만 업로드 가능**합니다. 기존 일반 유저는
-  이 베타 단계에서 접근할 수 없습니다 — 무료/유료 티어, 쿼터, 공개 제출 UI, 콘텐츠 신고 절차 등
-  "누구나 제출"을 전제로 한 장치는 V1 범위 밖입니다(인원이 임명으로 통제되므로).
+- **V1은 승인된 게임 크리에이터(`game_creator_access`, `status='ACTIVE'`)만 업로드 가능**합니다.
+  승인 없이는 접근할 수 없습니다 — 무료/유료 티어, 쿼터, 신고 절차 등 "누구나 즉시 제출"을
+  전제로 한 장치는 여전히 V1 범위 밖입니다.
+- **승인에 이르는 경로는 두 가지입니다**: ① 운영자가 직접 지정(기존, 신청 절차 없음), ②
+  유저가 직접 신청(`game_creator_applications`, 신규)한 뒤 운영자가 심사·승인. 어느 경로든
+  최종적으로 `game_creator_access`가 `ACTIVE`가 되어야 업로드가 가능하다는 점은 동일합니다 —
+  둘 다 "관리자 없이 즉시 업로드 가능"으로 이어지지 않습니다. 자세한 흐름은
+  [`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §5 참고.
 - 지명 실패 시 최후 수단으로 **운영자 본인이 제작자로 등록해 대신 업로드**할 수 있습니다.
 - 일반 유저 전면 개방(쿼터·과금·신고 절차 포함)은 V1이 안정된 뒤 별도로 설계·재개합니다.
 
-**용어**: 게임을 만드는 사람은 `game_developers`/"게임 제작자"로 부릅니다. 이 코드베이스에는
+**용어**: 게임을 만드는 사람은 이제 **GAME_CREATOR**/"게임 크리에이터"로 부릅니다(DB 테이블은
+`game_creator_access` — 과거 `game_developers`에서 이름만 변경, §3.7). 이 코드베이스에는
 "Creator"가 이미 스트리머(YouTube/CHZZK/SOOP/Twitch, `creator_profiles`)를 가리키는 용어로 쓰이고
-있어([`CREATOR_SYSTEM.md`](CREATOR_SYSTEM.md)), 게임 제작자에 같은 단어를 재사용하면 테이블·라우트·
-문서가 혼동됩니다.
+있어([`CREATOR_SYSTEM.md`](CREATOR_SYSTEM.md)), 게임 제작자에 같은 단어를 단독으로 재사용하면
+테이블·라우트·문서가 혼동됩니다 — 그래서 게임 쪽은 항상 **GAME_CREATOR**로, 방송 쪽은 항상
+**STREAMER**로 명시적으로 구분해 부릅니다([`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §7.3).
+GAME_CREATOR는 OwOGG 플랫폼 자체를 만드는 Staff Role인 SYSTEM_DEVELOPER와도 다른 개념입니다
+([`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §5.1) — 헷갈리기 쉬운 두 용어이니 확실히 구분하세요.
 
 **콘텐츠 정책(기본 원칙)**: 불법 콘텐츠·혐오/차별 표현·성인 콘텐츠 금지, 타인 IP 침해 에셋/텍스트
 금지, 악성 코드·타 사용자 피해 로직 금지, OwOGG 전체 톤/브랜드와 크게 어긋나지 않을 것.
@@ -295,10 +324,15 @@ GPU 인스턴스, 게임 화면 비디오 스트리밍, 서버에서의 WASM 대
 > ⚠️ 아래는 최초 설계 스케치이며, 실제 구현(review와 visibility를 완전히 분리한 두 축 모델 등)과
 > 세부 컬럼이 갈라져 있습니다 — 정확한 최신 스키마는
 > [`packages/db/migrations/0024_sandbox_games.sql`](../packages/db/migrations/0024_sandbox_games.sql)을
-> source of truth로 참고하세요.
+> source of truth로 참고하세요. 아래 `game_developers` 테이블은 마이그레이션
+> [`0025`](../packages/db/migrations/0025_staff_roles_and_game_creator_program.sql)에서
+> **`game_creator_access`로 이름만 변경**되었고(행 데이터는 그대로), 같은 마이그레이션이
+> 셀프서비스 신청을 위한 `game_creator_applications` 테이블을 추가했습니다 — 둘 다 이 스케치에는
+> 반영되어 있지 않으니 실제 컬럼은 마이그레이션 원문을 확인하세요.
 
 ```sql
--- 업로드 권한 (관리자가 임명). admin_accounts와 별개 — 비밀번호/Google step-up 없음
+-- 업로드 권한 (관리자가 임명, 또는 셀프서비스 신청 승인). admin_accounts와 별개 — 비밀번호/
+-- Google step-up 없음. 실제 테이블명은 game_creator_access (마이그레이션 0025에서 rename).
 CREATE TABLE game_developers (
   user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   granted_by_admin_id INTEGER NOT NULL,
@@ -437,9 +471,10 @@ secret**입니다 — 그래서 `apps/api/wrangler.jsonc`를 건드릴 필요가
 돌아가는지 실측** — 포인터 락, WASM 로딩(CORS), 오디오 자동재생 정책 등 실제로 터지는 문제가
 여기서 다 나옵니다.
 
-**2단계 — 제작자 임명 + 심사 워크플로우.** `game_developers`, `sandbox_games`,
-`sandbox_game_versions`, 감사 로그 + `/admin/games/review` 큐. 임명된 제작자가 업로드하면 관리자가
-심사(§3.7)하고, 승인 시 §3.6의 메타데이터(제목/설명/장르/XP)를 관리자가 조정합니다.
+**2단계 — 제작자 임명 + 심사 워크플로우.** `game_creator_access`(구 `game_developers`),
+`sandbox_games`, `sandbox_game_versions`, 감사 로그 + `/admin/games/review` 큐. 임명(또는
+셀프서비스 신청 승인, §3.6)된 제작자가 업로드하면 관리자가 심사(§3.7)하고, 승인 시 §3.6의
+메타데이터(제목/설명/장르/XP)를 관리자가 조정합니다.
 
 **3단계 (V1 범위 밖, 추후) — 일반 유저 개방.** 쿼터·과금·콘텐츠 신고 절차를 갖춰 임명제를 풀 때
 별도로 설계합니다.

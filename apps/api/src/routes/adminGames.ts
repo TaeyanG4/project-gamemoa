@@ -2,7 +2,11 @@ import { Hono } from "hono";
 import { AdminGameListResponseSchema, AdminGameToggleRequestSchema } from "@owogg/contracts";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
-import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
+import {
+  requireElevatedAdmin,
+  isElevatedAdminResponse,
+  requirePermission,
+} from "../auth/adminSession.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminGamesRouter = new Hono<ApiEnv>();
@@ -24,6 +28,8 @@ adminGamesRouter.use("*", async (c, next) => {
 adminGamesRouter.get("/", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "games.moderate");
+  if (denied) return denied;
 
   const { gameSettingsUseCases } = createContainer(c.env.DB);
   const games = await gameSettingsUseCases.listAll();
@@ -37,6 +43,8 @@ adminGamesRouter.get("/", async (c) => {
 adminGamesRouter.post("/:gameId/toggle", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "games.moderate");
+  if (denied) return denied;
 
   const gameId = c.req.param("gameId");
 

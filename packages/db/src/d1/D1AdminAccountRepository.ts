@@ -5,6 +5,7 @@ import type {
   AdminAccountRole,
   AdminAccountStatus,
   AdminAccountAuditAction,
+  Permission,
 } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
@@ -200,5 +201,37 @@ export class D1AdminAccountRepository implements AdminAccountRepository {
       .bind(limit)
       .all<Record<string, unknown>>();
     return (res.results || []).map(mapAuditRow);
+  }
+
+  async grantPermission(
+    accountId: number,
+    permission: Permission,
+    grantedByAdminId: number,
+    nowIso: string,
+  ): Promise<void> {
+    // INSERT OR IGNORE against UNIQUE(account_id, permission) — granting an already-granted
+    // permission is an idempotent no-op, not a conflict the caller needs to special-case.
+    await this.db
+      .prepare(
+        `INSERT OR IGNORE INTO admin_permission_grants (account_id, permission, granted_by_admin_id, created_at)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .bind(accountId, permission, grantedByAdminId, nowIso)
+      .run();
+  }
+
+  async revokePermission(accountId: number, permission: Permission): Promise<void> {
+    await this.db
+      .prepare(`DELETE FROM admin_permission_grants WHERE account_id = ? AND permission = ?`)
+      .bind(accountId, permission)
+      .run();
+  }
+
+  async listPermissions(accountId: number): Promise<Permission[]> {
+    const res = await this.db
+      .prepare(`SELECT permission FROM admin_permission_grants WHERE account_id = ?`)
+      .bind(accountId)
+      .all<{ permission: string }>();
+    return (res.results || []).map((r) => r.permission as Permission);
   }
 }

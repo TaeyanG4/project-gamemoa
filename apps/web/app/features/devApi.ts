@@ -1,5 +1,6 @@
 import {
-  DevMeResponseSchema,
+  GameCreatorMeResponseSchema,
+  GameCreatorApplicationRecordSchema,
   SandboxGameListResponseSchema,
   SandboxGameDetailResponseSchema,
   SandboxGameRecordSchema,
@@ -10,11 +11,28 @@ import { apiFetch } from "../lib/api/client";
 import { API_URL } from "../lib/api/config";
 import { ApiClientError } from "../lib/api";
 
-/** Developer-facing sandbox game API (the settings "개발" tab). Plain-session-gated on the
- * server (apps/api/src/routes/devGames.ts) — never requires the admin step-up flow. */
+/** Game-Creator-facing sandbox game API (the Game Creator Center). Plain-session-gated on the
+ * server (apps/api/src/routes/devGames.ts) — never requires the admin step-up flow. GAME_CREATOR
+ * is a Program/Entitlement, not a Staff Role — see docs/AUTHORIZATION.md. */
 
 export function fetchDevMe() {
-  return apiFetch("/api/dev/me", DevMeResponseSchema);
+  return apiFetch("/api/dev/me", GameCreatorMeResponseSchema);
+}
+
+/** Submits a self-serve Game Creator application. See canApplyForGameCreator's doc comment
+ * (packages/core/src/domain/gameCreator.ts) — no OwO Plus gate exists yet, so this is currently
+ * open to any logged-in user without an existing application or active access. */
+export function applyForGameCreator(message: string | null) {
+  return apiFetch("/api/dev/apply", GameCreatorApplicationRecordSchema, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+  });
+}
+
+export function withdrawGameCreatorApplication(applicationId: number) {
+  return apiFetch(`/api/dev/apply/${applicationId}/withdraw`, GameCreatorApplicationRecordSchema, {
+    method: "POST",
+  });
 }
 
 export function fetchMyGames() {

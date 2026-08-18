@@ -18,8 +18,12 @@ import {
   AdminUserDetailResponseSchema,
   UserModerationRecordSchema,
   AdminScoreActionResponseSchema,
-  GameDeveloperListResponseSchema,
-  GameDeveloperRecordSchema,
+  PermissionSchema,
+  type PermissionValue,
+  GameCreatorAccessListResponseSchema,
+  GameCreatorAccessRecordSchema,
+  GameCreatorApplicationListResponseSchema,
+  GameCreatorApplicationRecordSchema,
   SandboxGameReviewQueueResponseSchema,
   SandboxGameVersionRecordSchema,
   SandboxGameRecordSchema,
@@ -40,7 +44,7 @@ const AdminAccountSummaryOnCreateSchema = z.object({
   userId: z.number(),
   nickname: z.string(),
   username: z.string(),
-  role: z.enum(["SUPERADMIN", "ADMIN"]),
+  role: z.enum(["ADMIN", "OPERATOR", "MODERATOR", "SYSTEM_DEVELOPER"]),
   status: z.enum(["ACTIVE", "DISABLED"]),
   mustChangePassword: z.boolean(),
   createdAt: z.string(),
@@ -152,6 +156,32 @@ export function postRevokeAdminAccountSessions(id: number) {
   });
 }
 
+// ── Individual permission delegation (e.g. admin.center.access for a trusted SYSTEM_DEVELOPER —
+// see docs/AUTHORIZATION.md) ──
+
+const AdminPermissionListResponseSchema = z.object({ permissions: z.array(PermissionSchema) });
+
+export function fetchAdminAccountPermissions(id: number) {
+  return apiFetch(`/api/admin/accounts/${id}/permissions`, AdminPermissionListResponseSchema);
+}
+
+export function postGrantAdminPermission(id: number, permission: PermissionValue) {
+  return apiFetch(`/api/admin/accounts/${id}/permissions`, AdminSuccessResponseSchema, {
+    method: "POST",
+    body: JSON.stringify({ permission }),
+  });
+}
+
+export function deleteRevokeAdminPermission(id: number, permission: PermissionValue) {
+  return apiFetch(
+    `/api/admin/accounts/${id}/permissions/${permission}`,
+    AdminSuccessResponseSchema,
+    {
+      method: "DELETE",
+    },
+  );
+}
+
 export function fetchAdminGames() {
   return apiFetch("/api/admin/games", AdminGameListResponseSchema);
 }
@@ -225,23 +255,47 @@ export function postRestoreUserScores(userId: number) {
   });
 }
 
-// ── Game developers (upload permission, V1 invite-only) ──
+// ── Game Creator program (admin-direct grant/revoke + application review) ──
 
-export function fetchGameDevelopers() {
-  return apiFetch("/api/admin/game-developers", GameDeveloperListResponseSchema);
+export function fetchGameCreators() {
+  return apiFetch("/api/admin/game-creators", GameCreatorAccessListResponseSchema);
 }
 
-export function postGrantGameDeveloper(userId: number) {
-  return apiFetch("/api/admin/game-developers", GameDeveloperRecordSchema, {
+export function postGrantGameCreator(userId: number) {
+  return apiFetch("/api/admin/game-creators", GameCreatorAccessRecordSchema, {
     method: "POST",
     body: JSON.stringify({ userId }),
   });
 }
 
-export function postRevokeGameDeveloper(userId: number) {
-  return apiFetch(`/api/admin/game-developers/${userId}/revoke`, GameDeveloperRecordSchema, {
+export function postRevokeGameCreator(userId: number) {
+  return apiFetch(`/api/admin/game-creators/${userId}/revoke`, GameCreatorAccessRecordSchema, {
     method: "POST",
   });
+}
+
+export function fetchGameCreatorApplications(page = 1, pageSize = 20) {
+  const offset = (page - 1) * pageSize;
+  return apiFetch(
+    `/api/admin/game-creators/applications?page=${page}&pageSize=${pageSize}&offset=${offset}`,
+    GameCreatorApplicationListResponseSchema,
+  );
+}
+
+export function postApproveGameCreatorApplication(applicationId: number) {
+  return apiFetch(
+    `/api/admin/game-creators/applications/${applicationId}/approve`,
+    GameCreatorApplicationRecordSchema,
+    { method: "POST" },
+  );
+}
+
+export function postRejectGameCreatorApplication(applicationId: number, rejectReason: string) {
+  return apiFetch(
+    `/api/admin/game-creators/applications/${applicationId}/reject`,
+    GameCreatorApplicationRecordSchema,
+    { method: "POST", body: JSON.stringify({ rejectReason }) },
+  );
 }
 
 // ── Sandbox games (review queue, publish, generalized metadata) ──

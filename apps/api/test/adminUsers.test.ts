@@ -15,7 +15,13 @@ const ADMIN_SESSION_RAW_TOKEN = "admin_session_valid_token";
 const OWOGG_SESSION_TOKEN_HASH = await hashSessionToken(OWOGG_SESSION_RAW_TOKEN);
 const ADMIN_SESSION_TOKEN_HASH = await hashSessionToken(ADMIN_SESSION_RAW_TOKEN);
 
-function createAdminDb(userId: number) {
+// `managedAccount` is optional and, when present, makes the session's user resolve via a real
+// admin_accounts row (role + individual grants) instead of ADMIN_USER_IDS root eligibility —
+// used by the OPERATOR/MODERATOR permission-gating tests below. Every admin_accounts /
+// admin_permission_grants lookup returns the SAME row regardless of which user_id was bound, so
+// this mock is only safe for tests where the acting session's own user_id is what's under test —
+// it must not be used for scenarios needing a *different* managed role for the target user.
+function createAdminDb(userId: number, managedAccount?: { role: string; grants?: string[] }) {
   function statement(query: string) {
     let values: unknown[] = [];
     return {
@@ -51,9 +57,31 @@ function createAdminDb(userId: number) {
             updated_at: new Date().toISOString(),
           } as T;
         }
+        if (query.includes("FROM admin_accounts WHERE user_id")) {
+          if (!managedAccount) return null;
+          return {
+            id: 1,
+            user_id: userId,
+            google_sub: "mock-google-sub",
+            username: "mock-admin",
+            password_hash: "mock-hash",
+            role: managedAccount.role,
+            status: "ACTIVE",
+            must_change_password: 0,
+            created_by_admin_id: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            password_changed_at: new Date().toISOString(),
+          } as T;
+        }
         return null;
       },
       async all<T>() {
+        if (query.includes("FROM admin_permission_grants WHERE account_id")) {
+          return {
+            results: (managedAccount?.grants ?? []).map((permission) => ({ permission })),
+          } as { results: T[] };
+        }
         return { results: [] } as { results: T[] };
       },
       async run() {
@@ -233,4 +261,93 @@ test("POST /api/admin/users/:userId/ban without a reason is rejected before touc
     { DB: mock.db, ADMIN_USER_IDS: "1", ...LOCALHOST_ENV } as any,
   );
   assert.equal(res.status, 400);
+});
+
+// The OPERATOR/MODERATOR distinction that matters most in the design spec: users.ban is in
+// OPERATOR's default bundle (staffRoles.ts) but deliberately not in MODERATOR's. Neither test
+// needs ADMIN_USER_IDS at all — eligibility comes purely from the mocked managed account being
+// ACTIVE (see resolveAdminEligibility), same as a real OPERATOR/MODERATOR created via
+// POST /api/admin/accounts and never listed in the ADMIN_USER_IDS root/break-glass env var.
+
+test("POST /api/admin/users/:userId/ban reaches body validation for a managed OPERATOR (users.ban is in its default bundle)", async () => {
+  const mock = createAdminDb(1, { role: "OPERATOR" });
+  const res = await app.request(
+    "/api/admin/users/1/ban",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ reason: "" }), // empty reason — proves it got PAST the permission gate
+    },
+    { DB: mock.db, ...LOCALHOST_ENV } as any,
+  );
+  // 400 (validation), not 403 — the permission check let it through.
+  assert.equal(res.status, 400);
+});
+
+test("POST /api/admin/users/:userId/ban is denied (403) for a managed MODERATOR (users.ban is not in its default bundle)", async () => {
+  const mock = createAdminDb(1, { role: "MODERATOR" });
+  const res = await app.request(
+    "/api/admin/users/1/ban",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({ reason: "test" }), // a valid body — proves the block is the permission gate, not validation
+    },
+    { DB: mock.db, ...LOCALHOST_ENV } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
+test("POST /api/admin/users/:userId/suspend reaches body validation for a managed MODERATOR (users.suspend IS in its default bundle, unlike users.ban)", async () => {
+  const mock = createAdminDb(1, { role: "MODERATOR" });
+  const res = await app.request(
+    "/api/admin/users/1/suspend",
+    {
+      method: "POST",
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+      },
+      body: JSON.stringify({}), // missing required fields — proves it got PAST the permission gate
+    },
+    { DB: mock.db, ...LOCALHOST_ENV } as any,
+  );
+  assert.equal(res.status, 400);
+});
+
+test("GET /api/admin/users is reachable for a managed SYSTEM_DEVELOPER individually granted users.view (not part of its default bundle)", async () => {
+  const mock = createAdminDb(1, { role: "SYSTEM_DEVELOPER", grants: ["users.view"] });
+  const res = await app.request(
+    "/api/admin/users?query=nobody",
+    {
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+      },
+    },
+    { DB: mock.db, ...LOCALHOST_ENV } as any,
+  );
+  assert.equal(res.status, 200);
+});
+
+test("GET /api/admin/users is denied (403) for a managed SYSTEM_DEVELOPER with no individual users.view grant", async () => {
+  const mock = createAdminDb(1, { role: "SYSTEM_DEVELOPER" });
+  const res = await app.request(
+    "/api/admin/users?query=nobody",
+    {
+      headers: {
+        Cookie: "owogg_session=valid_session; owogg_admin_session=admin_session_valid_token",
+      },
+    },
+    { DB: mock.db, ...LOCALHOST_ENV } as any,
+  );
+  assert.equal(res.status, 403);
 });
