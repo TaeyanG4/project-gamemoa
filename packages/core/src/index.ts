@@ -22,11 +22,13 @@ export * from "./ports/adminAccounts.js";
 export * from "./ports/gameCreator.js";
 export * from "./ports/sandboxGames.js";
 
-// Unified Game Platform foundation (modules/game) — types and one port, no implementation and no
-// runtime wiring yet. The existing sandbox* exports above stay the live path until the phased
-// migration moves each consumer over; see packages/core/src/modules/game/ports/gameRegistry.ts.
+// Unified Game Platform foundation (modules/game). ScoreUseCases/GameSettingsUseCases already
+// resolve SYSTEM games through GameRegistry (see application/scoreUseCases.js below); the
+// sandbox* exports above remain the live path for everything creator-facing — registration,
+// review, publishing, and gameServing's security boundary are untouched by this module.
 export * from "./modules/game/domain/gameOwner.js";
 export * from "./modules/game/domain/gameDefinition.js";
+export * from "./modules/game/domain/publicGame.js";
 export * from "./modules/game/ports/gameRegistry.js";
 export * from "./modules/game/registry/staticGameRegistry.js";
 

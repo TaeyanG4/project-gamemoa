@@ -1,9 +1,12 @@
 import { Hono } from "hono";
 import {
   PublicGameAvailabilityResponseSchema,
+  PublicGameListResponseSchema,
+  PublicGameSchema,
   SandboxGamePublicDetailSchema,
   SandboxGamePublicListResponseSchema,
 } from "@owogg/contracts";
+import { mergePublicGames, resolvePublicGame, toPublicCreatorGame } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { readB2Config } from "./devGames.js";
@@ -44,18 +47,10 @@ gamesRouter.get("/sandbox/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
   const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
   if (!resolved) return c.text("Not Found", 404);
 
-  return c.json(
-    SandboxGamePublicDetailSchema.parse({
-      slug: resolved.game.slug,
-      title: resolved.game.title,
-      shortDescription: resolved.game.shortDescription,
-      description: resolved.game.description,
-      genre: resolved.game.genre,
-      mode: resolved.game.mode,
-      hasLogo: resolved.game.logoKey !== null,
-    }),
-    200,
-  );
+  // toPublicCreatorGame's shape is a strict superset of SandboxGamePublicDetailSchema's (adds
+  // ownerType/requiresAuth/supportsLeaderboard for symmetry with PublicSystemGame) — zod strips
+  // the extra fields on parse, so this route's wire response is byte-for-byte unchanged.
+  return c.json(SandboxGamePublicDetailSchema.parse(toPublicCreatorGame(resolved.game)), 200);
 });
 
 // GET /api/games/sandbox — every currently-PUBLIC sandbox game, for the main site catalog (see
@@ -69,17 +64,7 @@ gamesRouter.get("/sandbox", edgeCache({ ttlSeconds: 60 }), async (c) => {
   const games = await sandboxGameUseCases.listPublic();
 
   return c.json(
-    SandboxGamePublicListResponseSchema.parse({
-      games: games.map((game) => ({
-        slug: game.slug,
-        title: game.title,
-        shortDescription: game.shortDescription,
-        description: game.description,
-        genre: game.genre,
-        mode: game.mode,
-        hasLogo: game.logoKey !== null,
-      })),
-    }),
+    SandboxGamePublicListResponseSchema.parse({ games: games.map(toPublicCreatorGame) }),
     200,
   );
 });
@@ -101,4 +86,56 @@ gamesRouter.get("/sandbox/:slug/logo", edgeCache({ ttlSeconds: 3600 }), async (c
     status: 200,
     headers: { "Content-Type": resolved.contentType, "Cache-Control": "public, max-age=3600" },
   });
+});
+
+// ── Unified public Game read model ────────────────────────────────────────────
+//
+// GET /api/games and GET /api/games/:slug — the first Game Platform surface that answers "what
+// games exist" across SYSTEM (game-registry/) and CREATOR (sandbox_games) without a caller
+// needing to know which one it's asking about. Deliberately does NOT replace the routes above:
+// GET /api/games/sandbox* stays exactly as it was for compatibility, and nothing on the web side
+// (sandboxGameAdapter.ts, GameCard's owner-based routing) has been switched over to this yet —
+// that is a later, separate step.
+//
+// Registered after every /sandbox* route above and after /availability, and deliberately so:
+// GET /api/games/:slug is a catch-all single path segment, and it must never have a chance to
+// shadow a more specific literal route. apps/api/test/publicGames.test.ts asserts this ordering
+// holds (a request to /api/games/sandbox still reaches the sandbox-list handler, not this one).
+
+// GET /api/games — every SYSTEM game, then every currently-PUBLIC creator game whose slug doesn't
+// collide with a SYSTEM one (same "SYSTEM wins" policy as the single-slug route below, applied to
+// a list — see mergePublicGames's doc comment in packages/core for why a collision is dropped
+// here rather than left to appear twice under one slug).
+gamesRouter.get("/", edgeCache({ ttlSeconds: 60 }), async (c) => {
+  if (!c.env?.DB) return c.json(PublicGameListResponseSchema.parse({ games: [] }), 200);
+
+  const { gameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
+  const [systemGames, creatorGames] = await Promise.all([
+    gameRegistry.listAll(),
+    sandboxGameUseCases.listPublic(),
+  ]);
+
+  return c.json(
+    PublicGameListResponseSchema.parse({ games: mergePublicGames(systemGames, creatorGames) }),
+    200,
+  );
+});
+
+// GET /api/games/:slug — resolves a SYSTEM game first (a synchronous, in-memory lookup — no D1
+// round trip), and only falls through to the sandbox PUBLIC+live-version-gated lookup when no
+// SYSTEM game claims the slug. This ordering is what makes SYSTEM always win a same-slug
+// collision, not an incidental side effect of it happening to run first — see resolvePublicGame's
+// doc comment (packages/core) for why that guarantee matters and what it does not fix.
+gamesRouter.get("/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
+  if (!c.env?.DB) return c.text("Not Found", 404);
+
+  const { gameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
+  const slug = c.req.param("slug");
+
+  const systemGame = await gameRegistry.findBySlug(slug);
+  const creatorResolved = systemGame ? null : await sandboxGameUseCases.resolveLiveVersion(slug);
+  const game = resolvePublicGame(systemGame, creatorResolved?.game ?? null);
+  if (!game) return c.text("Not Found", 404);
+
+  return c.json(PublicGameSchema.parse(game), 200);
 });
