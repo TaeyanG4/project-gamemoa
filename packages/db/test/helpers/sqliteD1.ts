@@ -256,6 +256,15 @@ CREATE TABLE admin_account_audit_log (
   metadata_json TEXT,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE admin_permission_grants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  permission TEXT NOT NULL,
+  granted_by_admin_id INTEGER,
+  created_at TEXT NOT NULL,
+  UNIQUE (account_id, permission)
+);
 `;
 
 /** Schema for D1UserModerationRepository tests (migration 0023). */
@@ -300,7 +309,8 @@ CREATE TABLE user_moderation_audit_log (
 );
 `;
 
-/** Schema for D1GameDeveloperRepository / D1SandboxGameRepository tests (migration 0024). */
+/** Schema for D1GameCreatorRepository / D1SandboxGameRepository tests (migration 0024, renamed +
+ * extended by migration 0025 — see that file's comment for why this is a pure table rename). */
 export const SANDBOX_GAMES_TEST_SCHEMA = `
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -309,7 +319,7 @@ CREATE TABLE users (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE TABLE game_developers (
+CREATE TABLE game_creator_access (
   user_id INTEGER PRIMARY KEY,
   granted_by_admin_id INTEGER NOT NULL,
   status TEXT NOT NULL DEFAULT 'ACTIVE',
@@ -317,13 +327,31 @@ CREATE TABLE game_developers (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE game_developer_audit_log (
+CREATE TABLE game_creator_access_audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   target_user_id INTEGER NOT NULL,
   actor_admin_id INTEGER NOT NULL,
   action TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE game_creator_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  message TEXT,
+  reviewed_by_admin_id INTEGER,
+  reviewed_at TEXT,
+  reject_reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_game_creator_applications_user
+  ON game_creator_applications(user_id, created_at DESC);
+
+CREATE UNIQUE INDEX idx_game_creator_applications_one_pending_per_user
+  ON game_creator_applications(user_id) WHERE status = 'PENDING';
 
 CREATE TABLE sandbox_games (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

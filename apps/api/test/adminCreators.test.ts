@@ -359,7 +359,9 @@ test("admin me defaults to no access and never reveals ADMIN_USER_IDS", async ()
     stepUpRequired: false,
     bootstrapAvailable: false,
     mustChangePassword: false,
-    role: null,
+    // ADMIN_USER_IDS root eligibility resolves to the top Staff Role even with no managed
+    // admin_accounts row — see adminEligibility.ts's resolveEffectiveStaffRole doc comment.
+    role: "ADMIN",
   });
   assert.equal(JSON.stringify(body).includes("999"), false);
 

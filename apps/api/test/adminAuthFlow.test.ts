@@ -176,6 +176,14 @@ CREATE TABLE admin_account_audit_log (
   metadata_json TEXT,
   created_at TEXT NOT NULL
 );
+CREATE TABLE admin_permission_grants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  account_id INTEGER NOT NULL,
+  permission TEXT NOT NULL,
+  granted_by_admin_id INTEGER,
+  created_at TEXT NOT NULL,
+  UNIQUE (account_id, permission)
+);
 CREATE TABLE discord_guilds (
   guild_id TEXT PRIMARY KEY,
   slug TEXT UNIQUE NOT NULL,
@@ -373,7 +381,9 @@ test("full admin step-up flow: Google step-up -> login -> elevated session -> lo
       stepUpRequired: false,
       bootstrapAvailable: false,
       mustChangePassword: false,
-      role: null, // legacy env-credential admin — no managed admin_accounts row
+      // Legacy env-credential admin — no managed admin_accounts row, but ADMIN_USER_IDS root
+      // eligibility resolves to the top Staff Role regardless (see resolveEffectiveStaffRole).
+      role: "ADMIN",
     });
 
     // Protected admin endpoint now succeeds.
@@ -680,7 +690,7 @@ test("Google step-up: unset ADMIN_GOOGLE_SUBS (optional allowlist) never blocks 
   }
 });
 
-test("bootstrap: first SUPERADMIN can be created once; forced password change gates sensitive routes; duplicate bootstrap is rejected", async () => {
+test("bootstrap: first ADMIN can be created once; forced password change gates sensitive routes; duplicate bootstrap is rejected", async () => {
   clearGoogleJwksCache();
   const { privateKey, publicJwk } = createRsaKeySet();
   const jwks = mockJwksFetch([{ ...publicJwk, kid: "test-kid-1", use: "sig", alg: "RS256" }]);
@@ -726,7 +736,8 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
     assert.ok(adminSessionCookie);
     const authedCookie = `${sessionCookie}; owogg_admin_session=${adminSessionCookie}`;
 
-    // /me now reports SUPERADMIN + mustChangePassword, and bootstrap is no longer available.
+    // /me now reports ADMIN (the top Staff Role — bootstrap always creates one) +
+    // mustChangePassword, and bootstrap is no longer available.
     const meAfter = await app.request(
       "/api/admin/me",
       { headers: { Cookie: authedCookie } },
@@ -739,7 +750,7 @@ test("bootstrap: first SUPERADMIN can be created once; forced password change ga
       stepUpRequired: false,
       bootstrapAvailable: false,
       mustChangePassword: true,
-      role: "SUPERADMIN",
+      role: "ADMIN",
     });
 
     // Sensitive route is blocked while a password change is still pending.

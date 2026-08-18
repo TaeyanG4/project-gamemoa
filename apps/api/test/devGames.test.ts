@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { app } from "../src/index.js";
 import { hashSessionToken } from "@owogg/db";
 
-// Auth-gating + routing smoke tests for /api/dev/* and /api/admin/game-developers,
+// Auth-gating + routing smoke tests for /api/dev/* and /api/admin/game-creators,
 // /api/admin/sandbox-games. The underlying business logic (slug validation, review/visibility
 // invariants, session revocation-equivalents) already has thorough coverage against real SQLite
 // and in-memory fakes — see packages/db/test/D1SandboxGameRepository.test.ts,
-// packages/db/test/D1GameDeveloperRepository.test.ts, packages/core/test/sandboxGameUseCases.test.ts,
-// packages/core/test/gameDeveloperUseCases.test.ts. This file only confirms the route layer
+// packages/db/test/D1GameCreatorRepository.test.ts, packages/core/test/sandboxGameUseCases.test.ts,
+// packages/core/test/gameCreatorUseCases.test.ts. This file only confirms the route layer
 // enforces the right auth boundary and doesn't crash when wired end to end.
 const OWOGG_SESSION_RAW_TOKEN = "valid_session";
 const OWOGG_SESSION_TOKEN_HASH = await hashSessionToken(OWOGG_SESSION_RAW_TOKEN);
@@ -37,7 +37,7 @@ function createDb(options: { userId: number; isDeveloper?: boolean }) {
             updated_at: new Date().toISOString(),
           } as T;
         }
-        if (query.includes("FROM game_developers WHERE user_id")) {
+        if (query.includes("FROM game_creator_access WHERE user_id")) {
           if (!isDeveloper) return null;
           return {
             user_id: userId,
@@ -46,6 +46,9 @@ function createDb(options: { userId: number; isDeveloper?: boolean }) {
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           } as T;
+        }
+        if (query.includes("FROM game_creator_applications WHERE user_id")) {
+          return null; // no application on file in these tests
         }
         if (query.includes("FROM admin_accounts WHERE user_id")) {
           return null; // never a managed admin in these tests
@@ -81,7 +84,7 @@ test("GET /api/dev/me returns 401 without a session", async () => {
   assert.equal(res.status, 401);
 });
 
-test("GET /api/dev/me reports isGameDeveloper=false / isAdmin=false for a plain user", async () => {
+test("GET /api/dev/me reports hasAccess=false / isAdmin=false for a plain user", async () => {
   const { db } = createDb({ userId: 7, isDeveloper: false });
   const res = await app.request(
     "/api/dev/me",
@@ -89,12 +92,13 @@ test("GET /api/dev/me reports isGameDeveloper=false / isAdmin=false for a plain 
     { DB: db, ADMIN_USER_IDS: "1" } as any,
   );
   assert.equal(res.status, 200);
-  const body = (await res.json()) as { isGameDeveloper: boolean; isAdmin: boolean };
-  assert.equal(body.isGameDeveloper, false);
+  const body = (await res.json()) as { hasAccess: boolean; isAdmin: boolean; canApply: boolean };
+  assert.equal(body.hasAccess, false);
   assert.equal(body.isAdmin, false);
+  assert.equal(body.canApply, true); // no OWO_PLUS gate exists yet — see canApplyForGameCreator
 });
 
-test("GET /api/dev/me reports isGameDeveloper=true for an ACTIVE game_developers row", async () => {
+test("GET /api/dev/me reports hasAccess=true for an ACTIVE game_creator_access row", async () => {
   const { db } = createDb({ userId: 7, isDeveloper: true });
   const res = await app.request(
     "/api/dev/me",
@@ -102,8 +106,8 @@ test("GET /api/dev/me reports isGameDeveloper=true for an ACTIVE game_developers
     { DB: db, ADMIN_USER_IDS: "1" } as any,
   );
   assert.equal(res.status, 200);
-  const body = (await res.json()) as { isGameDeveloper: boolean };
-  assert.equal(body.isGameDeveloper, true);
+  const body = (await res.json()) as { hasAccess: boolean };
+  assert.equal(body.hasAccess, true);
 });
 
 test("POST /api/dev/games is rejected for a non-developer with FORBIDDEN, not a crash", async () => {
@@ -197,10 +201,10 @@ test("POST /api/dev/games/:id/versions with a complete B2 config gets past the 5
   assert.equal(body.error.code, "INVALID_REQUEST");
 });
 
-test("GET /api/admin/game-developers is denied for non-admin", async () => {
+test("GET /api/admin/game-creators is denied for non-admin", async () => {
   const { db } = createDb({ userId: 7 });
   const res = await app.request(
-    "/api/admin/game-developers",
+    "/api/admin/game-creators",
     { headers: { Cookie: "owogg_session=valid_session; owogg_admin_session=none" } },
     { DB: db, ADMIN_USER_IDS: "1" } as any,
   );
@@ -273,7 +277,7 @@ function createDevGamesDb(options: { existingGames?: Array<{ slug: string; revie
             updated_at: new Date().toISOString(),
           } as T;
         }
-        if (query.includes("FROM game_developers WHERE user_id")) {
+        if (query.includes("FROM game_creator_access WHERE user_id")) {
           return {
             user_id: 7,
             granted_by_admin_id: 1,

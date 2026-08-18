@@ -26,14 +26,14 @@ test("create + find round-trip by id/userId/username/googleSub", async () => {
     googleSub: "sub-1",
     username: "owogg-admin",
     passwordHash: "pbkdf2_sha256$1$c2FsdA==$aGFzaA==",
-    role: "SUPERADMIN",
+    role: "ADMIN",
     mustChangePassword: true,
     createdByAdminId: null,
     nowIso: iso(),
   });
 
   assert.equal(created.userId, 1);
-  assert.equal(created.role, "SUPERADMIN");
+  assert.equal(created.role, "ADMIN");
   assert.equal(created.status, "ACTIVE");
   assert.equal(created.mustChangePassword, true);
 
@@ -49,12 +49,12 @@ test("countActive / countActiveByRole reflect status and role", async () => {
   await seedUsers(raw, 2);
   const repo = new D1AdminAccountRepository(db);
 
-  const superadmin = await repo.create({
+  const rootAdmin = await repo.create({
     userId: 1,
     googleSub: "sub-1",
     username: "root-admin",
     passwordHash: "hash1",
-    role: "SUPERADMIN",
+    role: "ADMIN",
     mustChangePassword: false,
     createdByAdminId: null,
     nowIso: iso(),
@@ -64,19 +64,19 @@ test("countActive / countActiveByRole reflect status and role", async () => {
     googleSub: "sub-2",
     username: "second-admin",
     passwordHash: "hash2",
-    role: "ADMIN",
+    role: "OPERATOR",
     mustChangePassword: false,
-    createdByAdminId: superadmin.id,
+    createdByAdminId: rootAdmin.id,
     nowIso: iso(),
   });
 
   assert.equal(await repo.countActive(), 2);
-  assert.equal(await repo.countActiveByRole("SUPERADMIN"), 1);
   assert.equal(await repo.countActiveByRole("ADMIN"), 1);
+  assert.equal(await repo.countActiveByRole("OPERATOR"), 1);
 
-  await repo.updateStatus(superadmin.id, "DISABLED", iso());
+  await repo.updateStatus(rootAdmin.id, "DISABLED", iso());
   assert.equal(await repo.countActive(), 1);
-  assert.equal(await repo.countActiveByRole("SUPERADMIN"), 0);
+  assert.equal(await repo.countActiveByRole("ADMIN"), 0);
 });
 
 test("updatePassword sets hash, must_change_password, and password_changed_at", async () => {
@@ -115,8 +115,8 @@ test("updateRole persists role change", async () => {
     nowIso: iso(),
   });
 
-  await repo.updateRole(created.id, "SUPERADMIN", iso());
-  assert.equal((await repo.findById(created.id))?.role, "SUPERADMIN");
+  await repo.updateRole(created.id, "OPERATOR", iso());
+  assert.equal((await repo.findById(created.id))?.role, "OPERATOR");
 });
 
 test("username/user_id/google_sub uniqueness is enforced at the DB layer", async () => {
@@ -183,7 +183,7 @@ test("audit log: append-only insert and ordered listing", async () => {
     googleSub: "sub-1",
     username: "admin",
     passwordHash: "hash",
-    role: "SUPERADMIN",
+    role: "ADMIN",
     mustChangePassword: true,
     createdByAdminId: null,
     nowIso: iso(),
@@ -193,7 +193,7 @@ test("audit log: append-only insert and ordered listing", async () => {
     actorAdminId: null,
     targetAdminId: created.id,
     action: "ADMIN_CREATED",
-    metadata: { role: "SUPERADMIN", via: "bootstrap" },
+    metadata: { role: "ADMIN", via: "bootstrap" },
     nowIso: iso(),
   });
   await repo.appendAudit({
@@ -207,7 +207,7 @@ test("audit log: append-only insert and ordered listing", async () => {
   const entries = await repo.listAudit(10);
   assert.equal(entries.length, 2);
   assert.equal(entries[0]?.action, "PASSWORD_CHANGED"); // DESC by created_at
-  assert.deepEqual(entries[1]?.metadata, { role: "SUPERADMIN", via: "bootstrap" });
+  assert.deepEqual(entries[1]?.metadata, { role: "ADMIN", via: "bootstrap" });
 
   // Never stores a plaintext password/hash/token in metadata — this table's schema has no
   // column for it at all, so an attempt to smuggle one through metadata is still just opaque
@@ -224,7 +224,7 @@ test("list orders by created_at ascending", async () => {
     googleSub: "sub-1",
     username: "first",
     passwordHash: "hash",
-    role: "SUPERADMIN",
+    role: "ADMIN",
     mustChangePassword: false,
     createdByAdminId: null,
     nowIso: "2026-01-01T00:00:00.000Z",
