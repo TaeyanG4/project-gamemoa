@@ -1,0 +1,12 @@
+{
+  "score": {
+    "unit": "WPM",
+    "direction": "desc",
+    "min": 0,
+    "max": 300,
+    "displaySuffix": " WPM"
+  },
+  "leaderboard": true,
+  "xpPerCompletion": 0,
+  "requiresAuth": false
+}

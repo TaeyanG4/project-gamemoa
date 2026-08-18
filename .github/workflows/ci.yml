@@ -37,6 +37,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # `pnpm typecheck` is `turbo typecheck`, which only reaches workspace packages. scripts/ is
+      # not one, so the registry validator and the architecture guard were unchecked — and their
+      # tests run under tsx, which strips types without checking them.
+      - name: Typecheck build scripts
+        run: pnpm typecheck:scripts
+
       - name: Test
         run: pnpm test
 

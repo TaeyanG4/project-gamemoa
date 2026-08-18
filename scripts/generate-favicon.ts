@@ -328,8 +328,11 @@ const CRC_TABLE = (() => {
 
 function crc32(buf: Uint8Array): number {
   let crc = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) {
-    crc = CRC_TABLE[(crc ^ buf[i]) & 0xff] ^ (crc >>> 8);
+  for (const byte of buf) {
+    // `& 0xff` bounds the index to 0..255 and CRC_TABLE has exactly 256 entries, so the lookup
+    // cannot miss — asserted rather than defaulted, since a fallback value here would silently
+    // produce a wrong checksum instead of failing.
+    crc = CRC_TABLE[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }

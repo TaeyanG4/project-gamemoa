@@ -1,0 +1,22 @@
+// Typechecks scripts/ — the build tooling (registry generation + validation, the architecture
+// guard) that `pnpm typecheck` cannot reach.
+//
+// `pnpm typecheck` is `turbo typecheck`, which runs each *workspace* package's own tsc. scripts/
+// is not a workspace member, so none of it was ever typechecked, even though it now contains the
+// validator that decides whether a game registry entry is well-formed. Its tests run under tsx,
+// which strips types without checking them, so a type error there would have surfaced only as a
+// runtime failure — or not at all.
+//
+// `composite`/`declaration` are switched off (inherited from tsconfig.base.json): this project
+// emits nothing, and composite requires declaration emit.
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["scripts/**/*.ts"]
+}

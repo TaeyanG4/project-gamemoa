@@ -229,9 +229,12 @@ async function verifyWeb(expectedSha?: string): Promise<boolean> {
   );
 
   let allRoutesOk = true;
-  for (let i = 0; i < ROUTES_TO_CHECK.length; i++) {
-    const route = ROUTES_TO_CHECK[i];
-    const result = routeResults[i];
+  // Iterating the results (rather than indexing them by loop counter) is what lets TypeScript see
+  // `result` as a settled result rather than a possibly-undefined one, which in turn lets the
+  // else-branch narrow to the rejected case and reach `.reason`. allSettled preserves input order,
+  // so the paired route is still the one at the same index.
+  for (const [i, result] of routeResults.entries()) {
+    const route = ROUTES_TO_CHECK[i] ?? "(unknown route)";
     if (result.status === "fulfilled") {
       console.log(`  ✅ ${route} OK`);
     } else {

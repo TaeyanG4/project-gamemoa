@@ -24,17 +24,33 @@ async function checkRegistry() {
     "gameLoaders.generated.ts",
   );
 
+  const definitionsFile = path.join(
+    rootDir,
+    "packages",
+    "core",
+    "src",
+    "registry",
+    "gameDefinitions.generated.ts",
+  );
+
   const committedCoreContent = fs.existsSync(coreFile)
     ? fs.readFileSync(coreFile, "utf-8").replace(/\r\n/g, "\n")
     : "";
   const committedWebContent = fs.existsSync(webFile)
     ? fs.readFileSync(webFile, "utf-8").replace(/\r\n/g, "\n")
     : "";
+  const committedDefinitionsContent = fs.existsSync(definitionsFile)
+    ? fs.readFileSync(definitionsFile, "utf-8").replace(/\r\n/g, "\n")
+    : "";
 
-  const { coreRegistryCode, webLoaderCode, gameEntries } = await buildRegistrySources(rootDir);
+  // buildRegistrySources also reconciles game-registry/ against games/*/src/manifest.ts and
+  // throws on any disagreement, so that check runs here too — this script is what CI calls.
+  const { coreRegistryCode, webLoaderCode, gameDefinitionsCode, gameEntries, definitions } =
+    await buildRegistrySources(rootDir);
 
   const expectedCoreContent = coreRegistryCode.replace(/\r\n/g, "\n");
   const expectedWebContent = webLoaderCode.replace(/\r\n/g, "\n");
+  const expectedDefinitionsContent = gameDefinitionsCode.replace(/\r\n/g, "\n");
 
   let hasStale = false;
 
@@ -45,6 +61,11 @@ async function checkRegistry() {
 
   if (committedWebContent !== expectedWebContent) {
     console.error(`❌ Web Loader Registry is STALE! Path: ${webFile}`);
+    hasStale = true;
+  }
+
+  if (committedDefinitionsContent !== expectedDefinitionsContent) {
+    console.error(`❌ Game Definitions registry is STALE! Path: ${definitionsFile}`);
     hasStale = true;
   }
 
@@ -94,6 +115,9 @@ async function checkRegistry() {
 
   console.log(
     `✅ Verified Plugin Architecture Invariants: ${fsGameSlugs.length} games registered identically across filesystem, manifest registry, and web loaders.`,
+  );
+  console.log(
+    `✅ Verified Game Registry: ${definitions.length} SYSTEM game definitions in game-registry/, all slugs unique and in agreement with games/*/src/manifest.ts.`,
   );
   console.log(
     "✅ Verified Thumbnail Assets: All published game thumbnails exist in public directory.",
