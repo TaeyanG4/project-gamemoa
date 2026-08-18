@@ -1,10 +1,13 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S npx tsx
 // Runs the *real* production bundle-validation path (packages/core/src/domain/sandboxGameBundle.ts)
 // against the actual generated ball-dodge.zip — not a re-implementation of the checks, the same
 // functions the API route calls. Confirms the fixture will actually pass upload before anyone
 // tries it against a running server. See docs/GAME_CREATION_GUIDE.md §3.2/§3.4.
 //
-// Usage: node apps/api/test/fixtures/verify-ball-dodge-zip.mjs
+// Requires tsx (not plain `node`) — sandboxGameBundle.ts uses TypeScript parameter-property
+// constructor shorthand, which Node's built-in type-stripping doesn't support.
+//
+// Usage: npx tsx apps/api/test/fixtures/game-deploy-smoke-test/verify-ball-dodge-zip.mjs
 
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -14,8 +17,8 @@ import {
   validateBundleEntryMetadata,
   prepareBundleEntries,
   normalizeBundleEntryPath,
-} from "../../../../packages/core/src/domain/sandboxGameBundle.ts";
-import { SANDBOX_GAME_POLICY } from "../../../../packages/core/src/domain/sandboxGames.ts";
+} from "../../../../../packages/core/src/domain/sandboxGameBundle.ts";
+import { SANDBOX_GAME_POLICY } from "../../../../../packages/core/src/domain/sandboxGames.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const zipPath = join(here, "ball-dodge.zip");
