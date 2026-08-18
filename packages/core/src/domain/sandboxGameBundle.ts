@@ -54,6 +54,58 @@ export const PUBLISHED_MANIFEST_FILENAME = ".owogg-manifest.json";
 /** The file a bundle must contain, and what `/play/:slug` resolves to. */
 export const BUNDLE_ENTRY_PATH = "index.html";
 
+/**
+ * Optional file a game creator can include at the bundle root to skip the separate "create game"
+ * form step — drop a ZIP with this file in it onto the Game Creator Center and the game gets
+ * registered from its contents in one action (see SandboxGameUseCases.createGameFromBundle).
+ * Distinct from {@link PUBLISHED_MANIFEST_FILENAME}, which is OwOGG's own auto-generated
+ * published-files listing, never something a creator writes by hand.
+ */
+export const GAME_REGISTRATION_MANIFEST_FILENAME = "owogg.game.json";
+
+/** Raw, not-yet-validated shape read from {@link GAME_REGISTRATION_MANIFEST_FILENAME} — field
+ *-level validation (slug format, title/genre length) stays in SandboxGameUseCases so it shares
+ * exactly the same rules as the manual create-game form, rather than duplicating them here. */
+export interface RawGameRegistrationManifest {
+  slug?: unknown;
+  title?: unknown;
+  genre?: unknown;
+  shortDescription?: unknown;
+  description?: unknown;
+}
+
+/**
+ * Looks for {@link GAME_REGISTRATION_MANIFEST_FILENAME} among a prepared bundle's files. Returns
+ * `null` when it's simply not there (a normal upload for an already-existing game, or a creator
+ * who prefers the manual form) — that is not an error. Throws `BUNDLE_MALFORMED` when the file
+ * exists but isn't valid JSON or isn't a JSON object, since a bundle that clearly *intends* to
+ * self-register but has a broken manifest should fail loudly rather than silently falling back to
+ * "nothing happened."
+ */
+export function extractGameRegistrationManifest(
+  files: PreparedBundleFile[],
+): RawGameRegistrationManifest | null {
+  const entry = files.find((f) => f.path === GAME_REGISTRATION_MANIFEST_FILENAME);
+  if (!entry) return null;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(entry.bytes));
+  } catch {
+    throw new SandboxBundleRejectionError(
+      "BUNDLE_MALFORMED",
+      `${GAME_REGISTRATION_MANIFEST_FILENAME} is not valid JSON`,
+    );
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new SandboxBundleRejectionError(
+      "BUNDLE_MALFORMED",
+      `${GAME_REGISTRATION_MANIFEST_FILENAME} must be a JSON object`,
+    );
+  }
+  return parsed as RawGameRegistrationManifest;
+}
+
 // ── MIME ─────────────────────────────────────────────────────────────────────
 
 const MIME_TYPES: Record<string, string> = {

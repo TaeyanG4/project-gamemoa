@@ -54,6 +54,12 @@ export const PERMISSIONS = [
   // metadata/visibility.
   "sandbox_games.review",
 
+  // Soft-deleting a sandbox game (apps/api/src/routes/adminSandboxGames.ts, migration 0026) — a
+  // stronger, more destructive action than review/approve, so it is its own permission rather than
+  // folded into sandbox_games.review: MODERATOR has review but must not have delete (2026-08-18
+  // product decision — "관리자나 운영직급만").
+  "sandbox_games.delete",
+
   // Game Creator program administration (apps/api/src/routes/adminGameCreators.ts): direct
   // grant/revoke, and reviewing self-serve applications.
   "game_creators.manage",
@@ -104,13 +110,14 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<Exclude<StaffRole, "ADMIN">, Permi
     "users.score_moderation",
     "games.moderate",
     "sandbox_games.review",
+    "sandbox_games.delete",
     "game_creators.manage",
     "streamers.review",
     "system.monitor",
   ],
   // A deliberate subset of OPERATOR's bundle (see the module doc comment on why this isn't
   // expressed as a hierarchy): no users.ban, no games.moderate (the built-in-game kill switch is
-  // a stronger action than content review), no game_creators.manage.
+  // a stronger action than content review), no game_creators.manage, no sandbox_games.delete.
   MODERATOR: [
     "admin.center.access",
     "users.view",

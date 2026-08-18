@@ -14,6 +14,7 @@ export const PermissionSchema = z.enum([
   "users.score_moderation",
   "games.moderate",
   "sandbox_games.review",
+  "sandbox_games.delete",
   "game_creators.manage",
   "streamers.review",
   "system.monitor",

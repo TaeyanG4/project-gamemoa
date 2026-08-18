@@ -34,6 +34,9 @@ export const SANDBOX_GAME_FAILURE_STATUS: Record<
   BUNDLE_MISSING_ENTRY: 422,
   SUBMISSION_LIMIT_REACHED: 409,
   NOTHING_TO_WITHDRAW: 409,
+  MANIFEST_MISSING: 422,
+  INVALID_GENRE: 400,
+  ALREADY_DELETED: 409,
 };
 
 export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["code"], string> = {
@@ -60,4 +63,8 @@ export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["cod
   SUBMISSION_LIMIT_REACHED:
     "현재 심사 중인 게임이 2개입니다. 기존 게임의 심사가 완료되거나 제출을 철회한 뒤 다시 시도해주세요.",
   NOTHING_TO_WITHDRAW: "철회할 심사 중인 제출이 없습니다.",
+  MANIFEST_MISSING:
+    "ZIP 최상위에 owogg.game.json이 없습니다. 자동 등록하려면 slug/title/genre가 담긴 이 파일을 포함하세요.",
+  INVALID_GENRE: "genre는 비어 있지 않은 문자열이어야 합니다.",
+  ALREADY_DELETED: "이미 삭제된 게임입니다.",
 };

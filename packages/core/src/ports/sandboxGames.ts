@@ -27,6 +27,12 @@ export interface SandboxGameRecord {
    * its first review decision; null once decided (APPROVED/REJECTED) or withdrawn, and never
    * reclaimed afterward. See SANDBOX_GAME_POLICY.MAX_CONCURRENT_REVIEW_SLOTS. */
   reviewSlot: 1 | 2 | null;
+  /** Soft delete (migration 0026) — mirrors scores.deleted_at. Non-null means an ADMIN/OPERATOR
+   * removed this game; the row and its versions are kept for audit, but it is excluded from every
+   * public/queue listing and can never be served (deleteGame also forces visibility back to
+   * PRIVATE, which the existing isVersionServable gate already enforces). */
+  deletedAt: string | null;
+  deletedByAdminId: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -126,6 +132,12 @@ export interface SandboxGameRepository {
    * null. Called once a game's submission reaches a terminal state (see isTerminalVersionStatus):
    * approved, rejected, or withdrawn. Never reclaimed afterward. */
   releaseReviewSlot(id: number, nowIso: string): Promise<SandboxGameRecord>;
+
+  /** Soft delete (migration 0026) — sets deleted_at/deleted_by_admin_id and forces visibility back
+   * to PRIVATE in the same write (belt-and-suspenders: the existing isVersionServable gate already
+   * refuses to serve a non-PUBLIC game, so this alone stops serving even before any listing filter
+   * takes effect). The row and its versions are kept, not removed. */
+  softDelete(id: number, deletedByAdminId: number, nowIso: string): Promise<SandboxGameRecord>;
 
   updateMetadata(
     id: number,

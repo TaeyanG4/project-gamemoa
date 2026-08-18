@@ -10,6 +10,7 @@ import {
   SandboxGameDetailResponseSchema,
   SandboxGameRecordSchema,
   SandboxGameVersionRecordSchema,
+  SandboxGameUploadResponseSchema,
 } from "@owogg/contracts";
 import {
   SandboxGameUseCaseFailure,
@@ -244,6 +245,72 @@ devGamesRouter.post("/games", async (c) => {
     return c.json(errBody, status);
   }
 });
+
+// POST /api/dev/games/upload — drag-and-drop registration: a single ZIP whose root contains
+// owogg.game.json (slug/title/genre) creates the game *and* its first version in one call,
+// instead of the manual "fill in a form, then separately upload" two-step flow. Multipart, field
+// name "bundle" — same shape as /games/:id/versions. Rate limited on the same binding for the same
+// reason (real B2 writes + decompression CPU per call).
+devGamesRouter.post(
+  "/games/upload",
+  rateLimit({ name: "game-upload", binding: "GAME_UPLOAD_RATE_LIMITER" }),
+  async (c) => {
+    const session = await resolveDevSession(c);
+    if (!session) {
+      return c.json({ error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다." } }, 401);
+    }
+    if (!session.hasGameCreatorAccess) {
+      return c.json(
+        { error: { code: "FORBIDDEN", message: "게임 크리에이터 권한이 있는 사용자만 가능합니다." } },
+        403,
+      );
+    }
+
+    const container = createContainer(c.env.DB, readB2Config(c.env));
+    if (!container.gameBundlesConfigured) {
+      return c.json(
+        {
+          error: {
+            code: "GAME_BUNDLES_NOT_CONFIGURED",
+            message: "번들 저장소(Backblaze B2)가 아직 이 환경에 구성되지 않았습니다.",
+          },
+        },
+        503,
+      );
+    }
+
+    let body: Record<string, string | File>;
+    try {
+      body = await c.req.parseBody();
+    } catch {
+      return c.json(
+        { error: { code: "INVALID_REQUEST", message: "multipart/form-data 요청이 아닙니다." } },
+        400,
+      );
+    }
+
+    const bundle = body.bundle;
+    if (!(bundle instanceof File)) {
+      return c.json(
+        { error: { code: "INVALID_REQUEST", message: "bundle 파일 필드가 필요합니다." } },
+        400,
+      );
+    }
+
+    try {
+      const bytes = await bundle.arrayBuffer();
+      const { game, version } = await container.sandboxGameUseCases.createGameFromBundle({
+        developerUserId: session.userId,
+        bytes,
+        contentType: bundle.type || undefined,
+      });
+      return c.json(SandboxGameUploadResponseSchema.parse({ game, version }), 201);
+    } catch (err) {
+      const { body: errBody, status } = failureResponse(err);
+      return c.json(errBody, status);
+    }
+  },
+);
 
 // GET /api/dev/games/:id — detail (owner or admin only).
 devGamesRouter.get("/games/:id", async (c) => {

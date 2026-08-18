@@ -18,9 +18,11 @@ import {
   sourceArchiveObjectKey,
   publishedObjectKey,
   resolveBundleContentType,
+  extractGameRegistrationManifest,
   SANDBOX_BUNDLE_REJECTIONS,
   SandboxBundleRejectionError,
   type SandboxBundleRejection,
+  type PreparedBundle,
 } from "../domain/sandboxGameBundle.js";
 import { sha256Hex } from "../domain/contentHash.js";
 import type { GameBundlePublisher } from "./gameBundlePublisher.js";
@@ -48,6 +50,16 @@ export type SandboxGameUseCaseError =
   /** withdrawSubmission was called on a game with no open slot and no pending version — there is
    * nothing left to withdraw. */
   | "NOTHING_TO_WITHDRAW"
+  /** createGameFromBundle: the zip has no owogg.game.json at its root at all — not the same as a
+   * present-but-broken one, which surfaces as BUNDLE_MALFORMED (a SandboxBundleRejection) instead. */
+  | "MANIFEST_MISSING"
+  /** createGameFromBundle: owogg.game.json is present and valid JSON, but its `genre` field is
+   * missing/blank. slug/title reuse INVALID_SLUG/INVALID_TITLE — the same codes the manual
+   * create-game form already produces for the same problems. */
+  | "INVALID_GENRE"
+  /** deleteGame was called on a game that's already soft-deleted — idempotent-failure rather than
+   * a silent no-op, so a double-click doesn't look like it succeeded twice. */
+  | "ALREADY_DELETED"
   | SandboxBundleRejection;
 
 export class SandboxGameUseCaseFailure extends Error {
@@ -205,8 +217,88 @@ export class SandboxGameUseCases {
       }
     })();
 
+    return this.uploadPreparedVersion({
+      gameId: game.id,
+      bytes: input.bytes,
+      contentType: input.contentType,
+      prepared,
+    });
+  }
+
+  /**
+   * Self-registering upload: a single ZIP whose root contains
+   * `GAME_REGISTRATION_MANIFEST_FILENAME` (`owogg.game.json`, e.g. `{"slug": "ball-dodge",
+   * "title": "공 피하기", "genre": "action"}`) creates the game *and* its first version in one
+   * call — the drag-and-drop path in the Game Creator Center. Reuses `createGame`'s own
+   * slug/title validation and review-slot claim rather than duplicating them, so a manifest-driven
+   * registration is held to exactly the same rules as the manual form. The archive is decompressed
+   * only once here (unlike calling createGame then uploadVersion separately, which would parse the
+   * same bytes twice) — the manifest is read from the same `prepared.files` the upload itself uses.
+   */
+  async createGameFromBundle(input: {
+    developerUserId: number;
+    bytes: ArrayBuffer;
+    contentType?: string | undefined;
+  }): Promise<{ game: SandboxGameRecord; version: SandboxGameVersionRecord }> {
+    if (input.bytes.byteLength === 0) throw new SandboxGameUseCaseFailure("BUNDLE_EMPTY");
+    if (input.bytes.byteLength > SANDBOX_GAME_POLICY.MAX_BUNDLE_BYTES) {
+      throw new SandboxGameUseCaseFailure("BUNDLE_TOO_LARGE");
+    }
+
+    const prepared = (() => {
+      try {
+        return this.publisher.prepare(input.bytes);
+      } catch (err) {
+        return asFailure(err);
+      }
+    })();
+
+    const manifest = (() => {
+      try {
+        return extractGameRegistrationManifest(prepared.files);
+      } catch (err) {
+        return asFailure(err);
+      }
+    })();
+    if (!manifest) throw new SandboxGameUseCaseFailure("MANIFEST_MISSING");
+
+    if (typeof manifest.slug !== "string") throw new SandboxGameUseCaseFailure("INVALID_SLUG");
+    if (typeof manifest.title !== "string") throw new SandboxGameUseCaseFailure("INVALID_TITLE");
+    if (typeof manifest.genre !== "string" || manifest.genre.trim().length === 0) {
+      throw new SandboxGameUseCaseFailure("INVALID_GENRE");
+    }
+
+    const game = await this.createGame({
+      slug: manifest.slug,
+      developerUserId: input.developerUserId,
+      title: manifest.title,
+      shortDescription:
+        typeof manifest.shortDescription === "string" ? manifest.shortDescription : null,
+      description: typeof manifest.description === "string" ? manifest.description : null,
+      genre: manifest.genre,
+    });
+
+    const version = await this.uploadPreparedVersion({
+      gameId: game.id,
+      bytes: input.bytes,
+      contentType: input.contentType,
+      prepared,
+    });
+
+    return { game, version };
+  }
+
+  /** Shared tail of uploadVersion/createGameFromBundle once an archive has already been prepared:
+   * store it, insert the version row, and publish. See uploadVersion's own doc comment for why
+   * the ordering (store -> row -> publish) and the best-effort cleanup on a failed insert exist. */
+  private async uploadPreparedVersion(input: {
+    gameId: number;
+    bytes: ArrayBuffer;
+    contentType?: string | undefined;
+    prepared: PreparedBundle;
+  }): Promise<SandboxGameVersionRecord> {
     const contentHash = await sha256Hex(input.bytes);
-    const objectKey = sourceArchiveObjectKey(game.id, contentHash);
+    const objectKey = sourceArchiveObjectKey(input.gameId, contentHash);
     await this.storage.putObject({
       key: objectKey,
       bytes: input.bytes,
@@ -216,7 +308,7 @@ export class SandboxGameUseCases {
     let version: SandboxGameVersionRecord;
     try {
       version = await this.repo.createVersion({
-        gameId: game.id,
+        gameId: input.gameId,
         objectKey,
         contentHash,
         bundleBytes: input.bytes.byteLength,
@@ -237,7 +329,7 @@ export class SandboxGameUseCases {
     // A publish failure here leaves a real, valid version row that simply isn't servable yet
     // (FAILED), recoverable with republishVersion — so it is surfaced as its own error rather than
     // undoing the upload the developer just paid for.
-    return this.publishOrFail(version, prepared);
+    return this.publishOrFail(version, input.prepared);
   }
 
   /** Storage-level publish failures become a single typed code. The underlying provider message is
@@ -324,6 +416,46 @@ export class SandboxGameUseCases {
     const updated = await this.repo.findById(game.id);
     if (!updated) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
     return updated;
+  }
+
+  /**
+   * Soft-deletes a game (migration 0026) — ADMIN/OPERATOR only, enforced by the route's
+   * `requirePermission(admin, "sandbox_games.delete")` (this use case does not itself check who is
+   * calling, matching decideVersion/setVisibility's split: business rules here, authorization at
+   * the route). Any still-open review slot is released and any PENDING_REVIEW version withdrawn
+   * first, mirroring withdrawSubmission, so a deleted game never keeps occupying a developer's
+   * limited concurrent-submission quota. The row/versions are kept for audit — see
+   * SandboxGameRepository.softDelete's doc comment for why this isn't a hard delete.
+   */
+  async deleteGame(input: { gameId: number; actorAdminId: number }): Promise<SandboxGameRecord> {
+    const game = await this.repo.findById(input.gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    if (game.deletedAt !== null) throw new SandboxGameUseCaseFailure("ALREADY_DELETED");
+
+    const nowIso = new Date().toISOString();
+
+    if (game.reviewSlot !== null) {
+      const versions = await this.repo.listVersionsByGame(game.id);
+      const pending = versions.filter((v) => v.status === "PENDING_REVIEW");
+      for (const version of pending) {
+        await this.repo.withdrawVersion(version.id);
+      }
+      await this.repo.releaseReviewSlot(game.id, nowIso);
+    }
+
+    const deleted = await this.repo.softDelete(game.id, input.actorAdminId, nowIso);
+
+    await this.repo.appendReviewAudit({
+      gameId: game.id,
+      versionId: null,
+      actorAdminId: input.actorAdminId,
+      action: "DELETED",
+      reason: null,
+      metadata: null,
+      nowIso,
+    });
+
+    return deleted;
   }
 
   async decideVersion(input: {
