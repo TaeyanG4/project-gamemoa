@@ -12,14 +12,19 @@ interface GameCardProps {
   thumbnail: string;
   accent?: string | undefined;
   estimatedRoundSeconds?: number | undefined;
-  /** GameManifest's free-form, no-contract debug marker (see packages/game-sdk) — reused here as
-   * the one signal GameCard has to tell a sandbox game apart from a built-in one, since
-   * sandboxGameAdapter.ts deliberately sets it to the literal "sandbox" for exactly this. Built-in
-   * games are served at /games/:slug (game-slug.tsx, the static built-in registry); sandbox games
-   * live at the separate /sandbox-games/:slug (sandboxGamePlay.tsx) instead. Linking every card to
-   * /games/:slug unconditionally — the bug this fixes (2026-08-18) — sent every sandbox game to a
-   * route that only ever looks the slug up in the built-in registry, so it always 404'd. */
-  version?: string | undefined;
+}
+
+/**
+ * Every game card, SYSTEM or Creator, now routes here — /games/:slug's own transitional resolver
+ * (features/game/transitionalCreatorGameResolver.ts, added alongside GameHost's IframeRuntime
+ * counterpart) is what tells the two apart today, not the card. Before that resolver existed,
+ * /games/:slug only ever looked a slug up in the built-in registry, so a sandbox game's card had
+ * to route elsewhere (/sandbox-games/:slug) or 404 — see this function's git history for that
+ * branch. /sandbox-games/:slug (sandboxGamePlay.tsx) is unchanged and still reachable directly;
+ * this only changes where a catalog *card* points.
+ */
+export function gameCardHref(slug: string): string {
+  return `/games/${slug}`;
 }
 
 export function GameCard({
@@ -29,7 +34,6 @@ export function GameCard({
   modes,
   thumbnail,
   accent = "#6366f1",
-  version,
 }: GameCardProps) {
   const { isFavorite, toggleFavorite } = usePersonalization();
   const { dict } = useI18n();
@@ -69,10 +73,7 @@ export function GameCard({
         />
       </button>
 
-      <Link
-        to={version === "sandbox" ? `/sandbox-games/${slug}` : `/games/${slug}`}
-        className="flex flex-col flex-1"
-      >
+      <Link to={gameCardHref(slug)} className="flex flex-col flex-1">
         {/* Thumbnail Aspect 16:9 */}
         <div
           className="w-full aspect-[16/10] relative flex items-center justify-center p-3 sm:p-6 overflow-hidden bg-surface-overlay"

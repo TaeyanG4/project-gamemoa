@@ -54,6 +54,11 @@ export function sandboxGameToManifest(game: SandboxGamePublicDetail): GameManife
     supportsLeaderboard: true,
     inputMethods: ["mouse", "keyboard", "touch"],
     supportsReplay: false,
+    // GameManifest.version is a required, free-form debug marker (see packages/game-sdk) with no
+    // contract beyond "some string" — this used to double as the one signal GameCard read to
+    // route a sandbox game's card differently. GameCard no longer reads it at all (every card
+    // routes to /games/:slug — see GameCard.tsx's gameCardHref), so this is just a placeholder
+    // satisfying the required field now, not a meaningful marker read anywhere.
     version: "sandbox",
   };
 }
