@@ -22,6 +22,7 @@ import {
 } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 import { readB2Config } from "./devGames.js";
 import type { ApiEnv } from "./auth.js";
 
@@ -180,7 +181,7 @@ gamesRouter.get("/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
 // (not in sandbox_games at all) or a private/unpublished/unknown Creator game all 404 identically,
 // the same can't-distinguish-unknown-from-private posture as everywhere else in this file.
 
-gamesRouter.post("/:slug/session", async (c) => {
+gamesRouter.post("/:slug/session", rateLimit({ name: "game-session" }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
 
   const secret = c.env.GAME_SESSION_SECRET;
@@ -233,10 +234,11 @@ gamesRouter.post("/:slug/session", async (c) => {
 // attemptId and saving the score together, so there is no possible outcome where the token gets
 // spent but no score is recorded. See that class's own doc comment for the full reasoning.
 //
-// Deliberately not connected to anything past accepting the row: no leaderboard read, no XP/
-// achievement/guild XP award (those stay on the existing SYSTEM-game path,
-// apps/api/src/routes/scores.ts), and nothing here is called from GameHost/CreatorGameHost/the
-// Game Bridge yet — that wiring is a later PR's scope.
+// Called from CreatorGameHost (apps/web/app/features/game/creatorScoreFlow.ts) whenever
+// GAME_COMPLETE carries a score and the player is logged in. Still deliberately not connected to
+// anything past accepting the row: no leaderboard read, no XP/achievement/guild XP award (those
+// stay on the existing SYSTEM-game path, apps/api/src/routes/scores.ts), no Bridge protocol
+// change, no HOST_INIT payload change — the token this endpoint spends never reaches the iframe.
 
 /** HTTP status per failure reason — mirrors the shape POST /api/scores already uses (a JSON
  * {error:{code,message}} body), just with this route's own error codes. */
@@ -272,7 +274,7 @@ function creatorScoreAcceptErrorMessage(error: CreatorScoreAcceptError, reason?:
   }
 }
 
-gamesRouter.post("/:slug/score", async (c) => {
+gamesRouter.post("/:slug/score", rateLimit({ name: "creator-score-accept" }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
 
   const secret = c.env.GAME_SESSION_SECRET;

@@ -342,3 +342,41 @@ test("the same token presented twice is accepted once, then 409 ALREADY_CONSUMED
   assert.equal(scores.length, 1);
   assert.equal(scores[0]?.score, 120);
 });
+
+test("is rate limited under the 'creator-score-accept' name when RATE_LIMITER is bound and rejects", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const keys: string[] = [];
+  const res = await postScore(
+    db,
+    { token: "irrelevant", score: 1 },
+    {
+      GAME_SESSION_SECRET: SESSION_SECRET,
+      RATE_LIMITER: {
+        limit: async ({ key }: { key: string }) => {
+          keys.push(key);
+          return { success: false };
+        },
+      },
+    },
+  );
+  assert.equal(res.status, 429);
+  assert.ok(
+    keys[0]?.startsWith("creator-score-accept:"),
+    "keyed under this route's own name prefix",
+  );
+});
+
+test("passes through when RATE_LIMITER is bound and allows the request", async () => {
+  const { db, scores } = createDb({ userId: 7, game: LIVE_GAME, version: LIVE_VERSION });
+  const token = await signGameSession(samplePayload(), SESSION_SECRET);
+  const res = await postScore(
+    db,
+    { token, score: 120 },
+    {
+      GAME_SESSION_SECRET: SESSION_SECRET,
+      RATE_LIMITER: { limit: async () => ({ success: true }) },
+    },
+  );
+  assert.equal(res.status, 200);
+  assert.equal(scores.length, 1);
+});
