@@ -445,10 +445,20 @@ MODERATOR에는 없습니다([`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §4). �
   엔드포인트. 기존 단일 게임 조회(`GET /api/games/sandbox/:slug`)와 같은 축소된 필드만 노출
   (review/publish 내부 필드 없음), 60초 엣지 캐시.
 - `GET /api/games/sandbox/:slug/logo`(신규) — 로고 이미지 바이트 자체. 저장 키를 클라이언트에
-  절대 노출하지 않는 기존 원칙을 따라(`objectKey`/`manifestKey`와 동일 패턴),
-  `SandboxGameRecordSchema`는 `logoKey`를 `hasLogo: boolean`으로 변환해서만 내보냅니다 — 실제
+  절대 노출하지 않는 기존 원칙을 따라(`objectKey`/`manifestKey`와 동일 패턴), 내부 `logoKey`는
+  API 경계에서 `toSandboxGameRecordResponse()`가 `hasLogo: boolean`으로 바꿔 떨궈냅니다 — 실제
   이미지가 필요한 클라이언트는 이 엔드포인트를 직접 가리킵니다. 로고가 없는 게임(요구사항
   이전 등록)은 404를 반환하고, 웹 카탈로그는 OwOGG 파비콘으로 대체 표시합니다.
+
+  > **이 변환을 스키마 `.transform()`으로 구현하면 안 됩니다.** 최초 구현이 그렇게 했다가
+  > 2026-08-18 장애를 냈습니다: 입력에는 `logoKey`가 **필수**인데 출력에서는 그것이 제거되므로,
+  > 서버가 만든 응답을 클라이언트가 **같은 스키마로 다시 파싱할 수 없었습니다**
+  > (`logoKey: Required`). 게임 크리에이터 센터와 관리자 심사 페이지가 통째로
+  > "서버 응답 형식이 표준 계약과 일치하지 않습니다"를 띄웠습니다. 와이어 계약 스키마는
+  > **자기 출력을 스스로 파싱할 수 있어야(round-trip) 합니다** — 내부 필드 제거는 스키마가
+  > 아니라 서버 코드의 명시적 매퍼가 담당하고, 이 불변식은
+  > `apps/api/test/sandboxGameContractRoundTrip.test.ts`가 모든 응답 스키마에 대해 강제합니다.
+
 - 웹 쪽 통합은 `apps/web/app/features/catalog/sandboxGameAdapter.ts`가 담당합니다 —
   `SandboxGamePublicDetail`을 내장 게임과 동일한 `GameManifest` 형태로 변환해, 기존
   `GameGrid`/`GameCard` 컴포넌트가 두 종류를 구분 없이 렌더링합니다. `mode`는

@@ -9,6 +9,7 @@ import {
   SandboxGameListResponseSchema,
   SandboxGameDetailResponseSchema,
   SandboxGameRecordSchema,
+  toSandboxGameRecordResponse,
   SandboxGameVersionRecordSchema,
   SandboxGameUploadResponseSchema,
 } from "@owogg/contracts";
@@ -204,7 +205,10 @@ devGamesRouter.get("/games", async (c) => {
   }
   const { sandboxGameUseCases } = createContainer(c.env.DB);
   const games = await sandboxGameUseCases.listMine(session.userId);
-  return c.json(SandboxGameListResponseSchema.parse({ games }), 200);
+  return c.json(
+    SandboxGameListResponseSchema.parse({ games: games.map(toSandboxGameRecordResponse) }),
+    200,
+  );
 });
 
 // POST /api/dev/games — create a new catalog entry (no bundle yet). Dead from the UI's own
@@ -244,7 +248,7 @@ devGamesRouter.post("/games", async (c) => {
       genre: parsed.data.genre,
       mode: "single",
     });
-    return c.json(SandboxGameRecordSchema.parse(game), 201);
+    return c.json(SandboxGameRecordSchema.parse(toSandboxGameRecordResponse(game)), 201);
   } catch (err) {
     const { body: errBody, status } = failureResponse(err);
     return c.json(errBody, status);
@@ -311,7 +315,10 @@ devGamesRouter.post(
         bytes,
         contentType: bundle.type || undefined,
       });
-      return c.json(SandboxGameUploadResponseSchema.parse({ game, version }), 201);
+      return c.json(
+        SandboxGameUploadResponseSchema.parse({ game: toSandboxGameRecordResponse(game), version }),
+        201,
+      );
     } catch (err) {
       const { body: errBody, status } = failureResponse(err);
       return c.json(errBody, status);
@@ -341,7 +348,7 @@ devGamesRouter.get("/games/:id", async (c) => {
   ]);
   return c.json(
     SandboxGameDetailResponseSchema.parse({
-      game,
+      game: toSandboxGameRecordResponse(game),
       versions,
       auditLog,
     }),
@@ -366,7 +373,7 @@ devGamesRouter.post("/games/:id/withdraw", async (c) => {
       gameId: id,
       actingUserId: session.userId,
     });
-    return c.json(SandboxGameRecordSchema.parse(game), 200);
+    return c.json(SandboxGameRecordSchema.parse(toSandboxGameRecordResponse(game)), 200);
   } catch (err) {
     const { body: errBody, status } = failureResponse(err);
     return c.json(errBody, status);

@@ -18,10 +18,17 @@ export type SandboxGameVersionStatus = z.infer<typeof SandboxGameVersionStatusSc
 export const SandboxGameModeSchema = z.enum(["single", "multi"]);
 export type SandboxGameMode = z.infer<typeof SandboxGameModeSchema>;
 
-/** Raw shape as returned by the core `SandboxGameRecord` — kept separate from
- * {@link SandboxGameRecordSchema} below (which `.transform()`s this) so `logoKey`, an internal B2
- * storage key, never has to be manually stripped at every route call site. */
-const SandboxGameRecordRawSchema = z.object({
+/** The wire shape of a sandbox game, as it actually travels over HTTP.
+ *
+ * MUST stay symmetric — i.e. `Schema.parse(JSON.parse(JSON.stringify(Schema.parse(x))))` has to
+ * succeed. Both sides use this one schema: the API parses it to build a response, and the web
+ * client parses that same response back. An earlier version of this was a `.transform()` that took
+ * the core record's internal `logoKey` as *input* and emitted `hasLogo` as *output*, which broke
+ * that invariant: the API's own response no longer contained `logoKey`, so every client-side parse
+ * failed with "logoKey: Required" and the Game Creator Center / admin review pages showed a
+ * blanket contract error (2026-08-18). Internal-only fields are now dropped by an explicit mapper
+ * on the server ({@link toSandboxGameRecordResponse}) instead of by schema magic. */
+export const SandboxGameRecordSchema = z.object({
   id: z.number().int().positive(),
   slug: z.string(),
   developerUserId: z.number().int().positive(),
@@ -30,10 +37,10 @@ const SandboxGameRecordRawSchema = z.object({
   description: z.string().nullable(),
   genre: z.string(),
   mode: SandboxGameModeSchema,
-  /** Internal — see the `.transform()` below, which turns this into `hasLogo` and drops it. Never
-   * add a route that returns this schema without going through the transform (i.e. never import
-   * this raw schema directly outside this file). */
-  logoKey: z.string().nullable(),
+  /** Whether GET /api/games/sandbox/:slug/logo will actually return an image. The raw B2 storage
+   * key it is derived from (`logoKey`) is deliberately never on the wire — mirrors how
+   * `objectKey`/`manifestKey` are kept off SandboxGameVersionRecordSchema. */
+  hasLogo: z.boolean(),
   xpPerCompletion: z.number().int().nonnegative(),
   scoreUnit: z.string().nullable(),
   scoreDirection: z.enum(["asc", "desc"]).nullable(),
@@ -54,14 +61,22 @@ const SandboxGameRecordRawSchema = z.object({
   updatedAt: z.string(),
 });
 
-/** `.transform()` so every existing `SandboxGameRecordSchema.parse(game)` call site keeps working
- * unchanged while gaining `hasLogo` and losing `logoKey` — a client that wants to actually display
- * the logo hits the public, unauthenticated `GET /api/games/sandbox/:slug/logo` route instead
- * (mirrors how `objectKey`/`manifestKey` are already kept off SandboxGameVersionRecordSchema). */
-export const SandboxGameRecordSchema = SandboxGameRecordRawSchema.transform(
-  ({ logoKey, ...game }) => ({ ...game, hasLogo: logoKey !== null }),
-);
 export type SandboxGameRecord = z.infer<typeof SandboxGameRecordSchema>;
+
+/** Core record -> wire record. The one place `logoKey` is turned into `hasLogo` and dropped.
+ *
+ * Server-side only: every API route returning a game must run its core record through this before
+ * `SandboxGameRecordSchema.parse`. Structurally typed rather than importing `@owogg/core`'s
+ * `SandboxGameRecord`, since `@owogg/contracts` sits below core and must not depend on it.
+ *
+ * Forgetting it is loud, not silent: the schema requires `hasLogo`, so a raw core record fails to
+ * parse immediately instead of shipping a storage key to a client. */
+export function toSandboxGameRecordResponse<T extends { logoKey: string | null }>(
+  game: T,
+): Omit<T, "logoKey"> & { hasLogo: boolean } {
+  const { logoKey, ...rest } = game;
+  return { ...rest, hasLogo: logoKey !== null };
+}
 
 export const SandboxGamePublishStatusSchema = z.enum(["UPLOADED", "PUBLISHING", "READY", "FAILED"]);
 export type SandboxGamePublishStatus = z.infer<typeof SandboxGamePublishStatusSchema>;
@@ -134,7 +149,7 @@ export const SandboxGamePublicDetailSchema = z.object({
   genre: z.string(),
   mode: SandboxGameModeSchema,
   /** Whether GET /api/games/sandbox/:slug/logo will actually return an image — see
-   * SandboxGameRecordSchema's `.transform()` for why the raw storage key never leaves the API.
+   * {@link toSandboxGameRecordResponse} for why the raw storage key never leaves the API.
    * `false` for a game registered before the logo requirement (2026-08-18); the web catalog falls
    * back to the site favicon rather than treating that as broken. */
   hasLogo: z.boolean(),
