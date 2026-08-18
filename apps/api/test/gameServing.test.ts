@@ -386,7 +386,12 @@ test("a non-HTML asset carries no CSP — the policy belongs to the document, no
   assert.equal(res.headers.get("Content-Security-Policy"), null);
 });
 
-test("GET a published .wasm asset serves application/wasm with an immutable long-lived cache", async () => {
+test("GET a published .wasm asset serves application/wasm with an hour-long, non-immutable browser cache", async () => {
+  // NOT the edge's own year-long retention (gameAssetEdgeCache's edgeTtlSeconds, never sent to a
+  // client — see gameServing.ts's VERSIONED_ASSET_BROWSER_MAX_AGE_SECONDS doc comment): a
+  // year-long, `immutable` response is what a *browser* pins locally, and CORS/CSP living in that
+  // same response means a policy fix can't reach an already-downloaded browser until the pin
+  // expires. One hour bounds that to something a real incident response can wait out.
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
   const res = await withStorage({ stored: publishedObjects() }, () =>
     app.request("/games/1/17/Build/game.wasm", {}, { DB: db, ...B2_ENV } as any),
@@ -394,7 +399,7 @@ test("GET a published .wasm asset serves application/wasm with an immutable long
 
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("Content-Type"), "application/wasm");
-  assert.equal(res.headers.get("Cache-Control"), "public, max-age=31536000, immutable");
+  assert.equal(res.headers.get("Cache-Control"), "public, max-age=3600");
   // A non-document response carries no CSP — the policy only applies to the game's own document.
   assert.equal(res.headers.get("Content-Security-Policy"), null);
 });
@@ -674,6 +679,166 @@ test("within the availability window, a second request to the same URL is served
     );
     assert.equal(second.status, 200);
     assert.equal(dbReads, readsAfterFirst, "a cached availability/byte HIT must not re-touch D1");
+  });
+});
+
+// ── byte cache vs. serving policy headers (2026-08-18 policy-header staleness fix) ───────────
+//
+// The byte cache (this section) and the policy headers (CORS/CSP/browser Cache-Control) it used
+// to carry along for the ride are now two separate concerns — see gameServing.ts's
+// gameAssetEdgeCache doc comment. These tests pin that split down directly, not just via "the
+// current headers happen to be right" (every other test in this file already implicitly checks
+// that on whichever code path it exercises) but by proving a *stale* cached entry specifically
+// cannot leak its own headers into a live response.
+
+test("a cache entry carrying stale/wrong policy headers is never replayed — CORS/CSP are rebuilt fresh on every HIT", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+
+  await withFakeCaches(async () => {
+    const first = await withStorage({ stored: publishedObjects() }, () =>
+      app.request(
+        "/games/1/17/index.html",
+        {},
+        { DB: db, ...B2_ENV, FRONTEND_URL: "https://www.owogg.com" } as any,
+        fakeExecutionCtx as any,
+      ),
+    );
+    assert.equal(first.status, 200);
+    assert.equal(first.headers.get("Access-Control-Allow-Origin"), "*");
+
+    // Overwrite the byte-cache entry to look exactly like what the OLD, pre-fix caching used to
+    // store: the full original response headers, verbatim — including a deliberately WRONG CORS
+    // origin and an outdated CSP. This is the shape a real edge entry written before this fix
+    // shipped would still have, sitting there for however long is left on its own TTL.
+    const cache = (
+      (globalThis as { caches?: { default: FakeCache } }).caches as { default: FakeCache }
+    ).default;
+    const [key] = [...cache.store.keys()].filter((k) => k.includes("/games/1/17/index.html"));
+    assert.ok(key, "expected the byte-cache entry to exist after the first request");
+    const staleBody = await cache.store.get(key)!.clone().arrayBuffer();
+    cache.store.set(
+      key,
+      new Response(staleBody, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Access-Control-Allow-Origin": "https://evil.example",
+          "Content-Security-Policy": "default-src 'none'",
+        },
+      }),
+    );
+
+    const second = await withStorage({ stored: publishedObjects() }, () =>
+      app.request(
+        "/games/1/17/index.html",
+        {},
+        { DB: db, ...B2_ENV, FRONTEND_URL: "https://www.owogg.com" } as any,
+        fakeExecutionCtx as any,
+      ),
+    );
+
+    assert.equal(second.status, 200);
+    assert.equal(
+      second.headers.get("Access-Control-Allow-Origin"),
+      "*",
+      "must not replay the stale entry's wrong ACAO",
+    );
+    assert.equal(second.headers.get("Access-Control-Allow-Credentials"), null);
+    const csp = second.headers.get("Content-Security-Policy") ?? "";
+    assert.match(csp, /frame-ancestors https:\/\/www\.owogg\.com/);
+    assert.ok(!csp.includes("default-src 'none'"), "must not replay the stale entry's CSP");
+  });
+});
+
+test("a cache HIT reuses the cached body byte-for-byte, without touching storage again", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+
+  await withFakeCaches(async () => {
+    const stub1 = createStorageStub({ stored: publishedObjects() });
+    let first: Response;
+    try {
+      first = await app.request(
+        "/games/1/17/Build/game.wasm",
+        {},
+        { DB: db, ...B2_ENV } as any,
+        fakeExecutionCtx as any,
+      );
+    } finally {
+      stub1.restore();
+    }
+    assert.equal(first.status, 200);
+    const firstBody = new Uint8Array(await first.arrayBuffer());
+
+    // Deliberately empty storage for the second request — if the HIT below turned out to still
+    // need a storage read, it would 404 (no object) or fall through to a source-archive read that
+    // also fails, not silently succeed with the right bytes anyway.
+    const stub2 = createStorageStub({});
+    let second: Response;
+    try {
+      second = await app.request(
+        "/games/1/17/Build/game.wasm",
+        {},
+        { DB: db, ...B2_ENV } as any,
+        fakeExecutionCtx as any,
+      );
+    } finally {
+      stub2.restore();
+    }
+
+    assert.equal(second.status, 200, "a HIT must not need storage — this stub has nothing stored");
+    assert.deepEqual(stub2.requestedKeys, [], "storage must not be touched again on a cache HIT");
+    const secondBody = new Uint8Array(await second.arrayBuffer());
+    assert.deepEqual(secondBody, firstBody);
+  });
+});
+
+test("the edge holds a versioned non-HTML asset for a year, but every client response — hit or miss — stays capped at an hour", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+
+  await withFakeCaches(async () => {
+    const first = await withStorage({ stored: publishedObjects() }, () =>
+      app.request(
+        "/games/1/17/Build/game.wasm",
+        {},
+        { DB: db, ...B2_ENV } as any,
+        fakeExecutionCtx as any,
+      ),
+    );
+    assert.equal(first.status, 200);
+    assert.equal(
+      first.headers.get("Cache-Control"),
+      "public, max-age=3600",
+      "the client-facing response on the very first (MISS) request",
+    );
+
+    // The edge's OWN internal retention is the much longer value — never sent to a client, only
+    // ever the header on what cache.put() actually stored.
+    const cache = (
+      (globalThis as { caches?: { default: FakeCache } }).caches as { default: FakeCache }
+    ).default;
+    const [key] = [...cache.store.keys()].filter((k) => k.includes("/games/1/17/Build/game.wasm"));
+    assert.ok(key, "expected the byte-cache entry to exist after the first request");
+    const storedCacheControl = cache.store.get(key)!.headers.get("Cache-Control") ?? "";
+    assert.match(storedCacheControl, /s-maxage=31536000/);
+    assert.ok(
+      !storedCacheControl.includes("max-age=3600"),
+      "the stored entry's own retention must not be the short client-facing value",
+    );
+
+    const second = await withStorage({ stored: publishedObjects() }, () =>
+      app.request(
+        "/games/1/17/Build/game.wasm",
+        {},
+        { DB: db, ...B2_ENV } as any,
+        fakeExecutionCtx as any,
+      ),
+    );
+    assert.equal(second.status, 200);
+    assert.equal(
+      second.headers.get("Cache-Control"),
+      "public, max-age=3600",
+      "a cache HIT must return the same short client-facing Cache-Control as a MISS, not the edge's own long retention",
+    );
   });
 });
 

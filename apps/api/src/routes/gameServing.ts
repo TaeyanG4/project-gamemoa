@@ -12,6 +12,13 @@ import { readB2Config } from "./devGames.js";
 import { isLocalhost } from "./auth.js";
 import type { ApiEnv } from "./auth.js";
 
+/** What decides a served asset's browser-facing Cache-Control — computed fresh on every request
+ * (see gameAssetEdgeCache below), never read off a cached entry. */
+interface AssetCachePolicy {
+  maxAgeSeconds: number;
+  immutable: boolean;
+}
+
 const DEFAULT_FRONTEND_URL = "https://owogg.com";
 
 /** Same narrow local shape as middleware/edgeCache.ts's `CloudflareCacheStorage.default` — see
@@ -22,10 +29,22 @@ interface CloudflareCache {
   put(request: Request, response: Response): Promise<void>;
 }
 
-/** One year, the conventional ceiling for `max-age`. Safe only on the versioned path, where a URL
- * identifies one immutable published version — a new build gets a new version id and therefore a
- * new URL, so nothing ever needs purging. */
+/** One year, the conventional ceiling for `max-age`. EDGE retention only (gameAssetEdgeCache's
+ * `edgeTtlSeconds` on the versioned path) — safe there because a gameId+versionId+path triple's
+ * BYTES genuinely never change, a new build gets a new version id. Not used for the browser-facing
+ * Cache-Control a client actually receives; see VERSIONED_ASSET_BROWSER_MAX_AGE_SECONDS for why
+ * those two needed to stop being the same number. */
 const IMMUTABLE_MAX_AGE_SECONDS = 31536000;
+
+/** Browser-facing ceiling for a non-HTML versioned asset (Build/game.wasm, textures, ...). Deliberately
+ * NOT the same value as the edge's own year-long retention above, and deliberately not paired with
+ * `immutable` either: this is what actually sits in a *browser's* cache, and a header fix (CORS/CSP)
+ * shipped after a browser already downloaded and pinned a response for a year would not reach that
+ * browser until the pin expired — no amount of edge-side freshness (gameAssetEdgeCache already
+ * recomputes CORS/CSP on every edge request) fixes a header a client is holding onto locally. One
+ * hour bounds that window to something a real incident response can wait out, while still being a
+ * meaningful win over re-validating on every request. */
+const VERSIONED_ASSET_BROWSER_MAX_AGE_SECONDS = 3600;
 
 /** How long `/play/:slug` — which resolves to whatever is *currently* live — may be cached.
  * Bounds how long a live-version switch or rollback takes to become visible. */
@@ -88,7 +107,20 @@ publishedGameAssetsRouter.use("*", gameOriginHostGuard);
 
 // See middleware/edgeCache.ts's safety note: caching is sound on both routers because responses
 // depend only on the URL — no cookies are read, and nothing varies per viewer.
-gameServingRouter.use("*", edgeCache({ ttlSeconds: LIVE_RESOLVER_MAX_AGE_SECONDS }));
+//
+// Only the /:slug redirect uses the shared, generic edgeCache — its response is a plain 302 with
+// no CORS/CSP concerns, so replaying a cached response verbatim (that middleware's normal
+// behavior) is fine here. The actual asset-serving route below (/:slug/:rest) uses
+// gameAssetEdgeCache instead — see that function's doc comment for why a served game asset needs
+// different handling on a cache HIT.
+gameServingRouter.use("/:slug", edgeCache({ ttlSeconds: LIVE_RESOLVER_MAX_AGE_SECONDS }));
+gameServingRouter.use(
+  "/:slug/:rest{.+}",
+  gameAssetEdgeCache({
+    edgeTtlSeconds: LIVE_RESOLVER_MAX_AGE_SECONDS,
+    policyFor: legacyAssetCachePolicy,
+  }),
+);
 
 /**
  * Gate registered BEFORE the byte cache below — order matters. `caches.default` returns a HIT
@@ -151,7 +183,13 @@ const publishedAssetAvailabilityGate: MiddlewareHandler<ApiEnv> = async (c, next
 };
 
 publishedGameAssetsRouter.use("/:gameId/:versionId/:rest{.+}", publishedAssetAvailabilityGate);
-publishedGameAssetsRouter.use("*", edgeCache({ ttlSeconds: IMMUTABLE_MAX_AGE_SECONDS }));
+publishedGameAssetsRouter.use(
+  "/:gameId/:versionId/:rest{.+}",
+  gameAssetEdgeCache({
+    edgeTtlSeconds: IMMUTABLE_MAX_AGE_SECONDS,
+    policyFor: versionedAssetCachePolicy,
+  }),
+);
 
 /** Content-Security-Policy for a game's own document. This is the in-document half of the sandbox;
  * the other half is the `sandbox` attribute on the parent page's iframe, which a response header
@@ -181,19 +219,46 @@ function isHtmlPath(path: string): boolean {
   return path.endsWith(".html") || path.endsWith(".htm");
 }
 
-/** Response's BodyInit type doesn't reliably line up with Uint8Array across this package's mixed
- * DOM + @cloudflare/workers-types lib set (same class of issue as middleware/edgeCache.ts's
- * CacheStorage note), so responses are built from plain ArrayBuffers. */
-function fileResponse(
-  file: ServableBundleFile,
+/** The legacy /:slug/:rest path always resolves whatever is *currently* live — never
+ * immutable-cacheable in the browser regardless of file type, since the exact same URL's bytes
+ * change the moment an admin switches or rolls back the live version. */
+function legacyAssetCachePolicy(): AssetCachePolicy {
+  return { maxAgeSeconds: LIVE_RESOLVER_MAX_AGE_SECONDS, immutable: false };
+}
+
+/** The versioned /:gameId/:versionId/:rest path's BYTES are genuinely immutable per file (a new
+ * build gets a new version id), but neither file type gets a year-long, `immutable` browser
+ * Cache-Control — that value is what a *client* pins locally, and CORS/CSP living in the same
+ * response as the bytes means a policy fix can't reach an already-downloaded browser until
+ * whatever's pinned there expires, no matter how fresh the edge itself stays (see
+ * VERSIONED_ASSET_BROWSER_MAX_AGE_SECONDS). The entry document additionally gets the same short
+ * LIVE_RESOLVER_MAX_AGE_SECONDS as the mutable resolver path (not just "shorter than a year") —
+ * it's the one file a player is likely to hold across sessions, so it gets the tightest bound of
+ * any asset on this route. Everything else (Build/game.wasm, textures, ...) gets the full hour:
+ * still a real, meaningful cache win, just no longer long enough to make a client-held policy
+ * header a year-long liability. */
+function versionedAssetCachePolicy(path: string): AssetCachePolicy {
+  return isHtmlPath(path)
+    ? { maxAgeSeconds: LIVE_RESOLVER_MAX_AGE_SECONDS, immutable: false }
+    : { maxAgeSeconds: VERSIONED_ASSET_BROWSER_MAX_AGE_SECONDS, immutable: false };
+}
+
+/** The full header set for a served asset: content-describing headers the caller already has in
+ * hand (Content-Type/Content-Encoding/bundle source) plus the policy headers that must always be
+ * computed fresh — CORS, CSP (HTML only), and the browser-facing Cache-Control derived from
+ * `policy`. Used identically whether the bytes came from a live resolve (fileResponse, below) or
+ * the edge byte cache (gameAssetEdgeCache's HIT path), so the two can never drift apart. */
+function assetResponseHeaders(
   path: string,
-  options: { maxAgeSeconds: number; immutable: boolean; frontendUrl: string },
-): Response {
+  content: { contentType: string; contentEncoding?: string | undefined; bundleSource: string },
+  policy: AssetCachePolicy,
+  frontendUrl: string,
+): Headers {
   const headers = new Headers({
-    "Content-Type": file.contentType,
-    "Cache-Control": options.immutable
-      ? `public, max-age=${options.maxAgeSeconds}, immutable`
-      : `public, max-age=${options.maxAgeSeconds}`,
+    "Content-Type": content.contentType,
+    "Cache-Control": policy.immutable
+      ? `public, max-age=${policy.maxAgeSeconds}, immutable`
+      : `public, max-age=${policy.maxAgeSeconds}`,
     // Public, unauthenticated bundle bytes — this router never reads a cookie or session, so CORS
     // was never a confidentiality boundary here, only ever an accidental obstacle. A sandboxed
     // iframe (no allow-same-origin) sends Origin: null on its own <script type="module"> fetches,
@@ -205,14 +270,125 @@ function fileResponse(
     // they didn't, nothing on this path should ever be served with credentials attached.
     "Access-Control-Allow-Origin": "*",
   });
-  if (file.contentEncoding) headers.set("Content-Encoding", file.contentEncoding);
+  if (content.contentEncoding) headers.set("Content-Encoding", content.contentEncoding);
   if (isHtmlPath(path)) {
-    headers.set("Content-Security-Policy", contentSecurityPolicy(options.frontendUrl));
+    headers.set("Content-Security-Policy", contentSecurityPolicy(frontendUrl));
   }
   // Lets an operator confirm at a glance whether the fast published path or the migration
   // fallback served a request (see WORK_PROGRESS.md's "legacy runtime ZIP serving" decision).
-  headers.set("X-Owogg-Bundle-Source", file.published ? "published" : "archive-fallback");
+  headers.set("X-Owogg-Bundle-Source", content.bundleSource);
+  return headers;
+}
+
+/** Response's BodyInit type doesn't reliably line up with Uint8Array across this package's mixed
+ * DOM + @cloudflare/workers-types lib set (same class of issue as middleware/edgeCache.ts's
+ * CacheStorage note), so responses are built from plain ArrayBuffers. */
+function fileResponse(
+  file: ServableBundleFile,
+  path: string,
+  policy: AssetCachePolicy,
+  frontendUrl: string,
+): Response {
+  const headers = assetResponseHeaders(
+    path,
+    {
+      contentType: file.contentType,
+      ...(file.contentEncoding ? { contentEncoding: file.contentEncoding } : {}),
+      bundleSource: file.published ? "published" : "archive-fallback",
+    },
+    policy,
+    frontendUrl,
+  );
   return new Response(file.bytes, { status: 200, headers });
+}
+
+/**
+ * Body-only edge cache for a served game asset. Deliberately separate from the shared
+ * middleware/edgeCache.ts (untouched here — many unrelated routes depend on its existing
+ * behavior) and from that middleware's habit of replaying every cached response header verbatim
+ * on a HIT, which is exactly what let a stale CORS/CSP header keep being served at the edge for
+ * up to a year after a policy change shipped (2026-08-18 production bug — see PR history).
+ *
+ * `edgeTtlSeconds` governs only how long the stored BODY entry lives at the edge — Cloudflare's
+ * Cache API takes this from the stored response's own `s-maxage`, there is no separate TTL
+ * parameter for `cache.put()` — and that value is NEVER sent to a real browser. Every actual
+ * response this middleware returns, hit or miss, has its CORS/CSP/Cache-Control rebuilt fresh via
+ * `assetResponseHeaders`, driven only by `path` (parsed straight from the request) and
+ * `c.env.FRONTEND_URL` — neither needs the DB/storage read a real miss pays for. That is what
+ * lets a policy header change take effect at the edge on the very next request, instead of
+ * waiting out however long is left on a body-cache entry that predates the change.
+ *
+ * Only a clean 200 from the handler is ever stored (same guard as edgeCache.ts): a 404/5xx must
+ * never be pinned at the edge.
+ */
+function gameAssetEdgeCache(options: {
+  edgeTtlSeconds: number;
+  policyFor: (path: string) => AssetCachePolicy;
+}): MiddlewareHandler<ApiEnv> {
+  return async (c, next) => {
+    if (c.req.method !== "GET" || typeof caches === "undefined") {
+      await next();
+      return;
+    }
+
+    const rawRest = c.req.param("rest");
+    const path =
+      rawRest === undefined ? null : normalizeBundleEntryPath(decodeURIComponent(rawRest));
+    if (path === null) {
+      // Can't determine a policy for a path that doesn't even normalize — let the route handler's
+      // own validation reject it the same way it always has, uncached.
+      await next();
+      return;
+    }
+
+    const frontendUrl = c.env?.FRONTEND_URL || DEFAULT_FRONTEND_URL;
+    const cache = (caches as unknown as { default: CloudflareCache }).default;
+    const cacheKey = new Request(c.req.url, { method: "GET" });
+
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      const headers = assetResponseHeaders(
+        path,
+        {
+          contentType: cached.headers.get("Content-Type") ?? "application/octet-stream",
+          ...(cached.headers.get("Content-Encoding")
+            ? { contentEncoding: cached.headers.get("Content-Encoding") as string }
+            : {}),
+          bundleSource: cached.headers.get("X-Owogg-Bundle-Source") ?? "published",
+        },
+        options.policyFor(path),
+        frontendUrl,
+      );
+      headers.set("X-Cache", "HIT");
+      return new Response(await cached.clone().arrayBuffer(), { status: 200, headers });
+    }
+
+    await next();
+    if (!c.res || c.res.status !== 200) return;
+
+    // Store ONLY the content-describing headers alongside the body — never CORS/CSP/Cache-Control
+    // — so a stale entry can never replay a policy header even if this function's own hit-path
+    // logic is ever bypassed some other way.
+    const body = await c.res.clone().arrayBuffer();
+    const storeHeaders = new Headers();
+    for (const name of ["Content-Type", "Content-Encoding", "X-Owogg-Bundle-Source"]) {
+      const value = c.res.headers.get(name);
+      if (value) storeHeaders.set(name, value);
+    }
+    // Governs only the edge's own retention (see doc comment above) — never a header a real
+    // browser sees; the response returned to this request carries its own Cache-Control already,
+    // set by fileResponse via the route handler that just ran.
+    storeHeaders.set("Cache-Control", `public, s-maxage=${options.edgeTtlSeconds}`);
+    const toStore = new Response(body, { status: 200, headers: storeHeaders });
+
+    try {
+      c.executionCtx.waitUntil(cache.put(cacheKey, toStore));
+    } catch {
+      // No ExecutionContext (tests) — skip caching, still return the fresh response below.
+    }
+
+    c.res.headers.set("X-Cache", "MISS");
+  };
 }
 
 /** Every failure mode answers exactly the same way, so an anonymous probe can't tell an unknown
@@ -267,11 +443,12 @@ gameServingRouter.get("/:slug/:rest{.+}", async (c) => {
   });
   if (!file) return notFound(c);
 
-  return fileResponse(file, path, {
-    maxAgeSeconds: LIVE_RESOLVER_MAX_AGE_SECONDS,
-    immutable: false, // this URL's contents change when the live version does
-    frontendUrl: c.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
-  });
+  return fileResponse(
+    file,
+    path,
+    legacyAssetCachePolicy(), // this URL's contents change when the live version does
+    c.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
+  );
 });
 
 // ── /games/:gameId/:versionId/* — immutable published assets ─────────────────
@@ -295,13 +472,10 @@ publishedGameAssetsRouter.get("/:gameId/:versionId/:rest{.+}", async (c) => {
   const file = await sandboxGameUseCases.resolvePublishedFile({ gameId, versionId, path });
   if (!file) return notFound(c);
 
-  return fileResponse(file, path, {
-    // The entry document is deliberately not immutable-cached: it is the one file a player is
-    // likely to hold across sessions, and keeping it short-lived leaves room to change response
-    // headers (CSP in particular) without a version bump. Its asset references are versioned, so
-    // this costs one small revalidation, not a re-download of the game.
-    maxAgeSeconds: isHtmlPath(path) ? LIVE_RESOLVER_MAX_AGE_SECONDS : IMMUTABLE_MAX_AGE_SECONDS,
-    immutable: !isHtmlPath(path),
-    frontendUrl: c.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
-  });
+  return fileResponse(
+    file,
+    path,
+    versionedAssetCachePolicy(path),
+    c.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
+  );
 });
