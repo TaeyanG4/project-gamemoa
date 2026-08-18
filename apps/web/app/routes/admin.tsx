@@ -25,7 +25,8 @@ import {
   postAdminBootstrap,
   postAdminPasswordChange,
 } from "../features/adminApi";
-import type { AdminMeResponse, AdminOverviewResponse } from "@owogg/contracts";
+import { fetchMyAccess } from "../features/myAccess";
+import type { AdminMeResponse, AdminOverviewResponse, PermissionValue } from "@owogg/contracts";
 import { ApiClientError } from "../lib/api/errors";
 import { useAuth } from "../features/auth";
 
@@ -49,6 +50,7 @@ export default function AdminRoute() {
   const { isAuthenticated, isLoading: authLoading, providerStatus, openLoginModal } = useAuth();
   const [me, setMe] = useState<AdminMeResponse | null>(null);
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
+  const [permissions, setPermissions] = useState<PermissionValue[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadingMe, setLoadingMe] = useState(true);
   // Local, client-only progress within the two-step elevation flow — the server has no
@@ -61,8 +63,12 @@ export default function AdminRoute() {
       setMe(next);
       setError(null);
       if (next.adminAuthenticated && !next.mustChangePassword) {
-        const nextOverview = await fetchAdminOverview();
+        // Permission-gated nav (docs/AUTHORIZATION.md "admin.center.access" section) — reached
+        // the dashboard doesn't mean every section is visible, only the ones this admin's Staff
+        // Role/individual grants actually cover.
+        const [nextOverview, myAccess] = await Promise.all([fetchAdminOverview(), fetchMyAccess()]);
         setOverview(nextOverview);
+        setPermissions(myAccess.permissions);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "관리자 상태를 확인할 수 없습니다.");
@@ -146,6 +152,7 @@ export default function AdminRoute() {
     <AdminDashboard
       overview={overview}
       role={me?.role ?? null}
+      permissions={permissions}
       onLoggedOut={() => void refreshMe()}
     />
   );
@@ -430,7 +437,7 @@ function BootstrapForm({ onLoggedIn }: { onLoggedIn: () => void }) {
       className="flex flex-col gap-3 rounded-2xl border border-accent-yellow/40 bg-surface-raised p-5"
     >
       <p className="text-xs leading-relaxed text-text-muted">
-        아직 관리자 계정이 없습니다. 최초 SUPERADMIN 계정의 아이디/비밀번호를 설정해주세요. 이후
+        아직 관리자 계정이 없습니다. 최초 ADMIN 계정의 아이디/비밀번호를 설정해주세요. 이후
         로그인마다 비밀번호 변경이 강제됩니다.
       </p>
       <label className="flex flex-col gap-1.5 text-xs font-bold text-text-primary">
@@ -648,13 +655,19 @@ function StepBadge({
 function AdminDashboard({
   overview,
   role,
+  permissions,
   onLoggedOut,
 }: {
   overview: AdminOverviewResponse;
-  role: "SUPERADMIN" | "ADMIN" | null;
+  role: "ADMIN" | "OPERATOR" | "MODERATOR" | "SYSTEM_DEVELOPER" | null;
+  permissions: PermissionValue[];
   onLoggedOut: () => void;
 }) {
   const [loggingOut, setLoggingOut] = useState(false);
+  // ADMIN implicitly has every permission (see hasPermission's "ADMIN implies all" rule in
+  // packages/core/src/domain/staffRoles.ts) — mirrored here so this nav doesn't need its own copy
+  // of the full PERMISSIONS catalog just to special-case the top role.
+  const can = (permission: PermissionValue) => role === "ADMIN" || permissions.includes(permission);
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -695,43 +708,55 @@ function AdminDashboard({
       </header>
 
       <nav className="flex flex-wrap gap-2" aria-label="관리자 메뉴">
-        <Link
-          to="/admin/creators"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
-        >
-          <Users className="h-3.5 w-3.5" /> Creator 심사
-        </Link>
-        <Link
-          to="/admin/games"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
-        >
-          <Gamepad2 className="h-3.5 w-3.5" /> 게임 관리
-        </Link>
-        <Link
-          to="/admin/monitoring"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
-        >
-          <Activity className="h-3.5 w-3.5" /> 운영 모니터링
-        </Link>
-        <Link
-          to="/admin/users"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
-        >
-          <Users className="h-3.5 w-3.5" /> 유저 관리
-        </Link>
-        <Link
-          to="/admin/sandbox-games"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
-        >
-          <Gamepad2 className="h-3.5 w-3.5" /> 제작 게임 심사
-        </Link>
-        <Link
-          to="/admin/game-developers"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
-        >
-          <UserCog className="h-3.5 w-3.5" /> 게임 제작자 임명
-        </Link>
-        {role === "SUPERADMIN" && (
+        {can("streamers.review") && (
+          <Link
+            to="/admin/creators"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            <Users className="h-3.5 w-3.5" /> Creator 심사
+          </Link>
+        )}
+        {can("games.moderate") && (
+          <Link
+            to="/admin/games"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            <Gamepad2 className="h-3.5 w-3.5" /> 게임 관리
+          </Link>
+        )}
+        {can("system.monitor") && (
+          <Link
+            to="/admin/monitoring"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            <Activity className="h-3.5 w-3.5" /> 운영 모니터링
+          </Link>
+        )}
+        {can("users.view") && (
+          <Link
+            to="/admin/users"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            <Users className="h-3.5 w-3.5" /> 유저 관리
+          </Link>
+        )}
+        {can("sandbox_games.review") && (
+          <Link
+            to="/admin/sandbox-games"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            <Gamepad2 className="h-3.5 w-3.5" /> 제작 게임 심사
+          </Link>
+        )}
+        {can("game_creators.manage") && (
+          <Link
+            to="/admin/game-creators"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            <UserCog className="h-3.5 w-3.5" /> 게임 크리에이터 관리
+          </Link>
+        )}
+        {role === "ADMIN" && (
           <Link
             to="/admin/accounts"
             className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router";
-import { KeyRound, Power, RotateCcw, ShieldAlert, UserCog, UserPlus } from "lucide-react";
+import { KeyRound, Power, RotateCcw, ShieldAlert, UserCog, UserPlus, Key } from "lucide-react";
 import { useAuth } from "../features/auth";
 import {
   fetchAdminAccounts,
@@ -10,21 +10,51 @@ import {
   patchAdminAccountRole,
   postResetAdminAccountPassword,
   postRevokeAdminAccountSessions,
+  fetchAdminAccountPermissions,
+  postGrantAdminPermission,
+  deleteRevokeAdminPermission,
 } from "../features/adminApi";
 import { ApiClientError } from "../lib/api/errors";
 import type {
   AdminAccountSummary,
   AdminAccountAuditEntry,
   AdminAccountRoleValue,
+  PermissionValue,
 } from "@owogg/contracts";
 
 export function meta() {
   return [
     { title: "관리자 계정 관리 | OwOGG" },
-    { name: "description", content: "OwOGG 관리자 계정 관리 (SUPERADMIN 전용)" },
+    { name: "description", content: "OwOGG 관리자 계정 관리 (ADMIN 전용)" },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }
+
+const STAFF_ROLES: AdminAccountRoleValue[] = ["ADMIN", "OPERATOR", "MODERATOR", "SYSTEM_DEVELOPER"];
+const STAFF_ROLE_LABELS: Record<AdminAccountRoleValue, string> = {
+  ADMIN: "관리자",
+  OPERATOR: "운영자",
+  MODERATOR: "모더레이터",
+  SYSTEM_DEVELOPER: "시스템 개발자",
+};
+
+/** Individually delegable permissions only — `roles.manage` is deliberately excluded (never
+ * delegable, see packages/core/src/domain/staffRoles.ts's isDelegatablePermission). Every role
+ * already has its own default bundle server-side; this UI is specifically for the "one extra
+ * permission outside the role's defaults" case (e.g. admin.center.access for a SYSTEM_DEVELOPER). */
+const DELEGABLE_PERMISSIONS: PermissionValue[] = [
+  "admin.center.access",
+  "users.view",
+  "users.suspend",
+  "users.ban",
+  "users.score_moderation",
+  "games.moderate",
+  "sandbox_games.review",
+  "game_creators.manage",
+  "streamers.review",
+  "system.monitor",
+  "system.dev.access",
+];
 
 export default function AdminAccountsRoute() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -50,7 +80,7 @@ export default function AdminAccountsRoute() {
         setError(
           err.code === "ADMIN_SESSION_REQUIRED"
             ? "관리자 로그인이 필요합니다. /admin 에서 본인 확인을 먼저 완료해주세요."
-            : "SUPERADMIN만 접근할 수 있습니다.",
+            : "ADMIN만 접근할 수 있습니다.",
         );
       } else {
         setError(err instanceof Error ? err.message : "관리자 계정 목록을 불러올 수 없습니다.");
@@ -105,7 +135,7 @@ export default function AdminAccountsRoute() {
       <header>
         <div className="mb-2 inline-flex items-center gap-2 text-accent-yellow">
           <UserCog className="h-5 w-5" />
-          <span className="text-[11px] font-black uppercase tracking-[0.2em]">SUPERADMIN</span>
+          <span className="text-[11px] font-black uppercase tracking-[0.2em]">ADMIN</span>
         </div>
         <h1 className="text-3xl font-black tracking-tight text-text-primary">관리자 계정 관리</h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
@@ -147,7 +177,7 @@ export default function AdminAccountsRoute() {
           </thead>
           <tbody>
             {(accounts ?? []).map((account) => (
-              <tr key={account.id} className="border-b border-border/60 last:border-0">
+              <tr key={account.id} className="border-b border-border/60 last:border-0 align-top">
                 <td className="px-4 py-3 font-bold text-text-primary">
                   {account.nickname}{" "}
                   {account.isSelf && <span className="text-text-muted">(나)</span>}
@@ -174,13 +204,8 @@ export default function AdminAccountsRoute() {
                         ),
                       )
                     }
-                    onToggleRole={() =>
-                      withBusy(account.id, () =>
-                        patchAdminAccountRole(
-                          account.id,
-                          account.role === "SUPERADMIN" ? "ADMIN" : "SUPERADMIN",
-                        ),
-                      )
+                    onChangeRole={(role) =>
+                      withBusy(account.id, () => patchAdminAccountRole(account.id, role))
                     }
                     onResetPassword={(newPassword) =>
                       withBusy(account.id, () =>
@@ -206,6 +231,20 @@ export default function AdminAccountsRoute() {
       </section>
 
       <section className="rounded-2xl border border-border bg-surface-raised p-5">
+        <h2 className="text-sm font-black text-text-primary">개별 권한 위임</h2>
+        <p className="mt-1 text-xs text-text-muted">
+          역할의 기본 권한 외에, 특정 계정에게 권한을 하나씩 추가로 부여하거나 회수합니다 (예:
+          신뢰하는 시스템 개발자에게 관리자센터 접근만 허용). <code>roles.manage</code>는 이 화면에
+          나타나지 않습니다 — 위임할 수 없는 권한입니다.
+        </p>
+        <div className="mt-4 space-y-3">
+          {(accounts ?? []).map((account) => (
+            <PermissionEditor key={account.id} account={account} />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface-raised p-5">
         <h2 className="text-sm font-black text-text-primary">감사 로그 (최근 100건)</h2>
         <div className="mt-4 max-h-96 space-y-2 overflow-y-auto">
           {audit.length === 0 && <p className="text-xs text-text-muted">기록이 없습니다.</p>}
@@ -226,16 +265,20 @@ export default function AdminAccountsRoute() {
   );
 }
 
-function RoleBadge({ role }: { role: string }) {
+function RoleBadge({ role }: { role: AdminAccountRoleValue }) {
   return (
     <span
       className={`rounded-full px-2 py-1 text-[10px] font-bold ${
-        role === "SUPERADMIN"
+        role === "ADMIN"
           ? "bg-accent-yellow/15 text-accent-yellow"
-          : "bg-brand/15 text-brand-light"
+          : role === "OPERATOR"
+            ? "bg-brand/15 text-brand-light"
+            : role === "MODERATOR"
+              ? "bg-accent-green/15 text-accent-green"
+              : "bg-surface-overlay text-text-muted"
       }`}
     >
-      {role}
+      {STAFF_ROLE_LABELS[role]}
     </span>
   );
 }
@@ -258,14 +301,14 @@ function AccountActions({
   account,
   busy,
   onToggleStatus,
-  onToggleRole,
+  onChangeRole,
   onResetPassword,
   onRevokeSessions,
 }: {
   account: AdminAccountSummary;
   busy: boolean;
   onToggleStatus: () => void;
-  onToggleRole: () => void;
+  onChangeRole: (role: AdminAccountRoleValue) => void;
   onResetPassword: (newPassword: string) => void;
   onRevokeSessions: () => void;
 }) {
@@ -283,15 +326,24 @@ function AccountActions({
       >
         <Power className="h-3 w-3" /> {account.status === "ACTIVE" ? "비활성화" : "활성화"}
       </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onToggleRole}
-        title="역할 전환"
-        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-bold text-text-primary hover:border-brand disabled:opacity-50 cursor-pointer"
+      <label
+        className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-[10px] font-bold text-text-primary has-[select:disabled]:opacity-50"
+        title="역할 변경 — 자기 자신의 역할은 이 화면에서 변경할 수 없습니다"
       >
-        <UserCog className="h-3 w-3" /> 역할 전환
-      </button>
+        <UserCog className="h-3 w-3" />
+        <select
+          value={account.role}
+          disabled={busy || account.isSelf}
+          onChange={(e) => onChangeRole(e.target.value as AdminAccountRoleValue)}
+          className="cursor-pointer bg-transparent text-[10px] font-bold outline-none disabled:cursor-not-allowed"
+        >
+          {STAFF_ROLES.map((r) => (
+            <option key={r} value={r}>
+              {STAFF_ROLE_LABELS[r]}
+            </option>
+          ))}
+        </select>
+      </label>
       <button
         type="button"
         disabled={busy}
@@ -423,10 +475,13 @@ function CreateAdminForm({
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as AdminAccountRoleValue)}
-          className="w-32 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
+          className="w-36 rounded-xl border border-border bg-surface px-3 py-2 text-sm"
         >
-          <option value="ADMIN">ADMIN</option>
-          <option value="SUPERADMIN">SUPERADMIN</option>
+          {STAFF_ROLES.map((r) => (
+            <option key={r} value={r}>
+              {STAFF_ROLE_LABELS[r]}
+            </option>
+          ))}
         </select>
       </label>
       <button
@@ -441,6 +496,102 @@ function CreateAdminForm({
         가져옵니다.
       </p>
     </form>
+  );
+}
+
+/** One account's individually-delegated permissions, lazily loaded on first expand (not eagerly
+ * for every row on page load — this is an N+1-shaped call the admin rarely needs for every
+ * account at once). ADMIN accounts are shown collapsed with an explanatory note instead of a
+ * checklist, since ADMIN already implies every permission — delegating one individually would be
+ * a meaningless no-op the server would silently accept but that could confuse an operator
+ * skimming this list into thinking it matters. */
+function PermissionEditor({ account }: { account: AdminAccountSummary }) {
+  const [open, setOpen] = useState(false);
+  const [granted, setGranted] = useState<PermissionValue[] | null>(null);
+  const [busyPermission, setBusyPermission] = useState<PermissionValue | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetchAdminAccountPermissions(account.id);
+      setGranted(res.permissions);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "권한 목록을 불러올 수 없습니다.");
+    }
+  }, [account.id]);
+
+  const toggle = async (permission: PermissionValue, currentlyGranted: boolean) => {
+    setBusyPermission(permission);
+    setError(null);
+    try {
+      if (currentlyGranted) {
+        await deleteRevokeAdminPermission(account.id, permission);
+      } else {
+        await postGrantAdminPermission(account.id, permission);
+      }
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "권한 변경에 실패했습니다.");
+    } finally {
+      setBusyPermission(null);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-surface p-3">
+      <button
+        type="button"
+        onClick={() => {
+          const next = !open;
+          setOpen(next);
+          if (next && granted === null) void load();
+        }}
+        className="flex w-full items-center justify-between gap-2 text-left text-xs font-bold text-text-primary"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <Key className="h-3.5 w-3.5 text-text-muted" />
+          {account.nickname}
+          <span className="font-normal text-text-muted">({STAFF_ROLE_LABELS[account.role]})</span>
+        </span>
+        <span className="text-text-muted">{open ? "접기" : "펼치기"}</span>
+      </button>
+
+      {open &&
+        (account.role === "ADMIN" ? (
+          <p className="mt-2 text-[11px] text-text-muted">
+            ADMIN은 모든 권한을 이미 가지고 있어 개별 위임이 필요하지 않습니다.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {error && <p className="text-[11px] font-semibold text-accent-red">{error}</p>}
+            {granted === null ? (
+              <p className="text-[11px] text-text-muted">불러오는 중...</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {DELEGABLE_PERMISSIONS.map((permission) => {
+                  const isGranted = granted.includes(permission);
+                  return (
+                    <button
+                      key={permission}
+                      type="button"
+                      disabled={busyPermission === permission}
+                      onClick={() => void toggle(permission, isGranted)}
+                      className={`rounded-lg border px-2 py-1 text-[10px] font-bold disabled:opacity-50 cursor-pointer ${
+                        isGranted
+                          ? "border-brand bg-brand/10 text-brand-light"
+                          : "border-border text-text-muted hover:border-brand/50"
+                      }`}
+                    >
+                      {permission}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
+    </div>
   );
 }
 
