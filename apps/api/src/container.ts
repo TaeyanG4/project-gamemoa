@@ -211,6 +211,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     gameBundleStorageRepo,
     gameBundlePublisher,
+    gameRegistry,
   );
 
   return {
