@@ -14,7 +14,7 @@ export * from "./d1/D1AdminAccountRepository.js";
 export * from "./d1/D1GameSettingsRepository.js";
 export * from "./d1/D1AdminMonitoringRepository.js";
 export * from "./d1/D1UserModerationRepository.js";
-export * from "./d1/D1GameDeveloperRepository.js";
+export * from "./d1/D1GameCreatorRepository.js";
 export * from "./d1/D1SandboxGameRepository.js";
 export * from "./storage/BackblazeB2GameBundleRepository.js";
 export * from "./storage/UnconfiguredGameBundleRepository.js";

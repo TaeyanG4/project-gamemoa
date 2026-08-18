@@ -17,7 +17,7 @@ import {
 } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
-import { resolveAdminEligibility } from "../auth/adminEligibility.js";
+import { resolveAdminEligibility, resolveEffectiveStaffRole } from "../auth/adminEligibility.js";
 import { verifyAdminPassword, safeStringEqual, hashAdminPassword } from "../auth/adminPassword.js";
 import { verifyGoogleToken } from "../infrastructure/oauth/google.js";
 import { isLocalhost, type ApiEnv } from "./auth.js";
@@ -122,11 +122,12 @@ adminAuthRouter.get("/me", async (c) => {
   const sessionResult = await container.sessionRepo.findSession(rawSessionToken);
   if (!sessionResult) return notAuthenticated();
 
-  const { eligible, account } = await resolveAdminEligibility(
+  const eligibility = await resolveAdminEligibility(
     sessionResult.user.id,
     c.env.ADMIN_USER_IDS,
     container.adminAccountUseCases,
   );
+  const { eligible, account } = eligibility;
 
   let adminAuthenticated = false;
   if (eligible) {
@@ -150,7 +151,7 @@ adminAuthRouter.get("/me", async (c) => {
       stepUpRequired: eligible && !adminAuthenticated,
       bootstrapAvailable,
       mustChangePassword: adminAuthenticated ? Boolean(account?.mustChangePassword) : false,
-      role: adminAuthenticated ? (account?.role ?? null) : null,
+      role: adminAuthenticated ? resolveEffectiveStaffRole(eligibility) : null,
     }),
   );
 });
@@ -257,7 +258,7 @@ adminAuthRouter.post("/bootstrap", async (c) => {
 
   let account: AdminAccountRecord;
   try {
-    account = await adminAccountUseCases.bootstrapFirstSuperadmin({
+    account = await adminAccountUseCases.bootstrapFirstAdmin({
       userId: eligible.userId,
       googleSub: stepUp.googleSub,
       username: parsed.data.username,

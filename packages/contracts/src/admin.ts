@@ -17,7 +17,7 @@ export const AdminMeResponseSchema = z.object({
   stepUpRequired: z.boolean(),
   bootstrapAvailable: z.boolean(),
   mustChangePassword: z.boolean(),
-  role: z.enum(["SUPERADMIN", "ADMIN"]).nullable(),
+  role: z.enum(["ADMIN", "OPERATOR", "MODERATOR", "SYSTEM_DEVELOPER"]).nullable(),
 });
 export type AdminMeResponse = z.infer<typeof AdminMeResponseSchema>;
 
@@ -55,7 +55,12 @@ const ADMIN_USERNAME_SCHEMA = z
   .regex(/^[a-zA-Z0-9_.-]+$/, "영문/숫자/._- 조합만 가능합니다.");
 const ADMIN_NEW_PASSWORD_SCHEMA = z.string().min(12).max(200);
 
-export const AdminAccountRoleSchema = z.enum(["SUPERADMIN", "ADMIN"]);
+export const AdminAccountRoleSchema = z.enum([
+  "ADMIN",
+  "OPERATOR",
+  "MODERATOR",
+  "SYSTEM_DEVELOPER",
+]);
 export type AdminAccountRoleValue = z.infer<typeof AdminAccountRoleSchema>;
 
 export const AdminAccountStatusSchema = z.enum(["ACTIVE", "DISABLED"]);
@@ -117,7 +122,7 @@ export const AdminAccountListResponseSchema = z.object({
 });
 export type AdminAccountListResponse = z.infer<typeof AdminAccountListResponseSchema>;
 
-/** SUPERADMIN-only: creates another administrator bound to an existing OwOGG user whose Google
+/** ADMIN-only: creates another administrator bound to an existing OwOGG user whose Google
  * identity is derived server-side from that user's already-linked oauth_accounts row — never
  * accepted as free-text input here. */
 export const AdminAccountCreateRequestSchema = z.object({
@@ -153,6 +158,8 @@ export const AdminAccountAuditEntrySchema = z.object({
     "PASSWORD_CHANGED",
     "PASSWORD_RESET",
     "SESSIONS_REVOKED",
+    "PERMISSION_GRANTED",
+    "PERMISSION_REVOKED",
   ]),
   metadata: z.record(z.unknown()).nullable(),
   createdAt: z.string(),

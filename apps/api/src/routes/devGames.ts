@@ -2,14 +2,20 @@ import type { Context } from "hono";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import {
-  DevMeResponseSchema,
+  GameCreatorMeResponseSchema,
+  GameCreatorApplyRequestSchema,
+  GameCreatorApplicationRecordSchema,
   SandboxGameCreateRequestSchema,
   SandboxGameListResponseSchema,
   SandboxGameDetailResponseSchema,
   SandboxGameRecordSchema,
   SandboxGameVersionRecordSchema,
 } from "@owogg/contracts";
-import { SandboxGameUseCaseFailure } from "@owogg/core";
+import {
+  SandboxGameUseCaseFailure,
+  GameCreatorUseCaseFailure,
+  canApplyForGameCreator,
+} from "@owogg/core";
 import type { BackblazeB2Config } from "@owogg/db";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
@@ -17,6 +23,7 @@ import { resolveAdminEligibility } from "../auth/adminEligibility.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { SANDBOX_GAME_FAILURE_STATUS, SANDBOX_GAME_FAILURE_MESSAGE } from "./sandboxGameErrors.js";
 import type { SandboxGameFailureStatus } from "./sandboxGameErrors.js";
+import { GAME_CREATOR_FAILURE_STATUS, GAME_CREATOR_FAILURE_MESSAGE } from "./gameCreatorErrors.js";
 import type { ApiEnv } from "./auth.js";
 
 /** All five B2 values must be present or the upload path is treated as unconfigured — a partial
@@ -37,12 +44,17 @@ export function readB2Config(env: ApiEnv["Bindings"]): BackblazeB2Config | undef
 }
 
 /**
- * Developer-facing sandbox game routes — powers the settings "개발" tab's upload/manage flow.
- * Deliberately gated by plain OwOGG session + active game_developers row, NOT the elevated
- * admin step-up session (adminSession.ts) — a developer who isn't also an admin must never be
- * forced through Google step-up + admin password just to upload a game. Admin-only actions
- * (appoint developers, approve/reject, publish) live in adminGameDevelopers.ts /
- * adminSandboxGames.ts behind requireElevatedAdmin instead.
+ * Game-Creator-facing sandbox game routes — powers the Game Creator Center's apply/upload/manage
+ * flow. Deliberately gated by plain OwOGG session + active game_creator_access row, NOT the
+ * elevated admin step-up session (adminSession.ts) — a creator who isn't also an admin must never
+ * be forced through Google step-up + admin password just to upload a game. Admin/operator-only
+ * actions (appoint creators, review applications, approve/reject versions, publish) live in
+ * adminGameCreators.ts / adminSandboxGames.ts behind requireElevatedAdmin instead.
+ *
+ * GAME_CREATOR is a Program/Entitlement, never a Staff Role — see
+ * packages/core/src/domain/staffRoles.ts and docs/AUTHORIZATION.md. This file (and its `/api/dev`
+ * mount path, kept for URL stability) predates that distinction; nothing here grants or implies
+ * any Staff Role.
  */
 export const devGamesRouter = new Hono<ApiEnv>();
 
@@ -61,13 +73,13 @@ devGamesRouter.use("*", async (c, next) => {
 
 interface DevSession {
   userId: number;
-  isGameDeveloper: boolean;
+  hasGameCreatorAccess: boolean;
   isAdmin: boolean;
 }
 
-/** Resolves the caller's plain session + developer/admin standing in one pass. Returns null when
- * there is no valid session at all (caller responds 401); `isGameDeveloper`/`isAdmin` are false
- * rather than throwing when the session is valid but the user has neither role, so callers can
+/** Resolves the caller's plain session + Game Creator access/admin standing in one pass. Returns
+ * null when there is no valid session at all (caller responds 401); the boolean fields are false
+ * rather than throwing when the session is valid but the user has neither, so callers can
  * distinguish "not logged in" from "logged in but not allowed here". */
 async function resolveDevSession(c: Context<ApiEnv>): Promise<DevSession | null> {
   const sessionId = getCookie(c, "owogg_session");
@@ -78,12 +90,12 @@ async function resolveDevSession(c: Context<ApiEnv>): Promise<DevSession | null>
   if (!sessionResult) return null;
 
   const userId = sessionResult.user.id;
-  const [isGameDeveloper, eligibility] = await Promise.all([
-    container.gameDeveloperUseCases.isActiveDeveloper(userId),
+  const [hasGameCreatorAccess, eligibility] = await Promise.all([
+    container.gameCreatorUseCases.isActiveCreator(userId),
     resolveAdminEligibility(userId, c.env.ADMIN_USER_IDS, container.adminAccountUseCases),
   ]);
 
-  return { userId, isGameDeveloper, isAdmin: eligibility.eligible };
+  return { userId, hasGameCreatorAccess, isAdmin: eligibility.eligible };
 }
 
 function failureResponse(err: unknown): { body: unknown; status: SandboxGameFailureStatus } {
@@ -94,19 +106,86 @@ function failureResponse(err: unknown): { body: unknown; status: SandboxGameFail
   };
 }
 
+function gameCreatorFailureResponse(err: unknown): { body: unknown; status: 403 | 404 | 409 } {
+  if (!(err instanceof GameCreatorUseCaseFailure)) throw err;
+  return {
+    body: { error: { code: err.code, message: GAME_CREATOR_FAILURE_MESSAGE[err.code] } },
+    status: GAME_CREATOR_FAILURE_STATUS[err.code],
+  };
+}
+
 // GET /api/dev/me
 devGamesRouter.get("/me", async (c) => {
   const session = await resolveDevSession(c);
   if (!session) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다." } }, 401);
   }
+  const { gameCreatorUseCases } = createContainer(c.env.DB);
+  const latestApplication = session.hasGameCreatorAccess
+    ? null // already have access — an old application (if any) isn't relevant UI-wise
+    : await gameCreatorUseCases.getMyApplication(session.userId);
   return c.json(
-    DevMeResponseSchema.parse({
-      isGameDeveloper: session.isGameDeveloper,
+    GameCreatorMeResponseSchema.parse({
+      hasAccess: session.hasGameCreatorAccess,
+      canApply:
+        !session.hasGameCreatorAccess &&
+        latestApplication?.status !== "PENDING" &&
+        canApplyForGameCreator(),
+      latestApplication,
       isAdmin: session.isAdmin,
     }),
     200,
   );
+});
+
+// POST /api/dev/apply { message? } — self-serve Game Creator application.
+devGamesRouter.post("/apply", async (c) => {
+  const session = await resolveDevSession(c);
+  if (!session) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다." } }, 401);
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = GameCreatorApplyRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: { code: "INVALID_REQUEST", message: "요청 본문이 올바르지 않습니다." } },
+      400,
+    );
+  }
+
+  try {
+    const { gameCreatorUseCases } = createContainer(c.env.DB);
+    const application = await gameCreatorUseCases.apply(
+      session.userId,
+      parsed.data.message ?? null,
+    );
+    return c.json(GameCreatorApplicationRecordSchema.parse(application), 201);
+  } catch (err) {
+    const { body: errBody, status } = gameCreatorFailureResponse(err);
+    return c.json(errBody, status);
+  }
+});
+
+// POST /api/dev/apply/:id/withdraw — withdraws the caller's own PENDING application.
+devGamesRouter.post("/apply/:id/withdraw", async (c) => {
+  const session = await resolveDevSession(c);
+  if (!session) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다." } }, 401);
+  }
+
+  const applicationId = Number(c.req.param("id"));
+  try {
+    const { gameCreatorUseCases } = createContainer(c.env.DB);
+    const application = await gameCreatorUseCases.withdrawApplication(
+      applicationId,
+      session.userId,
+    );
+    return c.json(GameCreatorApplicationRecordSchema.parse(application), 200);
+  } catch (err) {
+    const { body: errBody, status } = gameCreatorFailureResponse(err);
+    return c.json(errBody, status);
+  }
 });
 
 // GET /api/dev/games — the caller's own sandbox games, any review/visibility state.
@@ -126,9 +205,9 @@ devGamesRouter.post("/games", async (c) => {
   if (!session) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다." } }, 401);
   }
-  if (!session.isGameDeveloper) {
+  if (!session.hasGameCreatorAccess) {
     return c.json(
-      { error: { code: "FORBIDDEN", message: "게임 제작자로 지정된 사용자만 가능합니다." } },
+      { error: { code: "FORBIDDEN", message: "게임 크리에이터 권한이 있는 사용자만 가능합니다." } },
       403,
     );
   }
@@ -189,10 +268,10 @@ devGamesRouter.get("/games/:id", async (c) => {
   );
 });
 
-// POST /api/dev/games/:id/withdraw — developer self-service withdrawal of a not-yet-decided
+// POST /api/dev/games/:id/withdraw — creator self-service withdrawal of a not-yet-decided
 // submission, releasing the review slot it was holding (see SANDBOX_GAME_POLICY.
-// MAX_CONCURRENT_REVIEW_SLOTS). Owner only — an admin who wants a submission gone uses
-// decideVersion(REJECTED) instead, which is a real decision, not the developer's own withdrawal.
+// MAX_CONCURRENT_REVIEW_SLOTS). Owner only — an admin/operator who wants a submission gone uses
+// decideVersion(REJECTED) instead, which is a real decision, not the creator's own withdrawal.
 devGamesRouter.post("/games/:id/withdraw", async (c) => {
   const session = await resolveDevSession(c);
   if (!session) {

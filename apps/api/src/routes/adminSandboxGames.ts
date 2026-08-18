@@ -13,7 +13,11 @@ import {
 import { SandboxGameUseCaseFailure } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
-import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
+import {
+  requireElevatedAdmin,
+  isElevatedAdminResponse,
+  requirePermission,
+} from "../auth/adminSession.js";
 import { SANDBOX_GAME_FAILURE_STATUS, SANDBOX_GAME_FAILURE_MESSAGE } from "./sandboxGameErrors.js";
 import type { SandboxGameFailureStatus } from "./sandboxGameErrors.js";
 import { readB2Config } from "./devGames.js";
@@ -49,6 +53,8 @@ function failureResponse(err: unknown): { body: unknown; status: SandboxGameFail
 adminSandboxGamesRouter.get("/review-queue", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const parsed = SandboxGameReviewQueueQuerySchema.safeParse({
     page: c.req.query("page"),
@@ -98,6 +104,8 @@ adminSandboxGamesRouter.get("/review-queue", async (c) => {
 adminSandboxGamesRouter.get("/:id", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const id = Number(c.req.param("id"));
   const { sandboxGameUseCases } = createContainer(c.env.DB);
@@ -116,6 +124,8 @@ adminSandboxGamesRouter.get("/:id", async (c) => {
 adminSandboxGamesRouter.post("/versions/:versionId/approve", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const versionId = Number(c.req.param("versionId"));
   try {
@@ -137,6 +147,8 @@ adminSandboxGamesRouter.post("/versions/:versionId/approve", async (c) => {
 adminSandboxGamesRouter.post("/versions/:versionId/reject", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const versionId = Number(c.req.param("versionId"));
   const body = await c.req.json().catch(() => ({}));
@@ -167,6 +179,8 @@ adminSandboxGamesRouter.post("/versions/:versionId/reject", async (c) => {
 adminSandboxGamesRouter.post("/versions/:versionId/republish", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const versionId = Number(c.req.param("versionId"));
   try {
@@ -185,6 +199,8 @@ adminSandboxGamesRouter.post("/versions/:versionId/republish", async (c) => {
 adminSandboxGamesRouter.patch("/:id/live-version", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const id = Number(c.req.param("id"));
   const body = await c.req.json().catch(() => ({}));
@@ -208,6 +224,8 @@ adminSandboxGamesRouter.patch("/:id/live-version", async (c) => {
 adminSandboxGamesRouter.patch("/:id/metadata", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const id = Number(c.req.param("id"));
   const body = await c.req.json().catch(() => ({}));
@@ -230,6 +248,8 @@ adminSandboxGamesRouter.patch("/:id/metadata", async (c) => {
 adminSandboxGamesRouter.patch("/:id/visibility", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
 
   const id = Number(c.req.param("id"));
   const body = await c.req.json().catch(() => ({}));

@@ -16,9 +16,10 @@ import { adminAccountsRouter } from "./routes/adminAccounts.js";
 import { adminCreatorsRouter } from "./routes/adminCreators.js";
 import { adminGamesRouter } from "./routes/adminGames.js";
 import { adminUsersRouter } from "./routes/adminUsers.js";
-import { adminGameDevelopersRouter } from "./routes/adminGameDevelopers.js";
+import { adminGameCreatorsRouter } from "./routes/adminGameCreators.js";
 import { adminSandboxGamesRouter } from "./routes/adminSandboxGames.js";
 import { devGamesRouter } from "./routes/devGames.js";
+import { myAccessRouter } from "./routes/myAccess.js";
 import { gameServingRouter, publishedGameAssetsRouter } from "./routes/gameServing.js";
 import { gamesRouter } from "./routes/games.js";
 import { renderRouter } from "./routes/render.js";
@@ -117,9 +118,10 @@ app.route("/api/admin", adminAccountsRouter);
 app.route("/api/admin/creators", adminCreatorsRouter);
 app.route("/api/admin/games", adminGamesRouter);
 app.route("/api/admin/users", adminUsersRouter);
-app.route("/api/admin/game-developers", adminGameDevelopersRouter);
+app.route("/api/admin/game-creators", adminGameCreatorsRouter);
 app.route("/api/admin/sandbox-games", adminSandboxGamesRouter);
 app.route("/api/dev", devGamesRouter);
+app.route("/api/me", myAccessRouter);
 // Not under /api on purpose — these serve actual game files (HTML/JS/WASM/...), not JSON, and are
 // meant to be reached through their own hostname (GAME_ORIGIN, e.g. play.owogg.com) so the iframe
 // running third-party game code is a real origin boundary. Same Worker for now; only the DNS/route

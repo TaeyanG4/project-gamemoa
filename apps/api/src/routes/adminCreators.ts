@@ -7,7 +7,11 @@ import {
 import type { CreatorManualReviewItem, CreatorReviewAuditLog } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
-import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
+import {
+  requireElevatedAdmin,
+  isElevatedAdminResponse,
+  requirePermission,
+} from "../auth/adminSession.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminCreatorsRouter = new Hono<ApiEnv>();
@@ -61,6 +65,8 @@ function mapAudit(audit: CreatorReviewAuditLog) {
 adminCreatorsRouter.get("/reviews", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "streamers.review");
+  if (denied) return denied;
 
   const pagination = AdminPaginationQuerySchema.safeParse({
     limit: c.req.query("limit"),
@@ -89,6 +95,8 @@ adminCreatorsRouter.get("/reviews", async (c) => {
 adminCreatorsRouter.post("/reviews/:jobId/action", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "streamers.review");
+  if (denied) return denied;
 
   const jobId = Number(c.req.param("jobId"));
   if (!Number.isSafeInteger(jobId) || jobId <= 0) {

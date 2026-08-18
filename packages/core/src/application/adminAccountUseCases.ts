@@ -1,4 +1,5 @@
 import type { AdminAccountRole, AdminAccountStatus } from "../domain/adminAccounts.js";
+import { isDelegatablePermission, type Permission } from "../domain/staffRoles.js";
 import type {
   AdminAccountRecord,
   AdminAccountAuditEntry,
@@ -12,7 +13,17 @@ export type AdminAccountUseCaseError =
   | "USER_ALREADY_ADMIN"
   | "GOOGLE_SUB_ALREADY_ADMIN"
   | "NOT_FOUND"
-  | "LAST_SUPERADMIN";
+  /** The last active ADMIN (the top Staff Role — see domain/staffRoles.ts) can never be disabled
+   * or demoted away from ADMIN, since that would permanently lock managed administration short of
+   * the ADMIN_USER_IDS break-glass path. */
+  | "LAST_ADMIN"
+  /** An ADMIN can never disable or demote *themselves* — even when other ADMINs exist. Protects
+   * against an accidental self-lockout click, not just the "last one" case. Self password change,
+   * self session revoke (via logout), and self profile edits are unaffected. */
+  | "CANNOT_MODIFY_SELF"
+  /** `roles.manage` is deliberately never delegable via admin_permission_grants — see
+   * domain/staffRoles.ts's isDelegatablePermission. */
+  | "PERMISSION_NOT_DELEGABLE";
 
 export class AdminAccountUseCaseFailure extends Error {
   constructor(public readonly code: AdminAccountUseCaseError) {
@@ -59,8 +70,9 @@ export class AdminAccountUseCases {
   /** First-admin bootstrap: only ever succeeds while zero active admin accounts exist anywhere.
    * The caller (route layer) is responsible for having already verified: root eligibility
    * (ADMIN_USER_IDS), a fresh Google step-up, and that the step-up's googleSub is the one linked
-   * to this exact OwOGG user. */
-  async bootstrapFirstSuperadmin(input: {
+   * to this exact OwOGG user. Always creates the top Staff Role (ADMIN) — there is no lesser
+   * "first account" tier to choose. */
+  async bootstrapFirstAdmin(input: {
     userId: number;
     googleSub: string;
     username: string;
@@ -76,7 +88,7 @@ export class AdminAccountUseCases {
       googleSub: input.googleSub,
       username: input.username,
       passwordHash: input.passwordHash,
-      role: "SUPERADMIN",
+      role: "ADMIN",
       mustChangePassword: true,
       createdByAdminId: null,
       nowIso,
@@ -85,14 +97,14 @@ export class AdminAccountUseCases {
       actorAdminId: null,
       targetAdminId: account.id,
       action: "ADMIN_CREATED",
-      metadata: { role: "SUPERADMIN", via: "bootstrap" },
+      metadata: { role: "ADMIN", via: "bootstrap" },
       nowIso,
     });
     return account;
   }
 
-  /** SUPERADMIN-only: create another administrator bound to an existing OwOGG user + their
-   * already-linked Google identity. */
+  /** ADMIN-only (the top Staff Role): create another administrator bound to an existing OwOGG
+   * user + their already-linked Google identity, with any Staff Role including ADMIN itself. */
   async createAdmin(input: {
     actorAdminId: number;
     userId: number;
@@ -172,7 +184,7 @@ export class AdminAccountUseCases {
     });
   }
 
-  /** SUPERADMIN resets another administrator's password to an operator-supplied temporary value
+  /** ADMIN resets another administrator's password to an operator-supplied temporary value
    * — always forces a change on next login and revokes that admin's existing sessions. */
   async resetPassword(input: {
     actorAdminId: number;
@@ -203,8 +215,15 @@ export class AdminAccountUseCases {
     const target = await this.repo.findById(input.targetAdminId);
     if (!target) throw new AdminAccountUseCaseFailure("NOT_FOUND");
 
-    if (input.status === "DISABLED" && target.role === "SUPERADMIN") {
-      await this.assertNotLastActiveSuperadmin(target);
+    if (input.status === "DISABLED") {
+      // Self-lockout guard first — cheaper than the last-ADMIN count query, and the more common
+      // accidental-click case ("나 자신을 실수로 비활성화").
+      if (input.targetAdminId === input.actorAdminId) {
+        throw new AdminAccountUseCaseFailure("CANNOT_MODIFY_SELF");
+      }
+      if (target.role === "ADMIN") {
+        await this.assertNotLastActiveAdmin(target);
+      }
     }
 
     const nowIso = (input.now ?? new Date()).toISOString();
@@ -230,8 +249,13 @@ export class AdminAccountUseCases {
     const target = await this.repo.findById(input.targetAdminId);
     if (!target) throw new AdminAccountUseCaseFailure("NOT_FOUND");
 
-    if (target.role === "SUPERADMIN" && input.role === "ADMIN") {
-      await this.assertNotLastActiveSuperadmin(target);
+    if (target.role === "ADMIN" && input.role !== "ADMIN") {
+      // Demoting away from the top role — same self-lockout + last-ADMIN protections as
+      // disabling, since losing ADMIN status is functionally equivalent to losing access.
+      if (input.targetAdminId === input.actorAdminId) {
+        throw new AdminAccountUseCaseFailure("CANNOT_MODIFY_SELF");
+      }
+      await this.assertNotLastActiveAdmin(target);
     }
 
     const nowIso = (input.now ?? new Date()).toISOString();
@@ -262,11 +286,70 @@ export class AdminAccountUseCases {
     });
   }
 
-  /** Never allow the last active SUPERADMIN to be disabled or demoted — that would permanently
-   * lock managed administration (short of the ADMIN_USER_IDS break-glass path). */
-  private async assertNotLastActiveSuperadmin(target: AdminAccountRecord): Promise<void> {
+  /** Never allow the last active ADMIN (the top Staff Role) to be disabled or demoted — that
+   * would permanently lock managed administration (short of the ADMIN_USER_IDS break-glass
+   * path). */
+  private async assertNotLastActiveAdmin(target: AdminAccountRecord): Promise<void> {
     if (target.status !== "ACTIVE") return; // already inactive — not "the" active one
-    const activeSuperadmins = await this.repo.countActiveByRole("SUPERADMIN");
-    if (activeSuperadmins <= 1) throw new AdminAccountUseCaseFailure("LAST_SUPERADMIN");
+    const activeAdmins = await this.repo.countActiveByRole("ADMIN");
+    if (activeAdmins <= 1) throw new AdminAccountUseCaseFailure("LAST_ADMIN");
+  }
+
+  // ── Individual permission delegation (migration 0025) ────────────────────
+
+  async listPermissions(accountId: number): Promise<Permission[]> {
+    return this.repo.listPermissions(accountId);
+  }
+
+  /** ADMIN-only (enforced by the route layer via `roles.manage`, checked again here defensively
+   * since a permission this powerful deserves belt-and-suspenders). `roles.manage` itself can
+   * never be granted this way — see isDelegatablePermission — so a delegated SYSTEM_DEVELOPER can
+   * never bootstrap their way into full role/permission control. */
+  async grantPermission(input: {
+    actorAdminId: number;
+    targetAdminId: number;
+    permission: Permission;
+    now?: Date;
+  }): Promise<void> {
+    if (!isDelegatablePermission(input.permission)) {
+      throw new AdminAccountUseCaseFailure("PERMISSION_NOT_DELEGABLE");
+    }
+    const target = await this.repo.findById(input.targetAdminId);
+    if (!target) throw new AdminAccountUseCaseFailure("NOT_FOUND");
+
+    const nowIso = (input.now ?? new Date()).toISOString();
+    await this.repo.grantPermission(
+      input.targetAdminId,
+      input.permission,
+      input.actorAdminId,
+      nowIso,
+    );
+    await this.repo.appendAudit({
+      actorAdminId: input.actorAdminId,
+      targetAdminId: input.targetAdminId,
+      action: "PERMISSION_GRANTED",
+      metadata: { permission: input.permission },
+      nowIso,
+    });
+  }
+
+  async revokePermission(input: {
+    actorAdminId: number;
+    targetAdminId: number;
+    permission: Permission;
+    now?: Date;
+  }): Promise<void> {
+    const target = await this.repo.findById(input.targetAdminId);
+    if (!target) throw new AdminAccountUseCaseFailure("NOT_FOUND");
+
+    const nowIso = (input.now ?? new Date()).toISOString();
+    await this.repo.revokePermission(input.targetAdminId, input.permission);
+    await this.repo.appendAudit({
+      actorAdminId: input.actorAdminId,
+      targetAdminId: input.targetAdminId,
+      action: "PERMISSION_REVOKED",
+      metadata: { permission: input.permission },
+      nowIso,
+    });
   }
 }

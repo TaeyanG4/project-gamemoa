@@ -3,6 +3,7 @@ import type {
   AdminAccountStatus,
   AdminAccountAuditAction,
 } from "../domain/adminAccounts.js";
+import type { Permission } from "../domain/staffRoles.js";
 
 export interface AdminAccountRecord {
   id: number;
@@ -73,4 +74,17 @@ export interface AdminAccountRepository {
   }): Promise<void>;
 
   listAudit(limit: number): Promise<AdminAccountAuditEntry[]>;
+
+  /** Individual permission delegation (migration 0025) — e.g. handing a trusted
+   * SYSTEM_DEVELOPER `admin.center.access` without making them a full OPERATOR. Idempotent:
+   * granting an already-granted permission is a no-op success (UNIQUE(account_id, permission)),
+   * never a conflict the caller needs to handle specially. */
+  grantPermission(
+    accountId: number,
+    permission: Permission,
+    grantedByAdminId: number,
+    nowIso: string,
+  ): Promise<void>;
+  revokePermission(accountId: number, permission: Permission): Promise<void>;
+  listPermissions(accountId: number): Promise<Permission[]>;
 }

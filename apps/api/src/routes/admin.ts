@@ -3,7 +3,11 @@ import { AdminOverviewResponseSchema, AdminMonitoringResponseSchema } from "@owo
 import { createContainer } from "../container.js";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
-import { requireElevatedAdmin, isElevatedAdminResponse } from "../auth/adminSession.js";
+import {
+  requireElevatedAdmin,
+  isElevatedAdminResponse,
+  requirePermission,
+} from "../auth/adminSession.js";
 import { DISCORD_SUBCOMMANDS } from "../infrastructure/discord/commands.js";
 import type { ApiEnv } from "./auth.js";
 
@@ -30,6 +34,8 @@ adminRouter.use("*", async (c, next) => {
 adminRouter.get("/overview", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "system.monitor");
+  if (denied) return denied;
 
   const container = createContainer(c.env.DB);
   const [reviewData, activeGuildCount] = await Promise.all([
@@ -74,6 +80,8 @@ const GAME_PLAY_COUNTS_WINDOW_DAYS = 7;
 adminRouter.get("/monitoring", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "system.monitor");
+  if (denied) return denied;
 
   const container = createContainer(c.env.DB);
   const [activeUsers, gamePlayCounts, d1] = await Promise.all([

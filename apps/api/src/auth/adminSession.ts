@@ -1,8 +1,9 @@
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
-import type { AdminAccountRecord } from "@owogg/core";
+import type { AdminAccountRecord, StaffRole, Permission } from "@owogg/core";
+import { hasPermission } from "@owogg/core";
 import { createContainer } from "../container.js";
-import { resolveAdminEligibility } from "./adminEligibility.js";
+import { resolveAdminEligibility, resolveEffectiveStaffRole } from "./adminEligibility.js";
 import type { ApiEnv } from "../routes/auth.js";
 
 export interface ElevatedAdmin {
@@ -11,6 +12,13 @@ export interface ElevatedAdmin {
   /** Non-null only for a managed (D1 admin_accounts) administrator; null for a legacy
    * ADMIN_USER_IDS/env-credential admin with no managed account row. */
   account: AdminAccountRecord | null;
+  /** See adminEligibility.ts's resolveEffectiveStaffRole — always non-null here, since reaching
+   * this type at all required passing eligibility. */
+  role: StaffRole;
+  /** This admin's individual admin_permission_grants rows (empty for ADMIN, whose every
+   * permission check short-circuits to true — see hasPermission). Combine with `role` via
+   * hasPermission() rather than checking this array directly. */
+  grantedPermissions: Permission[];
 }
 
 /**
@@ -24,7 +32,9 @@ export interface ElevatedAdmin {
  *   4. (unless `allowPasswordChangeRequired`) the managed account, if any, does not still have a
  *      forced password change pending — sensitive admin functions stay locked until it's cleared
  *
- * Returns a Response to send as-is on any failure, or the elevated admin identity on success.
+ * Returns a Response to send as-is on any failure, or the elevated admin identity (with resolved
+ * Staff Role + permissions) on success. Route handlers that need a SPECIFIC permission (rather
+ * than merely "any elevated admin") should call {@link requirePermission} with the result.
  */
 export async function requireElevatedAdmin(
   c: Context<ApiEnv>,
@@ -42,12 +52,12 @@ export async function requireElevatedAdmin(
   }
 
   const userId = sessionResult.user.id;
-  const { eligible, account } = await resolveAdminEligibility(
+  const eligibility = await resolveAdminEligibility(
     userId,
     c.env.ADMIN_USER_IDS,
     container.adminAccountUseCases,
   );
-  if (!eligible) {
+  if (!eligibility.eligible) {
     return c.json({ error: { code: "FORBIDDEN", message: "관리자 권한이 필요합니다." } }, 403);
   }
 
@@ -68,6 +78,7 @@ export async function requireElevatedAdmin(
     );
   }
 
+  const { account } = eligibility;
   if (!options.allowPasswordChangeRequired && account?.mustChangePassword) {
     return c.json(
       {
@@ -80,9 +91,40 @@ export async function requireElevatedAdmin(
     );
   }
 
-  return { userId, rawSessionToken, account };
+  const role = resolveEffectiveStaffRole(eligibility);
+  // Unreachable in practice — eligibility.eligible === true always implies a resolvable role
+  // (root or managed) — but keeps the return type honestly non-null rather than asserting.
+  if (!role) {
+    return c.json({ error: { code: "FORBIDDEN", message: "관리자 권한이 필요합니다." } }, 403);
+  }
+
+  const grantedPermissions = account
+    ? await container.adminAccountUseCases.listPermissions(account.id)
+    : [];
+
+  return { userId, rawSessionToken, account, role, grantedPermissions };
 }
 
 export function isElevatedAdminResponse(value: Response | ElevatedAdmin): value is Response {
   return value instanceof Response;
+}
+
+/**
+ * Second gate after {@link requireElevatedAdmin}: does this specific admin have `permission`
+ * (their role's default bundle, or an individual admin_permission_grants row)? Returns the
+ * 403 Response to send as-is on failure, or `null` on success — callers write
+ * `const denied = requirePermission(admin, "users.ban"); if (denied) return denied;`.
+ *
+ * Every `/api/admin/*` route that performs a specific privileged action (as opposed to a
+ * dashboard/read a broad "elevated admin" was historically sufficient for) should call this.
+ * Routes gated only by requireElevatedAdmin implicitly allow every Staff Role through — correct
+ * for genuinely role-agnostic endpoints (e.g. GET /api/admin/me, the self password-change
+ * endpoint) but wrong for anything permission-specific.
+ */
+export function requirePermission(admin: ElevatedAdmin, permission: Permission): Response | null {
+  if (hasPermission(admin.role, admin.grantedPermissions, permission)) return null;
+  return Response.json(
+    { error: { code: "FORBIDDEN", message: "이 작업을 수행할 권한이 없습니다.", permission } },
+    { status: 403 },
+  );
 }

@@ -15,7 +15,7 @@ import {
   D1GameSettingsRepository,
   D1AdminMonitoringRepository,
   D1UserModerationRepository,
-  D1GameDeveloperRepository,
+  D1GameCreatorRepository,
   D1SandboxGameRepository,
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
@@ -39,7 +39,7 @@ import {
   AdminAccountUseCases,
   GameSettingsUseCases,
   UserModerationUseCases,
-  GameDeveloperUseCases,
+  GameCreatorUseCases,
   SandboxGameUseCases,
   GameBundlePublisher,
   type UserRepository,
@@ -58,7 +58,8 @@ import {
   type GameSettingsRepository,
   type AdminMonitoringRepository,
   type UserModerationRepository,
-  type GameDeveloperRepository,
+  type GameCreatorAccessRepository,
+  type GameCreatorApplicationRepository,
   type SandboxGameRepository,
   type GameBundleStorageRepository,
 } from "@owogg/core";
@@ -82,7 +83,9 @@ export interface AppContainer {
   gameSettingsRepo: GameSettingsRepository;
   adminMonitoringRepo: AdminMonitoringRepository;
   userModerationRepo: UserModerationRepository;
-  gameDeveloperRepo: GameDeveloperRepository;
+  /** Implements both GameCreatorAccessRepository and GameCreatorApplicationRepository — see
+   * D1GameCreatorRepository's doc comment for why they share one D1 class. */
+  gameCreatorRepo: GameCreatorAccessRepository & GameCreatorApplicationRepository;
   sandboxGameRepo: SandboxGameRepository;
   gameBundleStorageRepo: GameBundleStorageRepository;
   /** True only when a complete Backblaze B2 config was passed to createContainer — routes should
@@ -107,7 +110,7 @@ export interface AppContainer {
   adminAccountUseCases: AdminAccountUseCases;
   gameSettingsUseCases: GameSettingsUseCases;
   userModerationUseCases: UserModerationUseCases;
-  gameDeveloperUseCases: GameDeveloperUseCases;
+  gameCreatorUseCases: GameCreatorUseCases;
   sandboxGameUseCases: SandboxGameUseCases;
   gameBundlePublisher: GameBundlePublisher;
 }
@@ -141,7 +144,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const gameSettingsRepo = new D1GameSettingsRepository(db);
   const adminMonitoringRepo = new D1AdminMonitoringRepository(db);
   const userModerationRepo = new D1UserModerationRepository(db);
-  const gameDeveloperRepo = new D1GameDeveloperRepository(db);
+  const gameCreatorRepo = new D1GameCreatorRepository(db);
   const sandboxGameRepo = new D1SandboxGameRepository(db);
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
     ? new BackblazeB2GameBundleRepository(b2Config)
@@ -172,7 +175,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sessionRepo,
     userRepo,
   );
-  const gameDeveloperUseCases = new GameDeveloperUseCases(gameDeveloperRepo, userRepo);
+  const gameCreatorUseCases = new GameCreatorUseCases(gameCreatorRepo, userRepo, gameCreatorRepo);
   const gameBundlePublisher = new GameBundlePublisher(
     sandboxGameRepo,
     gameBundleStorageRepo,
@@ -201,7 +204,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameSettingsRepo,
     adminMonitoringRepo,
     userModerationRepo,
-    gameDeveloperRepo,
+    gameCreatorRepo,
     sandboxGameRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
@@ -223,7 +226,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     adminAccountUseCases,
     gameSettingsUseCases,
     userModerationUseCases,
-    gameDeveloperUseCases,
+    gameCreatorUseCases,
     sandboxGameUseCases,
     gameBundlePublisher,
   };
