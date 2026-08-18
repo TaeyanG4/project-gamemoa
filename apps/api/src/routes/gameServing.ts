@@ -194,6 +194,16 @@ function fileResponse(
     "Cache-Control": options.immutable
       ? `public, max-age=${options.maxAgeSeconds}, immutable`
       : `public, max-age=${options.maxAgeSeconds}`,
+    // Public, unauthenticated bundle bytes — this router never reads a cookie or session, so CORS
+    // was never a confidentiality boundary here, only ever an accidental obstacle. A sandboxed
+    // iframe (no allow-same-origin) sends Origin: null on its own <script type="module"> fetches,
+    // and a `<script type="module">` is always CORS-checked (unlike a classic script) — wildcard
+    // ACAO with NO Access-Control-Allow-Credentials lets that succeed without weakening anything:
+    // the real security boundary on this content is the CSP below plus the iframe's sandbox flags
+    // (see SandboxGameFrame.tsx), never same-origin policy on already-public files. Deliberately
+    // NOT paired with Allow-Credentials — browsers reject that combination outright, and even if
+    // they didn't, nothing on this path should ever be served with credentials attached.
+    "Access-Control-Allow-Origin": "*",
   });
   if (file.contentEncoding) headers.set("Content-Encoding", file.contentEncoding);
   if (isHtmlPath(path)) {
