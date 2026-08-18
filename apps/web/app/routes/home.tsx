@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Gamepad2, Sparkles, Clock, Bookmark, TrendingUp } from "lucide-react";
 import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
+import { useSandboxCatalogManifests } from "../features/catalog/sandboxGameAdapter";
 import { GameGrid } from "../components/ui/GameGrid";
 import { GridColumnSwitcher } from "../components/ui/GridColumnSwitcher";
 import { CategoryChips } from "../components/ui/CategoryChips";
@@ -21,7 +22,16 @@ export default function Home() {
   const initialCategory = searchParams.get("category") || "all";
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
-  const gameManifests = useEnabledGameManifests();
+  const builtInGameManifests = useEnabledGameManifests();
+  // Approved sandbox games merged in alongside the built-in catalog, same as /games (see
+  // features/catalog/sandboxGameAdapter.ts) -- this page has its own separate "미니게임 라인업"
+  // section with its own filteredGames/popularGames/etc., so it needs the same merge, not just
+  // /games (2026-08-18: this section was still built-in-only after #10/#16 fixed only /games).
+  const sandboxGameManifests = useSandboxCatalogManifests();
+  const gameManifests = useMemo(
+    () => [...builtInGameManifests, ...sandboxGameManifests],
+    [builtInGameManifests, sandboxGameManifests],
+  );
 
   const { favoriteGameIds, recentPlays } = usePersonalization();
   const { dict } = useI18n();
@@ -35,6 +45,13 @@ export default function Home() {
     setSelectedCategory(categoryId);
   };
 
+  // Every list below depends on `gameManifests` and must say so -- sandboxGameManifests only
+  // resolves after the first render (its fetch happens in a useEffect), so a memo that reads
+  // gameManifests without declaring it as a dependency stays a stale closure over the initial,
+  // sandbox-less array forever (the exact bug #16 fixed on /games; missed here initially because
+  // this page's four memos were reviewed for correctness only against the *pre-existing* deps
+  // they already declared, not re-checked against what changed once gameManifests itself became
+  // a value that updates after mount).
   const filteredGames = useMemo(() => {
     if (selectedCategory === "all") return gameManifests;
     if (selectedCategory === "favorites") {
@@ -43,25 +60,25 @@ export default function Home() {
       );
     }
     return gameManifests.filter((game) => game.categories.includes(selectedCategory));
-  }, [selectedCategory, favoriteGameIds]);
+  }, [gameManifests, selectedCategory, favoriteGameIds]);
 
   const popularGames = useMemo(() => {
     return gameManifests.filter((game) => game.categories.includes("popular"));
-  }, []);
+  }, [gameManifests]);
 
   const recentGames = useMemo(() => {
     return recentPlays
       .map((r) => gameManifests.find((g) => g.slug === r.gameId || g.id === r.gameId))
       .filter((g): g is (typeof gameManifests)[0] => Boolean(g))
       .slice(0, 4);
-  }, [recentPlays]);
+  }, [gameManifests, recentPlays]);
 
   const favoriteGames = useMemo(() => {
     return favoriteGameIds
       .map((id) => gameManifests.find((g) => g.slug === id || g.id === id))
       .filter((g): g is (typeof gameManifests)[0] => Boolean(g))
       .slice(0, 4);
-  }, [favoriteGameIds]);
+  }, [gameManifests, favoriteGameIds]);
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-6 gap-10 max-w-7xl mx-auto flex-1">
