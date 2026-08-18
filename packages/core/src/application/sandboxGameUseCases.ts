@@ -7,6 +7,7 @@ import type {
   SandboxGamePendingVersionsPage,
   GameBundleStorageRepository,
 } from "../ports/sandboxGames.js";
+import type { GameRegistry } from "../modules/game/ports/gameRegistry.js";
 import type { SandboxGameVisibility, SandboxGameMode } from "../domain/sandboxGames.js";
 import {
   SANDBOX_GAME_POLICY,
@@ -141,6 +142,7 @@ export class SandboxGameUseCases {
     private repo: SandboxGameRepository,
     private storage: GameBundleStorageRepository,
     private publisher: GameBundlePublisher,
+    private gameRegistry: GameRegistry,
   ) {}
 
   async getById(id: number): Promise<SandboxGameRecord | null> {
@@ -192,6 +194,14 @@ export class SandboxGameUseCases {
     const slug = input.slug.trim().toLowerCase();
     if (!isValidSandboxGameSlug(slug)) throw new SandboxGameUseCaseFailure("INVALID_SLUG");
     const title = validateTitle(input.title);
+
+    // A SYSTEM game's slug (reaction-time, memory-test, ...) lives in a different table entirely
+    // (game-registry/, not sandbox_games) — repo.slugExists alone would never see it, and a
+    // creator could register e.g. "reaction-time" and silently shadow or collide with the
+    // built-in game at every place that resolves a slug through the unified registry (catalog,
+    // scoring, /play/:slug). P-03: a Creator registration must be rejected the same way a
+    // Creator-vs-Creator collision already is, before any row is written.
+    if (await this.gameRegistry.findBySlug(slug)) throw new SandboxGameUseCaseFailure("SLUG_TAKEN");
 
     // slugExists checks the raw DB constraint (includes soft-deleted rows), not just currently
     // resolvable games — findBySlug alone would miss a slug held by an admin-soft-deleted game

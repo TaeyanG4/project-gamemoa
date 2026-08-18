@@ -17,6 +17,7 @@ import type {
 import { SANDBOX_GAME_POLICY } from "../src/domain/sandboxGames.js";
 import type { SandboxGameBundleManifest } from "../src/domain/sandboxGameBundle.js";
 import { GAME_REGISTRATION_MANIFEST_FILENAME } from "../src/domain/sandboxGameBundle.js";
+import { GAME_DEFINITIONS, StaticGameRegistry, type GameRegistry } from "../src/index.js";
 
 // The zip container format itself is an infrastructure detail behind the BundleArchiveReader port,
 // so these tests inject archive *contents* directly. Real zip bytes (and therefore fflate) are
@@ -340,13 +341,22 @@ function createFakeStorage(): GameBundleStorageRepository & {
   };
 }
 
-function createUseCases(entries?: Record<string, Uint8Array>) {
+// Empty by default: none of the arbitrary slugs these tests invent (`my-game`, `ball-dodge`, ...)
+// collide with a real SYSTEM game, so the default keeps every existing test's behaviour exactly
+// as it was before SandboxGameUseCases took a GameRegistry at all. Tests exercising the P-03
+// SYSTEM-slug-collision guard itself pass `new StaticGameRegistry(GAME_DEFINITIONS)` explicitly —
+// the real registry, with the real built-in slugs (reaction-time, memory-test, ...), the same one
+// apps/api/src/container.ts wires in production.
+function createUseCases(
+  entries?: Record<string, Uint8Array>,
+  registry: GameRegistry = new StaticGameRegistry([]),
+) {
   const repo = createFakeRepo();
   const storage = createFakeStorage();
   const archives = createFakeArchiveReader(entries);
   const publisher = new GameBundlePublisher(repo, storage, archives);
-  const useCases = new SandboxGameUseCases(repo, storage, publisher);
-  return { useCases, repo, storage, archives, publisher };
+  const useCases = new SandboxGameUseCases(repo, storage, publisher, registry);
+  return { useCases, repo, storage, archives, publisher, registry };
 }
 
 async function createGameWithLiveVersion(entries?: Record<string, Uint8Array>) {
@@ -452,6 +462,90 @@ test("createGame rejects a slug held by a soft-deleted game, instead of crashing
       }),
     (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
   );
+});
+
+// ── P-03: a Creator registration must not collide with a SYSTEM game's slug ──
+
+test("createGame rejects a slug already taken by a SYSTEM game, e.g. reaction-time", async () => {
+  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
+  assert.ok(
+    await systemRegistry.findBySlug("reaction-time"),
+    "test setup: reaction-time must be a real SYSTEM slug for this to prove anything",
+  );
+  const { useCases } = createUseCases(undefined, systemRegistry);
+
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: "reaction-time",
+        developerUserId: 1,
+        title: "Reaction Time Clone",
+        shortDescription: null,
+        description: null,
+        genre: "arcade",
+        mode: "single",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
+});
+
+test("createGameFromBundle rejects a SYSTEM slug the same way the manual form does", async () => {
+  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
+  const { useCases } = createUseCases(
+    manifestEntries({ slug: "reaction-time", title: "반응속도 클론", genre: "arcade" }),
+    systemRegistry,
+  );
+
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
+});
+
+test("the SYSTEM-slug guard doesn't disturb an existing Creator-vs-Creator collision", async () => {
+  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
+  const { useCases } = createUseCases(undefined, systemRegistry);
+
+  await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "First",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: "my-game",
+        developerUserId: 2,
+        title: "Second",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
+});
+
+test("a genuinely new slug still registers fine with the SYSTEM registry wired in", async () => {
+  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
+  const { useCases } = createUseCases(undefined, systemRegistry);
+
+  const game = await useCases.createGame({
+    slug: "brand-new-creator-game",
+    developerUserId: 1,
+    title: "Brand New",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+
+  assert.equal(game.slug, "brand-new-creator-game");
 });
 
 test("uploadVersion rejects a non-owner, non-admin caller with NOT_OWNER", async () => {
@@ -687,6 +781,7 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
     },
     storage,
     publisher,
+    new StaticGameRegistry([]),
   );
 
   const game = await useCases.createGame({
