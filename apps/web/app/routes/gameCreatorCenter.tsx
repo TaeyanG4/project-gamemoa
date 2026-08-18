@@ -180,8 +180,15 @@ function ApplicationPanel({
 
   if (!devMe.canApply) {
     return (
-      <div className="rounded-3xl border border-border bg-surface-raised p-8 text-center shadow-xl">
-        <p className="text-sm text-text-muted">현재 게임 크리에이터 신청이 열려있지 않습니다.</p>
+      <div className="flex flex-col items-center gap-3 rounded-3xl border border-border bg-surface-raised p-8 text-center shadow-xl">
+        <Clock3 className="h-8 w-8 text-text-muted" />
+        <h2 className="text-lg font-bold text-text-primary">
+          게임 크리에이터 센터 — 추후 업데이트 예정
+        </h2>
+        <p className="max-w-md text-xs text-text-muted">
+          게임 크리에이터 셀프서비스 신청은 현재 준비 중이라 잠시 닫혀 있습니다. 정식 운영이
+          시작되면 이 페이지에서 바로 신청할 수 있도록 안내해드리겠습니다.
+        </p>
       </div>
     );
   }

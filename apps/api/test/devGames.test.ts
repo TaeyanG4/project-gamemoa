@@ -95,7 +95,10 @@ test("GET /api/dev/me reports hasAccess=false / isAdmin=false for a plain user",
   const body = (await res.json()) as { hasAccess: boolean; isAdmin: boolean; canApply: boolean };
   assert.equal(body.hasAccess, false);
   assert.equal(body.isAdmin, false);
-  assert.equal(body.canApply, true); // no OWO_PLUS gate exists yet — see canApplyForGameCreator
+  // Self-serve applications are currently closed (operational decision, 2026-08-18) — see
+  // canApplyForGameCreator's doc comment. Not an OWO_PLUS gate; just "not accepting applications
+  // right now".
+  assert.equal(body.canApply, false);
 });
 
 test("GET /api/dev/me reports hasAccess=true for an ACTIVE game_creator_access row", async () => {

@@ -15,11 +15,12 @@ import {
   SandboxGameUseCaseFailure,
   GameCreatorUseCaseFailure,
   canApplyForGameCreator,
+  hasImplicitGameCreatorAccess,
 } from "@owogg/core";
 import type { BackblazeB2Config } from "@owogg/db";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
-import { resolveAdminEligibility } from "../auth/adminEligibility.js";
+import { resolveAdminEligibility, resolveEffectiveStaffRole } from "../auth/adminEligibility.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { SANDBOX_GAME_FAILURE_STATUS, SANDBOX_GAME_FAILURE_MESSAGE } from "./sandboxGameErrors.js";
 import type { SandboxGameFailureStatus } from "./sandboxGameErrors.js";
@@ -90,10 +91,16 @@ async function resolveDevSession(c: Context<ApiEnv>): Promise<DevSession | null>
   if (!sessionResult) return null;
 
   const userId = sessionResult.user.id;
-  const [hasGameCreatorAccess, eligibility] = await Promise.all([
+  const [isActiveCreator, eligibility] = await Promise.all([
     container.gameCreatorUseCases.isActiveCreator(userId),
     resolveAdminEligibility(userId, c.env.ADMIN_USER_IDS, container.adminAccountUseCases),
   ]);
+
+  // ADMIN/OPERATOR/SYSTEM_DEVELOPER hold Game Creator access implicitly (see
+  // hasImplicitGameCreatorAccess's doc comment) — ORed with the real access-grant row, never a
+  // replacement for it.
+  const staffRole = resolveEffectiveStaffRole(eligibility);
+  const hasGameCreatorAccess = isActiveCreator || hasImplicitGameCreatorAccess(staffRole);
 
   return { userId, hasGameCreatorAccess, isAdmin: eligibility.eligible };
 }

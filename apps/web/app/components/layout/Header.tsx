@@ -83,9 +83,11 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
 
   const staffCenter = myAccess?.staffRole ? STAFF_CENTER_ENTRIES[myAccess.staffRole] : null;
   const gameCreator = myAccess?.gameCreator;
-  const showGameCreatorEntry =
-    !!gameCreator &&
-    (gameCreator.hasAccess || gameCreator.canApply || gameCreator.applicationStatus === "PENDING");
+  // Always shown to every logged-in user, regardless of canApply — even while self-serve
+  // applications are closed (canApplyForGameCreator() currently false, §"추후 업데이트 예정"), the
+  // entry stays visible and just routes to /game-creator's own "coming soon" state, rather than
+  // disappearing and giving no indication the program exists at all.
+  const showGameCreatorEntry = !!gameCreator;
   const gameCreatorLabel = !gameCreator
     ? ""
     : gameCreator.hasAccess

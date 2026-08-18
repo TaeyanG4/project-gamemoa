@@ -265,9 +265,10 @@ test("GET /api/me/access for a plain USER (no staff role, no programs) returns a
   assert.equal(body.staffRole, null);
   assert.deepEqual(body.permissions, []);
   assert.equal(body.gameCreator.hasAccess, false);
-  // canApplyForGameCreator() is unconditionally true today (no OWO_PLUS gate implemented yet —
-  // see domain/gameCreator.ts) and there's no ACTIVE access or PENDING application in the way.
-  assert.equal(body.gameCreator.canApply, true);
+  // Self-serve applications are currently closed (canApplyForGameCreator() — an operational
+  // decision, not a permanent architectural one; see its doc comment), independent of any
+  // ACTIVE access or PENDING application.
+  assert.equal(body.gameCreator.canApply, false);
   assert.equal(body.gameCreator.applicationStatus, null);
   assert.equal(body.streamer.isVerified, false);
 });
@@ -361,7 +362,7 @@ test("GET /api/me/access reflects a PENDING Game Creator application (hasAccess/
   assert.equal(body.gameCreator.applicationStatus, "PENDING");
 });
 
-test("GET /api/me/access reflects a REJECTED application as re-applicable (canApply true again)", async () => {
+test("GET /api/me/access reflects a REJECTED application (canApply stays false while applications are closed)", async () => {
   const db = await createDb();
   const rawToken = "rejected_applicant_session";
   const userId = await createUserWithSession(db, rawToken);
@@ -377,8 +378,38 @@ test("GET /api/me/access reflects a REJECTED application as re-applicable (canAp
     gameCreator: { hasAccess: boolean; canApply: boolean; applicationStatus: string | null };
   };
   assert.equal(body.gameCreator.hasAccess, false);
-  assert.equal(body.gameCreator.canApply, true);
+  // Being past a PENDING state (REJECTED, not currently pending) is necessary but not sufficient
+  // to re-apply — canApplyForGameCreator() being closed still blocks it, same as a brand-new user.
+  assert.equal(body.gameCreator.canApply, false);
   assert.equal(body.gameCreator.applicationStatus, "REJECTED");
+});
+
+test("GET /api/me/access grants implicit Game Creator access to OPERATOR, but not MODERATOR", async () => {
+  const db = await createDb();
+
+  const operatorToken = "operator_implicit_creator_session";
+  const operatorUserId = await createUserWithSession(db, operatorToken);
+  await createManagedAdmin(db, operatorUserId, "OPERATOR");
+
+  const moderatorToken = "moderator_no_implicit_creator_session";
+  const moderatorUserId = await createUserWithSession(db, moderatorToken);
+  await createManagedAdmin(db, moderatorUserId, "MODERATOR");
+
+  const operatorRes = await app.request(
+    "/api/me/access",
+    { headers: { Cookie: `owogg_session=${operatorToken}` } },
+    { DB: db } as any,
+  );
+  const operatorBody = (await operatorRes.json()) as { gameCreator: { hasAccess: boolean } };
+  assert.equal(operatorBody.gameCreator.hasAccess, true);
+
+  const moderatorRes = await app.request(
+    "/api/me/access",
+    { headers: { Cookie: `owogg_session=${moderatorToken}` } },
+    { DB: db } as any,
+  );
+  const moderatorBody = (await moderatorRes.json()) as { gameCreator: { hasAccess: boolean } };
+  assert.equal(moderatorBody.gameCreator.hasAccess, false);
 });
 
 test("GET /api/me/access reflects a VERIFIED Streamer/Creator profile", async () => {

@@ -275,10 +275,25 @@ USER ──────────────────►│               
 
 ### 5.3 신청 자격 — `canApplyForGameCreator()` (§6 참고)
 
-지금은 **누구나 조건 없이 신청 가능**합니다(`canApplyForGameCreator()`가 항상 `true` 반환). 이건
-"OwO Plus 구독이 신청 자격을 준다"는 향후 정책(§6)이 아직 구현되지 않았기 때문이며, 이 함수
-하나만 나중에 실제 구독 체크로 교체하면 되도록 추상화되어 있습니다 — 호출부(`apply()`)는 변경이
-필요 없습니다.
+**2026-08-18 운영 결정: 셀프서비스 신청은 현재 닫혀 있습니다**(`canApplyForGameCreator()`가
+`false` 반환) — 프로그램을 실제로 운영할 준비가 아직 안 되어, 지금 신청을 받아도 심사할 계획이
+없기 때문입니다("추후 업데이트 예정"). 프론트엔드(`/game-creator`)는 이 상태를 신청 폼 대신
+안내 메시지로 보여줍니다. "OwO Plus 구독이 신청 자격을 준다"는 향후 정책(§6)과는 무관한, 순수
+운영상의 온/오프 스위치입니다 — 이 함수 하나만 다시 `true`로 바꾸면 재개되도록 추상화되어 있고,
+호출부(`apply()`)나 계약(`GameCreatorMeResponseSchema.canApply`)은 전혀 바뀌지 않습니다. 관리자
+직접 임명(①)과 §5.3a의 스태프 암묵 부여는 이 스위치와 무관하게 계속 동작합니다 — 닫힌 건 "신청"
+경로 하나뿐입니다.
+
+### 5.3a 스태프 암묵 부여 — `hasImplicitGameCreatorAccess()`
+
+**2026-08-18 추가**: `ADMIN`/`OPERATOR`/`SYSTEM_DEVELOPER`는 별도 임명이나 신청 없이 Game
+Creator 접근 권한을 **암묵적으로** 보유합니다 — 운영/개발 스태프가 파이프라인을 테스트하거나
+지원할 때 매번 수동으로 권한을 부여받지 않아도 되게 하기 위함입니다. `MODERATOR`는
+제외됩니다(다른 곳의 기본 권한 번들이 좁은 것과 같은 이유). 이 규칙은 **GAME_CREATOR를 Staff
+Role로 만들지 않습니다** — 여전히 별도 축이며, 단지 "이 세 역할을 보유하는 것도 admin 직접 임명·
+신청 승인과 마찬가지로 접근 자격의 한 경로가 된다"는 정책입니다. 실제 `game_creator_access` 행
+상태와 항상 OR로 결합되며, 이 규칙이 그 행을 대체하지 않습니다 — MODERATOR나 일반 USER의 실제
+부여/회수는 그대로 동작합니다.
 
 ### 5.4 GAME_CREATOR가 할 수 있는 것 / 없는 것
 
@@ -505,18 +520,20 @@ UPDATE admin_accounts SET role = 'ADMIN' WHERE role = 'SUPERADMIN';
 
 ## 12. ✅ 현재 구현 vs 향후 계획 — 한눈에
 
-| 항목                                                            | 상태                                                        |
-| :-------------------------------------------------------------- | :---------------------------------------------------------- |
-| Staff Role 4종 + 권한 카탈로그 + 개별 위임                      | ✅ 구현됨                                                   |
-| Protected ADMIN 정책                                            | ✅ 구현됨                                                   |
-| `admin.center.access` 위임                                      | ✅ 구현됨                                                   |
-| GAME_CREATOR 직접 임명                                          | ✅ 구현됨 (기존 기능 유지)                                  |
-| GAME_CREATOR 셀프서비스 신청/심사                               | ✅ 구현됨 (신규)                                            |
-| STREAMER (채널 인증)                                            | ✅ 구현됨 (기존 기능, 문서상 재정의만)                      |
-| SUPERADMIN → ADMIN/OPERATOR 이관                                | ✅ 완료                                                     |
-| **OWO_PLUS 구독 시스템**                                        | ❌ **미구현 — 향후 계획** (§6)                              |
-| OWO_PLUS → GAME_CREATOR 신청 자격 연동                          | ❌ **미구현 — 정책 훅만 존재** (`canApplyForGameCreator()`) |
-| `canCreateGame()`/`canUploadGameVersion()` 등 추가 구독 정책 훅 | ❌ **미구현 — 필요 시점에 추가**                            |
+| 항목                                                            | 상태                                                                                       |
+| :-------------------------------------------------------------- | :----------------------------------------------------------------------------------------- |
+| Staff Role 4종 + 권한 카탈로그 + 개별 위임                      | ✅ 구현됨                                                                                  |
+| Protected ADMIN 정책                                            | ✅ 구현됨                                                                                  |
+| `admin.center.access` 위임                                      | ✅ 구현됨                                                                                  |
+| GAME_CREATOR 직접 임명                                          | ✅ 구현됨 (기존 기능 유지)                                                                 |
+| GAME_CREATOR 셀프서비스 신청/심사 (기능 자체)                   | ✅ 구현됨                                                                                  |
+| GAME_CREATOR 셀프서비스 신청 **오픈 여부**                      | ⏸️ **임시로 닫힘 — 추후 업데이트 예정** (`canApplyForGameCreator()`, 2026-08-18 운영 결정) |
+| GAME_CREATOR 스태프 암묵 부여 (ADMIN/OPERATOR/SYSTEM_DEVELOPER) | ✅ 구현됨 (신규, 2026-08-18)                                                               |
+| STREAMER (채널 인증)                                            | ✅ 구현됨 (기존 기능, 문서상 재정의만)                                                     |
+| SUPERADMIN → ADMIN/OPERATOR 이관                                | ✅ 완료                                                                                    |
+| **OWO_PLUS 구독 시스템**                                        | ❌ **미구현 — 향후 계획** (§6)                                                             |
+| OWO_PLUS → GAME_CREATOR 신청 자격 연동                          | ❌ **미구현 — 정책 훅만 존재** (`canApplyForGameCreator()`)                                |
+| `canCreateGame()`/`canUploadGameVersion()` 등 추가 구독 정책 훅 | ❌ **미구현 — 필요 시점에 추가**                                                           |
 
 ---
 

@@ -35,6 +35,11 @@ export class GameCreatorUseCases {
     private accessRepo: GameCreatorAccessRepository,
     private userRepo: UserRepository,
     private applicationRepo?: GameCreatorApplicationRepository,
+    // Defaults to the real domain policy (currently closed, see canApplyForGameCreator's doc
+    // comment) — injectable purely so tests can exercise apply()'s own mechanics (atomicity,
+    // ALREADY_ACTIVE/APPLICATION_ALREADY_PENDING guards, decide/withdraw) independent of today's
+    // open/closed toggle. Production wiring (container.ts) never overrides this.
+    private canApply: () => boolean = canApplyForGameCreator,
   ) {}
 
   // ── Access (admin-direct grant/revoke — predates the application flow) ──────
@@ -117,7 +122,7 @@ export class GameCreatorUseCases {
    * friendlier failure on the common non-race path).
    */
   async apply(userId: number, message: string | null): Promise<GameCreatorApplicationRecord> {
-    if (!canApplyForGameCreator()) {
+    if (!this.canApply()) {
       throw new GameCreatorUseCaseFailure("APPLICATION_NOT_ALLOWED");
     }
     const user = await this.userRepo.findById(userId);
