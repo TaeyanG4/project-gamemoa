@@ -153,6 +153,12 @@ function createFakeRepo(): SandboxGameRepository & {
       games.set(id, updated);
       return updated;
     },
+    async hardDelete(id) {
+      games.delete(id);
+      for (const [versionId, version] of versions) {
+        if (version.gameId === id) versions.delete(versionId);
+      }
+    },
     async releaseReviewSlot(id, nowIso) {
       const existing = games.get(id);
       if (!existing) throw new Error("not found");
@@ -581,7 +587,7 @@ test("updateMetadata rejects an out-of-policy title without writing anything", a
   assert.equal(repo.games.get(game.id)?.title, "Game");
 });
 
-test("uploadVersion cleans up the orphaned storage object when the D1 write fails after a successful put", async () => {
+test("uploadVersion cleans up the orphaned storage object when the D1 write fails after a successful put, and surfaces PUBLISH_FAILED rather than the raw D1 error", async () => {
   const repo = createFakeRepo();
   const storage = createFakeStorage();
   const dbFailure = new Error("D1 write failed");
@@ -606,6 +612,10 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
     genre: "puzzle",
   });
 
+  // The raw D1 error must NOT leak past this call — a route's failureResponse() only knows how
+  // to translate SandboxGameUseCaseFailure, so anything else would escape as an uncaught,
+  // JSON-less 500 (see the private uploadPreparedVersion's doc comment for the production bug
+  // this was fixed for).
   await assert.rejects(
     () =>
       useCases.uploadVersion({
@@ -614,10 +624,41 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
         isAdmin: false,
         bytes: new ArrayBuffer(10),
       }),
-    dbFailure,
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "PUBLISH_FAILED",
   );
   assert.equal(storage.deletedKeys.length, 1);
   assert.match(storage.deletedKeys[0]!, new RegExp(`^uploads/${game.id}/[0-9a-f]{64}\\.zip$`));
+});
+
+test("uploadVersion surfaces PUBLISH_FAILED (not a raw error) when the source archive write itself fails", async () => {
+  const { useCases, repo, storage } = createUseCases();
+  const storageFailure = new Error("simulated B2 network/auth failure");
+  storage.putObject = async () => {
+    throw storageFailure;
+  };
+
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () =>
+      useCases.uploadVersion({
+        gameId: game.id,
+        actingUserId: 1,
+        isAdmin: false,
+        bytes: new ArrayBuffer(10),
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "PUBLISH_FAILED",
+  );
+  // Nothing was ever stored, so the best-effort cleanup delete is a harmless no-op — no version
+  // row exists either (createVersion is never reached).
+  assert.equal(repo.versions.size, 0);
 });
 
 // ── publish pipeline ─────────────────────────────────────────────────────────
@@ -1829,4 +1870,110 @@ test("deleteGame on an unknown game id is GAME_NOT_FOUND", async () => {
     () => useCases.deleteGame({ gameId: 999, actorAdminId: 9 }),
     (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "GAME_NOT_FOUND",
   );
+});
+
+// ── deleteOwnGame (creator self-service) ────────────────────────────────────────
+
+test("deleteOwnGame hard-deletes a never-approved game — findById/findBySlug both return null afterward", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 });
+
+  assert.equal(await useCases.getById(game.id), null);
+  assert.equal(repo.games.has(game.id), false);
+});
+
+test("deleteOwnGame frees the slug for immediate reuse, unlike admin's soft-delete", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "ball-dodge",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 });
+
+  // The exact production scenario this fixes: a failed drag-and-drop registration leaves an
+  // orphaned game with no version, blocking the slug — deleteOwnGame must let the creator retry
+  // with the identical slug.
+  const retried = await useCases.createGame({
+    slug: "ball-dodge",
+    developerUserId: 1,
+    title: "Game (retry)",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  assert.equal(retried.slug, "ball-dodge");
+});
+
+test("deleteOwnGame also removes any pending version — it isn't left dangling in the review queue", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+
+  await useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 });
+
+  assert.equal(repo.versions.has(version.id), false);
+});
+
+test("deleteOwnGame rejects a non-owner with NOT_OWNER", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  await assert.rejects(
+    () => useCases.deleteOwnGame({ gameId: game.id, developerUserId: 999 }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "NOT_OWNER",
+  );
+  // Confirm it really wasn't deleted, not just that the error code is right.
+  assert.notEqual(await useCases.getById(game.id), null);
+});
+
+test("deleteOwnGame on an unknown game id is GAME_NOT_FOUND", async () => {
+  const { useCases } = createUseCases();
+  await assert.rejects(
+    () => useCases.deleteOwnGame({ gameId: 999, developerUserId: 1 }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "GAME_NOT_FOUND",
+  );
+});
+
+test("deleteOwnGame refuses a game with an approved version, even a not-currently-live one", async () => {
+  const { useCases, game } = await createGameWithLiveVersion();
+
+  await assert.rejects(
+    () => useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANNOT_DELETE_APPROVED_GAME",
+  );
+  // Still there — the refusal must not have half-deleted anything.
+  assert.notEqual(await useCases.getById(game.id), null);
 });
