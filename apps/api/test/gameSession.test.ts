@@ -1,0 +1,229 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { app } from "../src/index.js";
+import { verifyGameSession, gameSessionMatches } from "@owogg/core";
+
+// POST /api/games/:slug/session — the route-layer half of the Game Session prerequisite (the
+// signing/verification logic itself is unit-tested directly against real Web Crypto in
+// packages/core/test/gameSession.test.ts; this file only confirms auth gating, the PUBLIC + live
+// Creator game gate, and that the token this route actually issues round-trips through the real
+// verifyGameSession with the right claims — the same "real Hono app, fake D1" pattern
+// gameServing.test.ts and devGames.test.ts use.
+
+interface FakeGame {
+  id: number;
+  slug: string;
+  visibility: "PRIVATE" | "PUBLIC";
+  live_version_id: number | null;
+}
+interface FakeVersion {
+  id: number;
+  game_id: number;
+}
+
+function createDb(options: { userId?: number; game?: FakeGame; version?: FakeVersion }) {
+  const { userId = 7, game, version } = options;
+  function statement(query: string) {
+    let values: unknown[] = [];
+    return {
+      bind(...bound: unknown[]) {
+        values = bound;
+        return this;
+      },
+      async first<T>() {
+        // Session lookup — same query shape/fixture as devGames.test.ts's createDb.
+        if (query.includes("JOIN users u ON s.user_id = u.id")) {
+          return {
+            session_id: "valid_session",
+            user_id: userId,
+            expires_at: new Date(Date.now() + 86400000).toISOString(),
+            session_created_at: new Date().toISOString(),
+            nickname: "player",
+            email: "player@example.com",
+            avatar_url: null,
+            user_created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as T;
+        }
+
+        const wantsGameBySlug = query.includes("FROM sandbox_games WHERE slug");
+        const wantsGameById = query.includes("FROM sandbox_games WHERE id");
+        if (wantsGameBySlug || wantsGameById) {
+          const matches = wantsGameBySlug ? game?.slug === values[0] : game?.id === values[0];
+          if (!game || !matches) return null;
+          return {
+            id: game.id,
+            slug: game.slug,
+            developer_user_id: 1,
+            title: "Test Game",
+            short_description: null,
+            description: null,
+            genre: "puzzle",
+            xp_per_completion: 0,
+            score_unit: null,
+            score_direction: null,
+            score_min: null,
+            score_max: null,
+            score_display_prefix: null,
+            score_display_suffix: null,
+            visibility: game.visibility,
+            live_version_id: game.live_version_id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          } as T;
+        }
+
+        if (query.includes("FROM sandbox_game_versions WHERE id")) {
+          if (!version || version.id !== values[0]) return null;
+          return {
+            id: version.id,
+            game_id: version.game_id,
+            object_key: "uploads/1/abc.zip",
+            content_hash: "fakehash",
+            bundle_bytes: 123,
+            status: "APPROVED",
+            reviewed_by_admin_id: 1,
+            reviewed_at: new Date().toISOString(),
+            reject_reason: null,
+            uploaded_at: new Date().toISOString(),
+            publish_status: "READY",
+            publish_error: null,
+            published_at: new Date().toISOString(),
+            manifest_key: `games/${version.game_id}/${version.id}/.owogg-manifest.json`,
+            published_size_bytes: 456,
+            file_count: 2,
+          } as T;
+        }
+
+        return null;
+      },
+      async all<T>() {
+        return { results: [] } as { results: T[] };
+      },
+      async run() {
+        return { success: true, meta: { changes: 0 } };
+      },
+    };
+  }
+
+  return {
+    db: {
+      prepare(query: string) {
+        return statement(query);
+      },
+      async batch(statements: Array<ReturnType<typeof statement>>) {
+        return statements.map(() => ({ success: true, meta: { changes: 0 } }));
+      },
+    },
+  };
+}
+
+const LIVE_GAME: FakeGame = {
+  id: 1,
+  slug: "ball-dodge",
+  visibility: "PUBLIC",
+  live_version_id: 17,
+};
+const LIVE_VERSION: FakeVersion = { id: 17, game_id: 1 };
+const SESSION_SECRET = "test-game-session-secret";
+const AUTH_HEADERS = { Cookie: "owogg_session=valid_session" };
+
+test("requires authentication — no session cookie means 401, before anything else runs", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await app.request("/api/games/ball-dodge/session", { method: "POST" }, {
+    DB: db,
+    GAME_SESSION_SECRET: SESSION_SECRET,
+  } as any);
+  assert.equal(res.status, 401);
+});
+
+test("fails closed (503) when GAME_SESSION_SECRET is not configured in this environment", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await app.request(
+    "/api/games/ball-dodge/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    { DB: db } as any, // no GAME_SESSION_SECRET
+  );
+  assert.equal(res.status, 503);
+});
+
+test("404s for an unknown slug", async () => {
+  const { db } = createDb({});
+  const res = await app.request(
+    "/api/games/no-such-game/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    { DB: db, GAME_SESSION_SECRET: SESSION_SECRET } as any,
+  );
+  assert.equal(res.status, 404);
+});
+
+test("404s for a PRIVATE Creator game — never distinguishes from an unknown slug", async () => {
+  const { db } = createDb({
+    game: { ...LIVE_GAME, visibility: "PRIVATE", live_version_id: null },
+  });
+  const res = await app.request(
+    "/api/games/ball-dodge/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    { DB: db, GAME_SESSION_SECRET: SESSION_SECRET } as any,
+  );
+  assert.equal(res.status, 404);
+});
+
+test("404s for a SYSTEM slug — SYSTEM games are never rows in sandbox_games", async () => {
+  const { db } = createDb({}); // reaction-time never appears in the fake sandbox_games table
+  const res = await app.request(
+    "/api/games/reaction-time/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    { DB: db, GAME_SESSION_SECRET: SESSION_SECRET } as any,
+  );
+  assert.equal(res.status, 404);
+});
+
+test("issues a token carrying the authenticated user, resolved game, and its live version", async () => {
+  const { db } = createDb({ userId: 7, game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await app.request(
+    "/api/games/ball-dodge/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    { DB: db, GAME_SESSION_SECRET: SESSION_SECRET } as any,
+  );
+
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { token: string; expiresAt: string };
+  assert.equal(typeof body.token, "string");
+
+  const result = await verifyGameSession(body.token, SESSION_SECRET);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.payload.userId, 7);
+  assert.equal(result.payload.gameId, LIVE_GAME.id);
+  assert.equal(result.payload.versionId, LIVE_VERSION.id);
+  assert.equal(
+    gameSessionMatches(result.payload, {
+      userId: 7,
+      gameId: LIVE_GAME.id,
+      versionId: LIVE_VERSION.id,
+    }),
+    true,
+  );
+
+  const expiresAtSeconds = Math.floor(new Date(body.expiresAt).getTime() / 1000);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  assert.ok(expiresAtSeconds > nowSeconds, "expiresAt must be in the future");
+  assert.ok(
+    expiresAtSeconds <= nowSeconds + 600,
+    "expiresAt must fall within the 5-10 minute policy window",
+  );
+});
+
+test("a token issued here is rejected under a different secret — the signature is real, not decorative", async () => {
+  const { db } = createDb({ userId: 7, game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await app.request(
+    "/api/games/ball-dodge/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    { DB: db, GAME_SESSION_SECRET: SESSION_SECRET } as any,
+  );
+  const body = (await res.json()) as { token: string };
+
+  const result = await verifyGameSession(body.token, "a-different-secret-entirely");
+  assert.equal(result.ok, false);
+});

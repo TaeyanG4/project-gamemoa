@@ -75,3 +75,16 @@ export const PublicGameListResponseSchema = z.object({
   games: z.array(PublicGameSchema),
 });
 export type PublicGameListResponse = z.infer<typeof PublicGameListResponseSchema>;
+
+/**
+ * POST /api/games/:slug/session — a short-lived, HMAC-signed Game Session token (see
+ * packages/core/src/domain/gameSession.ts). `token` is an opaque string; a client has no reason to
+ * parse it, only to hold it and eventually attach it to a future request. `expiresAt` is
+ * informational (ISO 8601) — the token is self-describing and self-expiring server-side regardless
+ * of whether a caller ever reads this field.
+ */
+export const GameSessionResponseSchema = z.object({
+  token: z.string(),
+  expiresAt: z.string(),
+});
+export type GameSessionResponse = z.infer<typeof GameSessionResponseSchema>;

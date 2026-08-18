@@ -70,6 +70,13 @@ export type ApiEnv = {
      * `wrangler secret put GAME_ORIGIN` once play.owogg.com is connected — not a binding, no
      * wrangler.jsonc entry required, same reasoning as the B2_* values above. */
     GAME_ORIGIN?: string;
+    /** HMAC secret for signing/verifying Game Session tokens (packages/core/src/domain/
+     * gameSession.ts) — the prerequisite for Creator score submission, not yet connected to it.
+     * Plain `wrangler secret put GAME_SESSION_SECRET`, not a Cloudflare binding — no wrangler.jsonc
+     * entry required, same reasoning as the B2_* and GAME_ORIGIN values above. Absent means the
+     * feature isn't configured in this environment yet: POST /api/games/:slug/session fails closed
+     * with 503 rather than signing with an empty/predictable secret. */
+    GAME_SESSION_SECRET?: string;
     GOOGLE_CLIENT_ID?: string;
     DISCORD_CLIENT_ID?: string;
     DISCORD_CLIENT_SECRET?: string;

@@ -1,16 +1,39 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
+import { getCookie } from "hono/cookie";
 import {
+  GameSessionResponseSchema,
   PublicGameAvailabilityResponseSchema,
   PublicGameListResponseSchema,
   PublicGameSchema,
   SandboxGamePublicDetailSchema,
   SandboxGamePublicListResponseSchema,
 } from "@owogg/contracts";
-import { mergePublicGames, resolvePublicGame, toPublicCreatorGame } from "@owogg/core";
+import {
+  GAME_SESSION_POLICY,
+  mergePublicGames,
+  resolvePublicGame,
+  signGameSession,
+  toPublicCreatorGame,
+  type GameSessionPayload,
+} from "@owogg/core";
 import { createContainer } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { readB2Config } from "./devGames.js";
 import type { ApiEnv } from "./auth.js";
+
+// Same local requireAuth as creators.ts/discordGuilds.ts — not shared from auth.ts, matching this
+// codebase's existing per-route-file convention rather than introducing a shared import for it.
+async function requireAuth(
+  c: Context<ApiEnv>,
+): Promise<{ userId: number; user: { id: number; nickname: string } } | null> {
+  const sessionId = getCookie(c, "owogg_session");
+  if (!sessionId) return null;
+  const { sessionRepo } = createContainer(c.env.DB);
+  const result = await sessionRepo.findSession(sessionId);
+  if (!result) return null;
+  return { userId: result.user.id, user: { id: result.user.id, nickname: result.user.nickname } };
+}
 
 export const gamesRouter = new Hono<ApiEnv>();
 
@@ -138,4 +161,63 @@ gamesRouter.get("/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
   if (!game) return c.text("Not Found", 404);
 
   return c.json(PublicGameSchema.parse(game), 200);
+});
+
+// ── Game Session (Creator score-submission prerequisite) ─────────────────────
+//
+// POST /api/games/:slug/session — issues a short-lived, HMAC-signed Game Session token (see
+// packages/core/src/domain/gameSession.ts). Deliberately NOT connected to anything past signing
+// and returning it: no score/leaderboard/XP route reads this token yet, and nothing here writes
+// to D1 — that wiring is a later PR's scope. This exists so a Web Host can start acquiring and
+// holding a token now, ready for whenever that connection is made.
+//
+// Login required (the existing owogg_session cookie — same requireAuth as creators.ts/
+// discordGuilds.ts). Deliberately reuses resolveLiveVersion, the exact same "PUBLIC + has a live
+// version" gate every other public Creator-game read in this file already uses — a SYSTEM slug
+// (not in sandbox_games at all) or a private/unpublished/unknown Creator game all 404 identically,
+// the same can't-distinguish-unknown-from-private posture as everywhere else in this file.
+
+gamesRouter.post("/:slug/session", async (c) => {
+  if (!c.env?.DB) return c.text("Not Found", 404);
+
+  const secret = c.env.GAME_SESSION_SECRET;
+  if (!secret) {
+    // Fails closed rather than signing with an empty/predictable secret — same posture as
+    // GAME_BUNDLES_NOT_CONFIGURED in devGames.ts for a feature this environment hasn't set up.
+    return c.json(
+      {
+        error: {
+          code: "GAME_SESSION_NOT_CONFIGURED",
+          message: "게임 세션 서명 키가 아직 이 환경에 구성되지 않았습니다.",
+        },
+      },
+      503,
+    );
+  }
+
+  const auth = await requireAuth(c);
+  if (!auth)
+    return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+
+  const { sandboxGameUseCases } = createContainer(c.env.DB);
+  const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
+  if (!resolved) return c.text("Not Found", 404);
+
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const payload: GameSessionPayload = {
+    userId: auth.userId,
+    gameId: resolved.game.id,
+    versionId: resolved.version.id,
+    attemptId: crypto.randomUUID(),
+    exp: nowSeconds + GAME_SESSION_POLICY.EXPIRY_SECONDS,
+  };
+  const token = await signGameSession(payload, secret);
+
+  return c.json(
+    GameSessionResponseSchema.parse({
+      token,
+      expiresAt: new Date(payload.exp * 1000).toISOString(),
+    }),
+    200,
+  );
 });

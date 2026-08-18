@@ -15,6 +15,7 @@ export * from "./domain/gameCreator.js";
 export * from "./domain/sandboxGames.js";
 export * from "./domain/sandboxGameBundle.js";
 export * from "./domain/contentHash.js";
+export * from "./domain/gameSession.js";
 export * from "./ports/repositories.js";
 export * from "./ports/creatorProvider.js";
 export * from "./ports/adminAuth.js";
