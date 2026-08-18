@@ -6,6 +6,20 @@
 export const SANDBOX_GAME_VISIBILITIES = ["PRIVATE", "PUBLIC"] as const;
 export type SandboxGameVisibility = (typeof SANDBOX_GAME_VISIBILITIES)[number];
 
+/** Player-count shape, declared by the creator in owogg.game.json's `mode` field (2026-08-18) —
+ * mirrors the built-in-game catalog's richer `GameMode` (`"single" | "local-multi" |
+ * "online-multi"`, packages/game-sdk) at a coarser grain deliberately: OwOGG runs no server-side
+ * game-state relay (see docs/GAME_CREATION_GUIDE.md §3.2.2's explicit non-goals), so a sandbox
+ * "multi" game is understood as same-device/local multiplayer, never online — the web app maps
+ * "multi" -> "local-multi" when rendering it in the shared catalog grid (see
+ * apps/web/app/features/catalog/sandboxGameAdapter.ts). */
+export const SANDBOX_GAME_MODES = ["single", "multi"] as const;
+export type SandboxGameMode = (typeof SANDBOX_GAME_MODES)[number];
+
+export function isValidSandboxGameMode(value: unknown): value is SandboxGameMode {
+  return typeof value === "string" && (SANDBOX_GAME_MODES as readonly string[]).includes(value);
+}
+
 /** WITHDRAWN = the developer pulled their own submission before a decision was made — distinct
  * from REJECTED (an admin decision) even though both are terminal and both release the developer's
  * review slot (see SANDBOX_GAME_POLICY.MAX_CONCURRENT_REVIEW_SLOTS). */
@@ -88,6 +102,12 @@ export const SANDBOX_GAME_POLICY = {
    * invariant (a partial unique index), not just an application-level count, so concurrent
    * requests can't push a developer past it. */
   MAX_CONCURRENT_REVIEW_SLOTS: 2,
+  /** Cap on a single logo file's decompressed size (2026-08-18) — generous for a catalog-card
+   * icon (rendered at well under 100px in the grid) while still bounding the extra B2
+   * write/storage cost a required-per-game asset adds. Counted separately from, and in addition
+   * to, MAX_EXTRACTED_BUNDLE_BYTES — a logo this size is a rounding error against that cap, this
+   * exists purely so one oversized image can't dominate an otherwise-tiny bundle's declared size. */
+  MAX_LOGO_BYTES: 2 * 1024 * 1024,
 } as const;
 
 export function isValidSandboxGameSlug(slug: string): boolean {

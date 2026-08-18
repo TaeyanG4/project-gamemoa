@@ -17,6 +17,7 @@ async function seedGame(repo: D1SandboxGameRepository, slug = "test-game", devel
     shortDescription: "short",
     description: "long",
     genre: "puzzle",
+    mode: "single",
     nowIso: new Date().toISOString(),
   });
   if (!created) throw new Error(`seedGame(${slug}) unexpectedly hit the review-slot limit`);
@@ -426,6 +427,52 @@ test("a new game defaults to deleted_at/deleted_by_admin_id both null", async ()
   assert.equal(game.deletedByAdminId, null);
 });
 
+test("create persists the given mode, and a new game defaults logoKey to null", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+
+  const single = await repo.create({
+    slug: "single-game",
+    developerUserId: 1,
+    title: "Single",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+    nowIso: new Date().toISOString(),
+  });
+  assert.equal(single?.mode, "single");
+  assert.equal(single?.logoKey, null);
+
+  const multi = await repo.create({
+    slug: "multi-game",
+    developerUserId: 1,
+    title: "Multi",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "multi",
+    nowIso: new Date().toISOString(),
+  });
+  assert.equal(multi?.mode, "multi");
+});
+
+test("setLogo persists the given key and leaves the rest of the row untouched", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo);
+  const now = new Date().toISOString();
+
+  const withLogo = await repo.setLogo(game.id, `games/${game.id}/logo.png`, now);
+  assert.equal(withLogo.logoKey, `games/${game.id}/logo.png`);
+  assert.equal(withLogo.title, game.title);
+
+  const reread = await repo.findById(game.id);
+  assert.equal(reread?.logoKey, `games/${game.id}/logo.png`);
+});
+
 test("hardDelete removes the game row entirely, unlike softDelete", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev");
@@ -455,6 +502,7 @@ test("hardDelete frees the slug for an immediate re-insert with the same value â
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
     nowIso: new Date().toISOString(),
   });
   assert.notEqual(retried, null);
@@ -595,6 +643,7 @@ test("a third concurrent submission is refused (returns null) while both slots a
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
     nowIso: new Date().toISOString(),
   });
   await repo.create({
@@ -604,6 +653,7 @@ test("a third concurrent submission is refused (returns null) while both slots a
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
     nowIso: new Date().toISOString(),
   });
 
@@ -614,6 +664,7 @@ test("a third concurrent submission is refused (returns null) while both slots a
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
     nowIso: new Date().toISOString(),
   });
 
@@ -640,6 +691,7 @@ test("concurrent create calls for the same developer never claim more than 2 slo
         shortDescription: null,
         description: null,
         genre: "puzzle",
+        mode: "single",
         nowIso: new Date().toISOString(),
       }),
     ),
@@ -700,6 +752,7 @@ test("different developers each get their own independent 2-slot budget", async 
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
     nowIso: new Date().toISOString(),
   });
   assert.equal(aThird, null);

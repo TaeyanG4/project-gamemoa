@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { Gamepad2, Search } from "lucide-react";
 import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
+import { useSandboxCatalogManifests } from "../features/catalog/sandboxGameAdapter";
 import { GameGrid } from "../components/ui/GameGrid";
 import { GridColumnSwitcher } from "../components/ui/GridColumnSwitcher";
 import { CategoryChips } from "../components/ui/CategoryChips";
@@ -25,7 +26,15 @@ export default function Games() {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
-  const gameManifests = useEnabledGameManifests();
+  const builtInGameManifests = useEnabledGameManifests();
+  // Approved sandbox games (Game Creator uploads) merged in alongside the built-in catalog —
+  // see features/catalog/sandboxGameAdapter.ts. Built-in games first so the catalog's existing
+  // order doesn't shuffle as sandbox games are added/removed.
+  const sandboxGameManifests = useSandboxCatalogManifests();
+  const gameManifests = useMemo(
+    () => [...builtInGameManifests, ...sandboxGameManifests],
+    [builtInGameManifests, sandboxGameManifests],
+  );
 
   const { favoriteGameIds } = usePersonalization();
   const { isAuthenticated, openLoginModal } = useAuth();

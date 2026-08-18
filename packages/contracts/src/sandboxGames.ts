@@ -15,7 +15,13 @@ export const SandboxGameVersionStatusSchema = z.enum([
 ]);
 export type SandboxGameVersionStatus = z.infer<typeof SandboxGameVersionStatusSchema>;
 
-export const SandboxGameRecordSchema = z.object({
+export const SandboxGameModeSchema = z.enum(["single", "multi"]);
+export type SandboxGameMode = z.infer<typeof SandboxGameModeSchema>;
+
+/** Raw shape as returned by the core `SandboxGameRecord` — kept separate from
+ * {@link SandboxGameRecordSchema} below (which `.transform()`s this) so `logoKey`, an internal B2
+ * storage key, never has to be manually stripped at every route call site. */
+const SandboxGameRecordRawSchema = z.object({
   id: z.number().int().positive(),
   slug: z.string(),
   developerUserId: z.number().int().positive(),
@@ -23,6 +29,11 @@ export const SandboxGameRecordSchema = z.object({
   shortDescription: z.string().nullable(),
   description: z.string().nullable(),
   genre: z.string(),
+  mode: SandboxGameModeSchema,
+  /** Internal — see the `.transform()` below, which turns this into `hasLogo` and drops it. Never
+   * add a route that returns this schema without going through the transform (i.e. never import
+   * this raw schema directly outside this file). */
+  logoKey: z.string().nullable(),
   xpPerCompletion: z.number().int().nonnegative(),
   scoreUnit: z.string().nullable(),
   scoreDirection: z.enum(["asc", "desc"]).nullable(),
@@ -42,6 +53,14 @@ export const SandboxGameRecordSchema = z.object({
   createdAt: z.string(),
   updatedAt: z.string(),
 });
+
+/** `.transform()` so every existing `SandboxGameRecordSchema.parse(game)` call site keeps working
+ * unchanged while gaining `hasLogo` and losing `logoKey` — a client that wants to actually display
+ * the logo hits the public, unauthenticated `GET /api/games/sandbox/:slug/logo` route instead
+ * (mirrors how `objectKey`/`manifestKey` are already kept off SandboxGameVersionRecordSchema). */
+export const SandboxGameRecordSchema = SandboxGameRecordRawSchema.transform(
+  ({ logoKey, ...game }) => ({ ...game, hasLogo: logoKey !== null }),
+);
 export type SandboxGameRecord = z.infer<typeof SandboxGameRecordSchema>;
 
 export const SandboxGamePublishStatusSchema = z.enum(["UPLOADED", "PUBLISHING", "READY", "FAILED"]);
@@ -113,8 +132,23 @@ export const SandboxGamePublicDetailSchema = z.object({
   shortDescription: z.string().nullable(),
   description: z.string().nullable(),
   genre: z.string(),
+  mode: SandboxGameModeSchema,
+  /** Whether GET /api/games/sandbox/:slug/logo will actually return an image — see
+   * SandboxGameRecordSchema's `.transform()` for why the raw storage key never leaves the API.
+   * `false` for a game registered before the logo requirement (2026-08-18); the web catalog falls
+   * back to the site favicon rather than treating that as broken. */
+  hasLogo: z.boolean(),
 });
 export type SandboxGamePublicDetail = z.infer<typeof SandboxGamePublicDetailSchema>;
+
+/** GET /api/games/sandbox — every currently-PUBLIC sandbox game, for the main site catalog
+ * (apps/web/app/routes/games.tsx merges this in alongside the built-in GameManifest catalog — see
+ * apps/web/app/features/catalog/sandboxGameAdapter.ts). Same narrow, review/publish-internal-free
+ * shape as the single-game detail above, just plural. */
+export const SandboxGamePublicListResponseSchema = z.object({
+  games: z.array(SandboxGamePublicDetailSchema),
+});
+export type SandboxGamePublicListResponse = z.infer<typeof SandboxGamePublicListResponseSchema>;
 
 export const SandboxGameDetailResponseSchema = z.object({
   game: SandboxGameRecordSchema,

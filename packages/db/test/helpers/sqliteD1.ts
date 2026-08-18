@@ -361,6 +361,8 @@ CREATE TABLE sandbox_games (
   short_description TEXT,
   description TEXT,
   genre TEXT NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'single',
+  logo_key TEXT,
   xp_per_completion INTEGER NOT NULL DEFAULT 0,
   score_unit TEXT,
   score_direction TEXT,

@@ -64,23 +64,26 @@ export const BUNDLE_ENTRY_PATH = "index.html";
 export const GAME_REGISTRATION_MANIFEST_FILENAME = "owogg.game.json";
 
 /** Raw, not-yet-validated shape read from {@link GAME_REGISTRATION_MANIFEST_FILENAME} — field
- *-level validation (slug format, title/genre length) stays in SandboxGameUseCases so it shares
- * exactly the same rules as the manual create-game form, rather than duplicating them here. */
+ *-level validation (slug format, title/genre length, mode enum) stays in SandboxGameUseCases. */
 export interface RawGameRegistrationManifest {
   slug?: unknown;
   title?: unknown;
   genre?: unknown;
   shortDescription?: unknown;
   description?: unknown;
+  /** "single" | "multi" (2026-08-18) — required, see SandboxGameMode's doc comment
+   * (domain/sandboxGames.ts) for why only these two coarse values exist. */
+  mode?: unknown;
 }
 
 /**
  * Looks for {@link GAME_REGISTRATION_MANIFEST_FILENAME} among a prepared bundle's files. Returns
- * `null` when it's simply not there (a normal upload for an already-existing game, or a creator
- * who prefers the manual form) — that is not an error. Throws `BUNDLE_MALFORMED` when the file
- * exists but isn't valid JSON or isn't a JSON object, since a bundle that clearly *intends* to
- * self-register but has a broken manifest should fail loudly rather than silently falling back to
- * "nothing happened."
+ * `null` when it's simply not there — that is not an error at THIS layer (an existing game's
+ * plain version re-upload has no reason to carry one), but SandboxGameUseCases.createGameFromBundle
+ * (the only registration path since the manual form was removed, 2026-08-18) treats a null result
+ * as MANIFEST_MISSING. Throws `BUNDLE_MALFORMED` when the file exists but isn't valid JSON or
+ * isn't a JSON object, since a bundle that clearly *intends* to self-register but has a broken
+ * manifest should fail loudly rather than silently falling back to "nothing happened."
  */
 export function extractGameRegistrationManifest(
   files: PreparedBundleFile[],
@@ -104,6 +107,33 @@ export function extractGameRegistrationManifest(
     );
   }
   return parsed as RawGameRegistrationManifest;
+}
+
+/** Reserved basename (2026-08-18) for a game's catalog-card logo — `owogg.logo.<ext>` at the
+ * bundle root, any of {@link LOGO_EXTENSIONS}. Required on every new registration
+ * (SandboxGameUseCases.createGameFromBundle rejects a missing one with LOGO_REQUIRED) — a game
+ * registered before this requirement simply has no logo object, and the web catalog falls back to
+ * the site favicon for it rather than treating that as an error. Stored separately from the
+ * per-version published files (see {@link sandboxGameLogoObjectKey}): it belongs to the *game*,
+ * not any one version, so a version re-upload doesn't touch it and it isn't served from the
+ * immutable per-version path published files use. */
+export const LOGO_BASENAME = "owogg.logo";
+export const LOGO_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "svg"] as const;
+
+/** Finds the logo entry among a prepared bundle's root-level files, or `null` if none of the
+ * accepted extensions is present. */
+export function findGameLogoFile(files: PreparedBundleFile[]): PreparedBundleFile | null {
+  return (
+    files.find((f) => LOGO_EXTENSIONS.some((ext) => f.path === `${LOGO_BASENAME}.${ext}`)) ?? null
+  );
+}
+
+/** Where a game's logo lives — keyed by gameId only (not versionId), since the logo is a
+ * game-level asset re-used across every version. `logoPath` must be one of the
+ * {@link findGameLogoFile} matches, so its extension is trusted as-is. */
+export function sandboxGameLogoObjectKey(gameId: number, logoPath: string): string {
+  const ext = logoPath.slice(logoPath.lastIndexOf(".") + 1);
+  return `games/${gameId}/logo.${ext}`;
 }
 
 // ── MIME ─────────────────────────────────────────────────────────────────────

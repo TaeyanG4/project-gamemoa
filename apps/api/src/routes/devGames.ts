@@ -207,7 +207,11 @@ devGamesRouter.get("/games", async (c) => {
   return c.json(SandboxGameListResponseSchema.parse({ games }), 200);
 });
 
-// POST /api/dev/games — create a new catalog entry (no bundle yet).
+// POST /api/dev/games — create a new catalog entry (no bundle yet). Dead from the UI's own
+// perspective since 2026-08-18 (the manual registration form was removed from the Game Creator
+// Center in favor of drag-and-drop — see docs/GAME_CREATION_GUIDE.md §3.6.2), kept only so this
+// endpoint doesn't hard-break for any external caller that already knows about it. Hardcodes
+// mode: "single" (no logo) since this path has no way to collect either from a caller.
 devGamesRouter.post("/games", async (c) => {
   const session = await resolveDevSession(c);
   if (!session) {
@@ -238,6 +242,7 @@ devGamesRouter.post("/games", async (c) => {
       shortDescription: parsed.data.shortDescription ?? null,
       description: parsed.data.description ?? null,
       genre: parsed.data.genre,
+      mode: "single",
     });
     return c.json(SandboxGameRecordSchema.parse(game), 201);
   } catch (err) {

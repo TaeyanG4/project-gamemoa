@@ -15,10 +15,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const srcDir = join(here, "ball-dodge");
 const outFile = join(here, "ball-dodge.zip");
 
-// owogg.game.json (slug/title/genre) lets the fixture double as a worked example of the
-// drag-and-drop auto-registration path (see docs/GAME_CREATION_GUIDE.md §3.6.2) — dropping this
-// zip straight onto the Game Creator Center registers "ball-dodge" without the manual form.
-const files = ["index.html", "game.js", "style.css", "owogg.game.json"];
+// owogg.game.json (slug/title/genre/mode) + owogg.logo.svg let the fixture double as a worked
+// example of the drag-and-drop auto-registration path (see docs/GAME_CREATION_GUIDE.md §3.6.2) —
+// dropping this zip straight onto the Game Creator Center registers "ball-dodge", both fields
+// being required on every registration since 2026-08-18.
+const files = ["index.html", "game.js", "style.css", "owogg.game.json", "owogg.logo.svg"];
 const entries = {};
 for (const name of files) {
   entries[name] = readFileSync(join(srcDir, name));

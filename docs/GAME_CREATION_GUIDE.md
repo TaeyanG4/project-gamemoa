@@ -331,16 +331,31 @@ ZIP 최상위에 `owogg.game.json` 매니페스트 파일을 넣어 두면, 게�
   "slug": "ball-dodge",
   "title": "공 피하기",
   "genre": "action",
+  "mode": "single",
   "shortDescription": "장애물을 피해 최대한 오래 버티는 캐주얼 게임",
   "description": "선택 사항 — 상세 설명"
 }
 ```
 
-- `slug`/`title`/`genre`는 필수, `shortDescription`/`description`은 선택입니다. 검증 규칙은
-  과거의 수동 등록 폼과 동일합니다 — 매니페스트 경로가 별도 검증을 두지 않고 기존
+또한 ZIP 최상위에 **로고 이미지**가 반드시 있어야 합니다 — `owogg.logo.png`/`.jpg`/`.jpeg`/
+`.webp`/`.svg` 중 아무 확장자나 됩니다(`LOGO_BASENAME`/`LOGO_EXTENSIONS`,
+`packages/core/src/domain/sandboxGameBundle.ts`). 예: `owogg.logo.svg`.
+
+- `slug`/`title`/`genre`/`mode`는 필수, `shortDescription`/`description`은 선택입니다.
+  `mode`는 `"single"` 또는 `"multi"`만 허용합니다(`INVALID_MODE`) — OwOGG는 서버 측 게임 상태
+  릴레이를 운영하지 않으므로(§3.2.2의 명시적 비목표) `"multi"`는 항상 **같은 기기에서의 로컬
+  멀티플레이**를 뜻하며, 온라인 멀티플레이는 아닙니다. slug/title/genre 검증 규칙은 과거의 수동
+  등록 폼과 동일합니다 — 매니페스트 경로가 별도 검증을 두지 않고 기존
   `SandboxGameUseCases.createGame()`을 그대로 재사용하기 때문입니다
   (`SandboxGameUseCases.createGameFromBundle`,
   `packages/core/src/application/sandboxGameUseCases.ts`).
+- **로고는 2026-08-18부터 모든 신규 등록에 필수입니다** — 없으면 `LOGO_REQUIRED`로 거부됩니다.
+  이 요구사항 이전에 등록된 게임(로고 없음)은 그대로 유효하며, 사이트 카탈로그에서 OwOGG
+  파비콘으로 대체 표시됩니다(§3.6.6). 로고는 게임 자체가 아니라 **게임(gameId) 단위 자산**으로
+  별도 저장됩니다 — 버전을 재업로드해도 로고는 바뀌지 않고, 실제로 플레이 가능한 번들 파일
+  목록에서도 제외됩니다(발행되는 `index.html` 등과 섞이지 않음). 용량 상한은
+  `SANDBOX_GAME_POLICY.MAX_LOGO_BYTES`(2MiB, 압축 해제 후 기준)이며 초과 시
+  `LOGO_TOO_LARGE`로 거부됩니다.
 - **드래그 앤 드롭이 유일한 등록 경로입니다** (2026-08-18 — 게임 크리에이터 센터의 슬러그/제목/
   장르 수동 입력 폼은 제거했습니다). `owogg.game.json`이 없는 ZIP은 새 게임을 등록하지
   않습니다(`MANIFEST_MISSING`) — 이미 존재하는 게임에 새 버전을 올리는 "버전 업로드"만 매니페스트
@@ -349,9 +364,9 @@ ZIP 최상위에 `owogg.game.json` 매니페스트 파일을 넣어 두면, 게�
   것"처럼 조용히 넘어가지 않음).
 - ZIP은 **한 번만 압축 해제**됩니다 — 매니페스트를 읽는 것과 실제 파일을 발행하는 것이 같은
   `prepared.files`를 공유합니다.
-- 발행되는 파일 자체는 매니페스트 유무와 무관하게 동일한 검증(§3.2.1의 zip bomb 방어, 경로 검증,
-  `index.html` 존재 확인)을 거칩니다 — 매니페스트는 오직 "게임 row를 무엇으로 만들지"만 알려줄
-  뿐, 번들 검증 절차를 우회하지 않습니다.
+- 발행되는 파일 자체는 매니페스트/로고 유무와 무관하게 동일한 검증(§3.2.1의 zip bomb 방어, 경로
+  검증, `index.html` 존재 확인)을 거칩니다 — 매니페스트는 오직 "게임 row를 무엇으로 만들지"만
+  알려줄 뿐, 번들 검증 절차를 우회하지 않습니다.
 - API: `POST /api/dev/games/upload` (multipart, 필드명 `bundle`) — `docs/GAME_UPLOAD_GUIDE.md`와
   공개 위키([`/wiki/games/development`](../apps/web/app/routes/wikiGamesDevelopment.tsx))에서
   플레이어 대상 안내를 볼 수 있습니다.
@@ -418,6 +433,33 @@ MODERATOR에는 없습니다([`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §4). �
   이유가 없기 때문입니다. 되돌려진 버전은 일반 심사 대기 큐(`listPendingVersions`)에 그대로
   다시 나타나 재심사할 수 있습니다.
 - 사유는 선택 사항이며, 입력하면 감사 로그에 `APPROVAL_REVOKED` 액션으로 남습니다.
+
+#### 3.6.6 사이트 메인 카탈로그 통합 (2026-08-18)
+
+승인 + 공개(`visibility = 'PUBLIC'`) 전환된 샌드박스 게임은 이제 사이트 메인 카탈로그
+(`/games`, "미니게임 라인업")에 내장 게임과 함께 노출됩니다. 이전에는 승인/공개해도
+`/play/:slug` 직접 링크가 있어야만 접근할 수 있었습니다(발견 경로 없음) — 이 절은 그 간극을
+메웁니다.
+
+- `GET /api/games/sandbox`(신규) — 현재 PUBLIC인 모든 게임을 반환하는 공개(무인증) 목록
+  엔드포인트. 기존 단일 게임 조회(`GET /api/games/sandbox/:slug`)와 같은 축소된 필드만 노출
+  (review/publish 내부 필드 없음), 60초 엣지 캐시.
+- `GET /api/games/sandbox/:slug/logo`(신규) — 로고 이미지 바이트 자체. 저장 키를 클라이언트에
+  절대 노출하지 않는 기존 원칙을 따라(`objectKey`/`manifestKey`와 동일 패턴),
+  `SandboxGameRecordSchema`는 `logoKey`를 `hasLogo: boolean`으로 변환해서만 내보냅니다 — 실제
+  이미지가 필요한 클라이언트는 이 엔드포인트를 직접 가리킵니다. 로고가 없는 게임(요구사항
+  이전 등록)은 404를 반환하고, 웹 카탈로그는 OwOGG 파비콘으로 대체 표시합니다.
+- 웹 쪽 통합은 `apps/web/app/features/catalog/sandboxGameAdapter.ts`가 담당합니다 —
+  `SandboxGamePublicDetail`을 내장 게임과 동일한 `GameManifest` 형태로 변환해, 기존
+  `GameGrid`/`GameCard` 컴포넌트가 두 종류를 구분 없이 렌더링합니다. `mode`는
+  `GameManifest.modes`(`"single"` → `single`, `"multi"` → `local-multi`)로,
+  카테고리(`categories`)는 **의도적으로 빈 배열**로 매핑합니다 — 자유 텍스트인 `genre`가 기존
+  4대 태그(순발력/두뇌/에임/타자)에 들어맞지 않기 때문에, "전체" 탭에서만 보이고 태그 필터에는
+  걸리지 않습니다(§1의 기존 비고에 이미 있던 계획된 격차).
+- **알려진 한계, 아직 해결 안 됨**: 제작자가 고르는 slug는 다른 샌드박스 게임과의 유일성만
+  검사합니다(DB UNIQUE 제약) — 내장 게임의 slug와 충돌하는지는 검사하지 않습니다. `packages/
+core`가 웹 앱 전용 내장 게임 레지스트리에 의도적으로 의존하지 않기 때문입니다. 실무상 발생
+  가능성은 낮지만 완전히 막혀 있지는 않습니다.
 
 ### 3.7 DB 스키마 초안
 
