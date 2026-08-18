@@ -5,7 +5,6 @@ import {
   type LeaderRecord,
   type SubmitScoreResponse,
 } from "@owogg/contracts";
-import { GAME_MANIFEST_MAP } from "@owogg/core";
 import { apiFetch } from "../../lib/api";
 
 let activePlayToken: string | null = null;
@@ -94,15 +93,17 @@ export async function fetchLeaderboardApi(
   );
   const list = data.leaderboard || [];
 
+  // gameTitle is resolved server-side now (apps/api/src/routes/scores.ts, off the same
+  // GameRegistry the leaderboard query itself used) — no second request and no direct import of
+  // core's generated registry needed here. Falls back to the raw gameId only for a response from
+  // an old cached edge response predating this field, or a malformed one; not expected in
+  // practice, since the schema always resolves an id.
   return list.map((item) => {
     const gId = item.gameId || gameId;
-    const manifest = GAME_MANIFEST_MAP[gId];
-    const title = manifest?.title ?? gId;
-
     return {
       ...item,
       gameId: gId,
-      gameTitle: title,
+      gameTitle: item.gameTitle ?? gId,
     };
   });
 }

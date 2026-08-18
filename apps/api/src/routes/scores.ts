@@ -1,11 +1,10 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { createContainer, evaluateAchievementsForUser } from "../container.js";
+import { createContainer, evaluateAchievementsForUser, gameRegistry } from "../container.js";
 import { createReadContainer } from "../readReplica.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { scoreSubmissionSchema } from "@owogg/contracts";
-import { GAME_MANIFEST_MAP } from "@owogg/core";
 import type { ApiEnv } from "./auth.js";
 
 export const scoresRouter = new Hono<ApiEnv>();
@@ -201,7 +200,14 @@ scoresRouter.get("/user/me", async (c) => {
 scoresRouter.get("/:gameId", edgeCache({ ttlSeconds: 30 }), async (c) => {
   const gameId = c.req.param("gameId");
 
-  if (!GAME_MANIFEST_MAP[gameId]) {
+  // Resolved through the shared GameRegistry singleton (see container.ts), not a DB-bound
+  // container — this validation must run (and INVALID_GAME_ID must still be returned) even in an
+  // environment with no D1 binding, matching the check this replaced (GAME_MANIFEST_MAP was a
+  // plain in-memory lookup with the same property). Only covers SYSTEM games today; a creator
+  // slug is correctly INVALID_GAME_ID here, same as before — see ScoreUseCases's own doc comment
+  // on creator score submission being unsupported.
+  const definition = await gameRegistry.findBySlug(gameId);
+  if (!definition) {
     return c.json(
       { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
       400,
@@ -228,6 +234,10 @@ scoresRouter.get("/:gameId", edgeCache({ ttlSeconds: 30 }), async (c) => {
       avatar_url: item.avatar_url,
       avatarUrl: item.avatar_url,
       gameId: item.game_id,
+      // Resolved once above (the same game every row belongs to — scoreUseCases.getLeaderboard
+      // is already scoped to one gameId), not re-looked-up per row. Lets the web client drop its
+      // own GAME_MANIFEST_MAP-based title lookup — see apps/web/app/features/scores/api.ts.
+      gameTitle: definition.title,
       score: item.score,
       formattedScore: item.formattedScore,
       difficulty: item.difficulty,

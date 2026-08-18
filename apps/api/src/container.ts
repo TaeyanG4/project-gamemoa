@@ -77,8 +77,14 @@ import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleAr
  * registry:check` (scripts/registry-builder.ts's assertDefinitionsMatchManifests), so this is
  * behaviourally the same catalog ScoreUseCases/GameSettingsUseCases resolved through
  * GAME_MANIFEST_MAP/GAME_MANIFESTS before.
+ *
+ * Exported directly (not only reachable via `createContainer(db).gameRegistry`) because it
+ * genuinely needs no `db` argument to exist — a route that only wants to resolve a game id
+ * (routes/scores.ts's leaderboard gameId validation, in particular) can import this without first
+ * needing a D1 binding to be present, matching the validation-before-DB-check ordering that route
+ * already had.
  */
-const gameRegistry: GameRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
+export const gameRegistry: GameRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
 
 export interface AppContainer {
   userRepo: UserRepository;
