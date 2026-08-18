@@ -418,61 +418,76 @@ function ManageGamesPanel({
                         심사 대기 중 (슬롯 {g.reviewSlot})
                       </span>
                     )}
+                    {g.deletedAt && (
+                      <span
+                        className="rounded-full bg-accent-red/10 px-1.5 py-0.5 font-bold text-accent-red"
+                        title="관리자가 삭제했습니다. 기록은 감사 목적으로 남아 있으며, 같은 이름(슬러그)으로는 재등록할 수 없습니다."
+                      >
+                        관리자에 의해 삭제됨
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {g.reviewSlot !== null && (
-                  <button
-                    type="button"
-                    onClick={() => void handleWithdraw(g.id)}
-                    disabled={withdrawingGameId !== null}
-                    className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-muted hover:border-accent-red hover:text-accent-red disabled:opacity-50"
-                  >
-                    {withdrawingGameId === g.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <XCircle className="h-3.5 w-3.5" />
-                    )}
-                    철회
-                  </button>
-                )}
-                <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand">
-                  {uploadingGameId === g.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="h-3.5 w-3.5" />
+              {/* A game an admin has soft-deleted keeps its row (for audit) but is otherwise a
+                  dead end for the creator — no new version can attach to it, and self-delete only
+                  ever applied to never-approved games anyway. Showing live-looking action buttons
+                  here previously let a creator "버전 업로드" or re-register the same slug and hit
+                  an error with no explanation (2026-08-18). */}
+              {!g.deletedAt && (
+                <div className="flex shrink-0 items-center gap-2">
+                  {g.reviewSlot !== null && (
+                    <button
+                      type="button"
+                      onClick={() => void handleWithdraw(g.id)}
+                      disabled={withdrawingGameId !== null}
+                      className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-muted hover:border-accent-red hover:text-accent-red disabled:opacity-50"
+                    >
+                      {withdrawingGameId === g.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5" />
+                      )}
+                      철회
+                    </button>
                   )}
-                  버전 업로드
-                  <input
-                    type="file"
-                    accept=".zip"
-                    className="hidden"
-                    disabled={uploadingGameId !== null}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) void handleUploadVersion(g.id, file);
-                    }}
-                  />
-                </label>
-                {g.liveVersionId === null && (
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete(g.id, g.title)}
-                    disabled={deletingGameId !== null}
-                    title="관리자 승인 전까지만 직접 삭제할 수 있습니다."
-                    className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-muted hover:border-accent-red hover:text-accent-red disabled:opacity-50"
-                  >
-                    {deletingGameId === g.id ? (
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand">
+                    {uploadingGameId === g.id ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Upload className="h-3.5 w-3.5" />
                     )}
-                    삭제
-                  </button>
-                )}
-              </div>
+                    버전 업로드
+                    <input
+                      type="file"
+                      accept=".zip"
+                      className="hidden"
+                      disabled={uploadingGameId !== null}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = "";
+                        if (file) void handleUploadVersion(g.id, file);
+                      }}
+                    />
+                  </label>
+                  {g.liveVersionId === null && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDelete(g.id, g.title)}
+                      disabled={deletingGameId !== null}
+                      title="관리자 승인 전까지만 직접 삭제할 수 있습니다."
+                      className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-muted hover:border-accent-red hover:text-accent-red disabled:opacity-50"
+                    >
+                      {deletingGameId === g.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                      삭제
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           ))
         )}
