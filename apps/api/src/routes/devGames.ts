@@ -261,7 +261,9 @@ devGamesRouter.post(
     }
     if (!session.hasGameCreatorAccess) {
       return c.json(
-        { error: { code: "FORBIDDEN", message: "게임 크리에이터 권한이 있는 사용자만 가능합니다." } },
+        {
+          error: { code: "FORBIDDEN", message: "게임 크리에이터 권한이 있는 사용자만 가능합니다." },
+        },
         403,
       );
     }

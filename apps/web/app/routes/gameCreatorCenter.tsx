@@ -269,7 +269,9 @@ function ManageGamesPanel({
     setRegistering(true);
     try {
       const { game } = await uploadGameFromBundle(file);
-      setNotice(`"${game.title}" 게임이 등록되었습니다. 관리자 심사 후 승인되면 공개할 수 있습니다.`);
+      setNotice(
+        `"${game.title}" 게임이 등록되었습니다. 관리자 심사 후 승인되면 공개할 수 있습니다.`,
+      );
       onChanged();
     } catch (err) {
       onError(err instanceof Error ? err.message : "등록에 실패했습니다.");

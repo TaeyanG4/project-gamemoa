@@ -407,7 +407,9 @@ function GameDetailPanel({
             ) : (
               <EyeOff className="h-3.5 w-3.5" />
             )}
-            {game.visibility === "PUBLIC" ? "공개 중 (클릭 시 비공개)" : "비공개 (클릭 시 공개 전환)"}
+            {game.visibility === "PUBLIC"
+              ? "공개 중 (클릭 시 비공개)"
+              : "비공개 (클릭 시 공개 전환)"}
           </button>
           <button
             type="button"
@@ -427,8 +429,8 @@ function GameDetailPanel({
 
       {game.deletedAt !== null && (
         <p className="rounded-xl border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-[11px] font-semibold text-accent-red">
-          이 게임은 {game.deletedAt.split("T")[0]}에 삭제되었습니다 (관리자 #{game.deletedByAdminId}).
-          더 이상 플레이어에게 제공되지 않습니다.
+          이 게임은 {game.deletedAt.split("T")[0]}에 삭제되었습니다 (관리자 #{game.deletedByAdminId}
+          ). 더 이상 플레이어에게 제공되지 않습니다.
         </p>
       )}
 
