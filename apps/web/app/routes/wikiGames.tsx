@@ -32,6 +32,13 @@ export default function WikiGamesRoute() {
           <p className="text-sm font-black text-text-primary">{t.cardXp}</p>
           <p className="mt-1 text-xs text-text-muted">{t.cardXpDesc}</p>
         </Link>
+        <Link
+          to="/wiki/games/development"
+          className="rounded-2xl border border-border bg-surface-raised p-4 hover:border-brand/40"
+        >
+          <p className="text-sm font-black text-text-primary">{t.cardDevelopment}</p>
+          <p className="mt-1 text-xs text-text-muted">{t.cardDevelopmentDesc}</p>
+        </Link>
       </section>
 
       <p className="text-xs text-text-muted">

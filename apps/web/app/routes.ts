@@ -45,6 +45,7 @@ export default [
   route("wiki/account", "routes/wikiAccount.tsx"),
   route("wiki/account/merge", "routes/wikiAccountMerge.tsx"),
   route("wiki/games", "routes/wikiGames.tsx"),
+  route("wiki/games/development", "routes/wikiGamesDevelopment.tsx"),
   route("wiki/games/ranking", "routes/wikiGamesRanking.tsx"),
   route("wiki/games/xp", "routes/wikiGamesXp.tsx"),
   route("wiki/creator", "routes/wikiCreator.tsx"),

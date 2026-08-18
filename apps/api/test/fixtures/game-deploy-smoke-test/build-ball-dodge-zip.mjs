@@ -4,7 +4,7 @@
 // build artifact (gitignored, see .gitignore), regenerated on demand from the committed source
 // files rather than committed itself.
 //
-// Usage: node apps/api/test/fixtures/build-ball-dodge-zip.mjs
+// Usage: node apps/api/test/fixtures/game-deploy-smoke-test/build-ball-dodge-zip.mjs
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";

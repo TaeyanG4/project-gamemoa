@@ -46,6 +46,7 @@ export function buildWikiSections(dict: Dictionary): WikiNavSection[] {
       title: dict.wiki.navGamesRanking,
       items: [
         { path: "/wiki/games", label: dict.wiki.navGamesOverview },
+        { path: "/wiki/games/development", label: dict.wiki.navGamesDevelopment },
         { path: "/wiki/games/ranking", label: dict.wiki.navRanking },
         { path: "/wiki/games/xp", label: dict.wiki.navGamesXp },
       ],

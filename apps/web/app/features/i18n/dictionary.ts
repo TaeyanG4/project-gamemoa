@@ -498,6 +498,7 @@ export interface Dictionary {
     navGamesOverview: string;
     navRanking: string;
     navGamesXp: string;
+    navGamesDevelopment: string;
     navCreatorOverview: string;
     navCreatorVerification: string;
     navCreatorFeatured: string;
@@ -614,6 +615,31 @@ export interface Dictionary {
       cardRankingDesc: string;
       cardXp: string;
       cardXpDesc: string;
+      cardDevelopment: string;
+      cardDevelopmentDesc: string;
+      footerPrefix: string;
+      footerLink: string;
+      footerSuffix: string;
+    };
+    gamesDevelopment: {
+      title: string;
+      description: string;
+      intro: string;
+      eligibilityHeading: string;
+      eligibilityBody: string;
+      eligibilityLink: string;
+      sdkHeading: string;
+      sdkBody: string;
+      limitsHeading: string;
+      limitBundle: string;
+      limitExtracted: string;
+      limitFiles: string;
+      flowHeading: string;
+      flowStep1: string;
+      flowStep2: string;
+      flowStep3: string;
+      policyHeading: string;
+      policyBody: string;
       footerPrefix: string;
       footerLink: string;
       footerSuffix: string;
@@ -1599,6 +1625,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navGamesOverview: "게임 개요",
       navRanking: "랭킹",
       navGamesXp: "XP와 레벨",
+      navGamesDevelopment: "게임 개발 및 등록",
       navCreatorOverview: "Creator 개요",
       navCreatorVerification: "채널 소유권 인증",
       navCreatorFeatured: "Featured Creator",
@@ -1734,9 +1761,41 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         cardRankingDesc: "게임별/스트리머 랭킹 계산 방식",
         cardXp: "XP와 레벨 →",
         cardXpDesc: "경험치 지급 방식과 레벨 공식",
+        cardDevelopment: "게임 개발 및 등록 →",
+        cardDevelopmentDesc: "게임 크리에이터가 되어 직접 게임을 올리는 방법",
         footerPrefix: "지금 바로 ",
         footerLink: "게임 카탈로그",
         footerSuffix: "에서 플레이해보세요.",
+      },
+      gamesDevelopment: {
+        title: "게임 개발 및 등록",
+        description: "누구나 만든 웹 게임을 게임 크리에이터로 OwOGG에 올릴 수 있습니다.",
+        intro:
+          "웹으로 빌드되는 것이면 장르 제약 없이 올릴 수 있습니다 — 슈터, 퍼즐, 캐주얼, 액션, 무엇이든 좋습니다. 유일한 조건은 결과물이 index.html을 진입점으로 갖는 정적 웹 파일 묶음이어야 한다는 것입니다.",
+        eligibilityHeading: "게임 크리에이터 자격 얻기",
+        eligibilityBody:
+          "게임을 업로드하려면 먼저 게임 크리에이터 자격이 필요합니다. 운영팀이 직접 임명하거나, 아래 게임 크리에이터 센터에서 직접 신청할 수 있습니다. 신청은 운영팀 심사를 거쳐 승인/반려되며, 반려되어도 다시 신청할 수 있습니다.",
+        eligibilityLink: "게임 크리에이터 센터에서 신청하기",
+        sdkHeading: "호스트 연동 — 2줄이면 충분",
+        sdkBody:
+          "게임이 OwOGG 호스트에게 알려야 할 건 '로딩 끝남'과 '게임 종료 + 점수' 두 가지뿐입니다.",
+        limitsHeading: "용량 제한",
+        limitBundle: "ZIP 1개당 최대 20MiB (업로드 시점 압축 크기 기준)",
+        limitExtracted: "압축을 풀었을 때 총 50MiB 이하",
+        limitFiles: "파일 개수 300개 이하",
+        flowHeading: "제출 → 심사 → 공개",
+        flowStep1:
+          "업로드: 게임 크리에이터 센터에서 게임을 등록하고 번들(ZIP)을 업로드합니다. 업로드 직후는 본인에게만 보입니다.",
+        flowStep2:
+          "심사: 운영팀이 실제로 플레이해보고 콘텐츠를 확인합니다. 승인되어도 자동으로 공개되지 않습니다.",
+        flowStep3:
+          "공개: 운영팀이 별도로 공개 전환해야 그 순간부터 실제 유저에게 서비스가 시작됩니다.",
+        policyHeading: "콘텐츠 정책",
+        policyBody:
+          "불법 콘텐츠, 혐오/차별 표현, 성인 콘텐츠, 타인의 IP를 침해하는 에셋/텍스트, 악성 코드나 다른 유저에게 피해를 주는 로직은 금지됩니다.",
+        footerPrefix: "자세한 업로드 절차는 ",
+        footerLink: "게임 크리에이터 센터",
+        footerSuffix: "에서 직접 확인하세요.",
       },
       gamesRanking: {
         title: "랭킹",
@@ -2834,6 +2893,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navGamesOverview: "Games Overview",
       navRanking: "Ranking",
       navGamesXp: "XP & Levels",
+      navGamesDevelopment: "게임 개발 및 등록",
       navCreatorOverview: "Creator Overview",
       navCreatorVerification: "Channel Ownership Verification",
       navCreatorFeatured: "Featured Creator",
@@ -2979,9 +3039,41 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         cardRankingDesc: "How per-game and streamer rankings are calculated",
         cardXp: "XP & Levels →",
         cardXpDesc: "How XP is granted and the level formula",
+        cardDevelopment: "게임 개발 및 등록 →",
+        cardDevelopmentDesc: "게임 크리에이터가 되어 직접 게임을 올리는 방법",
         footerPrefix: "Jump right into the ",
         footerLink: "game catalog",
         footerSuffix: " and start playing.",
+      },
+      gamesDevelopment: {
+        title: "게임 개발 및 등록",
+        description: "누구나 만든 웹 게임을 게임 크리에이터로 OwOGG에 올릴 수 있습니다.",
+        intro:
+          "웹으로 빌드되는 것이면 장르 제약 없이 올릴 수 있습니다 — 슈터, 퍼즐, 캐주얼, 액션, 무엇이든 좋습니다. 유일한 조건은 결과물이 index.html을 진입점으로 갖는 정적 웹 파일 묶음이어야 한다는 것입니다.",
+        eligibilityHeading: "게임 크리에이터 자격 얻기",
+        eligibilityBody:
+          "게임을 업로드하려면 먼저 게임 크리에이터 자격이 필요합니다. 운영팀이 직접 임명하거나, 아래 게임 크리에이터 센터에서 직접 신청할 수 있습니다. 신청은 운영팀 심사를 거쳐 승인/반려되며, 반려되어도 다시 신청할 수 있습니다.",
+        eligibilityLink: "게임 크리에이터 센터에서 신청하기",
+        sdkHeading: "호스트 연동 — 2줄이면 충분",
+        sdkBody:
+          "게임이 OwOGG 호스트에게 알려야 할 건 '로딩 끝남'과 '게임 종료 + 점수' 두 가지뿐입니다.",
+        limitsHeading: "용량 제한",
+        limitBundle: "ZIP 1개당 최대 20MiB (업로드 시점 압축 크기 기준)",
+        limitExtracted: "압축을 풀었을 때 총 50MiB 이하",
+        limitFiles: "파일 개수 300개 이하",
+        flowHeading: "제출 → 심사 → 공개",
+        flowStep1:
+          "업로드: 게임 크리에이터 센터에서 게임을 등록하고 번들(ZIP)을 업로드합니다. 업로드 직후는 본인에게만 보입니다.",
+        flowStep2:
+          "심사: 운영팀이 실제로 플레이해보고 콘텐츠를 확인합니다. 승인되어도 자동으로 공개되지 않습니다.",
+        flowStep3:
+          "공개: 운영팀이 별도로 공개 전환해야 그 순간부터 실제 유저에게 서비스가 시작됩니다.",
+        policyHeading: "콘텐츠 정책",
+        policyBody:
+          "불법 콘텐츠, 혐오/차별 표현, 성인 콘텐츠, 타인의 IP를 침해하는 에셋/텍스트, 악성 코드나 다른 유저에게 피해를 주는 로직은 금지됩니다.",
+        footerPrefix: "자세한 업로드 절차는 ",
+        footerLink: "게임 크리에이터 센터",
+        footerSuffix: "에서 직접 확인하세요.",
       },
       gamesRanking: {
         title: "Ranking",
@@ -4091,6 +4183,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navGamesOverview: "ゲーム概要",
       navRanking: "ランキング",
       navGamesXp: "XPとレベル",
+      navGamesDevelopment: "게임 개발 및 등록",
       navCreatorOverview: "Creator概要",
       navCreatorVerification: "チャンネル所有権認証",
       navCreatorFeatured: "Featured Creator",
@@ -4231,9 +4324,41 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         cardRankingDesc: "ゲーム別・ストリーマーランキングの計算方式",
         cardXp: "XPとレベル →",
         cardXpDesc: "経験値の付与方式とレベル計算式",
+        cardDevelopment: "게임 개발 및 등록 →",
+        cardDevelopmentDesc: "게임 크리에이터가 되어 직접 게임을 올리는 방법",
         footerPrefix: "今すぐ",
         footerLink: "ゲームカタログ",
         footerSuffix: "からプレイしてみましょう。",
+      },
+      gamesDevelopment: {
+        title: "게임 개발 및 등록",
+        description: "누구나 만든 웹 게임을 게임 크리에이터로 OwOGG에 올릴 수 있습니다.",
+        intro:
+          "웹으로 빌드되는 것이면 장르 제약 없이 올릴 수 있습니다 — 슈터, 퍼즐, 캐주얼, 액션, 무엇이든 좋습니다. 유일한 조건은 결과물이 index.html을 진입점으로 갖는 정적 웹 파일 묶음이어야 한다는 것입니다.",
+        eligibilityHeading: "게임 크리에이터 자격 얻기",
+        eligibilityBody:
+          "게임을 업로드하려면 먼저 게임 크리에이터 자격이 필요합니다. 운영팀이 직접 임명하거나, 아래 게임 크리에이터 센터에서 직접 신청할 수 있습니다. 신청은 운영팀 심사를 거쳐 승인/반려되며, 반려되어도 다시 신청할 수 있습니다.",
+        eligibilityLink: "게임 크리에이터 센터에서 신청하기",
+        sdkHeading: "호스트 연동 — 2줄이면 충분",
+        sdkBody:
+          "게임이 OwOGG 호스트에게 알려야 할 건 '로딩 끝남'과 '게임 종료 + 점수' 두 가지뿐입니다.",
+        limitsHeading: "용량 제한",
+        limitBundle: "ZIP 1개당 최대 20MiB (업로드 시점 압축 크기 기준)",
+        limitExtracted: "압축을 풀었을 때 총 50MiB 이하",
+        limitFiles: "파일 개수 300개 이하",
+        flowHeading: "제출 → 심사 → 공개",
+        flowStep1:
+          "업로드: 게임 크리에이터 센터에서 게임을 등록하고 번들(ZIP)을 업로드합니다. 업로드 직후는 본인에게만 보입니다.",
+        flowStep2:
+          "심사: 운영팀이 실제로 플레이해보고 콘텐츠를 확인합니다. 승인되어도 자동으로 공개되지 않습니다.",
+        flowStep3:
+          "공개: 운영팀이 별도로 공개 전환해야 그 순간부터 실제 유저에게 서비스가 시작됩니다.",
+        policyHeading: "콘텐츠 정책",
+        policyBody:
+          "불법 콘텐츠, 혐오/차별 표현, 성인 콘텐츠, 타인의 IP를 침해하는 에셋/텍스트, 악성 코드나 다른 유저에게 피해를 주는 로직은 금지됩니다.",
+        footerPrefix: "자세한 업로드 절차는 ",
+        footerLink: "게임 크리에이터 센터",
+        footerSuffix: "에서 직접 확인하세요.",
       },
       gamesRanking: {
         title: "ランキング",
@@ -5321,6 +5446,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       navGamesOverview: "游戏概览",
       navRanking: "排行榜",
       navGamesXp: "XP 与等级",
+      navGamesDevelopment: "게임 개발 및 등록",
       navCreatorOverview: "Creator 概览",
       navCreatorVerification: "频道所有权认证",
       navCreatorFeatured: "Featured Creator",
@@ -5451,9 +5577,41 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         cardRankingDesc: "各游戏/主播排行榜的计算方式",
         cardXp: "XP 与等级 →",
         cardXpDesc: "经验值的发放方式与等级公式",
+        cardDevelopment: "게임 개발 및 등록 →",
+        cardDevelopmentDesc: "게임 크리에이터가 되어 직접 게임을 올리는 방법",
         footerPrefix: "现在就到",
         footerLink: "游戏目录",
         footerSuffix: "开始游玩吧。",
+      },
+      gamesDevelopment: {
+        title: "게임 개발 및 등록",
+        description: "누구나 만든 웹 게임을 게임 크리에이터로 OwOGG에 올릴 수 있습니다.",
+        intro:
+          "웹으로 빌드되는 것이면 장르 제약 없이 올릴 수 있습니다 — 슈터, 퍼즐, 캐주얼, 액션, 무엇이든 좋습니다. 유일한 조건은 결과물이 index.html을 진입점으로 갖는 정적 웹 파일 묶음이어야 한다는 것입니다.",
+        eligibilityHeading: "게임 크리에이터 자격 얻기",
+        eligibilityBody:
+          "게임을 업로드하려면 먼저 게임 크리에이터 자격이 필요합니다. 운영팀이 직접 임명하거나, 아래 게임 크리에이터 센터에서 직접 신청할 수 있습니다. 신청은 운영팀 심사를 거쳐 승인/반려되며, 반려되어도 다시 신청할 수 있습니다.",
+        eligibilityLink: "게임 크리에이터 센터에서 신청하기",
+        sdkHeading: "호스트 연동 — 2줄이면 충분",
+        sdkBody:
+          "게임이 OwOGG 호스트에게 알려야 할 건 '로딩 끝남'과 '게임 종료 + 점수' 두 가지뿐입니다.",
+        limitsHeading: "용량 제한",
+        limitBundle: "ZIP 1개당 최대 20MiB (업로드 시점 압축 크기 기준)",
+        limitExtracted: "압축을 풀었을 때 총 50MiB 이하",
+        limitFiles: "파일 개수 300개 이하",
+        flowHeading: "제출 → 심사 → 공개",
+        flowStep1:
+          "업로드: 게임 크리에이터 센터에서 게임을 등록하고 번들(ZIP)을 업로드합니다. 업로드 직후는 본인에게만 보입니다.",
+        flowStep2:
+          "심사: 운영팀이 실제로 플레이해보고 콘텐츠를 확인합니다. 승인되어도 자동으로 공개되지 않습니다.",
+        flowStep3:
+          "공개: 운영팀이 별도로 공개 전환해야 그 순간부터 실제 유저에게 서비스가 시작됩니다.",
+        policyHeading: "콘텐츠 정책",
+        policyBody:
+          "불법 콘텐츠, 혐오/차별 표현, 성인 콘텐츠, 타인의 IP를 침해하는 에셋/텍스트, 악성 코드나 다른 유저에게 피해를 주는 로직은 금지됩니다.",
+        footerPrefix: "자세한 업로드 절차는 ",
+        footerLink: "게임 크리에이터 센터",
+        footerSuffix: "에서 직접 확인하세요.",
       },
       gamesRanking: {
         title: "排行榜",

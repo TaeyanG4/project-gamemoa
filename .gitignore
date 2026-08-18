@@ -31,6 +31,7 @@ docs/AGENTS.md
 docs/PROGRESSION.md
 docs/ADMIN_GUIDE.md
 docs/PRODUCTION_INTEGRATIONS.md
+docs/GAME_DEPLOY_SMOKE_TEST.md
 docs/logs/
 docs/runbooks/
 docs/archive/
@@ -38,7 +39,8 @@ apps/api/.b2-secret.env
 apps/api/.dev.vars
 apps/api/b2-smoke-test.txt
 
-# Generated from apps/api/test/fixtures/ball-dodge/ by build-ball-dodge-zip.mjs — a build artifact
-# (the sandbox-game pipeline smoke-test upload fixture), not source. Regenerate with:
-#   node apps/api/test/fixtures/build-ball-dodge-zip.mjs
-apps/api/test/fixtures/ball-dodge.zip
+# Generated from apps/api/test/fixtures/game-deploy-smoke-test/ball-dodge/ by
+# build-ball-dodge-zip.mjs — a build artifact (the sandbox-game pipeline smoke-test upload
+# fixture), not source. Regenerate with:
+#   node apps/api/test/fixtures/game-deploy-smoke-test/build-ball-dodge-zip.mjs
+apps/api/test/fixtures/game-deploy-smoke-test/ball-dodge.zip

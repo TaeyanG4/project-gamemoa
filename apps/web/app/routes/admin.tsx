@@ -10,6 +10,7 @@ import {
   Loader2,
   LogOut,
   Server,
+  ServerCog,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -763,6 +764,33 @@ function AdminDashboard({
           >
             <UserCog className="h-3.5 w-3.5" /> 관리자 계정
           </Link>
+        )}
+        {/* ADMIN implicitly holds every permission (§1.3, docs/AUTHORIZATION.md) — these three
+            quick links surface the OPERATOR/MODERATOR/SYSTEM_DEVELOPER-specific centers directly
+            from here so ADMIN never needs to know their URLs by heart. Each page's own route
+            guard (useAdminGate) already lets role === "ADMIN" through regardless of permission,
+            so these links were always reachable — they just weren't visible until now. */}
+        {role === "ADMIN" && (
+          <>
+            <Link
+              to="/ops"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> 운영 센터
+            </Link>
+            <Link
+              to="/mod"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> 모더레이션
+            </Link>
+            <Link
+              to="/system-dev"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+            >
+              <ServerCog className="h-3.5 w-3.5" /> 시스템 개발
+            </Link>
+          </>
         )}
         <Link
           to="/admin/settings/security"
