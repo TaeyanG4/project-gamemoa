@@ -7,10 +7,11 @@ import type {
   SandboxGamePendingVersionsPage,
   GameBundleStorageRepository,
 } from "../ports/sandboxGames.js";
-import type { SandboxGameVisibility } from "../domain/sandboxGames.js";
+import type { SandboxGameVisibility, SandboxGameMode } from "../domain/sandboxGames.js";
 import {
   SANDBOX_GAME_POLICY,
   isValidSandboxGameSlug,
+  isValidSandboxGameMode,
   canSetVisibilityPublic,
   isPublishedVersion,
 } from "../domain/sandboxGames.js";
@@ -19,10 +20,13 @@ import {
   publishedObjectKey,
   resolveBundleContentType,
   extractGameRegistrationManifest,
+  findGameLogoFile,
+  sandboxGameLogoObjectKey,
   SANDBOX_BUNDLE_REJECTIONS,
   SandboxBundleRejectionError,
   type SandboxBundleRejection,
   type PreparedBundle,
+  type PreparedBundleFile,
 } from "../domain/sandboxGameBundle.js";
 import { sha256Hex } from "../domain/contentHash.js";
 import type { GameBundlePublisher } from "./gameBundlePublisher.js";
@@ -57,6 +61,16 @@ export type SandboxGameUseCaseError =
    * missing/blank. slug/title reuse INVALID_SLUG/INVALID_TITLE — the same codes the manual
    * create-game form already produces for the same problems. */
   | "INVALID_GENRE"
+  /** createGameFromBundle: owogg.game.json's `mode` field is missing or isn't "single"/"multi"
+   * (2026-08-18, required on every registration). */
+  | "INVALID_MODE"
+  /** createGameFromBundle: no owogg.logo.{png,jpg,jpeg,webp,svg} at the bundle root (2026-08-18,
+   * required on every registration going forward) — distinct from MANIFEST_MISSING, since the
+   * manifest itself can be present and perfectly valid while the logo is simply absent. */
+  | "LOGO_REQUIRED"
+  /** createGameFromBundle: the logo file exists but exceeds SANDBOX_GAME_POLICY.MAX_LOGO_BYTES
+   * once decompressed. */
+  | "LOGO_TOO_LARGE"
   /** deleteGame was called on a game that's already soft-deleted — idempotent-failure rather than
    * a silent no-op, so a double-click doesn't look like it succeeded twice. */
   | "ALREADY_DELETED"
@@ -165,6 +179,7 @@ export class SandboxGameUseCases {
     shortDescription: string | null;
     description: string | null;
     genre: string;
+    mode: SandboxGameMode;
   }): Promise<SandboxGameRecord> {
     const slug = input.slug.trim().toLowerCase();
     if (!isValidSandboxGameSlug(slug)) throw new SandboxGameUseCaseFailure("INVALID_SLUG");
@@ -183,6 +198,7 @@ export class SandboxGameUseCases {
       shortDescription: input.shortDescription,
       description: input.description,
       genre: input.genre.trim(),
+      mode: input.mode,
       nowIso: new Date().toISOString(),
     });
     if (!created) throw new SandboxGameUseCaseFailure("SUBMISSION_LIMIT_REACHED");
@@ -282,6 +298,17 @@ export class SandboxGameUseCases {
     if (typeof manifest.genre !== "string" || manifest.genre.trim().length === 0) {
       throw new SandboxGameUseCaseFailure("INVALID_GENRE");
     }
+    if (!isValidSandboxGameMode(manifest.mode)) {
+      throw new SandboxGameUseCaseFailure("INVALID_MODE");
+    }
+
+    // Required on every registration (2026-08-18) — checked here, before createGame(), so a
+    // missing/oversized logo never leaves a game row behind with nothing to show for it.
+    const logoFile = findGameLogoFile(prepared.files);
+    if (!logoFile) throw new SandboxGameUseCaseFailure("LOGO_REQUIRED");
+    if (logoFile.bytes.byteLength > SANDBOX_GAME_POLICY.MAX_LOGO_BYTES) {
+      throw new SandboxGameUseCaseFailure("LOGO_TOO_LARGE");
+    }
 
     const game = await this.createGame({
       slug: manifest.slug,
@@ -291,13 +318,25 @@ export class SandboxGameUseCases {
         typeof manifest.shortDescription === "string" ? manifest.shortDescription : null,
       description: typeof manifest.description === "string" ? manifest.description : null,
       genre: manifest.genre,
+      mode: manifest.mode,
     });
+
+    // The logo is a game-level asset, not a playable bundle file — excluded from what actually
+    // gets published to the version's servable path (see uploadPreparedVersion's logoFile
+    // handling, which stores it separately and links sandbox_games.logo_key instead).
+    const publishableFiles = prepared.files.filter((f) => f.path !== logoFile.path);
+    const publishablePrepared: PreparedBundle = {
+      ...prepared,
+      files: publishableFiles,
+      totalSize: prepared.totalSize - logoFile.bytes.byteLength,
+    };
 
     const version = await this.uploadPreparedVersion({
       gameId: game.id,
       bytes: input.bytes,
       contentType: input.contentType,
-      prepared,
+      prepared: publishablePrepared,
+      logoFile,
     });
 
     return { game, version };
@@ -305,12 +344,16 @@ export class SandboxGameUseCases {
 
   /** Shared tail of uploadVersion/createGameFromBundle once an archive has already been prepared:
    * store it, insert the version row, and publish. See uploadVersion's own doc comment for why
-   * the ordering (store -> row -> publish) and the best-effort cleanup on a failed insert exist. */
+   * the ordering (store -> row -> publish) and the best-effort cleanup on a failed insert exist.
+   * `logoFile`, when set (only by createGameFromBundle, on first registration), is stored and
+   * linked in the same try/catch umbrella as everything else here — a logo write failure surfaces
+   * as the same typed PUBLISH_FAILED, not a silent partial success. */
   private async uploadPreparedVersion(input: {
     gameId: number;
     bytes: ArrayBuffer;
     contentType?: string | undefined;
     prepared: PreparedBundle;
+    logoFile?: PreparedBundleFile | undefined;
   }): Promise<SandboxGameVersionRecord> {
     const contentHash = await sha256Hex(input.bytes);
     const objectKey = sourceArchiveObjectKey(input.gameId, contentHash);
@@ -340,6 +383,15 @@ export class SandboxGameUseCases {
         bundleBytes: input.bytes.byteLength,
         nowIso: new Date().toISOString(),
       });
+      if (input.logoFile) {
+        const logoKey = sandboxGameLogoObjectKey(input.gameId, input.logoFile.path);
+        await this.storage.putObject({
+          key: logoKey,
+          bytes: input.logoFile.bytes,
+          contentType: input.logoFile.contentType,
+        });
+        await this.repo.setLogo(input.gameId, logoKey, new Date().toISOString());
+      }
     } catch (err) {
       // Best-effort cleanup, not a distributed transaction: if the D1 write fails after the
       // archive already landed in storage, delete it rather than leaving an orphan nobody will
@@ -728,6 +780,23 @@ export class SandboxGameUseCases {
     const version = await this.repo.findVersionById(game.liveVersionId);
     if (!version || version.gameId !== game.id) return null;
     return { game, version };
+  }
+
+  /**
+   * Resolves the bytes for `GET /api/games/sandbox/:slug/logo` — same PUBLIC-only gate and
+   * can't-distinguish-unknown-from-private null as {@link resolveLiveVersion}, plus null when the
+   * game has no logo at all (registered before logos were required, 2026-08-18). Content type is
+   * derived from the stored key's own extension (see domain/sandboxGameBundle.ts's
+   * sandboxGameLogoObjectKey/resolveBundleContentType) rather than a separate stored column.
+   */
+  async resolvePublicLogo(
+    slug: string,
+  ): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+    const game = await this.repo.findBySlug(slug);
+    if (!game || game.visibility !== "PUBLIC" || game.logoKey === null) return null;
+    const bytes = await this.storage.getObject(game.logoKey);
+    if (!bytes) return null;
+    return { bytes, contentType: resolveBundleContentType(game.logoKey).contentType };
   }
 
   /**

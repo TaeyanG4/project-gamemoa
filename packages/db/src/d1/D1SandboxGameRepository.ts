@@ -8,6 +8,7 @@ import type {
   SandboxGameVisibility,
   SandboxGameVersionStatus,
   SandboxGamePublishStatus,
+  SandboxGameMode,
 } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
@@ -20,6 +21,11 @@ function mapGameRow(row: Record<string, unknown>): SandboxGameRecord {
     shortDescription: row.short_description ? String(row.short_description) : null,
     description: row.description ? String(row.description) : null,
     genre: String(row.genre),
+    // Falls back to "single" for pre-2026-08-18 rows inserted before this column existed with a
+    // NOT NULL DEFAULT (migration 0027) — the DB default already covers this, `?? "single"` here
+    // is just defense in depth against a row read through a stale schema.
+    mode: (row.mode as SandboxGameMode | undefined) ?? "single",
+    logoKey: row.logo_key ? String(row.logo_key) : null,
     xpPerCompletion: Number(row.xp_per_completion ?? 0),
     scoreUnit: row.score_unit ? String(row.score_unit) : null,
     scoreDirection: (row.score_direction as "asc" | "desc" | null) ?? null,
@@ -203,6 +209,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     shortDescription: string | null;
     description: string | null;
     genre: string;
+    mode: SandboxGameMode;
     nowIso: string;
   }): Promise<SandboxGameRecord | null> {
     // INSERT ... SELECT rather than a plain INSERT: the SELECT computes the lowest review_slot
@@ -215,9 +222,9 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     const res = await this.db
       .prepare(
         `INSERT INTO sandbox_games
-           (slug, developer_user_id, title, short_description, description, genre,
+           (slug, developer_user_id, title, short_description, description, genre, mode,
             review_slot, created_at, updated_at)
-         SELECT ?, ?, ?, ?, ?, ?, avail.slot, ?, ?
+         SELECT ?, ?, ?, ?, ?, ?, ?, avail.slot, ?, ?
          FROM (
            SELECT MIN(s.slot) AS slot
            FROM (SELECT 1 AS slot UNION ALL SELECT 2) s
@@ -235,6 +242,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
         input.shortDescription,
         input.description,
         input.genre,
+        input.mode,
         input.nowIso,
         input.nowIso,
         input.developerUserId,
@@ -299,6 +307,16 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
       .run();
     const updated = await this.findById(id);
     if (!updated) throw new Error(`sandbox_games row ${id} not found after visibility update`);
+    return updated;
+  }
+
+  async setLogo(id: number, logoKey: string, nowIso: string): Promise<SandboxGameRecord> {
+    await this.db
+      .prepare(`UPDATE sandbox_games SET logo_key = ?, updated_at = ? WHERE id = ?`)
+      .bind(logoKey, nowIso, id)
+      .run();
+    const updated = await this.findById(id);
+    if (!updated) throw new Error(`sandbox_games row ${id} not found after logo update`);
     return updated;
   }
 

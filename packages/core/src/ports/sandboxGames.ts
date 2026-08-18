@@ -2,6 +2,7 @@ import type {
   SandboxGameVisibility,
   SandboxGameVersionStatus,
   SandboxGamePublishStatus,
+  SandboxGameMode,
 } from "../domain/sandboxGames.js";
 
 export interface SandboxGameRecord {
@@ -12,6 +13,16 @@ export interface SandboxGameRecord {
   shortDescription: string | null;
   description: string | null;
   genre: string;
+  /** "single" | "multi" (2026-08-18) — required on every game created via
+   * createGameFromBundle, the only registration path since the manual form was removed. */
+  mode: SandboxGameMode;
+  /** Internal storage key of the game's logo image (see domain/sandboxGameBundle.ts's
+   * sandboxGameLogoObjectKey), or null for a game registered before logos were required. Never
+   * exposed to a client as-is — mirrors objectKey/manifestKey on SandboxGameVersionRecord below;
+   * the contract layer (packages/contracts/src/sandboxGames.ts) transforms this into a plain
+   * `hasLogo: boolean`, and a client that needs to actually display it hits the public
+   * GET /api/games/sandbox/:slug/logo route instead of ever seeing where the bytes live. */
+  logoKey: string | null;
   xpPerCompletion: number;
   scoreUnit: string | null;
   scoreDirection: "asc" | "desc" | null;
@@ -128,6 +139,7 @@ export interface SandboxGameRepository {
     shortDescription: string | null;
     description: string | null;
     genre: string;
+    mode: SandboxGameMode;
     nowIso: string;
   }): Promise<SandboxGameRecord | null>;
 
@@ -135,6 +147,11 @@ export interface SandboxGameRepository {
    * null. Called once a game's submission reaches a terminal state (see isTerminalVersionStatus):
    * approved, rejected, or withdrawn. Never reclaimed afterward. */
   releaseReviewSlot(id: number, nowIso: string): Promise<SandboxGameRecord>;
+
+  /** Records where a game's logo object lives (see domain/sandboxGameBundle.ts's
+   * sandboxGameLogoObjectKey) — called once, right after the logo bytes are actually stored,
+   * during createGameFromBundle. There is currently no route to change a logo after registration. */
+  setLogo(id: number, logoKey: string, nowIso: string): Promise<SandboxGameRecord>;
 
   /** Soft delete (migration 0026) — sets deleted_at/deleted_by_admin_id and forces visibility back
    * to PRIVATE in the same write (belt-and-suspenders: the existing isVersionServable gate already
