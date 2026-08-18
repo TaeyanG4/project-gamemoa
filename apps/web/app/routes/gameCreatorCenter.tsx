@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, type DragEvent, type FormEvent } from "react";
+import { useState, useEffect, useCallback, type DragEvent } from "react";
 import { Link } from "react-router";
 import {
   ArrowLeft,
   Loader2,
   Gamepad2,
-  Plus,
+  Trash2,
   Upload,
   UploadCloud,
   XCircle,
@@ -16,10 +16,10 @@ import { useAuth } from "../features/auth";
 import {
   fetchDevMe,
   fetchMyGames,
-  createDevGame,
   uploadDevGameVersion,
   uploadGameFromBundle,
   withdrawDevGameSubmission,
+  deleteDevGame,
   applyForGameCreator,
   withdrawGameCreatorApplication,
   countActiveSubmissions,
@@ -251,19 +251,16 @@ function ManageGamesPanel({
   onChanged: () => void;
   onError: (msg: string) => void;
 }) {
-  const [newGameSlug, setNewGameSlug] = useState("");
-  const [newGameTitle, setNewGameTitle] = useState("");
-  const [newGameGenre, setNewGameGenre] = useState("");
-  const [creatingGame, setCreatingGame] = useState(false);
   const [uploadingGameId, setUploadingGameId] = useState<number | null>(null);
   const [withdrawingGameId, setWithdrawingGameId] = useState<number | null>(null);
+  const [deletingGameId, setDeletingGameId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
   // Drag-and-drop registration: a ZIP whose root contains owogg.game.json (slug/title/genre)
-  // creates the game *and* its first version in one call — see devApi.uploadGameFromBundle. The
-  // manual form below stays as the fallback for a bundle with no manifest.
+  // creates the game *and* its first version in one call — see devApi.uploadGameFromBundle. This
+  // is now the only registration path (2026-08-18 — the manual slug/title/genre form was removed).
   const handleDropRegister = async (file: File) => {
     if (registering) return;
     setRegistering(true);
@@ -285,27 +282,6 @@ function ManageGamesPanel({
     setDragActive(false);
     const file = e.dataTransfer.files[0];
     if (file) void handleDropRegister(file);
-  };
-
-  const handleCreateGame = async (e: FormEvent) => {
-    e.preventDefault();
-    if (creatingGame || !newGameSlug.trim() || !newGameTitle.trim() || !newGameGenre.trim()) return;
-    setCreatingGame(true);
-    try {
-      await createDevGame({
-        slug: newGameSlug.trim(),
-        title: newGameTitle.trim(),
-        genre: newGameGenre.trim(),
-      });
-      setNewGameSlug("");
-      setNewGameTitle("");
-      setNewGameGenre("");
-      onChanged();
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "게임 등록에 실패했습니다.");
-    } finally {
-      setCreatingGame(false);
-    }
   };
 
   const handleUploadVersion = async (gameId: number, file: File) => {
@@ -335,6 +311,25 @@ function ManageGamesPanel({
       onError(err instanceof Error ? err.message : "철회에 실패했습니다.");
     } finally {
       setWithdrawingGameId(null);
+    }
+  };
+
+  // Creator self-service full removal — only offered for a game that has never been approved
+  // (liveVersionId === null client-side proxy; the server enforces the real rule and returns
+  // CANNOT_DELETE_APPROVED_GAME otherwise). Unlike admin's soft-delete, this is a genuine hard
+  // delete, so the slug becomes reusable immediately.
+  const handleDelete = async (gameId: number, title: string) => {
+    if (deletingGameId !== null) return;
+    if (!window.confirm(`"${title}" 게임을 완전히 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    setDeletingGameId(gameId);
+    try {
+      await deleteDevGame(gameId);
+      setNotice(`"${title}" 게임을 삭제했습니다.`);
+      onChanged();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+    } finally {
+      setDeletingGameId(null);
     }
   };
 
@@ -394,55 +389,6 @@ function ManageGamesPanel({
           />
         </label>
       </div>
-
-      <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-        <span className="h-px flex-1 bg-border" />
-        또는 수동으로 등록
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <form
-        onSubmit={(e) => void handleCreateGame(e)}
-        className="grid grid-cols-1 gap-2 rounded-2xl bg-surface p-4 sm:grid-cols-3"
-      >
-        <input
-          type="text"
-          value={newGameSlug}
-          onChange={(e) => setNewGameSlug(e.target.value)}
-          placeholder="슬러그 (예: my-shooter)"
-          className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
-        />
-        <input
-          type="text"
-          value={newGameTitle}
-          onChange={(e) => setNewGameTitle(e.target.value)}
-          placeholder="게임 이름"
-          className="rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
-        />
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newGameGenre}
-            onChange={(e) => setNewGameGenre(e.target.value)}
-            placeholder="장르 (예: 슈터)"
-            className="min-w-0 flex-1 rounded-xl border border-border bg-surface-raised px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
-          />
-          <button
-            type="submit"
-            disabled={
-              creatingGame || !newGameSlug.trim() || !newGameTitle.trim() || !newGameGenre.trim()
-            }
-            className="flex shrink-0 items-center gap-1 rounded-xl bg-brand px-3 py-2 text-xs font-bold text-white hover:bg-brand-light disabled:opacity-50"
-          >
-            {creatingGame ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Plus className="h-3.5 w-3.5" />
-            )}
-            등록
-          </button>
-        </div>
-      </form>
 
       <div className="flex flex-col divide-y divide-border/60">
         {(myGames ?? []).length === 0 ? (
@@ -510,6 +456,22 @@ function ManageGamesPanel({
                     }}
                   />
                 </label>
+                {g.liveVersionId === null && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(g.id, g.title)}
+                    disabled={deletingGameId !== null}
+                    title="관리자 승인 전까지만 직접 삭제할 수 있습니다."
+                    className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-muted hover:border-accent-red hover:text-accent-red disabled:opacity-50"
+                  >
+                    {deletingGameId === g.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                    삭제
+                  </button>
+                )}
               </div>
             </div>
           ))

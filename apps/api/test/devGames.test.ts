@@ -511,3 +511,30 @@ test("POST /api/dev/games/:id/withdraw releases the slot so a new submission can
   );
   assert.equal(res.status, 201);
 });
+
+test("DELETE /api/dev/games/:id returns 401 without a session", async () => {
+  const { db } = createDevGamesDb({});
+  const res = await app.request(
+    "/api/dev/games/1",
+    { method: "DELETE", headers: { Origin: "http://localhost:5173" } },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 401);
+});
+
+test("DELETE /api/dev/games/:id lets a creator delete their own never-approved game", async () => {
+  const { db } = createDevGamesDb({
+    existingGames: [{ slug: "orphaned-game", reviewSlot: 1 }],
+  });
+  const res = await app.request(
+    "/api/dev/games/1",
+    {
+      method: "DELETE",
+      headers: { Cookie: "owogg_session=valid_session", Origin: "http://localhost:5173" },
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { deleted: boolean };
+  assert.equal(body.deleted, true);
+});

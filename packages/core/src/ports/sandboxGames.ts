@@ -139,6 +139,15 @@ export interface SandboxGameRepository {
    * takes effect). The row and its versions are kept, not removed. */
   softDelete(id: number, deletedByAdminId: number, nowIso: string): Promise<SandboxGameRecord>;
 
+  /** Hard delete — removes the game row and its versions/review-audit rows entirely. Used only for
+   * a creator's own self-service removal of a game that has never been approved (see
+   * SandboxGameUseCases.deleteOwnGame): nothing worth auditing exists yet, so unlike softDelete
+   * there is no row left behind — and that is what actually frees `slug` for reuse, since `slug`
+   * carries a plain (non-partial) UNIQUE constraint that a soft-deleted row would keep occupying
+   * forever. Implementations must remove all three tables (game, versions, review audit) in one
+   * atomic operation regardless of whether FK ON DELETE CASCADE is relied upon. */
+  hardDelete(id: number): Promise<void>;
+
   updateMetadata(
     id: number,
     input: SandboxGameMetadataInput,

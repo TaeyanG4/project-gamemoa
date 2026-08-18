@@ -60,6 +60,10 @@ export type SandboxGameUseCaseError =
   /** deleteGame was called on a game that's already soft-deleted — idempotent-failure rather than
    * a silent no-op, so a double-click doesn't look like it succeeded twice. */
   | "ALREADY_DELETED"
+  /** deleteOwnGame (creator self-service) was called on a game with at least one ever-APPROVED
+   * version — self-delete is only for a game that has never been reviewed/approved; past that
+   * point only ADMIN/OPERATOR (sandbox_games.delete) may remove it. */
+  | "CANNOT_DELETE_APPROVED_GAME"
   | SandboxBundleRejection;
 
 export class SandboxGameUseCaseFailure extends Error {
@@ -299,14 +303,25 @@ export class SandboxGameUseCases {
   }): Promise<SandboxGameVersionRecord> {
     const contentHash = await sha256Hex(input.bytes);
     const objectKey = sourceArchiveObjectKey(input.gameId, contentHash);
-    await this.storage.putObject({
-      key: objectKey,
-      bytes: input.bytes,
-      contentType: input.contentType ?? "application/zip",
-    });
 
+    // Both the storage write and the D1 row insert are wrapped in the SAME catch — a bare
+    // `await this.storage.putObject(...)` with no try/catch used to let a real infra failure
+    // (B2 network/auth error, D1 write failure) escape as a raw, un-typed exception. That error
+    // is not a SandboxGameUseCaseFailure, so the route layer's `failureResponse` (which only
+    // knows how to translate SandboxGameUseCaseFailure) re-throws it, producing an opaque
+    // uncaught-exception 500 with no JSON body instead of a message the caller can show a user —
+    // and for createGameFromBundle specifically, the game row from the createGame() step earlier
+    // in that call had *already* committed, leaving an orphaned game with no version and a
+    // permanently-blocked slug (2026-08-18 production bug report). Converting every failure here
+    // to the single typed PUBLISH_FAILED code fixes both: a proper error message, and (via the
+    // route's normal error path) no silent partial state that looks like nothing happened.
     let version: SandboxGameVersionRecord;
     try {
+      await this.storage.putObject({
+        key: objectKey,
+        bytes: input.bytes,
+        contentType: input.contentType ?? "application/zip",
+      });
       version = await this.repo.createVersion({
         gameId: input.gameId,
         objectKey,
@@ -321,9 +336,11 @@ export class SandboxGameUseCases {
       // the only way this could delete an object another version still needs is two *different*
       // uploads producing byte-identical archives at the exact moment one of them fails to write
       // its DB row, an acceptable residual risk rather than one worth a reference-count column.
-      // Swallow the delete's own failure so the original DB error is what the caller sees.
+      // Also harmless (a no-op) when putObject itself was what failed, since nothing was stored.
+      // Swallow the delete's own failure so the original error doesn't get masked by a cleanup
+      // failure.
       await this.storage.deleteObject(objectKey).catch(() => {});
-      throw err;
+      throw new SandboxGameUseCaseFailure("PUBLISH_FAILED");
     }
 
     // A publish failure here leaves a real, valid version row that simply isn't servable yet
@@ -456,6 +473,35 @@ export class SandboxGameUseCases {
     });
 
     return deleted;
+  }
+
+  /**
+   * Creator self-service full removal of their OWN game — no permission grant required beyond
+   * ownership, unlike deleteGame(), because this is only reachable while nothing has ever been
+   * approved (2026-08-18 product decision — "관리자나 운영자가 승인한게 아니라면 그 전까진 게임
+   * 크리에이터가 지워도 됨"). Once any version reaches APPROVED, self-delete is refused
+   * (CANNOT_DELETE_APPROVED_GAME) and only an ADMIN/OPERATOR can remove it from then on via
+   * deleteGame(). A genuine hard delete (see SandboxGameRepository.hardDelete) rather than
+   * softDelete: nothing here was ever public or reviewed, so there is nothing worth an audit trail
+   * for — and hard-deleting is what actually frees `slug` for a retry with the same name, which
+   * softDelete's non-partial UNIQUE constraint on slug cannot do.
+   */
+  async deleteOwnGame(input: { gameId: number; developerUserId: number }): Promise<void> {
+    const game = await this.repo.findById(input.gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    if (game.developerUserId !== input.developerUserId) {
+      throw new SandboxGameUseCaseFailure("NOT_OWNER");
+    }
+
+    const versions = await this.repo.listVersionsByGame(game.id);
+    if (versions.some((v) => v.status === "APPROVED")) {
+      throw new SandboxGameUseCaseFailure("CANNOT_DELETE_APPROVED_GAME");
+    }
+
+    // hardDelete removes the versions (and audit log rows) along with the game row itself, so
+    // there is nothing left to withdraw/release separately — unlike deleteGame(), which has to
+    // because it keeps the row.
+    await this.repo.hardDelete(game.id);
   }
 
   async decideVersion(input: {

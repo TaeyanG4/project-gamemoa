@@ -177,6 +177,18 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return mapGameRow(row);
   }
 
+  async hardDelete(id: number): Promise<void> {
+    // Children first, parent last — explicit rather than relying on the schema's
+    // ON DELETE CASCADE actually being enforced (SQLite/D1 foreign-key enforcement is a per-
+    // connection PRAGMA; being explicit here doesn't depend on it). One batch() call for
+    // atomicity across the three statements.
+    await this.db.batch([
+      this.db.prepare(`DELETE FROM sandbox_game_review_audit_log WHERE game_id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM sandbox_game_versions WHERE game_id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM sandbox_games WHERE id = ?`).bind(id),
+    ]);
+  }
+
   async create(input: {
     slug: string;
     developerUserId: number;

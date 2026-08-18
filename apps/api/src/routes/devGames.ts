@@ -368,6 +368,27 @@ devGamesRouter.post("/games/:id/withdraw", async (c) => {
   }
 });
 
+// DELETE /api/dev/games/:id — creator self-service full removal of their OWN game, only while it
+// has never been approved (see SandboxGameUseCases.deleteOwnGame). No permission grant needed
+// beyond ownership; once a version is approved, only ADMIN/OPERATOR can remove it from then on
+// (DELETE /api/admin/sandbox-games/:id, sandbox_games.delete permission).
+devGamesRouter.delete("/games/:id", async (c) => {
+  const session = await resolveDevSession(c);
+  if (!session) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다." } }, 401);
+  }
+
+  const id = Number(c.req.param("id"));
+  try {
+    const { sandboxGameUseCases } = createContainer(c.env.DB);
+    await sandboxGameUseCases.deleteOwnGame({ gameId: id, developerUserId: session.userId });
+    return c.json({ deleted: true }, 200);
+  } catch (err) {
+    const { body: errBody, status } = failureResponse(err);
+    return c.json(errBody, status);
+  }
+});
+
 // POST /api/dev/games/:id/versions — multipart upload, field name "bundle". Owner or admin only.
 // Rate limited on its own binding (see wrangler.jsonc GAME_UPLOAD_RATE_LIMITER) — this is a
 // capacity/abuse guard against upload spam (each call costs real B2 writes + decompression CPU),

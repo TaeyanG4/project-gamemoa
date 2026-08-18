@@ -330,6 +330,79 @@ test("a new game defaults to deleted_at/deleted_by_admin_id both null", async ()
   assert.equal(game.deletedByAdminId, null);
 });
 
+test("hardDelete removes the game row entirely, unlike softDelete", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo, "orphaned-game");
+
+  await repo.hardDelete(game.id);
+
+  assert.equal(await repo.findById(game.id), null);
+  assert.equal(await repo.findBySlug("orphaned-game"), null);
+});
+
+test("hardDelete frees the slug for an immediate re-insert with the same value — softDelete cannot do this", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo, "ball-dodge");
+
+  await repo.hardDelete(game.id);
+
+  // The real UNIQUE constraint on sandbox_games.slug — this is the exact statement that would
+  // throw if the row still existed underneath (soft-deleted or not).
+  const retried = await repo.create({
+    slug: "ball-dodge",
+    developerUserId: 1,
+    title: "Retry",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    nowIso: new Date().toISOString(),
+  });
+  assert.notEqual(retried, null);
+  assert.equal(retried?.slug, "ball-dodge");
+});
+
+test("hardDelete also removes the game's versions and review-audit rows (no orphaned children)", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const now = new Date().toISOString();
+  const game = await seedGame(repo);
+
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "k",
+    contentHash: "h",
+    bundleBytes: 1,
+    nowIso: now,
+  });
+  await repo.appendReviewAudit({
+    gameId: game.id,
+    versionId: null,
+    actorAdminId: 99,
+    action: "SUBMISSION_WITHDRAWN",
+    reason: null,
+    metadata: null,
+    nowIso: now,
+  });
+
+  await repo.hardDelete(game.id);
+
+  assert.equal(await repo.findVersionById(version.id), null);
+  assert.deepEqual(await repo.listReviewAudit(game.id, 50), []);
+  const versionRowCount = raw
+    .prepare(`SELECT COUNT(*) AS n FROM sandbox_game_versions WHERE game_id = ?`)
+    .get(game.id) as { n: number };
+  assert.equal(versionRowCount.n, 0);
+  const auditRowCount = raw
+    .prepare(`SELECT COUNT(*) AS n FROM sandbox_game_review_audit_log WHERE game_id = ?`)
+    .get(game.id) as { n: number };
+  assert.equal(auditRowCount.n, 0);
+});
+
 test("a new version starts UPLOADED on the publish axis, independent of its review status", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev");
