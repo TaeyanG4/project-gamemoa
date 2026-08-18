@@ -321,7 +321,10 @@ test("listByDeveloper and listPublic scope correctly", async () => {
   assert.equal(publicGames[0]?.id, mine.id);
 });
 
-test("listAll returns every non-deleted game regardless of developer or visibility, but excludes soft-deleted ones", async () => {
+// Regression (2026-08-18): listAll used to exclude soft-deleted games. That made purgeGame
+// (only ever reachable on an already-deleted game) practically undiscoverable in the admin UI —
+// there was no way to find one without already knowing its id. It now deliberately includes them.
+test("listAll returns every game regardless of developer, visibility, or soft-deletion", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "DevA");
   seedUser(raw, 2, "DevB");
@@ -334,7 +337,8 @@ test("listAll returns every non-deleted game regardless of developer or visibili
   await repo.softDelete(deleted.id, 99, now);
 
   const all = await repo.listAll();
-  assert.deepEqual(all.map((g) => g.id).sort(), [a.id, b.id].sort());
+  assert.deepEqual(all.map((g) => g.id).sort(), [a.id, b.id, deleted.id].sort());
+  assert.ok(all.find((g) => g.id === deleted.id)?.deletedAt !== null);
 });
 
 test("softDelete sets deleted_at/deleted_by_admin_id and forces visibility back to PRIVATE", async () => {
