@@ -42,6 +42,9 @@ import {
   GameCreatorUseCases,
   SandboxGameUseCases,
   GameBundlePublisher,
+  StaticGameRegistry,
+  GAME_DEFINITIONS,
+  type GameRegistry,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -65,6 +68,17 @@ import {
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
+
+/**
+ * Built once from the compiled game-registry/ output (packages/core/src/registry/
+ * gameDefinitions.generated.ts), not per `createContainer` call — SYSTEM games are fixed at
+ * deploy time, so there is nothing request-specific to rebuild the way the D1-backed repositories
+ * below need a fresh handle each call. Held to agreement with GAME_MANIFESTS by `pnpm
+ * registry:check` (scripts/registry-builder.ts's assertDefinitionsMatchManifests), so this is
+ * behaviourally the same catalog ScoreUseCases/GameSettingsUseCases resolved through
+ * GAME_MANIFEST_MAP/GAME_MANIFESTS before.
+ */
+const gameRegistry: GameRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
 
 export interface AppContainer {
   userRepo: UserRepository;
@@ -92,6 +106,12 @@ export interface AppContainer {
    * check this (rather than try/catch-ing putBundle) to return a clean 503 before touching the
    * use case. */
   gameBundlesConfigured: boolean;
+  /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
+   * game is not "missing" from here so much as out of scope, see StaticGameRegistry's doc
+   * comment. Exposed on the container, not just threaded privately into ScoreUseCases/
+   * GameSettingsUseCases, so a future route that needs to resolve a game directly has one place
+   * to get it from rather than reaching back into a generated file. */
+  gameRegistry: GameRegistry;
 
   scoreUseCases: ScoreUseCases;
   personalizationUseCases: PersonalizationUseCases;
@@ -150,7 +170,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     ? new BackblazeB2GameBundleRepository(b2Config)
     : new UnconfiguredGameBundleRepository();
 
-  const scoreUseCases = new ScoreUseCases(scoreRepo);
+  const scoreUseCases = new ScoreUseCases(scoreRepo, gameRegistry);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
   const identityUseCases = new IdentityUseCases(userRepo);
   const accountMergeUseCases = new AccountMergeUseCases(
@@ -169,7 +189,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const creatorUseCases = new CreatorUseCases(creatorRepo, creatorReviewRepo);
   const adminAuthUseCases = new AdminAuthUseCases(adminAuthRepo);
   const adminAccountUseCases = new AdminAccountUseCases(adminAccountRepo, adminAuthRepo);
-  const gameSettingsUseCases = new GameSettingsUseCases(gameSettingsRepo);
+  const gameSettingsUseCases = new GameSettingsUseCases(gameSettingsRepo, gameRegistry);
   const userModerationUseCases = new UserModerationUseCases(
     userModerationRepo,
     sessionRepo,
@@ -208,6 +228,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
+    gameRegistry,
 
     scoreUseCases,
     personalizationUseCases,

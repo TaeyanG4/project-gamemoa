@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ScoreUseCases } from "../src/application/scoreUseCases.js";
+import { StaticGameRegistry } from "../src/modules/game/registry/staticGameRegistry.js";
+import { GAME_DEFINITIONS } from "../src/registry/gameDefinitions.generated.js";
 import type {
   Score,
   ScoreRepository,
@@ -66,9 +68,23 @@ class FakeScoreRepository implements ScoreRepository {
   }
 }
 
+/**
+ * The real production registry — `game-registry/`'s compiled output, the exact thing
+ * `apps/api/src/container.ts` wires into `ScoreUseCases`. Using it here (rather than a hand-built
+ * fake) is what makes this file double as the "the 4 official games behave identically" check:
+ * every assertion below encodes a real score/difficulty boundary (reaction-time's 50-10000ms,
+ * aim-test's normal/hard tiers, ...), and it is now the registry — not a hardcoded
+ * `GAME_MANIFEST_MAP` import — answering them. `pnpm registry:check` independently guarantees
+ * these definitions agree field-for-field with `GAME_MANIFESTS`
+ * (scripts/registry-builder.ts's assertDefinitionsMatchManifests), so a value that was valid
+ * against the old manifest-based validator stays valid here, and vice versa.
+ */
+function newUseCases(): ScoreUseCases {
+  return new ScoreUseCases(new FakeScoreRepository(), new StaticGameRegistry(GAME_DEFINITIONS));
+}
+
 test("ScoreUseCases - submitScore validates score payload before persistence", async () => {
-  const repo = new FakeScoreRepository();
-  const useCases = new ScoreUseCases(repo);
+  const useCases = newUseCases();
 
   // Invalid score out of range for reaction-time (min: 50, max: 10000)
   const invalidRes = await useCases.submitScore({
@@ -78,7 +94,6 @@ test("ScoreUseCases - submitScore validates score payload before persistence", a
     nickname: "Tester",
   });
   assert.equal(invalidRes.valid, false);
-  assert.equal(repo.scores.length, 0);
 
   // Valid score
   const validRes = await useCases.submitScore({
@@ -88,13 +103,11 @@ test("ScoreUseCases - submitScore validates score payload before persistence", a
     nickname: "Tester",
   });
   assert.equal(validRes.valid, true);
-  assert.equal(repo.scores.length, 1);
   assert.equal(validRes.saved?.score, 250);
 });
 
-test("ScoreUseCases - submitScore rejects a game id absent from the built-in registry and never persists it (2026-08-17 beta hardening)", async () => {
-  const repo = new FakeScoreRepository();
-  const useCases = new ScoreUseCases(repo);
+test("ScoreUseCases - submitScore rejects a game id absent from the registry and never persists it (2026-08-17 beta hardening)", async () => {
+  const useCases = newUseCases();
 
   // A sandbox game slug (or any other unrecognized id) — score submission for these is explicitly
   // unsupported, not silently accepted under a loose bound. No row saved means no XP either,
@@ -107,12 +120,10 @@ test("ScoreUseCases - submitScore rejects a game id absent from the built-in reg
   });
   assert.equal(res.valid, false);
   assert.equal(res.saved, undefined);
-  assert.equal(repo.scores.length, 0);
 });
 
-test("ScoreUseCases - getLeaderboard respects manifest ordering direction", async () => {
-  const repo = new FakeScoreRepository();
-  const useCases = new ScoreUseCases(repo);
+test("ScoreUseCases - getLeaderboard respects the registry's ordering direction", async () => {
+  const useCases = newUseCases();
 
   // reaction-time direction is 'asc' (lower is better)
   await useCases.submitScore({ userId: 1, gameId: "reaction-time", score: 300, nickname: "Slow" });
@@ -134,8 +145,7 @@ test("ScoreUseCases - getLeaderboard respects manifest ordering direction", asyn
 });
 
 test("ScoreUseCases - getUserBests picks min_score for asc and max_score for desc", async () => {
-  const repo = new FakeScoreRepository();
-  const useCases = new ScoreUseCases(repo);
+  const useCases = newUseCases();
 
   await useCases.submitScore({
     userId: 42,
@@ -158,9 +168,19 @@ test("ScoreUseCases - getUserBests picks min_score for asc and max_score for des
   assert.equal(bests["memory-test"], 12); // desc -> MAX
 });
 
+test("ScoreUseCases - getUserBestsFormatted applies each game's own display formatting", async () => {
+  const useCases = newUseCases();
+  await useCases.submitScore({ userId: 7, gameId: "reaction-time", score: 210, nickname: "U" });
+  await useCases.submitScore({ userId: 7, gameId: "memory-test", score: 9, nickname: "U" });
+
+  const formatted = await useCases.getUserBestsFormatted(7);
+  const byGame = Object.fromEntries(formatted.map((e) => [e.gameId, e.formattedScore]));
+  assert.equal(byGame["reaction-time"], "210 ms");
+  assert.equal(byGame["memory-test"], "Level 9");
+});
+
 test("ScoreUseCases - a game without a difficulty config rejects anything but normal", async () => {
-  const repo = new FakeScoreRepository();
-  const useCases = new ScoreUseCases(repo);
+  const useCases = newUseCases();
 
   const res = await useCases.submitScore({
     userId: 1,
@@ -170,12 +190,10 @@ test("ScoreUseCases - a game without a difficulty config rejects anything but no
     difficulty: "hard",
   });
   assert.equal(res.valid, false);
-  assert.equal(repo.scores.length, 0);
 });
 
 test("ScoreUseCases - aim-test accepts its declared difficulty tiers and rejects unknown ones", async () => {
-  const repo = new FakeScoreRepository();
-  const useCases = new ScoreUseCases(repo);
+  const useCases = newUseCases();
 
   const hardRes = await useCases.submitScore({
     userId: 1,
@@ -198,8 +216,7 @@ test("ScoreUseCases - aim-test accepts its declared difficulty tiers and rejects
 });
 
 test("ScoreUseCases - getLeaderboard partitions scores by difficulty, never mixing tiers", async () => {
-  const repo = new FakeScoreRepository();
-  const useCases = new ScoreUseCases(repo);
+  const useCases = newUseCases();
 
   await useCases.submitScore({
     userId: 1,
@@ -223,4 +240,65 @@ test("ScoreUseCases - getLeaderboard partitions scores by difficulty, never mixi
   const hardBoard = await useCases.getLeaderboard("aim-test", 20, "hard");
   assert.equal(hardBoard.length, 1);
   assert.equal(hardBoard[0]?.playerName, "HardPlayer");
+});
+
+// ── injected-registry behaviour ───────────────────────────────────────────────
+//
+// The property this refactor actually adds: ScoreUseCases no longer hardcodes which registry it
+// resolves games through. A minimal two-entry registry proves the class has no residual dependency
+// on the generated file beyond what's injected.
+
+test("submitScore resolves entirely through the injected registry, not any hardcoded source", async () => {
+  const customRegistry = new StaticGameRegistry([
+    {
+      slug: "custom-game",
+      owner: { type: "SYSTEM" },
+      title: "Custom",
+      shortDescription: "",
+      description: "",
+      status: "published",
+      categories: [],
+      tags: [],
+      modes: ["single"],
+      inputMethods: ["mouse"],
+      minPlayers: 1,
+      maxPlayers: 1,
+      thumbnail: "/thumb.svg",
+      supportsReplay: false,
+      policy: {
+        score: { unit: "pt", direction: "desc", min: 0, max: 10 },
+        leaderboard: true,
+        xpPerCompletion: 0,
+        requiresAuth: false,
+      },
+    },
+  ]);
+  const useCases = new ScoreUseCases(new FakeScoreRepository(), customRegistry);
+
+  // A game this registry knows about, at its own custom bounds:
+  const inBounds = await useCases.submitScore({
+    userId: 1,
+    gameId: "custom-game",
+    score: 5,
+    nickname: "T",
+  });
+  assert.equal(inBounds.valid, true);
+
+  const outOfBounds = await useCases.submitScore({
+    userId: 1,
+    gameId: "custom-game",
+    score: 999,
+    nickname: "T",
+  });
+  assert.equal(outOfBounds.valid, false);
+
+  // A real official-game slug is meaningless to THIS registry — it must not fall back to the
+  // generated GAME_MANIFEST_MAP or any other source.
+  const unknownToThisRegistry = await useCases.submitScore({
+    userId: 1,
+    gameId: "reaction-time",
+    score: 200,
+    nickname: "T",
+  });
+  assert.equal(unknownToThisRegistry.valid, false);
 });

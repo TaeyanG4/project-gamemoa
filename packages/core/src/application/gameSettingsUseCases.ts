@@ -1,10 +1,10 @@
-import { GAME_MANIFESTS } from "../registry/gameRegistry.generated.js";
 import type { GameSettingsRepository, GameSettingRecord } from "../ports/repositories.js";
+import type { GameRegistry } from "../modules/game/ports/gameRegistry.js";
 
 export interface GameAvailability {
   gameId: string;
   title: string;
-  /** The manifest's own static status (draft/beta/published/hidden) — for context only, the
+  /** The registry's own static status (draft/beta/published/hidden) — for context only, the
    * live `enabled` flag below is what actually gates play/scoring/catalog visibility. */
   status: string;
   enabled: boolean;
@@ -16,21 +16,34 @@ export interface GameAvailability {
 export type SetGameEnabledResult =
   { ok: true; record: GameSettingRecord } | { ok: false; code: "GAME_NOT_FOUND" };
 
+/**
+ * Resolves the set of known games through the injected {@link GameRegistry} rather than the
+ * build-time `GAME_MANIFESTS` this class used to import directly — see ScoreUseCases's doc
+ * comment for the same reasoning. The registry holds SYSTEM games only today (creator games are
+ * not resolved through it yet), so the admin kill switch's reach is unchanged: it still only ever
+ * covers the four built-in games, just no longer by hardcoding that source in this file.
+ */
 export class GameSettingsUseCases {
-  constructor(private repo: GameSettingsRepository) {}
+  constructor(
+    private repo: GameSettingsRepository,
+    private registry: GameRegistry,
+  ) {}
 
-  /** Every known game (from the manifest registry) merged with its live override, if any —
-   * used by the admin games panel. */
+  /** Every known game (from the registry) merged with its live override, if any — used by the
+   * admin games panel. */
   async listAll(): Promise<GameAvailability[]> {
-    const overrides = await this.repo.getAllOverrides();
+    const [definitions, overrides] = await Promise.all([
+      this.registry.listAll(),
+      this.repo.getAllOverrides(),
+    ]);
     const overrideByGameId = new Map(overrides.map((o) => [o.gameId, o]));
 
-    return GAME_MANIFESTS.map((manifest) => {
-      const override = overrideByGameId.get(manifest.id);
+    return definitions.map((definition) => {
+      const override = overrideByGameId.get(definition.slug);
       return {
-        gameId: manifest.id,
-        title: manifest.title,
-        status: manifest.status,
+        gameId: definition.slug,
+        title: definition.title,
+        status: definition.status,
         enabled: override ? override.enabled : true,
         disabledReason: override?.disabledReason ?? null,
         updatedByAdminId: override?.updatedByAdminId ?? null,
@@ -51,7 +64,7 @@ export class GameSettingsUseCases {
     reason: string | null,
     adminId: number,
   ): Promise<SetGameEnabledResult> {
-    if (!GAME_MANIFESTS.some((m) => m.id === gameId)) {
+    if (!(await this.registry.findBySlug(gameId))) {
       return { ok: false, code: "GAME_NOT_FOUND" };
     }
     const record = await this.repo.setEnabled(gameId, enabled, reason, adminId);
