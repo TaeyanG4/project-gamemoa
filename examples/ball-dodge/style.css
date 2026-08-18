@@ -1,0 +1,118 @@
+/* 공 피하기 — Game Bridge 참조 통합용 스타일. 외부 폰트/이미지 없이 시스템 폰트와 CSS만 사용합니다. */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0b0e14;
+  color: #e6e8ef;
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  overflow: hidden;
+  touch-action: none;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#game {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #11151f;
+}
+
+#hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 5;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+#overlay,
+#gameOver {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+  background: rgba(11, 14, 20, 0.82);
+  z-index: 10;
+}
+
+#overlay h1,
+#gameOver h1 {
+  margin: 0 0 4px;
+  font-size: clamp(24px, 6vw, 40px);
+  font-weight: 800;
+}
+
+#overlay p,
+#gameOver p {
+  margin: 0;
+  max-width: 420px;
+  font-size: 14px;
+  color: #a6adc0;
+}
+
+#overlay .hint {
+  font-size: 12px;
+  color: #6f7690;
+}
+
+#gameOver h1 {
+  color: #ff5d6c;
+}
+
+#finalTime {
+  font-size: 16px !important;
+  font-weight: 700;
+  color: #e6e8ef !important;
+}
+
+button {
+  margin-top: 8px;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 12px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:hover {
+  background: #7477f5;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+.hidden {
+  display: none !important;
+}
