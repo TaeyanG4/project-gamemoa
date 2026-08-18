@@ -1,7 +1,11 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { MyAccessResponseSchema } from "@owogg/contracts";
-import { effectivePermissions, canApplyForGameCreator } from "@owogg/core";
+import {
+  effectivePermissions,
+  canApplyForGameCreator,
+  hasImplicitGameCreatorAccess,
+} from "@owogg/core";
 import { createContainer } from "../container.js";
 import { resolveAdminEligibility, resolveEffectiveStaffRole } from "../auth/adminEligibility.js";
 import type { ApiEnv } from "./auth.js";
@@ -45,16 +49,19 @@ myAccessRouter.get("/access", async (c) => {
     ? await container.adminAccountUseCases.listPermissions(eligibility.account.id)
     : [];
 
+  // ADMIN/OPERATOR/SYSTEM_DEVELOPER hold Game Creator access implicitly — see
+  // hasImplicitGameCreatorAccess's doc comment. This is ORed with the real access-grant row, never
+  // a replacement for it (a MODERATOR or plain USER's actual grant/revoke still works unchanged).
+  const hasAccess =
+    gameCreatorAccess?.status === "ACTIVE" || hasImplicitGameCreatorAccess(staffRole);
+
   return c.json(
     MyAccessResponseSchema.parse({
       staffRole,
       permissions: effectivePermissions(staffRole, grantedPermissions),
       gameCreator: {
-        hasAccess: gameCreatorAccess?.status === "ACTIVE",
-        canApply:
-          gameCreatorAccess?.status !== "ACTIVE" &&
-          latestApplication?.status !== "PENDING" &&
-          canApplyForGameCreator(),
+        hasAccess,
+        canApply: !hasAccess && latestApplication?.status !== "PENDING" && canApplyForGameCreator(),
         applicationStatus: latestApplication?.status ?? null,
       },
       streamer: {

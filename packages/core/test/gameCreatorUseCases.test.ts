@@ -234,7 +234,12 @@ test("isActiveCreator reflects grant/revoke state", async () => {
 test("apply rejects a nonexistent user with USER_NOT_FOUND", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([]),
+    applicationRepo,
+    () => true,
+  );
   await assert.rejects(
     () => useCases.apply(1, null),
     (err: unknown) => err instanceof GameCreatorUseCaseFailure && err.code === "USER_NOT_FOUND",
@@ -244,7 +249,12 @@ test("apply rejects a nonexistent user with USER_NOT_FOUND", async () => {
 test("apply rejects a user who already has ACTIVE access with ALREADY_ACTIVE", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([1]),
+    applicationRepo,
+    () => true,
+  );
   await useCases.grant(1, 99);
   await assert.rejects(
     () => useCases.apply(1, null),
@@ -255,7 +265,12 @@ test("apply rejects a user who already has ACTIVE access with ALREADY_ACTIVE", a
 test("apply creates a PENDING application; a second apply while one is PENDING is rejected", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([1]),
+    applicationRepo,
+    () => true,
+  );
 
   const application = await useCases.apply(1, "  저는 인디 게임 개발자입니다  ");
   assert.equal(application.status, "PENDING");
@@ -271,7 +286,12 @@ test("apply creates a PENDING application; a second apply while one is PENDING i
 test("apply is allowed again after a previous application was REJECTED or WITHDRAWN", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1, 2]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([1, 2]),
+    applicationRepo,
+    () => true,
+  );
 
   const first = await useCases.apply(1, null);
   await useCases.decideApplication({
@@ -294,7 +314,12 @@ test("apply is allowed again after a previous application was REJECTED or WITHDR
 test("withdrawApplication only affects the caller's own PENDING application", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1, 2]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([1, 2]),
+    applicationRepo,
+    () => true,
+  );
 
   const application = await useCases.apply(1, null);
 
@@ -320,7 +345,12 @@ test("withdrawApplication only affects the caller's own PENDING application", as
 test("decideApplication(APPROVED) grants Game Creator access; REJECTED does not", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1, 2]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([1, 2]),
+    applicationRepo,
+    () => true,
+  );
 
   const approved = await useCases.apply(1, null);
   const decidedApproved = await useCases.decideApplication({
@@ -346,7 +376,12 @@ test("decideApplication(APPROVED) grants Game Creator access; REJECTED does not"
 test("decideApplication on an already-decided application is rejected with APPLICATION_NOT_PENDING", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([1]),
+    applicationRepo,
+    () => true,
+  );
 
   const application = await useCases.apply(1, null);
   await useCases.decideApplication({
@@ -370,7 +405,12 @@ test("decideApplication on an already-decided application is rejected with APPLI
 test("decideApplication(APPROVED) is idempotent-safe when the applicant already separately received a direct admin grant", async () => {
   const accessRepo = createFakeAccessRepo();
   const applicationRepo = createFakeApplicationRepo();
-  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1]), applicationRepo);
+  const useCases = new GameCreatorUseCases(
+    accessRepo,
+    createFakeUserRepo([1]),
+    applicationRepo,
+    () => true,
+  );
 
   const application = await useCases.apply(1, null);
   // An admin grants access directly (e.g. an unrelated invite) while the application is still
@@ -394,6 +434,7 @@ test("listPendingApplications only returns PENDING items, oldest first", async (
     accessRepo,
     createFakeUserRepo([1, 2, 3]),
     applicationRepo,
+    () => true,
   );
 
   const a = await useCases.apply(1, null);
@@ -410,5 +451,18 @@ test("listPendingApplications only returns PENDING items, oldest first", async (
   assert.deepEqual(
     items.map((i) => i.userId),
     [2, 3],
+  );
+});
+
+test("apply(): with no canApply override, uses the real (currently closed) domain policy and rejects", async () => {
+  const accessRepo = createFakeAccessRepo();
+  const applicationRepo = createFakeApplicationRepo();
+  // No 4th constructor arg — this is exactly how container.ts wires it in production.
+  const useCases = new GameCreatorUseCases(accessRepo, createFakeUserRepo([1]), applicationRepo);
+
+  await assert.rejects(
+    () => useCases.apply(1, null),
+    (err: unknown) =>
+      err instanceof GameCreatorUseCaseFailure && err.code === "APPLICATION_NOT_ALLOWED",
   );
 });
