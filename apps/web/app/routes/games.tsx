@@ -65,7 +65,12 @@ export default function Games() {
 
       return matchesSearch && matchesCategory;
     });
-  }, [searchQuery, selectedCategory, favoriteGameIds, dict]);
+    // gameManifests must be a dependency: sandboxGameManifests (part of it) only resolves after
+    // useSandboxCatalogManifests' fetch completes, strictly after the first render — without this
+    // dependency, filteredGames stays a stale closure over the initial (sandbox-less) array and a
+    // sandbox game never appears no matter how long the page sits open (2026-08-18, reported after
+    // a fresh registration was confirmed live via the API but never rendered on /games).
+  }, [gameManifests, searchQuery, selectedCategory, favoriteGameIds, dict]);
 
   return (
     <div className="flex flex-col w-full px-4 md:px-8 py-8 gap-8 max-w-7xl mx-auto flex-1">
