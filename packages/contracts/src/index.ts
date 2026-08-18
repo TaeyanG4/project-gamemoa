@@ -16,4 +16,5 @@ export * from "./staffRoles.js";
 export * from "./gameSettings.js";
 export * from "./gameCreator.js";
 export * from "./sandboxGames.js";
+export * from "./games.js";
 export * from "./i18n.js";
