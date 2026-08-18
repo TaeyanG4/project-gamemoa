@@ -321,10 +321,9 @@ GAME_CREATOR는 OwOGG 플랫폼 자체를 만드는 Staff Role인 SYSTEM_DEVELOP
 실제로 슬롯 확보는 `INSERT ... SELECT`로, "빈 슬롯 계산"과 "게임 row 생성"을 한 문장으로 묶어
 원자적으로 처리합니다(`packages/db/src/d1/D1SandboxGameRepository.ts` `create()`).
 
-#### 3.6.2 드래그 앤 드롭 자동 등록 — `owogg.game.json` (2026-08-18)
+#### 3.6.2 드래그 앤 드롭 자동 등록 — `owogg.game.json` (2026-08-18, 2026-08-18 수동 폼 폐지)
 
-기존에는 "폼에 슬러그/제목/장르 입력 → 게임 row 생성 → ZIP 업로드"가 별도의 두 단계였습니다.
-이제 ZIP 최상위에 `owogg.game.json` 매니페스트 파일을 넣어 두면, 게임 크리에이터 센터에 그 ZIP을
+ZIP 최상위에 `owogg.game.json` 매니페스트 파일을 넣어 두면, 게임 크리에이터 센터에 그 ZIP을
 끌어다 놓는 것만으로 게임 등록과 첫 버전 업로드가 한 번에 끝납니다:
 
 ```json
@@ -338,37 +337,62 @@ GAME_CREATOR는 OwOGG 플랫폼 자체를 만드는 Staff Role인 SYSTEM_DEVELOP
 ```
 
 - `slug`/`title`/`genre`는 필수, `shortDescription`/`description`은 선택입니다. 검증 규칙은
-  수동 폼과 **완전히 동일**합니다 — 매니페스트 경로가 별도 검증을 두지 않고 기존
+  과거의 수동 등록 폼과 동일합니다 — 매니페스트 경로가 별도 검증을 두지 않고 기존
   `SandboxGameUseCases.createGame()`을 그대로 재사용하기 때문입니다
   (`SandboxGameUseCases.createGameFromBundle`,
   `packages/core/src/application/sandboxGameUseCases.ts`).
-- `owogg.game.json`이 아예 없으면 자동 등록은 그냥 건너뛰고(에러 아님) — 기존처럼 수동 폼으로
-  먼저 게임을 만든 뒤 "버전 업로드"로 올리는 흐름도 계속 동작합니다. 파일은 있는데 JSON이 깨졌거나
-  객체가 아니면 `BUNDLE_MALFORMED`로 명확히 실패합니다("아무 일도 없었던 것"처럼 조용히 넘어가지
-  않음) — 자동 등록을 의도했는데 매니페스트가 깨진 채로 방치되는 상황을 막기 위함입니다.
+- **드래그 앤 드롭이 유일한 등록 경로입니다** (2026-08-18 — 게임 크리에이터 센터의 슬러그/제목/
+  장르 수동 입력 폼은 제거했습니다). `owogg.game.json`이 없는 ZIP은 새 게임을 등록하지
+  않습니다(`MANIFEST_MISSING`) — 이미 존재하는 게임에 새 버전을 올리는 "버전 업로드"만 매니페스트
+  없이도 동작합니다(그건 새 게임을 만드는 게 아니라 기존 게임에 파일을 추가하는 것이므로). 파일은
+  있는데 JSON이 깨졌거나 객체가 아니면 `BUNDLE_MALFORMED`로 명확히 실패합니다("아무 일도 없었던
+  것"처럼 조용히 넘어가지 않음).
 - ZIP은 **한 번만 압축 해제**됩니다 — 매니페스트를 읽는 것과 실제 파일을 발행하는 것이 같은
-  `prepared.files`를 공유합니다(수동 폼 뒤에 별도로 업로드하면 두 번 파싱되는 것과 대비됨).
+  `prepared.files`를 공유합니다.
 - 발행되는 파일 자체는 매니페스트 유무와 무관하게 동일한 검증(§3.2.1의 zip bomb 방어, 경로 검증,
   `index.html` 존재 확인)을 거칩니다 — 매니페스트는 오직 "게임 row를 무엇으로 만들지"만 알려줄
   뿐, 번들 검증 절차를 우회하지 않습니다.
 - API: `POST /api/dev/games/upload` (multipart, 필드명 `bundle`) — `docs/GAME_UPLOAD_GUIDE.md`와
   공개 위키([`/wiki/games/development`](../apps/web/app/routes/wikiGamesDevelopment.tsx))에서
   플레이어 대상 안내를 볼 수 있습니다.
+- **저장/D1 쓰기 실패는 항상 타입이 있는 `PUBLISH_FAILED`로 귀결됩니다** (2026-08-18 프로덕션
+  버그 수정) — 이전에는 원본 아카이브 저장(`storage.putObject`)이나 버전 row 삽입이 실패하면
+  가공되지 않은 예외가 그대로 새어나가 라우트 계층에서 처리되지 않는 500(빈 JSON 본문)이 되었고,
+  더 나쁘게는 `createGameFromBundle`의 앞쪽 절반(게임 row 생성)은 이미 성공한 뒤였기 때문에
+  버전 없는 "고아" 게임이 남아 같은 슬러그로 재시도조차 막혔습니다. 지금은
+  `SandboxGameUseCases`의 `uploadPreparedVersion`이 이 두 단계를 모두 감싸 예외를
+  `PUBLISH_FAILED`로 정규화합니다.
 
-#### 3.6.3 게임 삭제 — ADMIN/OPERATOR 전용 (2026-08-18)
+#### 3.6.3 게임 삭제 — 두 가지 경로 (2026-08-18)
 
-`sandbox_games.delete` 권한을 가진 스태프만 게임을 삭제할 수 있습니다(`DELETE
-/api/admin/sandbox-games/:id`). **소프트 삭제**입니다 — row는 감사(audit) 목적으로 남고,
-`deleted_at`/`deleted_by_admin_id`만 채워집니다(migration `0026_sandbox_game_soft_delete.sql`).
-삭제 즉시 `visibility`가 강제로 `PRIVATE`로 전환되고, 아직 심사 대기 중이던 버전이 있으면 함께
-철회되며 심사 슬롯도 반환됩니다(§3.6.1과 동일한 슬롯 반환 로직 재사용).
+승인 이전이냐 이후냐에 따라 삭제 권한과 방식이 다릅니다:
 
-`sandbox_games.review`(승인/반려)와 별개 권한인 이유: MODERATOR는 콘텐츠 심사는 하되, 게임을
-완전히 내리는 더 강한 조치까지는 할 수 없어야 한다는 2026-08-18 제품 결정 때문입니다 — 그래서
-`sandbox_games.delete`는 OPERATOR의 기본 권한 묶음에만 있고 MODERATOR에는 없습니다
-([`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §4). B2에 저장된 실제 파일(오브젝트)은 지우지
-않습니다 — 스토리지 GC는 §3.2 `sourceArchiveObjectKey`에서 이미 "추후 버전 GC" 대상으로 남겨둔
-별도 과제입니다.
+- **게임 크리에이터 셀프서비스 삭제** (`DELETE /api/dev/games/:id`,
+  `SandboxGameUseCases.deleteOwnGame`) — 자신이 등록한 게임이 **아직 한 번도 승인된 버전이
+  없을 때만** 스스로 완전히 삭제할 수 있습니다. 별도 권한 부여 없이 소유권만으로 동작합니다.
+  **진짜 하드 삭제**입니다 — 게임/버전/심사 로그 row가 전부 사라집니다(`SandboxGameRepository.
+hardDelete`). 소프트 삭제와 달리 이래야만 `slug`의 UNIQUE 제약이 실제로 풀려 같은 이름으로
+  즉시 재시도할 수 있습니다(고아가 된 등록 실패 게임을 지우고 재등록하는 정확한 시나리오). 이미
+  승인된 버전이 하나라도 있으면 `CANNOT_DELETE_APPROVED_GAME`으로 거부되며, 그 시점부터는
+  아래 경로로만 삭제할 수 있습니다.
+- **관리자/운영자 삭제** (`DELETE /api/admin/sandbox-games/:id`,
+  `SandboxGameUseCases.deleteGame`) — `sandbox_games.delete` 권한을 가진 스태프만(ADMIN/
+  OPERATOR) 승인 여부와 무관하게 어떤 게임이든 삭제할 수 있습니다. **소프트 삭제**입니다 — row는
+  감사(audit) 목적으로 남고, `deleted_at`/`deleted_by_admin_id`만 채워집니다(migration
+  `0026_sandbox_game_soft_delete.sql`). 삭제 즉시 `visibility`가 강제로 `PRIVATE`로 전환되고,
+  아직 심사 대기 중이던 버전이 있으면 함께 철회되며 심사 슬롯도 반환됩니다(§3.6.1과 동일한 슬롯
+  반환 로직 재사용).
+
+두 경로가 다른 삭제 방식을 쓰는 이유: 셀프서비스로 지울 수 있는 게임은 애초에 아무도 심사한 적이
+없으므로 감사 기록으로 남길 가치가 없고, 하드 삭제라야 슬러그가 실제로 풀립니다. 반면 관리자가
+지우는 게임은 이미 공개됐거나 심사를 거쳤을 수 있으므로 무엇이 왜 내려갔는지 기록이 남아야 합니다.
+
+`sandbox_games.delete`가 `sandbox_games.review`(승인/반려)와 별개 권한인 이유: MODERATOR는
+콘텐츠 심사는 하되, 게임을 완전히 내리는 더 강한 조치까지는 할 수 없어야 한다는 2026-08-18 제품
+결정 때문입니다 — 그래서 `sandbox_games.delete`는 OPERATOR의 기본 권한 묶음에만 있고
+MODERATOR에는 없습니다([`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §4). 두 경로 모두 B2에 저장된
+실제 파일(오브젝트)은 지우지 않습니다 — 스토리지 GC는 §3.2 `sourceArchiveObjectKey`에서 이미
+"추후 버전 GC" 대상으로 남겨둔 별도 과제입니다.
 
 ### 3.7 DB 스키마 초안
 
