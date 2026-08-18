@@ -125,6 +125,8 @@ function createFakeRepo(): SandboxGameRepository & {
         shortDescription: input.shortDescription,
         description: input.description,
         genre: input.genre,
+        mode: input.mode,
+        logoKey: null,
         xpPerCompletion: 0,
         scoreUnit: null,
         scoreDirection: null,
@@ -187,6 +189,13 @@ function createFakeRepo(): SandboxGameRepository & {
       const existing = games.get(id);
       if (!existing) throw new Error("not found");
       const updated = { ...existing, liveVersionId: versionId, updatedAt: nowIso };
+      games.set(id, updated);
+      return updated;
+    },
+    async setLogo(id, logoKey, nowIso) {
+      const existing = games.get(id);
+      if (!existing) throw new Error("not found");
+      const updated: SandboxGameRecord = { ...existing, logoKey, updatedAt: nowIso };
       games.set(id, updated);
       return updated;
     },
@@ -346,6 +355,7 @@ async function createGameWithLiveVersion(entries?: Record<string, Uint8Array>) {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await ctx.useCases.uploadVersion({
     gameId: game.id,
@@ -376,6 +386,7 @@ test("createGame rejects an invalid slug", async () => {
         shortDescription: null,
         description: null,
         genre: "puzzle",
+        mode: "single",
       }),
     (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_SLUG",
   );
@@ -390,6 +401,7 @@ test("createGame rejects a duplicate slug", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await assert.rejects(
     () =>
@@ -400,6 +412,7 @@ test("createGame rejects a duplicate slug", async () => {
         shortDescription: null,
         description: null,
         genre: "puzzle",
+        mode: "single",
       }),
     (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
   );
@@ -414,6 +427,7 @@ test("uploadVersion rejects a non-owner, non-admin caller with NOT_OWNER", async
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -437,6 +451,7 @@ test("uploadVersion allows an admin to upload on the developer's behalf", async 
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   const version = await useCases.uploadVersion({
@@ -458,6 +473,7 @@ test("uploadVersion rejects a bundle over the size cap without ever touching sto
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -482,6 +498,7 @@ test("setVisibility to PUBLIC is rejected until a version has been approved", as
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -516,6 +533,7 @@ test("decideVersion(APPROVED) sets the game's live_version_id", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -543,6 +561,7 @@ test("decideVersion(REJECTED) requires a non-empty reason", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -572,6 +591,7 @@ test("decideVersion is final — a second decision on the same version is reject
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -607,6 +627,7 @@ test("updateMetadata rejects an out-of-policy title without writing anything", a
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -639,6 +660,7 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   // The raw D1 error must NOT leak past this call — a route's failureResponse() only knows how
@@ -673,6 +695,7 @@ test("uploadVersion surfaces PUBLISH_FAILED (not a raw error) when the source ar
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -730,6 +753,7 @@ test("uploadVersion rejects a bundle with no index.html at its root", async () =
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -757,6 +781,7 @@ test("uploadVersion rejects a path-traversal entry and stores nothing at all", a
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -787,6 +812,7 @@ test("uploadVersion rejects an absolute path entry", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -816,6 +842,7 @@ test("uploadVersion rejects a bundle whose decompressed size exceeds the extract
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -851,6 +878,7 @@ test("an oversized *declared* size is rejected from archive metadata alone, befo
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -892,6 +920,7 @@ test("an implausible compression ratio is rejected even when the declared total 
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -929,6 +958,7 @@ test("a well-compressed but plausible entry (well under the ratio ceiling) is no
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   const version = await useCases.uploadVersion({
@@ -958,6 +988,7 @@ test("an oversized declared file count is rejected from archive metadata alone, 
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -994,6 +1025,7 @@ test("a path-traversal entry reported only in metadata is rejected before any fu
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -1020,6 +1052,7 @@ test("a malformed archive is rejected at the metadata stage, without ever callin
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -1048,6 +1081,7 @@ test("uploadVersion rejects a bundle with more files than the entry-count cap", 
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -1073,6 +1107,7 @@ test("uploadVersion rejects a malformed archive with BUNDLE_MALFORMED", async ()
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -1111,6 +1146,7 @@ test("a publish that fails part-way leaves the version non-READY with a recorded
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   storage.failPutContaining = "game.wasm";
 
@@ -1140,6 +1176,7 @@ test("a version left non-READY by a failed publish cannot be approved or made li
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   storage.failPutContaining = "index.html";
   await assert.rejects(() =>
@@ -1182,6 +1219,7 @@ test("a failed publish can be recovered by republishing from the stored source a
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   storage.failPutContaining = "index.html";
   await assert.rejects(() =>
@@ -1253,6 +1291,7 @@ test("setLiveVersion refuses a version belonging to a different game", async () 
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -1347,6 +1386,7 @@ test("revokeApproval refuses a version that is still pending", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const pending = await useCases.uploadVersion({
     gameId: game.id,
@@ -1371,6 +1411,7 @@ test("revokeApproval refuses an already-rejected version", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -1409,6 +1450,7 @@ test("listAll returns every non-deleted game regardless of developer or visibili
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.createGame({
     slug: "other-devs-game",
@@ -1417,6 +1459,7 @@ test("listAll returns every non-deleted game regardless of developer or visibili
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   const all = await useCases.listAll();
@@ -1489,6 +1532,7 @@ test("isVersionServable is false for a version belonging to a different game", a
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   assert.equal(await useCases.isVersionServable(other.id, version.id), false);
 });
@@ -1582,6 +1626,7 @@ test("createGame claims a review slot, visible on the returned record", async ()
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   assert.equal(game.reviewSlot, 1);
 });
@@ -1596,6 +1641,7 @@ test("a third concurrent submission is rejected with SUBMISSION_LIMIT_REACHED", 
       shortDescription: null,
       description: null,
       genre: "puzzle",
+      mode: "single",
     });
 
   await create("game-1");
@@ -1618,6 +1664,7 @@ test("this is not a lifetime cap: a decided game frees its slot for an unlimited
       shortDescription: null,
       description: null,
       genre: "puzzle",
+      mode: "single",
     });
     const version = await useCases.uploadVersion({
       gameId: game.id,
@@ -1648,6 +1695,7 @@ test("this is not a cap on total approved games: multiple already-approved games
       shortDescription: null,
       description: null,
       genre: "puzzle",
+      mode: "single",
     });
     const version = await useCases.uploadVersion({
       gameId: game.id,
@@ -1675,6 +1723,7 @@ test("this is not a cap on total approved games: multiple already-approved games
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.createGame({
     slug: "game-5",
@@ -1683,6 +1732,7 @@ test("this is not a cap on total approved games: multiple already-approved games
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 });
 
@@ -1695,6 +1745,7 @@ test("REJECTED also releases the review slot, not just APPROVED", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -1720,6 +1771,7 @@ test("withdrawSubmission releases the slot and marks the pending version WITHDRA
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -1742,6 +1794,7 @@ test("withdrawSubmission frees the slot for a new submission", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.createGame({
     slug: "game-2",
@@ -1750,6 +1803,7 @@ test("withdrawSubmission frees the slot for a new submission", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.withdrawSubmission({ gameId: g1.id, actingUserId: 1 });
 
@@ -1760,6 +1814,7 @@ test("withdrawSubmission frees the slot for a new submission", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   assert.equal(g3.reviewSlot, 1);
 });
@@ -1773,6 +1828,7 @@ test("withdrawSubmission rejects a non-owner", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -1790,6 +1846,7 @@ test("withdrawSubmission on a game with no open slot is rejected with NOTHING_TO
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -1821,6 +1878,7 @@ test("different developers have independent review-slot budgets", async () => {
       shortDescription: null,
       description: null,
       genre: "puzzle",
+      mode: "single",
     });
 
   await create("dev-a-1", 1);
@@ -1832,13 +1890,21 @@ test("different developers have independent review-slot budgets", async () => {
 
 // ── createGameFromBundle ──────────────────────────────────────────────────────
 
+/** Defaults `mode` to "single" and always includes a valid logo file, so every existing test that
+ * only cares about ONE specific validation failure doesn't also have to think about the two
+ * newer requirements (2026-08-18) — tests that specifically exercise INVALID_MODE/LOGO_REQUIRED/
+ * LOGO_TOO_LARGE override or omit these explicitly instead. */
 function manifestEntries(
   manifest: Record<string, unknown>,
   extra: Record<string, Uint8Array> = MINIMAL_BUNDLE,
 ): Record<string, Uint8Array> {
+  // A caller-provided `extra` keeps whichever `owogg.logo.*` entry it already has (e.g. the
+  // oversized-logo test) — only default one in when none is present at all.
+  const hasLogo = Object.keys(extra).some((path) => path.startsWith("owogg.logo."));
   return {
     ...extra,
-    [GAME_REGISTRATION_MANIFEST_FILENAME]: bytes(JSON.stringify(manifest)),
+    [GAME_REGISTRATION_MANIFEST_FILENAME]: bytes(JSON.stringify({ mode: "single", ...manifest })),
+    ...(hasLogo ? {} : { "owogg.logo.png": bytes("fake-logo-bytes") }),
   };
 }
 
@@ -1925,6 +1991,7 @@ test("createGameFromBundle surfaces a slug collision as SLUG_TAKEN, same as the 
     shortDescription: null,
     description: null,
     genre: "arcade",
+    mode: "single",
   });
 
   await assert.rejects(
@@ -1944,6 +2011,108 @@ test("createGameFromBundle rejects a malformed manifest as BUNDLE_MALFORMED, not
   );
 });
 
+// ── createGameFromBundle: mode + logo (2026-08-18) ────────────────────────────
+
+test("createGameFromBundle rejects a missing mode as INVALID_MODE", async () => {
+  const { useCases } = createUseCases({
+    ...MINIMAL_BUNDLE,
+    "owogg.logo.png": bytes("fake-logo-bytes"),
+    [GAME_REGISTRATION_MANIFEST_FILENAME]: bytes(
+      JSON.stringify({ slug: "ball-dodge", title: "공 피하기", genre: "action" }),
+    ),
+  });
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_MODE",
+  );
+});
+
+test("createGameFromBundle rejects a mode outside single/multi as INVALID_MODE", async () => {
+  const { useCases } = createUseCases(
+    manifestEntries({ slug: "ball-dodge", title: "공 피하기", genre: "action", mode: "coop" }),
+  );
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_MODE",
+  );
+});
+
+test("createGameFromBundle rejects a bundle with no logo file as LOGO_REQUIRED", async () => {
+  const { useCases } = createUseCases({
+    ...MINIMAL_BUNDLE,
+    [GAME_REGISTRATION_MANIFEST_FILENAME]: bytes(
+      JSON.stringify({ slug: "ball-dodge", title: "공 피하기", genre: "action", mode: "single" }),
+    ),
+  });
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "LOGO_REQUIRED",
+  );
+});
+
+test("createGameFromBundle accepts any of the logo extensions (png/jpg/jpeg/webp/svg)", async () => {
+  for (const ext of ["png", "jpg", "jpeg", "webp", "svg"]) {
+    const { useCases } = createUseCases({
+      ...MINIMAL_BUNDLE,
+      [`owogg.logo.${ext}`]: bytes("fake-logo-bytes"),
+      [GAME_REGISTRATION_MANIFEST_FILENAME]: bytes(
+        JSON.stringify({
+          slug: `ball-dodge-${ext}`,
+          title: "공 피하기",
+          genre: "action",
+          mode: "single",
+        }),
+      ),
+    });
+    const { game } = await useCases.createGameFromBundle({
+      developerUserId: 1,
+      bytes: new ArrayBuffer(10),
+    });
+    assert.equal(game.slug, `ball-dodge-${ext}`, `expected .${ext} logo to be accepted`);
+  }
+});
+
+test("createGameFromBundle rejects an oversized logo as LOGO_TOO_LARGE", async () => {
+  const { useCases } = createUseCases(
+    manifestEntries(
+      { slug: "ball-dodge", title: "공 피하기", genre: "action" },
+      {
+        ...MINIMAL_BUNDLE,
+        "owogg.logo.png": new Uint8Array(SANDBOX_GAME_POLICY.MAX_LOGO_BYTES + 1),
+      },
+    ),
+  );
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "LOGO_TOO_LARGE",
+  );
+});
+
+test("createGameFromBundle links the game's logoKey and excludes the logo from published files", async () => {
+  const { useCases, repo, publisher } = createUseCases(
+    manifestEntries({ slug: "ball-dodge", title: "공 피하기", genre: "action" }),
+  );
+  const publishSpy: string[][] = [];
+  const originalPublish = publisher.publish.bind(publisher);
+  publisher.publish = async (input) => {
+    publishSpy.push(input.prepared.files.map((f) => f.path));
+    return originalPublish(input);
+  };
+
+  const { game } = await useCases.createGameFromBundle({
+    developerUserId: 1,
+    bytes: new ArrayBuffer(10),
+  });
+
+  const stored = repo.games.get(game.id);
+  assert.equal(stored?.logoKey, `games/${game.id}/logo.png`);
+  assert.ok(
+    publishSpy[0] && !publishSpy[0].includes("owogg.logo.png"),
+    "the logo must not be published as a servable game asset",
+  );
+  assert.ok(publishSpy[0]?.includes("index.html"), "index.html must still be published");
+});
+
 // ── deleteGame ─────────────────────────────────────────────────────────────────
 
 test("deleteGame soft-deletes the game, forces it PRIVATE, and records a DELETED audit entry", async () => {
@@ -1955,6 +2124,7 @@ test("deleteGame soft-deletes the game, forces it PRIVATE, and records a DELETED
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   // Take this game past its review slot so deletion doesn't also exercise the withdraw path here.
   await useCases.withdrawSubmission({ gameId: game.id, actingUserId: 1 });
@@ -1976,6 +2146,7 @@ test("deleteGame releases an open review slot and withdraws the pending version"
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -2000,6 +2171,7 @@ test("deleteGame frees the review slot for a new submission, same as withdrawSub
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.createGame({
     slug: "game-2",
@@ -2008,6 +2180,7 @@ test("deleteGame frees the review slot for a new submission, same as withdrawSub
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.deleteGame({ gameId: g1.id, actorAdminId: 9 });
 
@@ -2018,6 +2191,7 @@ test("deleteGame frees the review slot for a new submission, same as withdrawSub
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   assert.equal(g3.reviewSlot, 1);
 });
@@ -2031,6 +2205,7 @@ test("deleteGame is idempotent-failure: a second call returns ALREADY_DELETED, n
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
 
@@ -2059,6 +2234,7 @@ test("deleteOwnGame hard-deletes a never-approved game — findById/findBySlug b
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 });
@@ -2076,6 +2252,7 @@ test("deleteOwnGame frees the slug for immediate reuse, unlike admin's soft-dele
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   await useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 });
 
@@ -2089,6 +2266,7 @@ test("deleteOwnGame frees the slug for immediate reuse, unlike admin's soft-dele
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   assert.equal(retried.slug, "ball-dodge");
 });
@@ -2102,6 +2280,7 @@ test("deleteOwnGame also removes any pending version — it isn't left dangling 
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
   const version = await useCases.uploadVersion({
     gameId: game.id,
@@ -2124,6 +2303,7 @@ test("deleteOwnGame rejects a non-owner with NOT_OWNER", async () => {
     shortDescription: null,
     description: null,
     genre: "puzzle",
+    mode: "single",
   });
 
   await assert.rejects(
