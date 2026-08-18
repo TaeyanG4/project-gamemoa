@@ -418,12 +418,16 @@ function ManageGamesPanel({
                         심사 대기 중 (슬롯 {g.reviewSlot})
                       </span>
                     )}
+                    {/* A row can only ever reach this list with deletedAt set via the admin's
+                        soft-delete — the creator's own self-delete (deleteOwnGame) is a hard
+                        delete that removes the row outright, so it never appears here at all.
+                        No need to attribute "by admin" — there is no other case. */}
                     {g.deletedAt && (
                       <span
                         className="rounded-full bg-accent-red/10 px-1.5 py-0.5 font-bold text-accent-red"
-                        title="관리자가 삭제했습니다. 기록은 감사 목적으로 남아 있으며, 같은 이름(슬러그)으로는 재등록할 수 없습니다."
+                        title="삭제되었습니다. 기록은 감사 목적으로 남아 있으며, 같은 이름(슬러그)으로는 재등록할 수 없습니다."
                       >
-                        관리자에 의해 삭제됨
+                        삭제됨
                       </span>
                     )}
                   </p>
