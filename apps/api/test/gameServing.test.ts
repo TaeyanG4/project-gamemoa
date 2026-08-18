@@ -332,6 +332,50 @@ test("the legacy /play/:slug/* path serves its entry document with the same CSP"
   assert.match(csp, /frame-ancestors https:\/\/www\.owogg\.com/);
 });
 
+// ── CORS on public bundle assets (2026-08-18 sandbox-iframe CORS bug) ────────
+//
+// A sandboxed game iframe (no allow-same-origin — see SandboxGameFrame.tsx) sends `Origin: null`
+// on its own same-document requests, including <script type="module"> fetches, which are always
+// CORS-checked by the browser (unlike a classic script). These routes are public, cookie-free
+// bytes — CORS was never a confidentiality boundary here — so fileResponse answers with a plain
+// wildcard, deliberately never paired with Access-Control-Allow-Credentials. This is a separate,
+// narrower policy from the API's credentialed app.use("/api/*", cors(...)) in index.ts — see
+// cors.test.ts for the assertion that that middleware no longer reaches these routes at all.
+
+test("a published asset response carries a wildcard Access-Control-Allow-Origin, matching an Origin: null module-script fetch", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/games/1/17/Build/game.wasm", { headers: { Origin: "null" } }, {
+      DB: db,
+      ...B2_ENV,
+    } as any),
+  );
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
+});
+
+test("a published asset response never carries Access-Control-Allow-Credentials alongside the wildcard", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/games/1/17/index.html", {}, { DB: db, ...B2_ENV } as any),
+  );
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.equal(res.headers.get("Access-Control-Allow-Credentials"), null);
+});
+
+test("the legacy /play/:slug/* asset path also carries the wildcard ACAO", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/play/live-game/Build/game.wasm", {}, { DB: db, ...B2_ENV } as any),
+  );
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
+});
+
 test("a non-HTML asset carries no CSP — the policy belongs to the document, not the bytes", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
   const res = await withStorage({ stored: publishedObjects() }, () =>

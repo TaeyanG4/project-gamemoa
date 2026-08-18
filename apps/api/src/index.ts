@@ -53,8 +53,25 @@ function isAllowedOrigin(origin: string | undefined, frontendUrl?: string): bool
   return false;
 }
 
+// Scoped to /api/* only — NOT global. This is the credentialed, cookie-aware CORS policy for the
+// JSON API; it must never apply to /play/* or /games/* (gameServing.ts's public bundle-asset
+// routers), which serve plain files to a sandboxed game iframe rather than authenticated JSON.
+// Those two get their own, deliberately different CORS treatment (see fileResponse in
+// gameServing.ts) — a wildcard Access-Control-Allow-Origin with no credentials, appropriate for
+// already-public, cookie-free bytes but never appropriate for an endpoint that reads a session.
+//
+// 2026-08-18 production bug: a sandboxed iframe (no allow-same-origin, by design — see
+// SandboxGameFrame.tsx) sends `Origin: null` on its own same-document requests, including
+// `<script type="module">` fetches (module scripts are always CORS-checked, unlike classic
+// scripts). When this middleware was global, that request got THIS credentialed policy — which
+// echoes back a specific allowed origin, never "*", once `credentials: true` is set — and the
+// browser rejected the response because the echoed origin ("https://owogg.com") didn't match the
+// request's actual origin ("null"). The fix is not to widen this policy to accept "null" (that
+// would mean any sandboxed origin, including someone else's, gets credentialed access to the
+// API); it's that game assets were never API requests and should never have shared this
+// middleware with API's `credentials: true` policy in the first place.
 app.use(
-  "*",
+  "/api/*",
   cors({
     origin: (origin, c) => {
       const allowedFrontend = c.env?.FRONTEND_URL || DEFAULT_FRONTEND_URL;
