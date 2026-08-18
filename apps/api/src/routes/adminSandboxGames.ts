@@ -9,6 +9,7 @@ import {
   SandboxGameLiveVersionUpdateRequestSchema,
   SandboxGameRecordSchema,
   SandboxGameDetailResponseSchema,
+  SandboxGameListResponseSchema,
 } from "@owogg/contracts";
 import { SandboxGameUseCaseFailure } from "@owogg/core";
 import { createContainer } from "../container.js";
@@ -48,6 +49,21 @@ function failureResponse(err: unknown): { body: unknown; status: SandboxGameFail
     status: SANDBOX_GAME_FAILURE_STATUS[err.code],
   };
 }
+
+// GET /api/admin/sandbox-games — every non-deleted game, admin-facing "browse everything" list
+// (regardless of visibility/developer) so an operator can find and toggle a game without already
+// knowing its id. Registered before "/:id" is irrelevant here since this path has no id segment,
+// but kept up top for readability alongside the other list endpoint.
+adminSandboxGamesRouter.get("/", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
+
+  const { sandboxGameUseCases } = createContainer(c.env.DB);
+  const games = await sandboxGameUseCases.listAll();
+  return c.json(SandboxGameListResponseSchema.parse({ games }), 200);
+});
 
 // GET /api/admin/sandbox-games/review-queue?page=&pageSize=
 adminSandboxGamesRouter.get("/review-queue", async (c) => {
@@ -164,6 +180,36 @@ adminSandboxGamesRouter.post("/versions/:versionId/reject", async (c) => {
       adminId: admin.userId,
       decision: "REJECTED",
       reason: parsed.data.reason ?? null,
+    });
+    return c.json(SandboxGameVersionRecordSchema.parse(version), 200);
+  } catch (err) {
+    const { body: errBody, status } = failureResponse(err);
+    return c.json(errBody, status);
+  }
+});
+
+// POST /api/admin/sandbox-games/versions/:versionId/revoke { reason? } — reverts an APPROVED
+// decision back to PENDING_REVIEW ("승인 결정 자체를 취소") — an admin undoing a mistaken
+// approval, distinct from toggling visibility (that only hides/shows an already-approved game) or
+// rejecting (only valid while still pending). If this was the game's live version, visibility is
+// forced back to PRIVATE in the same call — see SandboxGameUseCases.revokeApproval.
+adminSandboxGamesRouter.post("/versions/:versionId/revoke", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.review");
+  if (denied) return denied;
+
+  const versionId = Number(c.req.param("versionId"));
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = SandboxGameVersionDecisionRequestSchema.safeParse(body);
+  const reason = parsed.success ? (parsed.data.reason ?? null) : null;
+
+  try {
+    const { sandboxGameUseCases } = createContainer(c.env.DB);
+    const version = await sandboxGameUseCases.revokeApproval({
+      versionId,
+      adminId: admin.userId,
+      reason,
     });
     return c.json(SandboxGameVersionRecordSchema.parse(version), 200);
   } catch (err) {

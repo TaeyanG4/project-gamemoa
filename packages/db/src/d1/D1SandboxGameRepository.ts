@@ -159,6 +159,13 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return (res.results || []).map(mapGameRow);
   }
 
+  async listAll(): Promise<SandboxGameRecord[]> {
+    const res = await this.db
+      .prepare(`SELECT * FROM sandbox_games WHERE deleted_at IS NULL ORDER BY created_at DESC`)
+      .all<Record<string, unknown>>();
+    return (res.results || []).map(mapGameRow);
+  }
+
   async softDelete(
     id: number,
     deletedByAdminId: number,
@@ -305,6 +312,29 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return updated;
   }
 
+  async clearLiveVersionIfMatches(
+    id: number,
+    versionId: number,
+    nowIso: string,
+  ): Promise<SandboxGameRecord> {
+    // `AND live_version_id = ?` makes this conditional at the SQL level, not a read-then-write:
+    // if the game's live version has already moved on (0 rows affected), the row is left
+    // untouched rather than this racing a concurrent setLiveVersion call. visibility -> PRIVATE in
+    // the same statement satisfies the CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT
+    // NULL) constraint — same reasoning as softDelete.
+    await this.db
+      .prepare(
+        `UPDATE sandbox_games
+         SET live_version_id = NULL, visibility = 'PRIVATE', updated_at = ?
+         WHERE id = ? AND live_version_id = ?`,
+      )
+      .bind(nowIso, id, versionId)
+      .run();
+    const updated = await this.findById(id);
+    if (!updated) throw new Error(`sandbox_games row ${id} not found after live-version clear`);
+    return updated;
+  }
+
   async createVersion(input: {
     gameId: number;
     objectKey: string;
@@ -418,6 +448,20 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
       .run();
     const updated = await this.findVersionById(id);
     if (!updated) throw new Error(`sandbox_game_versions row ${id} not found after decision`);
+    return updated;
+  }
+
+  async revokeVersionApproval(id: number): Promise<SandboxGameVersionRecord> {
+    await this.db
+      .prepare(
+        `UPDATE sandbox_game_versions
+         SET status = 'PENDING_REVIEW', reviewed_by_admin_id = NULL, reviewed_at = NULL, reject_reason = NULL
+         WHERE id = ?`,
+      )
+      .bind(id)
+      .run();
+    const updated = await this.findVersionById(id);
+    if (!updated) throw new Error(`sandbox_game_versions row ${id} not found after revoke`);
     return updated;
   }
 
