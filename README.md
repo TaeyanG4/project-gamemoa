@@ -46,9 +46,11 @@ X(트위터) 인텐트 공유, Discord용 서식 텍스트 클립보드 복사, 
 
 YouTube/CHZZK/SOOP/Twitch 공식 소유권 검증, Featured 자격 자동 심사 및 14일 재검증, 관리자 수동 심사 큐. Featured는 게임 점수·XP·랭킹에 영향을 주지 않습니다. 자세한 내용은 `docs/CREATOR_SYSTEM.md` 참고.
 
-**Admin Center**
+**Admin Center & 권한 모델 (RBAC)**
 
 `ADMIN_USER_IDS`(근본 자격) + Google Step-Up 본인 확인 + 관리자 전용 로그인을 모두 통과해야 별도 관리자 세션이 발급되는 다층 인증 구조. 로그인 실패는 rate limit으로 보호되며, 관리자 페이지는 검색 색인에서 제외됩니다. 설정 절차는 `docs/ADMIN_GUIDE.md` 참고.
+
+인가(authorization)는 세 개의 독립된 축으로 모델링됩니다 — **Staff Role**(ADMIN/OPERATOR/MODERATOR/SYSTEM_DEVELOPER, 운영 인력), **Program/Entitlement**(GAME_CREATOR/STREAMER, 특정 기능 승인 사용자), **Subscription**(OWO_PLUS, 향후 계획·미구현). GAME_CREATOR/STREAMER는 Staff Role의 하위 역할이 아닌 완전히 별개의 축입니다. 역할별 권한 카탈로그, Protected ADMIN 정책, `admin.center.access` 개별 위임, GAME_CREATOR 신청/승인 흐름 전체는 `docs/AUTHORIZATION.md` 참고.
 
 **아키텍처**
 
@@ -147,12 +149,15 @@ owogg/
     ├── ARCHITECTURE.md            # 레이어 의존성 & 플러그인 아키텍처
     ├── WORK_PROGRESS.md           # 현재 작업 현황 및 대기 백로그
     ├── GAME_CREATION_GUIDE.md     # 게임 제작/등록 지침 및 메타데이터 규격
+    ├── GAME_UPLOAD_GUIDE.md       # 게임 크리에이터(GAME_CREATOR) 실사용 업로드 가이드
     ├── GAME_LINEUP.md             # 신규 게임 라인업 및 기획 명세서
     ├── PROGRESSION.md             # XP/레벨/도전과제 설계
-    ├── CREATOR_SYSTEM.md          # 크리에이터 인증 & Featured 정책
+    ├── CREATOR_SYSTEM.md          # 크리에이터(STREAMER) 인증 & Featured 정책
     ├── DISCORD_INTEGRATION.md     # Discord HTTP Interactions 아키텍처
     ├── DISCORD_BOT_GUIDE.md       # Discord 봇 실무 가이드
-    ├── ADMIN_GUIDE.md             # Admin Center 인증 및 운영 가이드
+    ├── ADMIN_GUIDE.md             # Admin Center 인증(다층 Step-Up) 및 운영 가이드
+    ├── AUTHORIZATION.md           # Staff Role/권한/Program(GAME_CREATOR·STREAMER)/구독 모델
+    ├── DATABASE.md                # D1 스키마 전체 및 ERD
     ├── PRODUCTION_INTEGRATIONS.md # 외부 연동 운영 설정 체크리스트
     ├── I18N.md                    # 다국어(4개 언어) 콘텐츠 관리
     ├── MULTIPLAYER_GAME_DESIGN.md # 1:1 실시간 대전 설계 (계획 단계)

@@ -106,6 +106,7 @@ API Composition Root (apps/api/src/container.ts)
 
 ## 관련 문서
 
+- **Staff Role / 권한 / GAME_CREATOR·STREAMER 프로그램 모델**: [`docs/AUTHORIZATION.md`](AUTHORIZATION.md)
 - **계정 식별/통합 절차**: [`docs/runbooks/account-linking.md`](runbooks/account-linking.md)
 - **소셜 로그인 설정**: [`docs/runbooks/oauth-setup.md`](runbooks/oauth-setup.md)
 - **시점 조사 기록** (확장성 점검, 리플레이 타당성, satori+resvg 렌더링 — 2026-08-14):
