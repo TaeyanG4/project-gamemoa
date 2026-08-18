@@ -28,6 +28,7 @@ import {
   SandboxGameVersionRecordSchema,
   SandboxGameRecordSchema,
   SandboxGameDetailResponseSchema,
+  SandboxGameListResponseSchema,
   type AdminAccountRoleValue,
   type AdminAccountStatusValue,
   type AdminUserPeriod,
@@ -307,6 +308,12 @@ export function fetchSandboxReviewQueue(page = 1, pageSize = 20) {
   );
 }
 
+/** Every non-deleted game, regardless of developer/visibility — powers the admin "게임 관리" list
+ * (activate/deactivate without needing to already know a game's id). */
+export function fetchAllSandboxGames() {
+  return apiFetch("/api/admin/sandbox-games", SandboxGameListResponseSchema);
+}
+
 export function fetchAdminSandboxGameDetail(id: number) {
   return apiFetch(`/api/admin/sandbox-games/${id}`, SandboxGameDetailResponseSchema);
 }
@@ -322,6 +329,17 @@ export function postApproveSandboxVersion(versionId: number) {
 export function postRejectSandboxVersion(versionId: number, reason: string) {
   return apiFetch(
     `/api/admin/sandbox-games/versions/${versionId}/reject`,
+    SandboxGameVersionRecordSchema,
+    { method: "POST", body: JSON.stringify({ reason }) },
+  );
+}
+
+/** Reverts an APPROVED decision back to PENDING_REVIEW ("승인 결정 자체를 취소") — undoing a
+ * mistaken approval. If the version was the game's live version, the game is forced back to
+ * PRIVATE server-side in the same call. */
+export function postRevokeSandboxVersion(versionId: number, reason: string | null) {
+  return apiFetch(
+    `/api/admin/sandbox-games/versions/${versionId}/revoke`,
     SandboxGameVersionRecordSchema,
     { method: "POST", body: JSON.stringify({ reason }) },
   );
