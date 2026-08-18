@@ -81,6 +81,9 @@ export type SandboxGameUseCaseError =
   /** revokeApproval was called on a version that isn't currently APPROVED — there is no approval
    * decision left to undo (it's still pending, was rejected, or was already revoked). */
   | "REVOKE_REQUIRES_APPROVED"
+  /** purgeGame was called on a game that hasn't been soft-deleted yet — purge only ever follows
+   * deleteGame, never replaces it, so there is nothing to permanently erase yet. */
+  | "NOT_YET_DELETED"
   | SandboxBundleRejection;
 
 export class SandboxGameUseCaseFailure extends Error {
@@ -547,6 +550,32 @@ export class SandboxGameUseCases {
     });
 
     return deleted;
+  }
+
+  /**
+   * Permanently erases an already-admin-deleted game — ADMIN/OPERATOR only (same
+   * `sandbox_games.delete` permission as deleteGame), and only reachable on a game deleteGame has
+   * already soft-deleted (NOT_YET_DELETED otherwise). This two-step shape is deliberate: soft
+   * delete is the routine "take this down" action and always keeps the audit trail; purge is the
+   * separate, rarer "actually forget this and free the slug" action an admin reaches for only when
+   * they've decided the audit trail (and the slug reservation deliberately built on top of it — see
+   * SandboxGameRepository.slugExists) is no longer worth keeping — e.g. test data, or a creator
+   * asking to reuse a name after 관리자에게 문의. Unlike deleteOwnGame, this has no
+   * CANNOT_DELETE_APPROVED_GAME guard: by the time a game is even eligible here it was already
+   * soft-deleted specifically *because* it had an approved/live version, so refusing to purge one
+   * would make the action pointless.
+   *
+   * A genuine hard delete (SandboxGameRepository.hardDelete): the row, its versions, and its
+   * review-audit log all go, and `slug` becomes free for a new registration — same effect as
+   * deleteOwnGame's hard delete, just reached from the other side (admin, on an already-deleted
+   * game) instead of the creator's own never-approved one.
+   */
+  async purgeGame(input: { gameId: number; actorAdminId: number }): Promise<void> {
+    const game = await this.repo.findById(input.gameId);
+    if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    if (game.deletedAt === null) throw new SandboxGameUseCaseFailure("NOT_YET_DELETED");
+
+    await this.repo.hardDelete(game.id);
   }
 
   /**

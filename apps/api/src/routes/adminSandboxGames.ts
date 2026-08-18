@@ -344,3 +344,25 @@ adminSandboxGamesRouter.delete("/:id", async (c) => {
     return c.json(errBody, status);
   }
 });
+
+// DELETE /api/admin/sandbox-games/:id/purge — permanently erases an already soft-deleted game
+// (row, versions, review-audit log all gone) and frees its `slug` for reuse. Same permission as
+// the soft delete above — this is the separate, rarer "actually forget this" step an admin only
+// reaches for after deciding the audit trail is no longer worth keeping (e.g. test data, or a
+// creator asking to reuse a name). See SandboxGameUseCases.purgeGame's doc comment.
+adminSandboxGamesRouter.delete("/:id/purge", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.delete");
+  if (denied) return denied;
+
+  const id = Number(c.req.param("id"));
+  try {
+    const { sandboxGameUseCases } = createContainer(c.env.DB);
+    await sandboxGameUseCases.purgeGame({ gameId: id, actorAdminId: admin.userId });
+    return c.json({ purged: true }, 200);
+  } catch (err) {
+    const { body: errBody, status } = failureResponse(err);
+    return c.json(errBody, status);
+  }
+});
