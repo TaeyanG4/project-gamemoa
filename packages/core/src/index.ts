@@ -22,6 +22,7 @@ export * from "./ports/adminAuth.js";
 export * from "./ports/adminAccounts.js";
 export * from "./ports/gameCreator.js";
 export * from "./ports/sandboxGames.js";
+export * from "./ports/gameAttempt.js";
 
 // Unified Game Platform foundation (modules/game). ScoreUseCases/GameSettingsUseCases already
 // resolve SYSTEM games through GameRegistry (see application/scoreUseCases.js below); the
@@ -53,6 +54,7 @@ export * from "./application/userModerationUseCases.js";
 export * from "./application/gameCreatorUseCases.js";
 export * from "./application/sandboxGameUseCases.js";
 export * from "./application/gameBundlePublisher.js";
+export * from "./application/gameAttemptUseCases.js";
 export * from "./registry/gameRegistry.generated.js";
 // Compiled from game-registry/. Exported so tests and the next PR's wiring can reach it; no
 // runtime consumer yet — GAME_MANIFESTS above is still what score/settings/catalog read.

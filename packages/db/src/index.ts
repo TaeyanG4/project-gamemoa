@@ -16,6 +16,7 @@ export * from "./d1/D1AdminMonitoringRepository.js";
 export * from "./d1/D1UserModerationRepository.js";
 export * from "./d1/D1GameCreatorRepository.js";
 export * from "./d1/D1SandboxGameRepository.js";
+export * from "./d1/D1GameAttemptConsumptionRepository.js";
 export * from "./storage/BackblazeB2GameBundleRepository.js";
 export * from "./storage/UnconfiguredGameBundleRepository.js";
 // R2GameBundleRepository (packages/db/src/storage/R2GameBundleRepository.ts) is intentionally
