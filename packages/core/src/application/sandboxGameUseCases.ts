@@ -64,6 +64,9 @@ export type SandboxGameUseCaseError =
    * version — self-delete is only for a game that has never been reviewed/approved; past that
    * point only ADMIN/OPERATOR (sandbox_games.delete) may remove it. */
   | "CANNOT_DELETE_APPROVED_GAME"
+  /** revokeApproval was called on a version that isn't currently APPROVED — there is no approval
+   * decision left to undo (it's still pending, was rejected, or was already revoked). */
+  | "REVOKE_REQUIRES_APPROVED"
   | SandboxBundleRejection;
 
 export class SandboxGameUseCaseFailure extends Error {
@@ -133,6 +136,14 @@ export class SandboxGameUseCases {
 
   async listPublic(): Promise<SandboxGameRecord[]> {
     return this.repo.listPublic();
+  }
+
+  /** Every non-deleted game, admin-facing — unlike listPublic (PUBLIC only) or listMine (one
+   * developer), this is "everything an ADMIN/OPERATOR should be able to browse and toggle
+   * visibility on" so the admin UI doesn't need to know a game's id ahead of time (see
+   * docs/GAME_CREATION_GUIDE.md §3.6.4). */
+  async listAll(): Promise<SandboxGameRecord[]> {
+    return this.repo.listAll();
   }
 
   async listVersions(gameId: number): Promise<SandboxGameVersionRecord[]> {
@@ -566,6 +577,52 @@ export class SandboxGameUseCases {
     });
 
     return decided;
+  }
+
+  /**
+   * Reverts an APPROVED version's decision back to PENDING_REVIEW — an ADMIN/OPERATOR undoing a
+   * mistaken approval (2026-08-18 product decision — "관리자가 승인 결정 자체를 취소(재심사
+   * 대기로 되돌림)"), not a developer action and not the same as toggling visibility. Distinct
+   * from decideVersion, which only ever moves PENDING_REVIEW forward to a terminal state.
+   *
+   * If this was the game's current live version, `live_version_id` is cleared and `visibility`
+   * forced back to PRIVATE in the same write (same CHECK-constraint reasoning as softDelete/
+   * hardDelete) — a game can't stay PUBLIC pointing at a version that is, as of this call, no
+   * longer approved. If the game had already moved on to a different live version (e.g. a newer
+   * upload was approved since), this is a no-op at the game level — only the specific version's
+   * own status changes.
+   *
+   * Deliberately does NOT re-claim a review slot: MAX_CONCURRENT_REVIEW_SLOTS exists to bound how
+   * many *developer-initiated* submissions can be open at once, and this is an admin correcting
+   * their own past decision, not a new developer action — the reverted version still surfaces in
+   * the general PENDING_REVIEW queue (listPendingReview) for re-review regardless.
+   */
+  async revokeApproval(input: {
+    versionId: number;
+    adminId: number;
+    reason: string | null;
+  }): Promise<SandboxGameVersionRecord> {
+    const version = await this.repo.findVersionById(input.versionId);
+    if (!version) throw new SandboxGameUseCaseFailure("VERSION_NOT_FOUND");
+    if (version.status !== "APPROVED") {
+      throw new SandboxGameUseCaseFailure("REVOKE_REQUIRES_APPROVED");
+    }
+
+    const nowIso = new Date().toISOString();
+    await this.repo.clearLiveVersionIfMatches(version.gameId, version.id, nowIso);
+    const reverted = await this.repo.revokeVersionApproval(version.id);
+
+    await this.repo.appendReviewAudit({
+      gameId: version.gameId,
+      versionId: version.id,
+      actorAdminId: input.adminId,
+      action: "APPROVAL_REVOKED",
+      reason: input.reason,
+      metadata: null,
+      nowIso,
+    });
+
+    return reverted;
   }
 
   /**

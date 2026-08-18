@@ -110,6 +110,9 @@ export interface SandboxGameRepository {
   /** Public catalog surface — visibility = 'PUBLIC' only (implies an approved live version, by
    * the DB CHECK constraint). */
   listPublic(): Promise<SandboxGameRecord[]>;
+  /** Every non-deleted game, regardless of developer or visibility — the admin-facing "browse
+   * everything" surface (see SandboxGameUseCases.listAll). */
+  listAll(): Promise<SandboxGameRecord[]>;
 
   /**
    * Creates a game AND atomically claims one of the developer's `MAX_CONCURRENT_REVIEW_SLOTS`
@@ -198,6 +201,22 @@ export interface SandboxGameRepository {
     reason: string | null,
     nowIso: string,
   ): Promise<SandboxGameVersionRecord>;
+
+  /** Reverts a version's decision back to PENDING_REVIEW — an admin undoing a mistaken approval
+   * (see SandboxGameUseCases.revokeApproval), not a developer action. Clears
+   * reviewedByAdminId/reviewedAt/rejectReason. Callers are expected to have already checked the
+   * version is currently APPROVED. */
+  revokeVersionApproval(id: number): Promise<SandboxGameVersionRecord>;
+
+  /** If `versionId` is currently `gameId`'s live_version_id, clears it and forces visibility back
+   * to PRIVATE in the same write (same CHECK-constraint reasoning as softDelete) — a no-op if the
+   * game's live version has already moved on to something else. Used by revokeApproval so an
+   * un-approved version immediately stops being served. */
+  clearLiveVersionIfMatches(
+    gameId: number,
+    versionId: number,
+    nowIso: string,
+  ): Promise<SandboxGameRecord>;
 
   /** Developer self-service withdrawal of their own still-pending submission — sets status to
    * WITHDRAWN. Only meaningful from PENDING_REVIEW; implementations should make the transition a

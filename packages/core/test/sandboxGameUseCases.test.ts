@@ -99,6 +99,9 @@ function createFakeRepo(): SandboxGameRepository & {
     async listPublic() {
       return [...games.values()].filter((g) => g.visibility === "PUBLIC");
     },
+    async listAll() {
+      return [...games.values()];
+    },
     async create(input) {
       // Mirrors D1SandboxGameRepository.create's contract: atomically pick the lowest slot (1 or
       // 2) not already held by this developer, or return null if both are taken. A single-threaded
@@ -187,6 +190,19 @@ function createFakeRepo(): SandboxGameRepository & {
       games.set(id, updated);
       return updated;
     },
+    async clearLiveVersionIfMatches(id, versionId, nowIso) {
+      const existing = games.get(id);
+      if (!existing) throw new Error("not found");
+      if (existing.liveVersionId !== versionId) return existing;
+      const updated: SandboxGameRecord = {
+        ...existing,
+        liveVersionId: null,
+        visibility: "PRIVATE",
+        updatedAt: nowIso,
+      };
+      games.set(id, updated);
+      return updated;
+    },
     async createVersion(input) {
       const id = nextVersionId++;
       const record: SandboxGameVersionRecord = {
@@ -236,6 +252,19 @@ function createFakeRepo(): SandboxGameRepository & {
         reviewedByAdminId: adminId,
         reviewedAt: nowIso,
         rejectReason: reason,
+      };
+      versions.set(id, updated);
+      return updated;
+    },
+    async revokeVersionApproval(id) {
+      const existing = versions.get(id);
+      if (!existing) throw new Error("not found");
+      const updated: SandboxGameVersionRecord = {
+        ...existing,
+        status: "PENDING_REVIEW",
+        reviewedByAdminId: null,
+        reviewedAt: null,
+        rejectReason: null,
       };
       versions.set(id, updated);
       return updated;
@@ -1246,6 +1275,153 @@ test("setLiveVersion refuses a version that has not been approved", async () => 
     (err: unknown) =>
       err instanceof SandboxGameUseCaseFailure && err.code === "VERSION_NOT_APPROVED",
   );
+});
+
+// ── revokeApproval / listAll ──────────────────────────────────────────────────
+
+test("revokeApproval reverts an APPROVED version to PENDING_REVIEW and clears the review fields", async () => {
+  const { useCases, version } = await createGameWithLiveVersion();
+
+  const reverted = await useCases.revokeApproval({
+    versionId: version.id,
+    adminId: 99,
+    reason: "실수로 승인함",
+  });
+
+  assert.equal(reverted.status, "PENDING_REVIEW");
+  assert.equal(reverted.reviewedByAdminId, null);
+  assert.equal(reverted.reviewedAt, null);
+  assert.equal(reverted.rejectReason, null);
+});
+
+test("revokeApproval forces the game back to PRIVATE and clears liveVersionId when that version was live", async () => {
+  const { useCases, game, version } = await createGameWithLiveVersion();
+  assert.equal(game.liveVersionId, null); // stale reference from before setVisibility(PUBLIC)
+  const beforeRevoke = await useCases.getById(game.id);
+  assert.equal(beforeRevoke?.visibility, "PUBLIC");
+  assert.equal(beforeRevoke?.liveVersionId, version.id);
+
+  await useCases.revokeApproval({ versionId: version.id, adminId: 99, reason: null });
+
+  const afterRevoke = await useCases.getById(game.id);
+  assert.equal(afterRevoke?.visibility, "PRIVATE");
+  assert.equal(afterRevoke?.liveVersionId, null);
+});
+
+test("revokeApproval leaves the game alone at the game level if a different version is now live", async () => {
+  const { useCases, game, version: firstVersion } = await createGameWithLiveVersion();
+  const secondVersion = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(20),
+  });
+  await useCases.decideVersion({
+    versionId: secondVersion.id,
+    adminId: 99,
+    decision: "APPROVED",
+    reason: null,
+  });
+  await useCases.setLiveVersion(game.id, 99, secondVersion.id);
+
+  // Revoke the OLDER, no-longer-live version — the game itself must be untouched.
+  await useCases.revokeApproval({ versionId: firstVersion.id, adminId: 99, reason: null });
+
+  const afterRevoke = await useCases.getById(game.id);
+  assert.equal(afterRevoke?.visibility, "PUBLIC");
+  assert.equal(afterRevoke?.liveVersionId, secondVersion.id);
+});
+
+test("revokeApproval records an APPROVAL_REVOKED audit entry with the given reason", async () => {
+  const { useCases, repo, version } = await createGameWithLiveVersion();
+  await useCases.revokeApproval({ versionId: version.id, adminId: 99, reason: "테스트 사유" });
+  assert.equal(repo.auditActions.at(-1), "APPROVAL_REVOKED");
+});
+
+test("revokeApproval refuses a version that is still pending", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const pending = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+
+  await assert.rejects(
+    () => useCases.revokeApproval({ versionId: pending.id, adminId: 99, reason: null }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "REVOKE_REQUIRES_APPROVED",
+  );
+});
+
+test("revokeApproval refuses an already-rejected version", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+  await useCases.decideVersion({
+    versionId: version.id,
+    adminId: 99,
+    decision: "REJECTED",
+    reason: "부적절함",
+  });
+
+  await assert.rejects(
+    () => useCases.revokeApproval({ versionId: version.id, adminId: 99, reason: null }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "REVOKE_REQUIRES_APPROVED",
+  );
+});
+
+test("revokeApproval on an unknown version id is VERSION_NOT_FOUND", async () => {
+  const { useCases } = createUseCases();
+  await assert.rejects(
+    () => useCases.revokeApproval({ versionId: 999, adminId: 99, reason: null }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "VERSION_NOT_FOUND",
+  );
+});
+
+test("listAll returns every non-deleted game regardless of developer or visibility", async () => {
+  const { useCases } = createUseCases();
+  await useCases.createGame({
+    slug: "private-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.createGame({
+    slug: "other-devs-game",
+    developerUserId: 2,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+
+  const all = await useCases.listAll();
+  assert.equal(all.length, 2);
+  assert.deepEqual(all.map((g) => g.slug).sort(), ["other-devs-game", "private-game"]);
 });
 
 // ── public serving resolution ────────────────────────────────────────────────

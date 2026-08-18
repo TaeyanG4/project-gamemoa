@@ -75,6 +75,86 @@ test("createVersion then decideVersion(APPROVED) + setLiveVersion lets visibilit
   assert.equal(published.visibility, "PUBLIC");
 });
 
+test("revokeVersionApproval reverts status to PENDING_REVIEW and clears the review fields", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo);
+  const now = new Date().toISOString();
+
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "k",
+    contentHash: "h",
+    bundleBytes: 1,
+    nowIso: now,
+  });
+  await repo.decideVersion(version.id, "APPROVED", 99, null, now);
+
+  const reverted = await repo.revokeVersionApproval(version.id);
+  assert.equal(reverted.status, "PENDING_REVIEW");
+  assert.equal(reverted.reviewedByAdminId, null);
+  assert.equal(reverted.reviewedAt, null);
+  assert.equal(reverted.rejectReason, null);
+});
+
+test("clearLiveVersionIfMatches clears live_version_id and forces PRIVATE only when the version is still live", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo);
+  const now = new Date().toISOString();
+
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "k",
+    contentHash: "h",
+    bundleBytes: 1,
+    nowIso: now,
+  });
+  await repo.decideVersion(version.id, "APPROVED", 99, null, now);
+  await repo.setLiveVersion(game.id, version.id, now);
+  await repo.setVisibility(game.id, "PUBLIC", now);
+
+  const cleared = await repo.clearLiveVersionIfMatches(game.id, version.id, now);
+  assert.equal(cleared.liveVersionId, null);
+  assert.equal(cleared.visibility, "PRIVATE");
+});
+
+test("clearLiveVersionIfMatches is a no-op when the given version isn't the current live one", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo);
+  const now = new Date().toISOString();
+
+  const v1 = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "k1",
+    contentHash: "h1",
+    bundleBytes: 1,
+    nowIso: now,
+  });
+  await repo.decideVersion(v1.id, "APPROVED", 99, null, now);
+  await repo.setLiveVersion(game.id, v1.id, now);
+  await repo.setVisibility(game.id, "PUBLIC", now);
+
+  const v2 = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "k2",
+    contentHash: "h2",
+    bundleBytes: 1,
+    nowIso: now,
+  });
+  await repo.decideVersion(v2.id, "APPROVED", 99, null, now);
+  await repo.setLiveVersion(game.id, v2.id, now);
+
+  // v1 is no longer live (v2 is) — clearing v1 must leave the game untouched.
+  const unchanged = await repo.clearLiveVersionIfMatches(game.id, v1.id, now);
+  assert.equal(unchanged.liveVersionId, v2.id);
+  assert.equal(unchanged.visibility, "PUBLIC");
+});
+
 test("decideVersion(REJECTED) records the reason and never sets live_version_id", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev");
@@ -238,6 +318,22 @@ test("listByDeveloper and listPublic scope correctly", async () => {
   const publicGames = await repo.listPublic();
   assert.equal(publicGames.length, 1);
   assert.equal(publicGames[0]?.id, mine.id);
+});
+
+test("listAll returns every non-deleted game regardless of developer or visibility, but excludes soft-deleted ones", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "DevA");
+  seedUser(raw, 2, "DevB");
+  const repo = new D1SandboxGameRepository(db);
+  const now = new Date().toISOString();
+
+  const a = await seedGame(repo, "a", 1);
+  const b = await seedGame(repo, "b", 2);
+  const deleted = await seedGame(repo, "c-deleted", 2);
+  await repo.softDelete(deleted.id, 99, now);
+
+  const all = await repo.listAll();
+  assert.deepEqual(all.map((g) => g.id).sort(), [a.id, b.id].sort());
 });
 
 test("softDelete sets deleted_at/deleted_by_admin_id and forces visibility back to PRIVATE", async () => {

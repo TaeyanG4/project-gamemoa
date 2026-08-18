@@ -6,8 +6,10 @@ import {
   EyeOff,
   Gamepad2,
   History,
+  ListChecks,
   Loader2,
   Package,
+  RotateCcw,
   Search,
   ShieldAlert,
   Trash2,
@@ -16,14 +18,20 @@ import {
 import { useAuth } from "../features/auth";
 import {
   fetchSandboxReviewQueue,
+  fetchAllSandboxGames,
   fetchAdminSandboxGameDetail,
   postApproveSandboxVersion,
   postRejectSandboxVersion,
+  postRevokeSandboxVersion,
   patchSandboxGameMetadata,
   patchSandboxGameVisibility,
   deleteSandboxGame,
 } from "../features/adminApi";
-import type { SandboxGameReviewQueueResponse, SandboxGameDetailResponse } from "@owogg/contracts";
+import type {
+  SandboxGameReviewQueueResponse,
+  SandboxGameDetailResponse,
+  SandboxGameRecord,
+} from "@owogg/contracts";
 import { ApiClientError } from "../lib/api";
 
 export function meta() {
@@ -37,6 +45,8 @@ export function meta() {
 export default function AdminSandboxGamesRoute() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [queue, setQueue] = useState<SandboxGameReviewQueueResponse | null>(null);
+  const [allGames, setAllGames] = useState<SandboxGameRecord[] | null>(null);
+  const [togglingGameId, setTogglingGameId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [busyVersionId, setBusyVersionId] = useState<number | null>(null);
@@ -49,7 +59,12 @@ export default function AdminSandboxGamesRoute() {
   const loadQueue = async () => {
     setError(null);
     try {
-      setQueue(await fetchSandboxReviewQueue());
+      const [queueRes, gamesRes] = await Promise.all([
+        fetchSandboxReviewQueue(),
+        fetchAllSandboxGames(),
+      ]);
+      setQueue(queueRes);
+      setAllGames(gamesRes.games);
     } catch (err) {
       if (err instanceof ApiClientError && (err.status === 401 || err.status === 403)) {
         setAccessDenied(true);
@@ -67,6 +82,39 @@ export default function AdminSandboxGamesRoute() {
   useEffect(() => {
     if (!authLoading && isAuthenticated) void loadQueue();
   }, [authLoading, isAuthenticated]);
+
+  // Inline activate/deactivate from the game list — same action as GameDetailPanel's visibility
+  // toggle, just without opening the detail panel first.
+  const handleToggleGameVisibility = async (gameRecord: SandboxGameRecord) => {
+    if (togglingGameId !== null) return;
+    setTogglingGameId(gameRecord.id);
+    setError(null);
+    try {
+      const updated = await patchSandboxGameVisibility(
+        gameRecord.id,
+        gameRecord.visibility === "PUBLIC" ? "PRIVATE" : "PUBLIC",
+      );
+      setAllGames((prev) => prev?.map((g) => (g.id === updated.id ? updated : g)) ?? prev);
+      if (detail?.game.id === updated.id) setDetail({ ...detail, game: updated });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "공개 상태 변경에 실패했습니다.");
+    } finally {
+      setTogglingGameId(null);
+    }
+  };
+
+  const handleOpenGame = async (id: number) => {
+    setGameIdInput(String(id));
+    setLoadingDetail(true);
+    setError(null);
+    try {
+      setDetail(await fetchAdminSandboxGameDetail(id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "게임 정보를 불러올 수 없습니다.");
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
 
   const handleApprove = async (versionId: number) => {
     setBusyVersionId(versionId);
@@ -251,6 +299,80 @@ export default function AdminSandboxGamesRoute() {
 
       <section className="space-y-3 border-t border-border pt-6">
         <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
+          <ListChecks className="h-4 w-4" /> 게임 관리 ({allGames?.length ?? 0})
+        </h2>
+        {!allGames ? (
+          <PageMessage small>불러오는 중...</PageMessage>
+        ) : allGames.length === 0 ? (
+          <p className="rounded-2xl border border-border bg-surface-raised p-6 text-center text-xs text-text-muted">
+            등록된 게임이 없습니다.
+          </p>
+        ) : (
+          <div className="flex flex-col divide-y divide-border/60 rounded-2xl border border-border bg-surface-raised px-4">
+            {allGames.map((g) => (
+              <div key={g.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-text-primary">
+                    {g.title} <span className="text-[10px] font-bold text-text-muted">#{g.id}</span>
+                  </p>
+                  <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-muted">
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 font-bold ${
+                        g.visibility === "PUBLIC"
+                          ? "bg-accent-green/10 text-accent-green"
+                          : "bg-surface-overlay text-text-muted"
+                      }`}
+                    >
+                      {g.visibility === "PUBLIC" ? "활성" : "비활성"}
+                    </span>
+                    <span>제작자 #{g.developerUserId}</span>
+                    <span>{g.slug}</span>
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={
+                      togglingGameId !== null ||
+                      (g.visibility === "PRIVATE" && g.liveVersionId === null)
+                    }
+                    onClick={() => void handleToggleGameVisibility(g)}
+                    title={
+                      g.liveVersionId === null
+                        ? "승인된 버전이 있어야 활성화할 수 있습니다."
+                        : undefined
+                    }
+                    className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-40 ${
+                      g.visibility === "PUBLIC"
+                        ? "border-accent-green/30 bg-accent-green/10 text-accent-green hover:bg-accent-green/20"
+                        : "border-border bg-surface text-text-primary hover:border-brand"
+                    }`}
+                  >
+                    {togglingGameId === g.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : g.visibility === "PUBLIC" ? (
+                      <Eye className="h-3.5 w-3.5" />
+                    ) : (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    )}
+                    {g.visibility === "PUBLIC" ? "활성" : "비활성"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenGame(g.id)}
+                    className="rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+                  >
+                    관리
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3 border-t border-border pt-6">
+        <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
           <Gamepad2 className="h-4 w-4" /> 게임 메타데이터 / 공개 관리
         </h2>
         <form onSubmit={(e) => void handleLoadGame(e)} className="flex items-center gap-2">
@@ -302,6 +424,7 @@ function GameDetailPanel({
   const [saving, setSaving] = useState(false);
   const [togglingVisibility, setTogglingVisibility] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [revokingVersionId, setRevokingVersionId] = useState<number | null>(null);
 
   const handleSaveMetadata = async () => {
     setSaving(true);
@@ -363,6 +486,25 @@ function GameDetailPanel({
       onError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Undoes a mistaken approval — reverts the version to PENDING_REVIEW and, if it was the live
+  // version, forces the game back to PRIVATE server-side. Re-fetches the full detail afterward
+  // (rather than patching state by hand) since both the version and the game record can change.
+  const handleRevoke = async (versionId: number) => {
+    if (revokingVersionId !== null) return;
+    const reason = window.prompt("철회 사유 (선택 사항, 감사 로그에 기록됩니다):");
+    if (reason === null) return; // user cancelled the prompt
+    setRevokingVersionId(versionId);
+    onError("");
+    try {
+      await postRevokeSandboxVersion(versionId, reason.trim() || null);
+      onChanged(await fetchAdminSandboxGameDetail(game.id));
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "철회에 실패했습니다.");
+    } finally {
+      setRevokingVersionId(null);
     }
   };
 
@@ -528,21 +670,39 @@ function GameDetailPanel({
         </h4>
         <div className="flex flex-col divide-y divide-border/60">
           {detail.versions.map((v) => (
-            <div key={v.id} className="flex items-center justify-between py-2 text-xs">
+            <div key={v.id} className="flex items-center justify-between gap-2 py-2 text-xs">
               <span className="text-text-muted">
                 {v.uploadedAt.split("T")[0]} · {(v.bundleBytes / 1024 / 1024).toFixed(1)}MB
               </span>
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                  v.status === "APPROVED"
-                    ? "bg-accent-green/10 text-accent-green"
-                    : v.status === "REJECTED"
-                      ? "bg-accent-red/10 text-accent-red"
-                      : "bg-accent-yellow/10 text-accent-yellow"
-                }`}
-              >
-                {v.status}
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                    v.status === "APPROVED"
+                      ? "bg-accent-green/10 text-accent-green"
+                      : v.status === "REJECTED"
+                        ? "bg-accent-red/10 text-accent-red"
+                        : "bg-accent-yellow/10 text-accent-yellow"
+                  }`}
+                >
+                  {v.status}
+                </span>
+                {v.status === "APPROVED" && (
+                  <button
+                    type="button"
+                    disabled={revokingVersionId !== null}
+                    onClick={() => void handleRevoke(v.id)}
+                    title="승인 결정을 취소하고 재심사 대기로 되돌립니다."
+                    className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] font-bold text-text-muted hover:border-accent-red hover:text-accent-red disabled:opacity-50"
+                  >
+                    {revokingVersionId === v.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-3 w-3" />
+                    )}
+                    철회
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>
