@@ -127,8 +127,9 @@ export interface SandboxGameRepository {
   /** Public catalog surface — visibility = 'PUBLIC' only (implies an approved live version, by
    * the DB CHECK constraint). */
   listPublic(): Promise<SandboxGameRecord[]>;
-  /** Every non-deleted game, regardless of developer or visibility — the admin-facing "browse
-   * everything" surface (see SandboxGameUseCases.listAll). */
+  /** Every game, including soft-deleted ones, regardless of developer or visibility — the
+   * admin-facing "browse everything" surface (see SandboxGameUseCases.listAll's doc comment for
+   * why deleted games are deliberately included here, unlike listPublic). */
   listAll(): Promise<SandboxGameRecord[]>;
 
   /**
