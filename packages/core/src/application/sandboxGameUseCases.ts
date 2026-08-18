@@ -155,10 +155,15 @@ export class SandboxGameUseCases {
     return this.repo.listPublic();
   }
 
-  /** Every non-deleted game, admin-facing — unlike listPublic (PUBLIC only) or listMine (one
-   * developer), this is "everything an ADMIN/OPERATOR should be able to browse and toggle
-   * visibility on" so the admin UI doesn't need to know a game's id ahead of time (see
-   * docs/GAME_CREATION_GUIDE.md §3.6.4). */
+  /** Every game, including soft-deleted ones, admin-facing — unlike listPublic (PUBLIC only) or
+   * listMine (one developer), this is "everything an ADMIN/OPERATOR should be able to browse" so
+   * the admin UI doesn't need to know a game's id ahead of time (see
+   * docs/GAME_CREATION_GUIDE.md §3.6.4). Deliberately includes deleted games (2026-08-18 fix) —
+   * purgeGame only reaches an already-deleted game, and this list was the one place an admin was
+   * supposed to be able to find one without already knowing its id; excluding them defeated that
+   * and made purge practically undiscoverable. The web UI disables the visibility toggle and
+   * shows a "삭제됨" badge for these rows instead (setVisibility itself also refuses them, as a
+   * second guard against reviving a deleted game's visibility from a stray request). */
   async listAll(): Promise<SandboxGameRecord[]> {
     return this.repo.listAll();
   }
@@ -774,6 +779,10 @@ export class SandboxGameUseCases {
   ): Promise<SandboxGameRecord> {
     const game = await this.repo.findById(gameId);
     if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
+    // A deleted game has no "undelete" — deleteGame already forces PRIVATE, and without this
+    // guard a stray PATCH could flip a soft-deleted (and now, since listAll includes deleted
+    // games, browsable-again) row back to PUBLIC with no explicit undelete step ever happening.
+    if (game.deletedAt !== null) throw new SandboxGameUseCaseFailure("ALREADY_DELETED");
     if (visibility === "PUBLIC" && !canSetVisibilityPublic(game.liveVersionId !== null)) {
       throw new SandboxGameUseCaseFailure("NO_APPROVED_VERSION");
     }

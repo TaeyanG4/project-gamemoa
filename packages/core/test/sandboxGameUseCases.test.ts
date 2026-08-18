@@ -1477,7 +1477,7 @@ test("revokeApproval on an unknown version id is VERSION_NOT_FOUND", async () =>
   );
 });
 
-test("listAll returns every non-deleted game regardless of developer or visibility", async () => {
+test("listAll returns every game regardless of developer, visibility, or deletion", async () => {
   const { useCases } = createUseCases();
   await useCases.createGame({
     slug: "private-game",
@@ -1488,7 +1488,7 @@ test("listAll returns every non-deleted game regardless of developer or visibili
     genre: "puzzle",
     mode: "single",
   });
-  await useCases.createGame({
+  const other = await useCases.createGame({
     slug: "other-devs-game",
     developerUserId: 2,
     title: "Game",
@@ -1497,10 +1497,36 @@ test("listAll returns every non-deleted game regardless of developer or visibili
     genre: "puzzle",
     mode: "single",
   });
+  await useCases.deleteGame({ gameId: other.id, actorAdminId: 9 });
 
+  // Regression (2026-08-18): listAll used to exclude soft-deleted games, which made purgeGame
+  // (only ever reachable on an already-deleted game) practically undiscoverable — an admin had
+  // no way to find one without already knowing its id. See purgeGame's doc comment.
   const all = await useCases.listAll();
   assert.equal(all.length, 2);
   assert.deepEqual(all.map((g) => g.slug).sort(), ["other-devs-game", "private-game"]);
+  assert.ok(all.find((g) => g.slug === "other-devs-game")?.deletedAt !== null);
+});
+
+test("setVisibility refuses a soft-deleted game with ALREADY_DELETED", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  // Without this guard, listAll now including deleted games would let a stray PATCH flip a
+  // soft-deleted row's visibility back to PUBLIC with no explicit undelete ever happening.
+  await assert.rejects(
+    () => useCases.setVisibility(game.id, 9, "PRIVATE"),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "ALREADY_DELETED",
+  );
 });
 
 // ── public serving resolution ────────────────────────────────────────────────
