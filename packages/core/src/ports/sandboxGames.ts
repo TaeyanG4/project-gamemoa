@@ -117,6 +117,12 @@ export interface SandboxGamePendingVersionsPage {
 export interface SandboxGameRepository {
   findById(id: number): Promise<SandboxGameRecord | null>;
   findBySlug(slug: string): Promise<SandboxGameRecord | null>;
+  /** Whether `slug` is taken at the DB level — includes soft-deleted rows, unlike findBySlug.
+   * `slug` carries a raw SQL UNIQUE constraint (migration 0024) that a soft delete does not lift
+   * (the row survives for audit — see SandboxGameUseCases.deleteGame), so createGame's
+   * pre-insert check has to agree with that constraint or the INSERT crashes with a raw,
+   * unhandled uniqueness violation instead of a clean SLUG_TAKEN. */
+  slugExists(slug: string): Promise<boolean>;
   listByDeveloper(developerUserId: number): Promise<SandboxGameRecord[]>;
   /** Public catalog surface — visibility = 'PUBLIC' only (implies an approved live version, by
    * the DB CHECK constraint). */

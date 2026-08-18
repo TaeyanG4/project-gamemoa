@@ -185,8 +185,10 @@ export class SandboxGameUseCases {
     if (!isValidSandboxGameSlug(slug)) throw new SandboxGameUseCaseFailure("INVALID_SLUG");
     const title = validateTitle(input.title);
 
-    const existing = await this.repo.findBySlug(slug);
-    if (existing) throw new SandboxGameUseCaseFailure("SLUG_TAKEN");
+    // slugExists checks the raw DB constraint (includes soft-deleted rows), not just currently
+    // resolvable games — findBySlug alone would miss a slug held by an admin-soft-deleted game
+    // and let the INSERT below crash on the UNIQUE constraint instead of failing cleanly here.
+    if (await this.repo.slugExists(slug)) throw new SandboxGameUseCaseFailure("SLUG_TAKEN");
 
     // repo.create claims a review slot atomically as part of the same insert (see
     // D1SandboxGameRepository.create) — null here means both of this developer's
