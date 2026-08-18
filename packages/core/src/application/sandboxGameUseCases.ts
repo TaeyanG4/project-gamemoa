@@ -340,6 +340,15 @@ export class SandboxGameUseCases {
       // Swallow the delete's own failure so the original error doesn't get masked by a cleanup
       // failure.
       await this.storage.deleteObject(objectKey).catch(() => {});
+      // Server-side only (Worker console -> `wrangler tail`), never sent to the client — same
+      // reasoning as publishOrFail's doc comment on why raw provider errors don't reach the
+      // response body. Without this, PUBLISH_FAILED alone gives an operator no way to tell "B2
+      // auth is broken" from "D1 is down" from anything else; this is the only place that
+      // distinction is still observable at all.
+      console.error(
+        `uploadPreparedVersion failed for gameId=${input.gameId}:`,
+        err instanceof Error ? err.message : err,
+      );
       throw new SandboxGameUseCaseFailure("PUBLISH_FAILED");
     }
 
