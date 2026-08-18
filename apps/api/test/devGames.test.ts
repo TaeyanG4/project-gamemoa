@@ -227,6 +227,19 @@ test("DELETE /api/admin/sandbox-games/:id is denied for non-admin", async () => 
   assert.equal(res.status, 403);
 });
 
+test("DELETE /api/admin/sandbox-games/:id/purge is denied for non-admin", async () => {
+  const { db } = createDb({ userId: 7 });
+  const res = await app.request(
+    "/api/admin/sandbox-games/1/purge",
+    {
+      method: "DELETE",
+      headers: { Cookie: "owogg_session=valid_session; owogg_admin_session=none" },
+    },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
 test("POST /api/dev/games/upload is rejected for a non-developer with FORBIDDEN, not a crash", async () => {
   const { db } = createDb({ userId: 7, isDeveloper: false });
   const res = await app.request(

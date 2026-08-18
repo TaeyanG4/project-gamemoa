@@ -2259,6 +2259,64 @@ test("deleteGame on an unknown game id is GAME_NOT_FOUND", async () => {
   );
 });
 
+// ── purgeGame (admin-only, follow-up to deleteGame) ─────────────────────────────
+
+test("purgeGame hard-deletes an already soft-deleted game and frees its slug", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  await useCases.purgeGame({ gameId: game.id, actorAdminId: 9 });
+
+  assert.equal(await useCases.getById(game.id), null);
+
+  // The whole point: the slug is genuinely free again, not just SLUG_TAKEN-avoided.
+  const reregistered = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 2,
+    title: "Reregistered",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+  assert.equal(reregistered.slug, "my-game");
+});
+
+test("purgeGame refuses a game that hasn't been soft-deleted yet, with NOT_YET_DELETED", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+
+  await assert.rejects(
+    () => useCases.purgeGame({ gameId: game.id, actorAdminId: 9 }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "NOT_YET_DELETED",
+  );
+});
+
+test("purgeGame on an unknown game id is GAME_NOT_FOUND", async () => {
+  const { useCases } = createUseCases();
+  await assert.rejects(
+    () => useCases.purgeGame({ gameId: 999, actorAdminId: 9 }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "GAME_NOT_FOUND",
+  );
+});
+
 // ── deleteOwnGame (creator self-service) ────────────────────────────────────────
 
 test("deleteOwnGame hard-deletes a never-approved game — findById/findBySlug both return null afterward", async () => {
