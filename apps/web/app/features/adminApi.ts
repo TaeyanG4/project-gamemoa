@@ -367,3 +367,11 @@ export function deleteSandboxGame(id: number) {
     method: "DELETE",
   });
 }
+
+/** Permanently erases an already-soft-deleted sandbox game (row, versions, review-audit log) and
+ * frees its slug for reuse — only valid after deleteSandboxGame. Same permission requirement. */
+export function purgeSandboxGame(id: number) {
+  return apiFetch(`/api/admin/sandbox-games/${id}/purge`, z.object({ purged: z.literal(true) }), {
+    method: "DELETE",
+  });
+}

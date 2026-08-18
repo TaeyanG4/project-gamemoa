@@ -42,6 +42,7 @@ export const SANDBOX_GAME_FAILURE_STATUS: Record<
   INVALID_MODE: 400,
   LOGO_REQUIRED: 422,
   LOGO_TOO_LARGE: 422,
+  NOT_YET_DELETED: 409,
 };
 
 export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["code"], string> = {
@@ -79,4 +80,5 @@ export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["cod
   LOGO_REQUIRED:
     "ZIP 최상위에 로고 이미지(owogg.logo.png/jpg/jpeg/webp/svg 중 하나)가 없습니다. 게임 등록에는 로고가 필요합니다.",
   LOGO_TOO_LARGE: "로고 이미지 용량이 최대 허용치를 초과했습니다.",
+  NOT_YET_DELETED: "먼저 삭제(비공개 전환)된 게임만 완전 삭제할 수 있습니다.",
 };
