@@ -16,6 +16,7 @@ import type {
 } from "../src/ports/sandboxGames.js";
 import { SANDBOX_GAME_POLICY } from "../src/domain/sandboxGames.js";
 import type { SandboxGameBundleManifest } from "../src/domain/sandboxGameBundle.js";
+import { GAME_REGISTRATION_MANIFEST_FILENAME } from "../src/domain/sandboxGameBundle.js";
 
 // The zip container format itself is an infrastructure detail behind the BundleArchiveReader port,
 // so these tests inject archive *contents* directly. Real zip bytes (and therefore fflate) are
@@ -131,11 +132,26 @@ function createFakeRepo(): SandboxGameRepository & {
         visibility: "PRIVATE",
         liveVersionId: null,
         reviewSlot: slot,
+        deletedAt: null,
+        deletedByAdminId: null,
         createdAt: input.nowIso,
         updatedAt: input.nowIso,
       };
       games.set(id, record);
       return record;
+    },
+    async softDelete(id, deletedByAdminId, nowIso) {
+      const existing = games.get(id);
+      if (!existing) throw new Error("not found");
+      const updated: SandboxGameRecord = {
+        ...existing,
+        deletedAt: nowIso,
+        deletedByAdminId,
+        visibility: "PRIVATE",
+        updatedAt: nowIso,
+      };
+      games.set(id, updated);
+      return updated;
     },
     async releaseReviewSlot(id, nowIso) {
       const existing = games.get(id);
@@ -1595,4 +1611,222 @@ test("different developers have independent review-slot budgets", async () => {
   // Developer 1 is now at their limit — developer 2 is unaffected.
   const b1 = await create("dev-b-1", 2);
   assert.equal(b1.reviewSlot, 1);
+});
+
+// ── createGameFromBundle ──────────────────────────────────────────────────────
+
+function manifestEntries(
+  manifest: Record<string, unknown>,
+  extra: Record<string, Uint8Array> = MINIMAL_BUNDLE,
+): Record<string, Uint8Array> {
+  return {
+    ...extra,
+    [GAME_REGISTRATION_MANIFEST_FILENAME]: bytes(JSON.stringify(manifest)),
+  };
+}
+
+test("createGameFromBundle creates the game and its first version from the embedded manifest", async () => {
+  const { useCases, repo } = createUseCases(
+    manifestEntries({ slug: "ball-dodge", title: "공 피하기", genre: "action" }),
+  );
+
+  const { game, version } = await useCases.createGameFromBundle({
+    developerUserId: 1,
+    bytes: new ArrayBuffer(10),
+  });
+
+  assert.equal(game.slug, "ball-dodge");
+  assert.equal(game.title, "공 피하기");
+  assert.equal(game.genre, "action");
+  assert.equal(game.developerUserId, 1);
+  assert.equal(game.reviewSlot, 1);
+  assert.equal(version.gameId, game.id);
+  assert.equal(version.status, "PENDING_REVIEW");
+  assert.equal(repo.versions.size, 1);
+});
+
+test("createGameFromBundle only decompresses the archive once (shared with the upload)", async () => {
+  const { useCases, archives } = createUseCases(
+    manifestEntries({ slug: "ball-dodge", title: "공 피하기", genre: "action" }),
+  );
+  await useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) });
+  assert.equal(archives.readCalls, 1);
+});
+
+test("createGameFromBundle rejects a bundle with no manifest as MANIFEST_MISSING", async () => {
+  const { useCases } = createUseCases(MINIMAL_BUNDLE);
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "MANIFEST_MISSING",
+  );
+});
+
+test("createGameFromBundle rejects a manifest missing/invalid slug as INVALID_SLUG", async () => {
+  const { useCases } = createUseCases(manifestEntries({ title: "공 피하기", genre: "action" }));
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_SLUG",
+  );
+});
+
+test("createGameFromBundle rejects a manifest missing/invalid title as INVALID_TITLE", async () => {
+  const { useCases } = createUseCases(manifestEntries({ slug: "ball-dodge", genre: "action" }));
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_TITLE",
+  );
+});
+
+test("createGameFromBundle rejects a manifest with a blank genre as INVALID_GENRE", async () => {
+  const { useCases } = createUseCases(
+    manifestEntries({ slug: "ball-dodge", title: "공 피하기", genre: "   " }),
+  );
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_GENRE",
+  );
+});
+
+test("createGameFromBundle rejects a manifest with a non-string genre as INVALID_GENRE", async () => {
+  const { useCases } = createUseCases(
+    manifestEntries({ slug: "ball-dodge", title: "공 피하기", genre: 5 }),
+  );
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "INVALID_GENRE",
+  );
+});
+
+test("createGameFromBundle surfaces a slug collision as SLUG_TAKEN, same as the manual form", async () => {
+  const { useCases } = createUseCases(
+    manifestEntries({ slug: "ball-dodge", title: "공 피하기", genre: "action" }),
+  );
+  await useCases.createGame({
+    slug: "ball-dodge",
+    developerUserId: 2,
+    title: "Existing",
+    shortDescription: null,
+    description: null,
+    genre: "arcade",
+  });
+
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
+});
+
+test("createGameFromBundle rejects a malformed manifest as BUNDLE_MALFORMED, not silently ignored", async () => {
+  const { useCases } = createUseCases({
+    ...MINIMAL_BUNDLE,
+    [GAME_REGISTRATION_MANIFEST_FILENAME]: bytes("{ not json"),
+  });
+  await assert.rejects(
+    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "BUNDLE_MALFORMED",
+  );
+});
+
+// ── deleteGame ─────────────────────────────────────────────────────────────────
+
+test("deleteGame soft-deletes the game, forces it PRIVATE, and records a DELETED audit entry", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  // Take this game past its review slot so deletion doesn't also exercise the withdraw path here.
+  await useCases.withdrawSubmission({ gameId: game.id, actingUserId: 1 });
+
+  const deleted = await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  assert.notEqual(deleted.deletedAt, null);
+  assert.equal(deleted.deletedByAdminId, 9);
+  assert.equal(deleted.visibility, "PRIVATE");
+  assert.equal(repo.auditActions.at(-1), "DELETED");
+});
+
+test("deleteGame releases an open review slot and withdraws the pending version", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  const version = await useCases.uploadVersion({
+    gameId: game.id,
+    actingUserId: 1,
+    isAdmin: false,
+    bytes: new ArrayBuffer(10),
+  });
+  assert.notEqual(game.reviewSlot, null);
+
+  const deleted = await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  assert.equal(deleted.reviewSlot, null);
+  assert.equal(repo.versions.get(version.id)?.status, "WITHDRAWN");
+});
+
+test("deleteGame frees the review slot for a new submission, same as withdrawSubmission", async () => {
+  const { useCases } = createUseCases();
+  const g1 = await useCases.createGame({
+    slug: "game-1",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.createGame({
+    slug: "game-2",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.deleteGame({ gameId: g1.id, actorAdminId: 9 });
+
+  const g3 = await useCases.createGame({
+    slug: "game-3",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  assert.equal(g3.reviewSlot, 1);
+});
+
+test("deleteGame is idempotent-failure: a second call returns ALREADY_DELETED, not a silent no-op", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+  });
+  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  await assert.rejects(
+    () => useCases.deleteGame({ gameId: game.id, actorAdminId: 9 }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "ALREADY_DELETED",
+  );
+});
+
+test("deleteGame on an unknown game id is GAME_NOT_FOUND", async () => {
+  const { useCases } = createUseCases();
+  await assert.rejects(
+    () => useCases.deleteGame({ gameId: 999, actorAdminId: 9 }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "GAME_NOT_FOUND",
+  );
 });

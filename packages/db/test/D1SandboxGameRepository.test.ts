@@ -240,6 +240,96 @@ test("listByDeveloper and listPublic scope correctly", async () => {
   assert.equal(publicGames[0]?.id, mine.id);
 });
 
+test("softDelete sets deleted_at/deleted_by_admin_id and forces visibility back to PRIVATE", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const now = new Date().toISOString();
+
+  const game = await seedGame(repo);
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "k",
+    contentHash: "h",
+    bundleBytes: 1,
+    nowIso: now,
+  });
+  await repo.decideVersion(version.id, "APPROVED", 99, null, now);
+  await repo.setLiveVersion(game.id, version.id, now);
+  await repo.setVisibility(game.id, "PUBLIC", now);
+
+  const deleted = await repo.softDelete(game.id, 99, now);
+  assert.equal(deleted.deletedAt, now);
+  assert.equal(deleted.deletedByAdminId, 99);
+  assert.equal(deleted.visibility, "PRIVATE");
+
+  const reread = await repo.findById(game.id);
+  assert.equal(reread?.deletedAt, now);
+  assert.equal(reread?.visibility, "PRIVATE");
+});
+
+test("a soft-deleted game is excluded from findBySlug (the /play/:slug lookup path)", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const now = new Date().toISOString();
+
+  const game = await seedGame(repo, "vanishing-game");
+  assert.notEqual(await repo.findBySlug("vanishing-game"), null);
+
+  await repo.softDelete(game.id, 99, now);
+  assert.equal(await repo.findBySlug("vanishing-game"), null);
+  // findById stays available — admin tooling and audit trails still need to look it up by id.
+  assert.notEqual(await repo.findById(game.id), null);
+});
+
+test("a soft-deleted game is excluded from listPublic even if it was PUBLIC beforehand", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const now = new Date().toISOString();
+
+  const game = await seedGame(repo, "public-then-deleted");
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "k",
+    contentHash: "h",
+    bundleBytes: 1,
+    nowIso: now,
+  });
+  await repo.decideVersion(version.id, "APPROVED", 99, null, now);
+  await repo.setLiveVersion(game.id, version.id, now);
+  await repo.setVisibility(game.id, "PUBLIC", now);
+  assert.equal((await repo.listPublic()).length, 1);
+
+  await repo.softDelete(game.id, 99, now);
+  assert.equal((await repo.listPublic()).length, 0);
+});
+
+test("a soft-deleted game stays visible to its own developer via listByDeveloper", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const now = new Date().toISOString();
+
+  const game = await seedGame(repo, "deleted-but-mine");
+  await repo.softDelete(game.id, 99, now);
+
+  const mine = await repo.listByDeveloper(1);
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0]?.id, game.id);
+  assert.notEqual(mine[0]?.deletedAt, null);
+});
+
+test("a new game defaults to deleted_at/deleted_by_admin_id both null", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo);
+  assert.equal(game.deletedAt, null);
+  assert.equal(game.deletedByAdminId, null);
+});
+
 test("a new version starts UPLOADED on the publish axis, independent of its review status", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev");

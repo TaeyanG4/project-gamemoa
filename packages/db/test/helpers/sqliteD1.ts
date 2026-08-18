@@ -371,11 +371,15 @@ CREATE TABLE sandbox_games (
   visibility TEXT NOT NULL DEFAULT 'PRIVATE',
   live_version_id INTEGER,
   review_slot INTEGER,
+  deleted_at TEXT,
+  deleted_by_admin_id INTEGER,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT NULL),
   CHECK (review_slot IS NULL OR review_slot IN (1, 2))
 );
+
+CREATE INDEX idx_sandbox_games_deleted_at ON sandbox_games(deleted_at);
 
 CREATE UNIQUE INDEX idx_sandbox_games_review_slot
   ON sandbox_games(developer_user_id, review_slot)

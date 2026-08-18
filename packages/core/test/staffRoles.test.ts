@@ -27,17 +27,21 @@ test("hasPermission: OPERATOR gets its default bundle without any individual gra
   assert.equal(hasPermission("OPERATOR", [], "users.ban"), true);
   assert.equal(hasPermission("OPERATOR", [], "games.moderate"), true);
   assert.equal(hasPermission("OPERATOR", [], "sandbox_games.review"), true);
+  assert.equal(hasPermission("OPERATOR", [], "sandbox_games.delete"), true);
   // Not in any default bundle, and not individually granted.
   assert.equal(hasPermission("OPERATOR", [], "roles.manage"), false);
 });
 
-test("hasPermission: MODERATOR's default bundle deliberately excludes users.ban/games.moderate/game_creators.manage", () => {
+test("hasPermission: MODERATOR's default bundle deliberately excludes users.ban/games.moderate/game_creators.manage/sandbox_games.delete", () => {
   assert.equal(hasPermission("MODERATOR", [], "users.view"), true);
   assert.equal(hasPermission("MODERATOR", [], "users.suspend"), true);
   assert.equal(hasPermission("MODERATOR", [], "sandbox_games.review"), true);
   assert.equal(hasPermission("MODERATOR", [], "users.ban"), false);
   assert.equal(hasPermission("MODERATOR", [], "games.moderate"), false);
   assert.equal(hasPermission("MODERATOR", [], "game_creators.manage"), false);
+  // MODERATOR has review (can approve/reject content) but must not have delete — a stronger,
+  // more destructive action (2026-08-18 product decision, see DEFAULT_ROLE_PERMISSIONS).
+  assert.equal(hasPermission("MODERATOR", [], "sandbox_games.delete"), false);
 });
 
 test("hasPermission: an individual grant extends a role's default bundle (e.g. MODERATOR + users.ban)", () => {

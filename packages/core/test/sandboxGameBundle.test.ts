@@ -12,6 +12,9 @@ import {
   prepareBundleEntries,
   validateBundleEntryMetadata,
   SandboxBundleRejectionError,
+  extractGameRegistrationManifest,
+  GAME_REGISTRATION_MANIFEST_FILENAME,
+  type PreparedBundleFile,
 } from "../src/domain/sandboxGameBundle.js";
 import { SANDBOX_GAME_POLICY } from "../src/domain/sandboxGames.js";
 
@@ -301,4 +304,57 @@ test("validateBundleEntryMetadata's ratio guard ignores a zero compressed size c
     (err: unknown) =>
       err instanceof SandboxBundleRejectionError && err.code === "BUNDLE_EXTRACTED_TOO_LARGE",
   );
+});
+
+// ── registration manifest ────────────────────────────────────────────────────
+
+function preparedFile(path: string, contents: unknown): PreparedBundleFile {
+  return {
+    path,
+    bytes: bytes(typeof contents === "string" ? contents : JSON.stringify(contents)),
+    contentType: "application/octet-stream",
+  };
+}
+
+test("extractGameRegistrationManifest returns null when the file is simply absent", () => {
+  assert.equal(
+    extractGameRegistrationManifest([preparedFile("index.html", "<html></html>")]),
+    null,
+  );
+});
+
+test("extractGameRegistrationManifest parses a present, well-formed manifest", () => {
+  const manifest = extractGameRegistrationManifest([
+    preparedFile("index.html", "<html></html>"),
+    preparedFile(GAME_REGISTRATION_MANIFEST_FILENAME, {
+      slug: "ball-dodge",
+      title: "Ball Dodge",
+      genre: "arcade",
+    }),
+  ]);
+  assert.deepEqual(manifest, { slug: "ball-dodge", title: "Ball Dodge", genre: "arcade" });
+});
+
+test("extractGameRegistrationManifest rejects invalid JSON as BUNDLE_MALFORMED", () => {
+  assert.throws(
+    () =>
+      extractGameRegistrationManifest([
+        preparedFile(GAME_REGISTRATION_MANIFEST_FILENAME, "{ not json"),
+      ]),
+    (err: unknown) => err instanceof SandboxBundleRejectionError && err.code === "BUNDLE_MALFORMED",
+  );
+});
+
+test("extractGameRegistrationManifest rejects a JSON array or primitive as BUNDLE_MALFORMED", () => {
+  for (const bad of [[1, 2, 3], "just a string", 42, null] as unknown[]) {
+    assert.throws(
+      () =>
+        extractGameRegistrationManifest([
+          preparedFile(GAME_REGISTRATION_MANIFEST_FILENAME, JSON.stringify(bad)),
+        ]),
+      (err: unknown) =>
+        err instanceof SandboxBundleRejectionError && err.code === "BUNDLE_MALFORMED",
+      `expected rejection for manifest body ${JSON.stringify(bad)}`,
+    );
+  }
 });
