@@ -28,6 +28,7 @@ export * from "./ports/sandboxGames.js";
 export * from "./modules/game/domain/gameOwner.js";
 export * from "./modules/game/domain/gameDefinition.js";
 export * from "./modules/game/ports/gameRegistry.js";
+export * from "./modules/game/registry/staticGameRegistry.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";
@@ -50,3 +51,6 @@ export * from "./application/gameCreatorUseCases.js";
 export * from "./application/sandboxGameUseCases.js";
 export * from "./application/gameBundlePublisher.js";
 export * from "./registry/gameRegistry.generated.js";
+// Compiled from game-registry/. Exported so tests and the next PR's wiring can reach it; no
+// runtime consumer yet — GAME_MANIFESTS above is still what score/settings/catalog read.
+export * from "./registry/gameDefinitions.generated.js";

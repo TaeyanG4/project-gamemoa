@@ -3,6 +3,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import prettier from "prettier";
 import type { GameManifest } from "../packages/game-sdk/src/contracts/manifest.js";
+import type { GameDefinition } from "../packages/core/src/modules/game/domain/gameDefinition.js";
+import { parseGameDefinition } from "./game-registry-schema.js";
 
 export interface GameEntry {
   dirName: string;
@@ -13,7 +15,164 @@ export interface GameEntry {
 export interface RegistryBuildResult {
   coreRegistryCode: string;
   webLoaderCode: string;
+  /** `GAME_DEFINITIONS`, built from game-registry/. Generated and checked in, consumed by nothing
+   * yet — see loadGameDefinitions. */
+  gameDefinitionsCode: string;
   gameEntries: GameEntry[];
+  definitions: GameDefinition[];
+}
+
+/**
+ * Reads `game-registry/games/<slug>/{info,policy}.json` into validated GameDefinitions.
+ *
+ * This directory is the canonical description of SYSTEM-owned games. It does not yet feed the
+ * runtime — `GAME_MANIFESTS` (built from `games/*​/src/manifest.ts`, below) is still what score
+ * validation and the admin kill switch read. Both are generated here so that
+ * assertDefinitionsMatchManifests can hold them to agreement on every build; that agreement is
+ * what makes switching consumers over later a small change instead of a leap of faith.
+ *
+ * Creator-owned games are deliberately absent: where their canonical description will live is an
+ * open decision, and nothing here presumes an answer.
+ */
+export function loadGameDefinitions(rootDir = process.cwd()): GameDefinition[] {
+  const registryDir = path.join(rootDir, "game-registry", "games");
+  if (!fs.existsSync(registryDir)) {
+    throw new Error("❌ game-registry/games directory not found");
+  }
+
+  const slugs = fs
+    .readdirSync(registryDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
+    .map((entry) => entry.name);
+
+  const definitions = slugs.map((slug) => {
+    const infoFile = `game-registry/games/${slug}/info.json`;
+    const policyFile = `game-registry/games/${slug}/policy.json`;
+
+    return parseGameDefinition({
+      slug,
+      infoFile,
+      policyFile,
+      info: readJsonFile(path.join(registryDir, slug, "info.json"), infoFile),
+      policy: readJsonFile(path.join(registryDir, slug, "policy.json"), policyFile),
+      // Never read from the data: this directory holds SYSTEM games by definition, and a file
+      // declaring its own owner is exactly what a creator-supplied one must not be able to do.
+      owner: { type: "SYSTEM" },
+    });
+  });
+
+  assertUniqueSlugs(definitions);
+
+  // Deterministic order, matching how gameEntries below is sorted — a generated file whose
+  // contents depend on filesystem enumeration order would churn between machines.
+  return definitions.sort((a, b) => a.slug.localeCompare(b.slug));
+}
+
+function readJsonFile(absolutePath: string, displayPath: string): unknown {
+  if (!fs.existsSync(absolutePath)) {
+    throw new Error(`❌ Missing ${displayPath}`);
+  }
+  try {
+    return JSON.parse(fs.readFileSync(absolutePath, "utf-8"));
+  } catch (err) {
+    throw new Error(`❌ ${displayPath} is not valid JSON: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Global slug uniqueness — the guarantee that does not exist anywhere today.
+ * `sandbox_games.slug` carries a UNIQUE constraint only among sandbox rows, so nothing currently
+ * stops an uploaded game from claiming `reaction-time`. With SYSTEM games alone there is nothing
+ * to collide with yet; this is the check creator registration will be routed through once its
+ * definitions are resolved here too.
+ */
+export function assertUniqueSlugs(definitions: readonly GameDefinition[]): void {
+  const seen = new Set<string>();
+  for (const definition of definitions) {
+    if (seen.has(definition.slug)) {
+      throw new Error(`❌ Duplicate game slug "${definition.slug}" in the game registry`);
+    }
+    seen.add(definition.slug);
+  }
+}
+
+/**
+ * Holds the two sources to agreement while both exist.
+ *
+ * `game-registry/` (new, canonical-in-waiting) and `games/*​/src/manifest.ts` (still what the
+ * runtime reads) describe the same four games. Until the consumers are switched over, any
+ * disagreement between them is a bug that would otherwise surface as a catalog that renders one
+ * thing and scores another — so it fails the build here, at the point where both are already in
+ * memory, rather than being left for a reviewer to notice.
+ *
+ * `xpPerCompletion` is exempt: it is a registry-only concept with no manifest counterpart.
+ */
+export function assertDefinitionsMatchManifests(
+  definitions: readonly GameDefinition[],
+  manifests: readonly GameManifest[],
+): void {
+  const definitionSlugs = definitions.map((d) => d.slug).sort();
+  const manifestSlugs = manifests.map((m) => m.slug).sort();
+  if (JSON.stringify(definitionSlugs) !== JSON.stringify(manifestSlugs)) {
+    throw new Error(
+      `❌ game-registry/ and games/ describe different games.\n` +
+        `   game-registry: ${definitionSlugs.join(", ") || "(none)"}\n` +
+        `   games/:        ${manifestSlugs.join(", ") || "(none)"}`,
+    );
+  }
+
+  const manifestBySlug = new Map(manifests.map((m) => [m.slug, m]));
+  for (const definition of definitions) {
+    const manifest = manifestBySlug.get(definition.slug);
+    if (!manifest) continue; // unreachable given the set comparison above
+
+    const mismatches = diffDefinitionAgainstManifest(definition, manifest);
+    if (mismatches.length > 0) {
+      throw new Error(
+        `❌ game-registry/games/${definition.slug} disagrees with games/*/src/manifest.ts:\n` +
+          mismatches.map((line) => `   ${line}`).join("\n"),
+      );
+    }
+  }
+}
+
+function diffDefinitionAgainstManifest(
+  definition: GameDefinition,
+  manifest: GameManifest,
+): string[] {
+  const mismatches: string[] = [];
+  const compare = (field: string, fromRegistry: unknown, fromManifest: unknown): void => {
+    if (JSON.stringify(fromRegistry ?? null) !== JSON.stringify(fromManifest ?? null)) {
+      mismatches.push(
+        `${field}: registry ${JSON.stringify(fromRegistry)} vs manifest ${JSON.stringify(fromManifest)}`,
+      );
+    }
+  };
+
+  compare("title", definition.title, manifest.title);
+  compare("shortDescription", definition.shortDescription, manifest.shortDescription);
+  compare("description", definition.description, manifest.description);
+  compare("status", definition.status, manifest.status);
+  compare("categories", definition.categories, manifest.categories);
+  compare("tags", definition.tags, manifest.tags);
+  compare("modes", definition.modes, manifest.modes);
+  compare("inputMethods", definition.inputMethods, manifest.inputMethods);
+  compare("minPlayers", definition.minPlayers, manifest.minPlayers);
+  compare("maxPlayers", definition.maxPlayers, manifest.maxPlayers);
+  compare("thumbnail", definition.thumbnail, manifest.thumbnail);
+  compare("accent", definition.accent, manifest.accent);
+  compare(
+    "estimatedRoundSeconds",
+    definition.estimatedRoundSeconds,
+    manifest.estimatedRoundSeconds,
+  );
+  compare("supportsReplay", definition.supportsReplay, manifest.supportsReplay);
+  compare("difficulty", definition.difficulty, manifest.difficulty);
+  compare("policy.score", definition.policy.score, manifest.scoreConfig ?? null);
+  compare("policy.leaderboard", definition.policy.leaderboard, manifest.supportsLeaderboard);
+  compare("policy.requiresAuth", definition.policy.requiresAuth, manifest.requiresAuth);
+
+  return mismatches;
 }
 
 export async function buildRegistrySources(rootDir = process.cwd()): Promise<RegistryBuildResult> {
@@ -95,6 +254,12 @@ export async function buildRegistrySources(rootDir = process.cwd()): Promise<Reg
 
   const manifests = gameEntries.map((e) => e.manifest);
 
+  // The registry is loaded and reconciled before any code is emitted, so a disagreement between
+  // the two sources fails the build rather than producing a pair of generated files that quietly
+  // contradict each other.
+  const definitions = loadGameDefinitions(rootDir);
+  assertDefinitionsMatchManifests(definitions, manifests);
+
   // 1. Core Manifest Registry Raw Code
   // The generated file lands in packages/core, so it imports the framework-independent
   // "@owogg/game-sdk/contracts" entry rather than the package root — the root re-exports the
@@ -154,6 +319,25 @@ ${loaderEntries}
 };
 `;
 
+  // 3. Game Definitions Raw Code — the file-based registry's compiled form.
+  const rawGameDefinitionsCode = `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
+//
+// Compiled from game-registry/games/<slug>/{info,policy}.json. Edit those files, then run
+// \`pnpm generate:registry\`; \`pnpm registry:check\` fails the build if this drifts from them.
+//
+// SYSTEM-owned games only. Nothing reads this yet — GAME_MANIFESTS (gameRegistry.generated.ts)
+// is still the runtime source of truth for score policy and the admin kill switch.
+import type { GameDefinition } from "../modules/game/domain/gameDefinition.js";
+
+export const GAME_DEFINITIONS: GameDefinition[] = ${JSON.stringify(definitions, null, 2)};
+
+export const GAME_DEFINITION_MAP: Record<string, GameDefinition> = ${JSON.stringify(
+    Object.fromEntries(definitions.map((d) => [d.slug, d])),
+    null,
+    2,
+  )};
+`;
+
   const coreOutputPath = path.join(
     rootDir,
     "packages",
@@ -171,9 +355,18 @@ ${loaderEntries}
     "catalog",
     "gameLoaders.generated.ts",
   );
+  const definitionsOutputPath = path.join(
+    rootDir,
+    "packages",
+    "core",
+    "src",
+    "registry",
+    "gameDefinitions.generated.ts",
+  );
 
   const coreConfig = (await prettier.resolveConfig(coreOutputPath)) || {};
   const webConfig = (await prettier.resolveConfig(webOutputPath)) || {};
+  const definitionsConfig = (await prettier.resolveConfig(definitionsOutputPath)) || {};
 
   // Format canonically using Prettier with resolved config and filepath
   const coreRegistryCode = await prettier.format(rawCoreRegistryCode, {
@@ -188,9 +381,17 @@ ${loaderEntries}
     parser: "typescript",
   });
 
+  const gameDefinitionsCode = await prettier.format(rawGameDefinitionsCode, {
+    ...definitionsConfig,
+    filepath: definitionsOutputPath,
+    parser: "typescript",
+  });
+
   return {
     coreRegistryCode,
     webLoaderCode,
+    gameDefinitionsCode,
     gameEntries,
+    definitions,
   };
 }

@@ -1,0 +1,12 @@
+{
+  "score": {
+    "unit": "Level",
+    "direction": "desc",
+    "min": 1,
+    "max": 50,
+    "displayPrefix": "Level "
+  },
+  "leaderboard": true,
+  "xpPerCompletion": 0,
+  "requiresAuth": false
+}

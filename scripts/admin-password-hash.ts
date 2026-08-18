@@ -21,7 +21,6 @@ function readStdinPassword(): Promise<string> {
     if (isTty) {
       process.stderr.write("Admin 비밀번호 입력 (입력은 화면에 표시되지 않습니다): ");
       try {
-        // @ts-expect-error -- setRawMode only exists on TTY streams; guarded by isTTY above.
         process.stdin.setRawMode(true);
       } catch {
         // Fall through to plain (echoed) stdin if raw mode is unavailable.
@@ -50,7 +49,6 @@ function readStdinPassword(): Promise<string> {
       finished = true;
       if (isTty) {
         try {
-          // @ts-expect-error -- see above.
           process.stdin.setRawMode(false);
         } catch {
           /* ignore */
