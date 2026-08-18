@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import {
+  CreatorScoreAcceptRequestSchema,
+  CreatorScoreAcceptResponseSchema,
   GameSessionResponseSchema,
   PublicGameAvailabilityResponseSchema,
   PublicGameListResponseSchema,
@@ -15,6 +17,7 @@ import {
   resolvePublicGame,
   signGameSession,
   toPublicCreatorGame,
+  type CreatorScoreAcceptError,
   type GameSessionPayload,
 } from "@owogg/core";
 import { createContainer } from "../container.js";
@@ -220,4 +223,124 @@ gamesRouter.post("/:slug/session", async (c) => {
     }),
     200,
   );
+});
+
+// ── Creator score acceptance ──────────────────────────────────────────────────
+//
+// POST /api/games/:slug/score — the actual write a Game Session token exists for. Every check
+// (game availability, token validity, token-vs-context match, score policy) runs in
+// CreatorScoreAcceptanceUseCases.accept() before the one atomic D1 write — consuming the
+// attemptId and saving the score together, so there is no possible outcome where the token gets
+// spent but no score is recorded. See that class's own doc comment for the full reasoning.
+//
+// Deliberately not connected to anything past accepting the row: no leaderboard read, no XP/
+// achievement/guild XP award (those stay on the existing SYSTEM-game path,
+// apps/api/src/routes/scores.ts), and nothing here is called from GameHost/CreatorGameHost/the
+// Game Bridge yet — that wiring is a later PR's scope.
+
+/** HTTP status per failure reason — mirrors the shape POST /api/scores already uses (a JSON
+ * {error:{code,message}} body), just with this route's own error codes. */
+function creatorScoreAcceptErrorStatus(error: CreatorScoreAcceptError): 400 | 401 | 404 | 409 {
+  switch (error) {
+    case "GAME_NOT_AVAILABLE":
+      return 404;
+    case "INVALID_TOKEN":
+    case "CONTEXT_MISMATCH":
+      return 401;
+    case "SCORE_POLICY_NOT_CONFIGURED":
+    case "INVALID_SCORE":
+      return 400;
+    case "ALREADY_CONSUMED":
+      return 409;
+  }
+}
+
+function creatorScoreAcceptErrorMessage(error: CreatorScoreAcceptError, reason?: string): string {
+  switch (error) {
+    case "GAME_NOT_AVAILABLE":
+      return "게임을 찾을 수 없습니다.";
+    case "INVALID_TOKEN":
+      return "게임 세션이 유효하지 않거나 만료되었습니다.";
+    case "CONTEXT_MISMATCH":
+      return "게임 세션이 이 요청과 일치하지 않습니다. 다시 시작해 주세요.";
+    case "SCORE_POLICY_NOT_CONFIGURED":
+      return "이 게임은 아직 점수 제출을 지원하지 않습니다.";
+    case "INVALID_SCORE":
+      return reason || "유효하지 않은 점수입니다.";
+    case "ALREADY_CONSUMED":
+      return "이미 처리된 플레이입니다.";
+  }
+}
+
+gamesRouter.post("/:slug/score", async (c) => {
+  if (!c.env?.DB) return c.text("Not Found", 404);
+
+  const secret = c.env.GAME_SESSION_SECRET;
+  if (!secret) {
+    return c.json(
+      {
+        error: {
+          code: "GAME_SESSION_NOT_CONFIGURED",
+          message: "게임 세션 서명 키가 아직 이 환경에 구성되지 않았습니다.",
+        },
+      },
+      503,
+    );
+  }
+
+  // Inlined rather than the narrower local requireAuth() above — this needs avatar_url too (for
+  // the score row), the same fields POST /api/scores itself reads off the session directly.
+  const sessionId = getCookie(c, "owogg_session");
+  if (!sessionId) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+  }
+  const { sessionRepo, creatorScoreAcceptanceUseCases } = createContainer(c.env.DB);
+  const authData = await sessionRepo.findSession(sessionId);
+  if (!authData) {
+    return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
+  }
+
+  // Same score-submission block POST /api/scores already enforces (see UserModerationUseCases) —
+  // applies identically regardless of which kind of game the score is for.
+  if (authData.user.score_submission_blocked) {
+    return c.json(
+      {
+        error: { code: "SCORE_SUBMISSION_BLOCKED", message: "현재 점수 제출이 제한된 계정입니다." },
+      },
+      403,
+    );
+  }
+
+  const rawBody = await c.req.json().catch(() => ({}));
+  const parseResult = CreatorScoreAcceptRequestSchema.safeParse(rawBody);
+  if (!parseResult.success) {
+    return c.json(
+      { error: { code: "INVALID_PAYLOAD", message: "요청 형식이 올바르지 않습니다." } },
+      400,
+    );
+  }
+
+  const result = await creatorScoreAcceptanceUseCases.accept({
+    slug: c.req.param("slug"),
+    userId: authData.user.id,
+    nickname: authData.user.nickname,
+    avatarUrl: authData.user.avatar_url,
+    token: parseResult.data.token,
+    secret,
+    score: parseResult.data.score,
+  });
+
+  if (!result.ok) {
+    return c.json(
+      {
+        error: {
+          code: result.error,
+          message: creatorScoreAcceptErrorMessage(result.error, result.reason),
+        },
+      },
+      creatorScoreAcceptErrorStatus(result.error),
+    );
+  }
+
+  return c.json(CreatorScoreAcceptResponseSchema.parse({ success: true }), 200);
 });
