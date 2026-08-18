@@ -509,6 +509,41 @@ test("hardDelete frees the slug for an immediate re-insert with the same value �
   assert.equal(retried?.slug, "ball-dodge");
 });
 
+// Regression (2026-08-18): production crashed with a raw 500 when a creator re-registered a slug
+// an admin had just soft-deleted — findBySlug (deleted_at-filtered) said the slug was free, but
+// the raw UNIQUE constraint on sandbox_games.slug still held the old row, so the INSERT below
+// throws. slugExists is the fix's foundation: it has to agree with the constraint (see it used in
+// SandboxGameUseCases.createGame, tested at the use-case layer in sandboxGameUseCases.test.ts).
+test("softDelete does NOT free the slug — slugExists stays true, and a raw re-insert throws", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo, "ball-dodge");
+  const now = new Date().toISOString();
+
+  await repo.softDelete(game.id, 99, now);
+
+  assert.equal(await repo.findBySlug("ball-dodge"), null, "findBySlug excludes deleted rows");
+  assert.equal(
+    await repo.slugExists("ball-dodge"),
+    true,
+    "but the slug is still held at the DB level",
+  );
+
+  await assert.rejects(() =>
+    repo.create({
+      slug: "ball-dodge",
+      developerUserId: 1,
+      title: "Retry",
+      shortDescription: null,
+      description: null,
+      genre: "puzzle",
+      mode: "single",
+      nowIso: new Date().toISOString(),
+    }),
+  );
+});
+
 test("hardDelete also removes the game's versions and review-audit rows (no orphaned children)", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev");

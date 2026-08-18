@@ -145,6 +145,16 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return row ? mapGameRow(row) : null;
   }
 
+  // Deliberately NOT filtered by deleted_at — see the port doc comment. Checks existence only
+  // (SELECT 1), not the full row, since the caller just needs a boolean.
+  async slugExists(slug: string): Promise<boolean> {
+    const row = await this.db
+      .prepare(`SELECT 1 FROM sandbox_games WHERE slug = ?`)
+      .bind(slug)
+      .first<{ 1: number }>();
+    return row !== null;
+  }
+
   // Deliberately NOT filtered by deleted_at — a developer's own "my games" list still shows a
   // deleted game (with deletedAt set) so they know what happened to it, the same way a REJECTED
   // version stays visible rather than disappearing.

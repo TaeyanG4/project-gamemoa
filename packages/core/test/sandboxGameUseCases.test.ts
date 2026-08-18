@@ -93,6 +93,9 @@ function createFakeRepo(): SandboxGameRepository & {
     async findBySlug(slug) {
       return [...games.values()].find((g) => g.slug === slug) ?? null;
     },
+    async slugExists(slug) {
+      return [...games.values()].some((g) => g.slug === slug);
+    },
     async listByDeveloper(developerUserId) {
       return [...games.values()].filter((g) => g.developerUserId === developerUserId);
     },
@@ -409,6 +412,39 @@ test("createGame rejects a duplicate slug", async () => {
         slug: "my-game",
         developerUserId: 2,
         title: "Other",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
+});
+
+// Regression (2026-08-18): a soft-deleted game's row survives for audit (see deleteGame), and
+// `slug` carries a raw DB UNIQUE constraint that the soft delete does not lift. findBySlug alone
+// (which excludes deleted rows) would miss this and let the create fall through to a raw,
+// unhandled constraint violation instead of a clean SLUG_TAKEN — this is what actually happened
+// in production when a creator re-registered a slug an admin had just soft-deleted.
+test("createGame rejects a slug held by a soft-deleted game, instead of crashing on it", async () => {
+  const { useCases } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: "my-game",
+        developerUserId: 1,
+        title: "Game Again",
         shortDescription: null,
         description: null,
         genre: "puzzle",
