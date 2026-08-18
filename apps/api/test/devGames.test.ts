@@ -214,6 +214,74 @@ test("GET /api/admin/game-creators is denied for non-admin", async () => {
   assert.equal(res.status, 403);
 });
 
+test("DELETE /api/admin/sandbox-games/:id is denied for non-admin", async () => {
+  const { db } = createDb({ userId: 7 });
+  const res = await app.request(
+    "/api/admin/sandbox-games/1",
+    {
+      method: "DELETE",
+      headers: { Cookie: "owogg_session=valid_session; owogg_admin_session=none" },
+    },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
+test("POST /api/dev/games/upload is rejected for a non-developer with FORBIDDEN, not a crash", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: false });
+  const res = await app.request(
+    "/api/dev/games/upload",
+    {
+      method: "POST",
+      headers: { Cookie: "owogg_session=valid_session", Origin: "http://localhost:5173" },
+      body: new FormData(),
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
+test("POST /api/dev/games/upload returns 503 GAME_BUNDLES_NOT_CONFIGURED when B2 config is absent", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: true });
+  const res = await app.request(
+    "/api/dev/games/upload",
+    {
+      method: "POST",
+      headers: { Cookie: "owogg_session=valid_session", Origin: "http://localhost:5173" },
+      body: new FormData(),
+    },
+    { DB: db, ADMIN_USER_IDS: "1", FRONTEND_URL: "http://localhost:5173" } as any,
+  );
+  assert.equal(res.status, 503);
+  const body = (await res.json()) as { error: { code: string } };
+  assert.equal(body.error.code, "GAME_BUNDLES_NOT_CONFIGURED");
+});
+
+test("POST /api/dev/games/upload with a complete B2 config gets past the 503 gate (fails later, on the missing bundle field, not on config)", async () => {
+  const { db } = createDb({ userId: 7, isDeveloper: true });
+  const res = await app.request(
+    "/api/dev/games/upload",
+    {
+      method: "POST",
+      headers: { Cookie: "owogg_session=valid_session", Origin: "http://localhost:5173" },
+      body: new FormData(), // no "bundle" field
+    },
+    {
+      DB: db,
+      ADMIN_USER_IDS: "1",
+      FRONTEND_URL: "http://localhost:5173",
+      B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
+      B2_REGION: "us-west-004",
+      B2_BUCKET_NAME: "owogg-game-bundles",
+      B2_KEY_ID: "someKeyId",
+      B2_APPLICATION_KEY: "someApplicationKey",
+    } as any,
+  );
+  assert.equal(res.status, 400);
+  const body = (await res.json()) as { error: { code: string } };
+  assert.equal(body.error.code, "INVALID_REQUEST");
+});
+
 test("GET /api/admin/sandbox-games/review-queue is denied for non-admin", async () => {
   const { db } = createDb({ userId: 7 });
   const res = await app.request(

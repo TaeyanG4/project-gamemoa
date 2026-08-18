@@ -267,3 +267,23 @@ adminSandboxGamesRouter.patch("/:id/visibility", async (c) => {
     return c.json(errBody, status);
   }
 });
+
+// DELETE /api/admin/sandbox-games/:id — soft delete (migration 0026). Deliberately gated on its
+// own permission (sandbox_games.delete), not sandbox_games.review — MODERATOR has the latter but
+// must not have this (2026-08-18 product decision: only ADMIN/OPERATOR).
+adminSandboxGamesRouter.delete("/:id", async (c) => {
+  const admin = await requireElevatedAdmin(c);
+  if (isElevatedAdminResponse(admin)) return admin;
+  const denied = requirePermission(admin, "sandbox_games.delete");
+  if (denied) return denied;
+
+  const id = Number(c.req.param("id"));
+  try {
+    const { sandboxGameUseCases } = createContainer(c.env.DB);
+    const game = await sandboxGameUseCases.deleteGame({ gameId: id, actorAdminId: admin.userId });
+    return c.json(SandboxGameRecordSchema.parse(game), 200);
+  } catch (err) {
+    const { body: errBody, status } = failureResponse(err);
+    return c.json(errBody, status);
+  }
+});

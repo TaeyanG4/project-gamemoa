@@ -36,6 +36,11 @@ function mapGameRow(row: Record<string, unknown>): SandboxGameRecord {
       row.review_slot === null || row.review_slot === undefined
         ? null
         : (Number(row.review_slot) as 1 | 2),
+    deletedAt: row.deleted_at ? String(row.deleted_at) : null,
+    deletedByAdminId:
+      row.deleted_by_admin_id === null || row.deleted_by_admin_id === undefined
+        ? null
+        : Number(row.deleted_by_admin_id),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };
@@ -124,14 +129,19 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return row ? mapGameRow(row) : null;
   }
 
+  // Excludes soft-deleted games — this is the slug lookup /play/:slug resolves through, so a
+  // deleted game's slug must stop resolving immediately, not just stop being servable once found.
   async findBySlug(slug: string): Promise<SandboxGameRecord | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM sandbox_games WHERE slug = ?`)
+      .prepare(`SELECT * FROM sandbox_games WHERE slug = ? AND deleted_at IS NULL`)
       .bind(slug)
       .first<Record<string, unknown>>();
     return row ? mapGameRow(row) : null;
   }
 
+  // Deliberately NOT filtered by deleted_at — a developer's own "my games" list still shows a
+  // deleted game (with deletedAt set) so they know what happened to it, the same way a REJECTED
+  // version stays visible rather than disappearing.
   async listByDeveloper(developerUserId: number): Promise<SandboxGameRecord[]> {
     const res = await this.db
       .prepare(`SELECT * FROM sandbox_games WHERE developer_user_id = ? ORDER BY created_at DESC`)
@@ -142,9 +152,29 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
 
   async listPublic(): Promise<SandboxGameRecord[]> {
     const res = await this.db
-      .prepare(`SELECT * FROM sandbox_games WHERE visibility = 'PUBLIC' ORDER BY created_at DESC`)
+      .prepare(
+        `SELECT * FROM sandbox_games WHERE visibility = 'PUBLIC' AND deleted_at IS NULL ORDER BY created_at DESC`,
+      )
       .all<Record<string, unknown>>();
     return (res.results || []).map(mapGameRow);
+  }
+
+  async softDelete(
+    id: number,
+    deletedByAdminId: number,
+    nowIso: string,
+  ): Promise<SandboxGameRecord> {
+    const row = await this.db
+      .prepare(
+        `UPDATE sandbox_games
+         SET deleted_at = ?, deleted_by_admin_id = ?, visibility = 'PRIVATE', updated_at = ?
+         WHERE id = ?
+         RETURNING *`,
+      )
+      .bind(nowIso, deletedByAdminId, nowIso, id)
+      .first<Record<string, unknown>>();
+    if (!row) throw new Error(`sandbox_games row ${id} vanished mid-delete`);
+    return mapGameRow(row);
   }
 
   async create(input: {

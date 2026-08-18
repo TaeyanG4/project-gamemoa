@@ -52,20 +52,21 @@ gameCreator.hasAccess === true`(평범한 유저이면서 게임 크리에이터
 
 `packages/core/src/domain/staffRoles.ts`의 `PERMISSIONS`가 유일한 정의처입니다:
 
-| 권한                     | 게이트하는 기능                                           |
-| :----------------------- | :-------------------------------------------------------- |
-| `admin.center.access`    | 관리자 센터(`/admin`) 진입 자체 — ADMIN 역할과는 별개(§3) |
-| `users.view`             | 유저 검색/조회                                            |
-| `users.suspend`          | 유저 일시 정지                                            |
-| `users.ban`              | 유저 영구 차단                                            |
-| `users.score_moderation` | 점수 제출 차단 + 점수 초기화/복원                         |
-| `games.moderate`         | 내장 게임 강제 비활성화(킬 스위치)                        |
-| `sandbox_games.review`   | 업로드된 게임 버전 심사(승인/반려/공개 전환)              |
-| `game_creators.manage`   | Game Creator 프로그램 직접 임명/해제 + 신청 심사          |
-| `streamers.review`       | Streamer Featured 배지 수동 심사                          |
-| `system.monitor`         | 운영 모니터링 대시보드(DAU/WAU, D1 상태)                  |
-| `system.dev.access`      | SYSTEM_DEVELOPER 기본 자격 — 내부 진단 도구               |
-| `roles.manage`           | 역할/개별 권한 위임 — **절대 위임 불가**(§1.5)            |
+| 권한                     | 게이트하는 기능                                                                                                 |
+| :----------------------- | :-------------------------------------------------------------------------------------------------------------- |
+| `admin.center.access`    | 관리자 센터(`/admin`) 진입 자체 — ADMIN 역할과는 별개(§3)                                                       |
+| `users.view`             | 유저 검색/조회                                                                                                  |
+| `users.suspend`          | 유저 일시 정지                                                                                                  |
+| `users.ban`              | 유저 영구 차단                                                                                                  |
+| `users.score_moderation` | 점수 제출 차단 + 점수 초기화/복원                                                                               |
+| `games.moderate`         | 내장 게임 강제 비활성화(킬 스위치)                                                                              |
+| `sandbox_games.review`   | 업로드된 게임 버전 심사(승인/반려/공개 전환)                                                                    |
+| `sandbox_games.delete`   | 게임 소프트 삭제 — `review`보다 강한 조치, 별도 권한([`GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md) §3.6.3) |
+| `game_creators.manage`   | Game Creator 프로그램 직접 임명/해제 + 신청 심사                                                                |
+| `streamers.review`       | Streamer Featured 배지 수동 심사                                                                                |
+| `system.monitor`         | 운영 모니터링 대시보드(DAU/WAU, D1 상태)                                                                        |
+| `system.dev.access`      | SYSTEM_DEVELOPER 기본 자격 — 내부 진단 도구                                                                     |
+| `roles.manage`           | 역할/개별 권한 위임 — **절대 위임 불가**(§1.5)                                                                  |
 
 ### 1.3 기본 권한 번들 (Default Permission Bundle)
 
@@ -82,6 +83,7 @@ gameCreator.hasAccess === true`(평범한 유저이면서 게임 크리에이터
 | `users.score_moderation` |    ✅    |    ❌     |        ❌        |
 | `games.moderate`         |    ✅    |    ❌     |        ❌        |
 | `sandbox_games.review`   |    ✅    |    ✅     |        ❌        |
+| `sandbox_games.delete`   |    ✅    |    ❌     |        ❌        |
 | `game_creators.manage`   |    ✅    |    ❌     |        ❌        |
 | `streamers.review`       |    ✅    |    ✅     |        ❌        |
 | `system.monitor`         |    ✅    |    ❌     |        ✅        |

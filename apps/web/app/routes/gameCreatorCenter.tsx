@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useCallback, type DragEvent, type FormEvent } from "react";
 import { Link } from "react-router";
 import {
   ArrowLeft,
@@ -6,6 +6,7 @@ import {
   Gamepad2,
   Plus,
   Upload,
+  UploadCloud,
   XCircle,
   Send,
   Clock3,
@@ -17,6 +18,7 @@ import {
   fetchMyGames,
   createDevGame,
   uploadDevGameVersion,
+  uploadGameFromBundle,
   withdrawDevGameSubmission,
   applyForGameCreator,
   withdrawGameCreatorApplication,
@@ -256,6 +258,34 @@ function ManageGamesPanel({
   const [uploadingGameId, setUploadingGameId] = useState<number | null>(null);
   const [withdrawingGameId, setWithdrawingGameId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [registering, setRegistering] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
+
+  // Drag-and-drop registration: a ZIP whose root contains owogg.game.json (slug/title/genre)
+  // creates the game *and* its first version in one call — see devApi.uploadGameFromBundle. The
+  // manual form below stays as the fallback for a bundle with no manifest.
+  const handleDropRegister = async (file: File) => {
+    if (registering) return;
+    setRegistering(true);
+    try {
+      const { game } = await uploadGameFromBundle(file);
+      setNotice(
+        `"${game.title}" 게임이 등록되었습니다. 관리자 심사 후 승인되면 공개할 수 있습니다.`,
+      );
+      onChanged();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "등록에 실패했습니다.");
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void handleDropRegister(file);
+  };
 
   const handleCreateGame = async (e: FormEvent) => {
     e.preventDefault();
@@ -327,6 +357,49 @@ function ManageGamesPanel({
           {notice}
         </p>
       )}
+
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragActive(true);
+        }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={handleDrop}
+        className={`flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center transition-colors ${
+          dragActive
+            ? "border-brand bg-brand/5"
+            : "border-border bg-surface hover:border-brand-light"
+        }`}
+      >
+        {registering ? (
+          <Loader2 className="h-6 w-6 animate-spin text-brand" />
+        ) : (
+          <UploadCloud className="h-6 w-6 text-text-muted" />
+        )}
+        <p className="text-xs font-bold text-text-primary">
+          owogg.game.json이 포함된 ZIP을 여기로 끌어다 놓으면 자동 등록됩니다
+        </p>
+        <label className="cursor-pointer text-[11px] font-semibold text-brand hover:text-brand-light">
+          또는 파일 선택
+          <input
+            type="file"
+            accept=".zip"
+            className="hidden"
+            disabled={registering}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) void handleDropRegister(file);
+            }}
+          />
+        </label>
+      </div>
+
+      <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+        <span className="h-px flex-1 bg-border" />
+        또는 수동으로 등록
+        <span className="h-px flex-1 bg-border" />
+      </div>
 
       <form
         onSubmit={(e) => void handleCreateGame(e)}

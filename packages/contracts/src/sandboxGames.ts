@@ -36,6 +36,9 @@ export const SandboxGameRecordSchema = z.object({
    * its first review decision. A client can derive "N/2 슬롯 사용 중" for its own games by counting
    * entries with a non-null reviewSlot in the response of GET /api/dev/games. */
   reviewSlot: z.union([z.literal(1), z.literal(2)]).nullable(),
+  /** Soft delete (migration 0026) — non-null means an ADMIN/OPERATOR removed this game. */
+  deletedAt: z.string().nullable(),
+  deletedByAdminId: z.number().int().positive().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -119,6 +122,15 @@ export const SandboxGameDetailResponseSchema = z.object({
   auditLog: z.array(SandboxGameReviewAuditEntrySchema),
 });
 export type SandboxGameDetailResponse = z.infer<typeof SandboxGameDetailResponseSchema>;
+
+/** POST /api/dev/games/upload response — the combined "drag a ZIP with owogg.game.json onto the
+ * Game Creator Center" flow (see AUTHORIZATION.md/GAME_CREATION_GUIDE.md). Both the created game
+ * and its first version, since that one call does what the manual flow does in two. */
+export const SandboxGameUploadResponseSchema = z.object({
+  game: SandboxGameRecordSchema,
+  version: SandboxGameVersionRecordSchema,
+});
+export type SandboxGameUploadResponse = z.infer<typeof SandboxGameUploadResponseSchema>;
 
 // ── Admin-facing ──
 

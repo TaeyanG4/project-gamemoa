@@ -5,7 +5,9 @@ import {
   SandboxGameDetailResponseSchema,
   SandboxGameRecordSchema,
   SandboxGameVersionRecordSchema,
+  SandboxGameUploadResponseSchema,
   type SandboxGameCreateRequest,
+  type SandboxGameUploadResponse,
 } from "@owogg/contracts";
 import { apiFetch } from "../lib/api/client";
 import { API_URL } from "../lib/api/config";
@@ -95,4 +97,41 @@ export async function uploadDevGameVersion(gameId: number, file: File) {
 
   const json = await res.json();
   return SandboxGameVersionRecordSchema.parse(json);
+}
+
+/**
+ * Drag-and-drop registration: a single ZIP whose root contains `owogg.game.json`
+ * (slug/title/genre) creates the game *and* its first version in one call — see
+ * SandboxGameUseCases.createGameFromBundle. Same multipart shape as uploadDevGameVersion, so it
+ * shares that function's error-mapping (MANIFEST_MISSING/INVALID_SLUG/INVALID_GENRE/SLUG_TAKEN
+ * etc. all surface as `code` on the thrown ApiClientError).
+ */
+export async function uploadGameFromBundle(file: File): Promise<SandboxGameUploadResponse> {
+  const form = new FormData();
+  form.append("bundle", file);
+
+  const res = await fetch(`${API_URL}/api/dev/games/upload`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+
+  if (!res.ok) {
+    let detail: string | undefined;
+    let code: string | undefined;
+    try {
+      const body = (await res.json()) as { error?: { code?: string; message?: string } };
+      detail = body.error?.message;
+      code = body.error?.code;
+    } catch {
+      // ignore parse failure — fall back to a generic message below
+    }
+    throw new ApiClientError("HttpError", detail || `등록에 실패했습니다. (HTTP ${res.status})`, {
+      status: res.status,
+      ...(code ? { code } : {}),
+    });
+  }
+
+  const json = await res.json();
+  return SandboxGameUploadResponseSchema.parse(json);
 }

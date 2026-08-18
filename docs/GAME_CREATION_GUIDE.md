@@ -321,6 +321,55 @@ GAME_CREATOR는 OwOGG 플랫폼 자체를 만드는 Staff Role인 SYSTEM_DEVELOP
 실제로 슬롯 확보는 `INSERT ... SELECT`로, "빈 슬롯 계산"과 "게임 row 생성"을 한 문장으로 묶어
 원자적으로 처리합니다(`packages/db/src/d1/D1SandboxGameRepository.ts` `create()`).
 
+#### 3.6.2 드래그 앤 드롭 자동 등록 — `owogg.game.json` (2026-08-18)
+
+기존에는 "폼에 슬러그/제목/장르 입력 → 게임 row 생성 → ZIP 업로드"가 별도의 두 단계였습니다.
+이제 ZIP 최상위에 `owogg.game.json` 매니페스트 파일을 넣어 두면, 게임 크리에이터 센터에 그 ZIP을
+끌어다 놓는 것만으로 게임 등록과 첫 버전 업로드가 한 번에 끝납니다:
+
+```json
+{
+  "slug": "ball-dodge",
+  "title": "공 피하기",
+  "genre": "action",
+  "shortDescription": "장애물을 피해 최대한 오래 버티는 캐주얼 게임",
+  "description": "선택 사항 — 상세 설명"
+}
+```
+
+- `slug`/`title`/`genre`는 필수, `shortDescription`/`description`은 선택입니다. 검증 규칙은
+  수동 폼과 **완전히 동일**합니다 — 매니페스트 경로가 별도 검증을 두지 않고 기존
+  `SandboxGameUseCases.createGame()`을 그대로 재사용하기 때문입니다
+  (`SandboxGameUseCases.createGameFromBundle`,
+  `packages/core/src/application/sandboxGameUseCases.ts`).
+- `owogg.game.json`이 아예 없으면 자동 등록은 그냥 건너뛰고(에러 아님) — 기존처럼 수동 폼으로
+  먼저 게임을 만든 뒤 "버전 업로드"로 올리는 흐름도 계속 동작합니다. 파일은 있는데 JSON이 깨졌거나
+  객체가 아니면 `BUNDLE_MALFORMED`로 명확히 실패합니다("아무 일도 없었던 것"처럼 조용히 넘어가지
+  않음) — 자동 등록을 의도했는데 매니페스트가 깨진 채로 방치되는 상황을 막기 위함입니다.
+- ZIP은 **한 번만 압축 해제**됩니다 — 매니페스트를 읽는 것과 실제 파일을 발행하는 것이 같은
+  `prepared.files`를 공유합니다(수동 폼 뒤에 별도로 업로드하면 두 번 파싱되는 것과 대비됨).
+- 발행되는 파일 자체는 매니페스트 유무와 무관하게 동일한 검증(§3.2.1의 zip bomb 방어, 경로 검증,
+  `index.html` 존재 확인)을 거칩니다 — 매니페스트는 오직 "게임 row를 무엇으로 만들지"만 알려줄
+  뿐, 번들 검증 절차를 우회하지 않습니다.
+- API: `POST /api/dev/games/upload` (multipart, 필드명 `bundle`) — `docs/GAME_UPLOAD_GUIDE.md`와
+  공개 위키([`/wiki/games/development`](../apps/web/app/routes/wikiGamesDevelopment.tsx))에서
+  플레이어 대상 안내를 볼 수 있습니다.
+
+#### 3.6.3 게임 삭제 — ADMIN/OPERATOR 전용 (2026-08-18)
+
+`sandbox_games.delete` 권한을 가진 스태프만 게임을 삭제할 수 있습니다(`DELETE
+/api/admin/sandbox-games/:id`). **소프트 삭제**입니다 — row는 감사(audit) 목적으로 남고,
+`deleted_at`/`deleted_by_admin_id`만 채워집니다(migration `0026_sandbox_game_soft_delete.sql`).
+삭제 즉시 `visibility`가 강제로 `PRIVATE`로 전환되고, 아직 심사 대기 중이던 버전이 있으면 함께
+철회되며 심사 슬롯도 반환됩니다(§3.6.1과 동일한 슬롯 반환 로직 재사용).
+
+`sandbox_games.review`(승인/반려)와 별개 권한인 이유: MODERATOR는 콘텐츠 심사는 하되, 게임을
+완전히 내리는 더 강한 조치까지는 할 수 없어야 한다는 2026-08-18 제품 결정 때문입니다 — 그래서
+`sandbox_games.delete`는 OPERATOR의 기본 권한 묶음에만 있고 MODERATOR에는 없습니다
+([`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §4). B2에 저장된 실제 파일(오브젝트)은 지우지
+않습니다 — 스토리지 GC는 §3.2 `sourceArchiveObjectKey`에서 이미 "추후 버전 GC" 대상으로 남겨둔
+별도 과제입니다.
+
 ### 3.7 DB 스키마 초안
 
 핵심은 **게임(카탈로그 엔트리)과 번들 버전을 분리**하는 것입니다 — 재업로드는 재심사를 받아야
