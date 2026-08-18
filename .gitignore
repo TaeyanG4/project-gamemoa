@@ -44,3 +44,9 @@ apps/api/b2-smoke-test.txt
 # fixture), not source. Regenerate with:
 #   node apps/api/test/fixtures/game-deploy-smoke-test/build-ball-dodge-zip.mjs
 apps/api/test/fixtures/game-deploy-smoke-test/ball-dodge.zip
+
+# examples/ball-dodge/ (Game Bridge reference integration) build output — vendor/ is
+# @owogg/game-sdk/bridge's source, copied fresh on every build (see build.mjs), never committed;
+# ball-dodge.zip is the resulting upload artifact. dist/ is already covered above.
+examples/ball-dodge/vendor/
+examples/ball-dodge/ball-dodge.zip

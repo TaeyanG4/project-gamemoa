@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>공 피하기</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!--
+      Game Bridge (@owogg/game-sdk/bridge) reference integration — the first Creator game wired to
+      GameHost + IframeRuntime through READY/STARTED/GAME_COMPLETE. See src/main.ts's doc comment
+      for the bridge wiring itself, and dist/vendor/game-sdk-bridge/ (built, not committed) for the
+      vendored SDK source this bundle actually ships.
+
+      Still fully playable standalone (no host, no bridge messages) — connectGameBridge() never
+      blocks page setup; see main.ts.
+    -->
+    <div id="app">
+      <div id="hud">
+        <span id="timer">0.0초</span>
+      </div>
+      <canvas id="game"></canvas>
+      <div id="overlay">
+        <h1>공 피하기</h1>
+        <p>WASD 또는 방향키로 이동하세요. 화면 가장자리에서 공이 날아옵니다.</p>
+        <p class="hint">모바일: 화면을 터치한 채로 드래그하면 이동합니다.</p>
+        <button id="startButton" type="button">시작</button>
+      </div>
+      <div id="gameOver" class="hidden">
+        <h1>GAME OVER</h1>
+        <p id="finalTime">생존 시간: 0.0초</p>
+        <button id="restartButton" type="button">다시 시작</button>
+      </div>
+    </div>
+    <script type="module" src="main.js"></script>
+  </body>
+</html>
