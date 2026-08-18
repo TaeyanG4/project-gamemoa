@@ -340,3 +340,12 @@ export function patchSandboxGameVisibility(id: number, visibility: SandboxGameVi
     body: JSON.stringify({ visibility }),
   });
 }
+
+/** Soft-deletes a sandbox game (migration 0026) — requires `sandbox_games.delete`, ADMIN/OPERATOR
+ * only (MODERATOR has review but not delete, see docs/AUTHORIZATION.md). Forces the game back to
+ * PRIVATE server-side; the row itself is kept for audit, not hard-deleted. */
+export function deleteSandboxGame(id: number) {
+  return apiFetch(`/api/admin/sandbox-games/${id}`, SandboxGameRecordSchema, {
+    method: "DELETE",
+  });
+}

@@ -10,6 +10,7 @@ import {
   Package,
   Search,
   ShieldAlert,
+  Trash2,
   X,
 } from "lucide-react";
 import { useAuth } from "../features/auth";
@@ -20,6 +21,7 @@ import {
   postRejectSandboxVersion,
   patchSandboxGameMetadata,
   patchSandboxGameVisibility,
+  deleteSandboxGame,
 } from "../features/adminApi";
 import type { SandboxGameReviewQueueResponse, SandboxGameDetailResponse } from "@owogg/contracts";
 import { ApiClientError } from "../lib/api";
@@ -299,6 +301,7 @@ function GameDetailPanel({
   const [scoreMax, setScoreMax] = useState(game.scoreMax === null ? "" : String(game.scoreMax));
   const [saving, setSaving] = useState(false);
   const [togglingVisibility, setTogglingVisibility] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleSaveMetadata = async () => {
     setSaving(true);
@@ -339,6 +342,30 @@ function GameDetailPanel({
     }
   };
 
+  // ADMIN/OPERATOR only (sandbox_games.delete) — enforced server-side; a MODERATOR who reaches
+  // this page (they hold sandbox_games.review) sees the button but gets a 403 from the API if
+  // they click it, surfaced the same way any other action-level failure is here.
+  const handleDelete = async () => {
+    if (deleting) return;
+    if (
+      !window.confirm(
+        `"${game.title}" 게임을 삭제할까요? 즉시 비공개로 전환되며, 심사 중이던 제출도 함께 철회됩니다.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    onError("");
+    try {
+      const game2 = await deleteSandboxGame(game.id);
+      onChanged({ ...detail, game: game2 });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 rounded-2xl border border-border bg-surface-raised p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -353,33 +380,57 @@ function GameDetailPanel({
             제작자 #{game.developerUserId} · 등록일 {game.createdAt.split("T")[0]}
           </p>
         </div>
-        <button
-          type="button"
-          disabled={
-            togglingVisibility || (game.visibility === "PRIVATE" && game.liveVersionId === null)
-          }
-          onClick={() => void handleToggleVisibility()}
-          title={
-            game.liveVersionId === null
-              ? "승인된 버전이 있어야 공개로 전환할 수 있습니다."
-              : undefined
-          }
-          className={`flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-bold disabled:opacity-40 ${
-            game.visibility === "PUBLIC"
-              ? "border-accent-green/30 bg-accent-green/10 text-accent-green hover:bg-accent-green/20"
-              : "border-border bg-surface text-text-primary hover:border-brand"
-          }`}
-        >
-          {togglingVisibility ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : game.visibility === "PUBLIC" ? (
-            <Eye className="h-3.5 w-3.5" />
-          ) : (
-            <EyeOff className="h-3.5 w-3.5" />
-          )}
-          {game.visibility === "PUBLIC" ? "공개 중 (클릭 시 비공개)" : "비공개 (클릭 시 공개 전환)"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={
+              togglingVisibility ||
+              game.deletedAt !== null ||
+              (game.visibility === "PRIVATE" && game.liveVersionId === null)
+            }
+            onClick={() => void handleToggleVisibility()}
+            title={
+              game.liveVersionId === null
+                ? "승인된 버전이 있어야 공개로 전환할 수 있습니다."
+                : undefined
+            }
+            className={`flex items-center gap-1.5 rounded-xl border px-4 py-2.5 text-xs font-bold disabled:opacity-40 ${
+              game.visibility === "PUBLIC"
+                ? "border-accent-green/30 bg-accent-green/10 text-accent-green hover:bg-accent-green/20"
+                : "border-border bg-surface text-text-primary hover:border-brand"
+            }`}
+          >
+            {togglingVisibility ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : game.visibility === "PUBLIC" ? (
+              <Eye className="h-3.5 w-3.5" />
+            ) : (
+              <EyeOff className="h-3.5 w-3.5" />
+            )}
+            {game.visibility === "PUBLIC" ? "공개 중 (클릭 시 비공개)" : "비공개 (클릭 시 공개 전환)"}
+          </button>
+          <button
+            type="button"
+            disabled={deleting || game.deletedAt !== null}
+            onClick={() => void handleDelete()}
+            className="flex items-center gap-1.5 rounded-xl border border-accent-red/30 bg-accent-red/10 px-4 py-2.5 text-xs font-bold text-accent-red hover:bg-accent-red/20 disabled:opacity-40"
+          >
+            {deleting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            {game.deletedAt !== null ? "삭제됨" : "게임 삭제"}
+          </button>
+        </div>
       </div>
+
+      {game.deletedAt !== null && (
+        <p className="rounded-xl border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-[11px] font-semibold text-accent-red">
+          이 게임은 {game.deletedAt.split("T")[0]}에 삭제되었습니다 (관리자 #{game.deletedByAdminId}).
+          더 이상 플레이어에게 제공되지 않습니다.
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <LabeledField label="제목">
@@ -462,7 +513,7 @@ function GameDetailPanel({
 
       <button
         type="button"
-        disabled={saving}
+        disabled={saving || game.deletedAt !== null}
         onClick={() => void handleSaveMetadata()}
         className="w-full rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light disabled:opacity-50"
       >
