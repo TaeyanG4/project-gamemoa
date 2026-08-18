@@ -1,5 +1,5 @@
 import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
-import { formatScore } from "@owogg/game-sdk";
+import { formatScore } from "@owogg/game-sdk/contracts";
 import type { Score, ScoreRepository } from "../ports/repositories.js";
 import { validateScorePayload, validateDifficulty } from "../domain/scoreValidation.js";
 

@@ -265,6 +265,83 @@ test("the CSP's frame-ancestors comes from FRONTEND_URL, with no hardcoded host"
   assert.ok(!csp.includes("owogg.com"), "must not fall back to a hardcoded production host");
 });
 
+/**
+ * The CSP is the in-document half of the sandbox (the iframe `sandbox` attribute is the other —
+ * see apps/web/app/test/sandboxGameFrame.test.ts). The tests above cover the two directives that
+ * were most obviously load-bearing; this one pins the whole set, because every directive here is
+ * doing a specific job and a partial policy would still look "present" to a reviewer:
+ * `connect-src 'none'` is what stops an uploaded game phoning home or reaching OwOGG's own API,
+ * `base-uri`/`form-action 'none'` close the two ways a document can redirect where its own
+ * requests go without ever issuing a fetch, and `frame-ancestors` stops a third-party page from
+ * embedding a game as bait.
+ */
+test("the served CSP carries every directive the sandbox depends on, not just connect-src", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/games/1/17/index.html", {}, {
+      DB: db,
+      ...B2_ENV,
+      FRONTEND_URL: "https://www.owogg.com",
+    } as any),
+  );
+
+  const csp = res.headers.get("Content-Security-Policy") ?? "";
+  for (const directive of [
+    "default-src 'self'",
+    "connect-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors https://www.owogg.com",
+  ]) {
+    assert.ok(csp.includes(directive), `missing directive: ${directive}`);
+  }
+});
+
+test("the CSP never widens connect-src to allow a game to reach the network", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/games/1/17/index.html", {}, { DB: db, ...B2_ENV } as any),
+  );
+
+  const csp = res.headers.get("Content-Security-Policy") ?? "";
+  const connectSrc = csp
+    .split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith("connect-src"));
+
+  // Exactly 'none' — not "'self'", not "'none' https://api.owogg.com". A game that needs to talk
+  // to OwOGG does it through the host page, never directly from inside the iframe.
+  assert.equal(connectSrc, "connect-src 'none'");
+});
+
+test("the legacy /play/:slug/* path serves its entry document with the same CSP", async () => {
+  // This path predates the versioned one and is kept only so an older URL still resolves — but it
+  // serves the same third-party HTML, so it must not be a way to get a document without a policy.
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/play/live-game/index.html", {}, {
+      DB: db,
+      ...B2_ENV,
+      FRONTEND_URL: "https://www.owogg.com",
+    } as any),
+  );
+
+  assert.equal(res.status, 200);
+  const csp = res.headers.get("Content-Security-Policy") ?? "";
+  assert.match(csp, /connect-src 'none'/);
+  assert.match(csp, /frame-ancestors https:\/\/www\.owogg\.com/);
+});
+
+test("a non-HTML asset carries no CSP — the policy belongs to the document, not the bytes", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/games/1/17/Build/game.wasm", {}, { DB: db, ...B2_ENV } as any),
+  );
+
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("Content-Security-Policy"), null);
+});
+
 test("GET a published .wasm asset serves application/wasm with an immutable long-lived cache", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
   const res = await withStorage({ stored: publishedObjects() }, () =>
