@@ -8,6 +8,7 @@ import {
   SandboxGameVisibilityUpdateRequestSchema,
   SandboxGameLiveVersionUpdateRequestSchema,
   SandboxGameRecordSchema,
+  toSandboxGameRecordResponse,
   SandboxGameDetailResponseSchema,
   SandboxGameListResponseSchema,
 } from "@owogg/contracts";
@@ -62,7 +63,10 @@ adminSandboxGamesRouter.get("/", async (c) => {
 
   const { sandboxGameUseCases } = createContainer(c.env.DB);
   const games = await sandboxGameUseCases.listAll();
-  return c.json(SandboxGameListResponseSchema.parse({ games }), 200);
+  return c.json(
+    SandboxGameListResponseSchema.parse({ games: games.map(toSandboxGameRecordResponse) }),
+    200,
+  );
 });
 
 // GET /api/admin/sandbox-games/review-queue?page=&pageSize=
@@ -133,7 +137,14 @@ adminSandboxGamesRouter.get("/:id", async (c) => {
     sandboxGameUseCases.listVersions(id),
     sandboxGameUseCases.getReviewAudit(id),
   ]);
-  return c.json(SandboxGameDetailResponseSchema.parse({ game, versions, auditLog }), 200);
+  return c.json(
+    SandboxGameDetailResponseSchema.parse({
+      game: toSandboxGameRecordResponse(game),
+      versions,
+      auditLog,
+    }),
+    200,
+  );
 });
 
 // POST /api/admin/sandbox-games/versions/:versionId/approve
@@ -258,7 +269,7 @@ adminSandboxGamesRouter.patch("/:id/live-version", async (c) => {
   try {
     const { sandboxGameUseCases } = createContainer(c.env.DB);
     const game = await sandboxGameUseCases.setLiveVersion(id, admin.userId, parsed.data.versionId);
-    return c.json(SandboxGameRecordSchema.parse(game), 200);
+    return c.json(SandboxGameRecordSchema.parse(toSandboxGameRecordResponse(game)), 200);
   } catch (err) {
     const { body: errBody, status } = failureResponse(err);
     return c.json(errBody, status);
@@ -283,7 +294,7 @@ adminSandboxGamesRouter.patch("/:id/metadata", async (c) => {
   try {
     const { sandboxGameUseCases } = createContainer(c.env.DB);
     const game = await sandboxGameUseCases.updateMetadata(id, admin.userId, parsed.data);
-    return c.json(SandboxGameRecordSchema.parse(game), 200);
+    return c.json(SandboxGameRecordSchema.parse(toSandboxGameRecordResponse(game)), 200);
   } catch (err) {
     const { body: errBody, status } = failureResponse(err);
     return c.json(errBody, status);
@@ -307,7 +318,7 @@ adminSandboxGamesRouter.patch("/:id/visibility", async (c) => {
   try {
     const { sandboxGameUseCases } = createContainer(c.env.DB);
     const game = await sandboxGameUseCases.setVisibility(id, admin.userId, parsed.data.visibility);
-    return c.json(SandboxGameRecordSchema.parse(game), 200);
+    return c.json(SandboxGameRecordSchema.parse(toSandboxGameRecordResponse(game)), 200);
   } catch (err) {
     const { body: errBody, status } = failureResponse(err);
     return c.json(errBody, status);
@@ -327,7 +338,7 @@ adminSandboxGamesRouter.delete("/:id", async (c) => {
   try {
     const { sandboxGameUseCases } = createContainer(c.env.DB);
     const game = await sandboxGameUseCases.deleteGame({ gameId: id, actorAdminId: admin.userId });
-    return c.json(SandboxGameRecordSchema.parse(game), 200);
+    return c.json(SandboxGameRecordSchema.parse(toSandboxGameRecordResponse(game)), 200);
   } catch (err) {
     const { body: errBody, status } = failureResponse(err);
     return c.json(errBody, status);
