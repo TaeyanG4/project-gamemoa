@@ -334,6 +334,11 @@ export default function AdminSandboxGamesRoute() {
                     >
                       {g.visibility === "PUBLIC" ? "활성" : "비활성"}
                     </span>
+                    {g.deletedAt && (
+                      <span className="rounded-full bg-accent-red/10 px-1.5 py-0.5 font-bold text-accent-red">
+                        삭제됨
+                      </span>
+                    )}
                     <span>제작자 #{g.developerUserId}</span>
                     <span>{g.slug}</span>
                   </p>
@@ -343,13 +348,16 @@ export default function AdminSandboxGamesRoute() {
                     type="button"
                     disabled={
                       togglingGameId !== null ||
+                      g.deletedAt !== null ||
                       (g.visibility === "PRIVATE" && g.liveVersionId === null)
                     }
                     onClick={() => void handleToggleGameVisibility(g)}
                     title={
-                      g.liveVersionId === null
-                        ? "승인된 버전이 있어야 활성화할 수 있습니다."
-                        : undefined
+                      g.deletedAt !== null
+                        ? "삭제된 게임입니다. 관리 화면에서 완전 삭제할 수 있습니다."
+                        : g.liveVersionId === null
+                          ? "승인된 버전이 있어야 활성화할 수 있습니다."
+                          : undefined
                     }
                     className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-40 ${
                       g.visibility === "PUBLIC"
