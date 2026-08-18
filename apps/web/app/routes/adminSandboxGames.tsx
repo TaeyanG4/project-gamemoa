@@ -26,6 +26,7 @@ import {
   patchSandboxGameMetadata,
   patchSandboxGameVisibility,
   deleteSandboxGame,
+  purgeSandboxGame,
 } from "../features/adminApi";
 import type {
   SandboxGameReviewQueueResponse,
@@ -101,6 +102,14 @@ export default function AdminSandboxGamesRoute() {
     } finally {
       setTogglingGameId(null);
     }
+  };
+
+  // The row is gone after this (see purgeSandboxGame) — unlike every other action here, there is
+  // no updated record to fold back in. Drop it from the list and close the detail panel if it was
+  // showing this game.
+  const handlePurged = (gameId: number) => {
+    setAllGames((prev) => prev?.filter((g) => g.id !== gameId) ?? prev);
+    setDetail((prev) => (prev?.game.id === gameId ? null : prev));
   };
 
   const handleOpenGame = async (id: number) => {
@@ -396,7 +405,14 @@ export default function AdminSandboxGamesRoute() {
           </button>
         </form>
 
-        {detail && <GameDetailPanel detail={detail} onChanged={setDetail} onError={setError} />}
+        {detail && (
+          <GameDetailPanel
+            detail={detail}
+            onChanged={setDetail}
+            onPurged={handlePurged}
+            onError={setError}
+          />
+        )}
       </section>
     </div>
   );
@@ -405,10 +421,12 @@ export default function AdminSandboxGamesRoute() {
 function GameDetailPanel({
   detail,
   onChanged,
+  onPurged,
   onError,
 }: {
   detail: SandboxGameDetailResponse;
   onChanged: (detail: SandboxGameDetailResponse) => void;
+  onPurged: (gameId: number) => void;
   onError: (message: string) => void;
 }) {
   const { game } = detail;
@@ -424,6 +442,7 @@ function GameDetailPanel({
   const [saving, setSaving] = useState(false);
   const [togglingVisibility, setTogglingVisibility] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [purging, setPurging] = useState(false);
   const [revokingVersionId, setRevokingVersionId] = useState<number | null>(null);
 
   const handleSaveMetadata = async () => {
@@ -486,6 +505,29 @@ function GameDetailPanel({
       onError(err instanceof Error ? err.message : "삭제에 실패했습니다.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Only reachable once the game is already soft-deleted (see the button's own guard). Separate,
+  // stronger confirmation from handleDelete's — this is the one action on this page with no undo
+  // and no audit trail left behind afterward.
+  const handlePurge = async () => {
+    if (purging) return;
+    if (
+      !window.confirm(
+        `"${game.title}" 게임을 완전히 삭제할까요? 되돌릴 수 없고 감사 기록도 함께 사라집니다 — 대신 슬러그 "${game.slug}"는 즉시 재사용 가능해집니다.`,
+      )
+    ) {
+      return;
+    }
+    setPurging(true);
+    onError("");
+    try {
+      await purgeSandboxGame(game.id);
+      onPurged(game.id);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "완전 삭제에 실패했습니다.");
+      setPurging(false);
     }
   };
 
@@ -566,6 +608,22 @@ function GameDetailPanel({
             )}
             {game.deletedAt !== null ? "삭제됨" : "게임 삭제"}
           </button>
+          {game.deletedAt !== null && (
+            <button
+              type="button"
+              disabled={purging}
+              onClick={() => void handlePurge()}
+              title="행을 포함해 완전히 지우고 슬러그를 재사용 가능하게 합니다. 감사 기록도 함께 사라집니다."
+              className="flex items-center gap-1.5 rounded-xl border border-accent-red/60 bg-accent-red px-4 py-2.5 text-xs font-bold text-white hover:bg-accent-red/80 disabled:opacity-40"
+            >
+              {purging ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <X className="h-3.5 w-3.5" />
+              )}
+              완전 삭제 (슬러그 해제)
+            </button>
+          )}
         </div>
       </div>
 
