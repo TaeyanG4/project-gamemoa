@@ -37,6 +37,7 @@ export const SANDBOX_GAME_FAILURE_STATUS: Record<
   MANIFEST_MISSING: 422,
   INVALID_GENRE: 400,
   ALREADY_DELETED: 409,
+  CANNOT_DELETE_APPROVED_GAME: 409,
 };
 
 export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["code"], string> = {
@@ -67,4 +68,6 @@ export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["cod
     "ZIP 최상위에 owogg.game.json이 없습니다. 자동 등록하려면 slug/title/genre가 담긴 이 파일을 포함하세요.",
   INVALID_GENRE: "genre는 비어 있지 않은 문자열이어야 합니다.",
   ALREADY_DELETED: "이미 삭제된 게임입니다.",
+  CANNOT_DELETE_APPROVED_GAME:
+    "이미 승인된 버전이 있는 게임은 직접 삭제할 수 없습니다. 관리자에게 문의하세요.",
 };

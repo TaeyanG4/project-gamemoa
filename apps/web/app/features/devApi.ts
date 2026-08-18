@@ -68,6 +68,34 @@ export function countActiveSubmissions(games: Array<{ reviewSlot: 1 | 2 | null }
   return games.filter((g) => g.reviewSlot !== null).length;
 }
 
+/**
+ * Creator self-service full removal of their OWN game — only while it has never been approved
+ * (see SandboxGameUseCases.deleteOwnGame). Distinct from adminApi.deleteSandboxGame, which is
+ * ADMIN/OPERATOR-only and works on any game, approved or not. A raw fetch (not apiFetch) since the
+ * route returns a small `{ deleted: true }` acknowledgement rather than a SandboxGameRecord.
+ */
+export async function deleteDevGame(gameId: number): Promise<void> {
+  const res = await fetch(`${API_URL}/api/dev/games/${gameId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    let detail: string | undefined;
+    let code: string | undefined;
+    try {
+      const body = (await res.json()) as { error?: { code?: string; message?: string } };
+      detail = body.error?.message;
+      code = body.error?.code;
+    } catch {
+      // ignore parse failure — fall back to a generic message below
+    }
+    throw new ApiClientError("HttpError", detail || `삭제에 실패했습니다. (HTTP ${res.status})`, {
+      status: res.status,
+      ...(code ? { code } : {}),
+    });
+  }
+}
+
 /** Bundle upload is multipart, not JSON — bypasses apiFetch's JSON Content-Type default. */
 export async function uploadDevGameVersion(gameId: number, file: File) {
   const form = new FormData();
