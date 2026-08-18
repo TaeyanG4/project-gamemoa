@@ -1,36 +1,106 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateScorePayload } from "../src/domain/scoreValidation.js";
+import {
+  validateScoreAgainstPolicy,
+  validateDifficultyAgainstDefinition,
+} from "../src/domain/scoreValidation.js";
+import type { GameDifficulty, GamePolicy } from "../src/modules/game/domain/gameDefinition.js";
 
-test("validateScorePayload validates reaction-time scores", () => {
-  assert.equal(validateScorePayload("reaction-time", 200).valid, true);
-  assert.equal(validateScorePayload("reaction-time", 10).valid, false); // impossible bot reaction
-  assert.equal(validateScorePayload("reaction-time", 15000).valid, false); // too slow
+/**
+ * Pure unit tests — no registry, no generated file, just policy objects in and a verdict out.
+ * Equivalence with the real four official games (their actual score bounds and difficulty tiers,
+ * exercised end-to-end through ScoreUseCases) lives in scoreUseCases.test.ts, which runs these
+ * same rules through the real, generated GAME_DEFINITIONS.
+ */
+
+const REACTION_TIME_POLICY: GamePolicy = {
+  score: { unit: "ms", direction: "asc", min: 50, max: 10000 },
+  leaderboard: true,
+  xpPerCompletion: 0,
+  requiresAuth: false,
+};
+
+const UNSCORED_POLICY: GamePolicy = {
+  score: null,
+  leaderboard: false,
+  xpPerCompletion: 0,
+  requiresAuth: false,
+};
+
+test("validateScoreAgainstPolicy accepts a score within the policy's bounds", () => {
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 200).valid, true);
 });
 
-test("validateScorePayload validates memory-test levels", () => {
-  assert.equal(validateScorePayload("memory-test", 12).valid, true);
-  assert.equal(validateScorePayload("memory-test", 0).valid, false);
-  assert.equal(validateScorePayload("memory-test", 100).valid, false);
+test("validateScoreAgainstPolicy rejects a score outside the policy's bounds", () => {
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 10).valid, false); // below min
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 15000).valid, false); // above max
 });
 
-test("validateScorePayload validates aim-test scores automatically", () => {
-  assert.equal(validateScorePayload("aim-test", 1500).valid, true);
-  assert.equal(validateScorePayload("aim-test", 100).valid, false); // below min 500ms
+test("validateScoreAgainstPolicy rejects negative scores, NaN, and non-integers regardless of policy", () => {
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, -5).valid, false);
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, NaN).valid, false);
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 12.34).valid, false);
 });
 
-test("validateScorePayload rejects negative scores and NaNs", () => {
-  assert.equal(validateScorePayload("reaction-time", -5).valid, false);
-  assert.equal(validateScorePayload("reaction-time", NaN).valid, false);
-  assert.equal(validateScorePayload("reaction-time", 12.34).valid, false);
-});
-
-test("validateScorePayload rejects any gameId absent from the built-in registry, regardless of score (2026-08-17 beta hardening)", () => {
-  // Sandbox game slugs are never in the static built-in registry, and score submission for them
-  // is explicitly unsupported for now — this must reject outright, not fall back to a loose
-  // "0..1,000,000" bound (the old behavior, which let an unrecognized/sandbox game id through).
+test("validateScoreAgainstPolicy rejects null policy — an unknown game, not a loose fallback (2026-08-17 beta hardening)", () => {
+  // Preserved from before this refactor: an unrecognized/sandbox game id must not fall back to a
+  // loose "0..1,000,000" bound. `null` is what a GameRegistry.findBySlug miss maps to.
   for (const score of [0, 1, 500, 999999, 1000000]) {
-    const result = validateScorePayload("some-sandbox-game-slug", score);
-    assert.equal(result.valid, false, `score ${score} for an unknown game must be rejected`);
+    assert.equal(
+      validateScoreAgainstPolicy(null, score).valid,
+      false,
+      `score ${score} against no policy must be rejected`,
+    );
   }
+});
+
+test("validateScoreAgainstPolicy accepts anything non-negative when the game is deliberately unscored", () => {
+  // Distinct from `null`: this game exists, and has explicitly opted out of score bounds.
+  assert.equal(validateScoreAgainstPolicy(UNSCORED_POLICY, 0).valid, true);
+  assert.equal(validateScoreAgainstPolicy(UNSCORED_POLICY, 999999999).valid, true);
+});
+
+// ── difficulty ───────────────────────────────────────────────────────────────
+
+const AIM_TEST_DIFFICULTY: GameDifficulty = {
+  levels: [
+    { id: "normal", label: "보통" },
+    { id: "hard", label: "어려움" },
+  ],
+  defaultLevelId: "normal",
+};
+
+test("a game with no difficulty config only ever accepts normal (or nothing, defaulting to normal)", () => {
+  assert.deepEqual(validateDifficultyAgainstDefinition(undefined, undefined), {
+    valid: true,
+    normalizedDifficultyId: "normal",
+  });
+  assert.deepEqual(validateDifficultyAgainstDefinition(undefined, "normal"), {
+    valid: true,
+    normalizedDifficultyId: "normal",
+  });
+  assert.equal(validateDifficultyAgainstDefinition(undefined, "hard").valid, false);
+});
+
+test("an omitted difficulty resolves to the game's own declared default", () => {
+  const result = validateDifficultyAgainstDefinition(AIM_TEST_DIFFICULTY, undefined);
+  assert.equal(result.valid, true);
+  assert.equal(result.normalizedDifficultyId, "normal");
+});
+
+test("a declared tier is accepted; an unknown one is rejected and falls back to the default", () => {
+  assert.deepEqual(validateDifficultyAgainstDefinition(AIM_TEST_DIFFICULTY, "hard"), {
+    valid: true,
+    normalizedDifficultyId: "hard",
+  });
+
+  const rejected = validateDifficultyAgainstDefinition(AIM_TEST_DIFFICULTY, "nightmare");
+  assert.equal(rejected.valid, false);
+  assert.equal(rejected.normalizedDifficultyId, "normal");
+});
+
+test("whitespace around a submitted difficulty id is trimmed before matching", () => {
+  const result = validateDifficultyAgainstDefinition(AIM_TEST_DIFFICULTY, "  hard  ");
+  assert.equal(result.valid, true);
+  assert.equal(result.normalizedDifficultyId, "hard");
 });
