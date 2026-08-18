@@ -18,6 +18,7 @@ import {
   D1GameCreatorRepository,
   D1SandboxGameRepository,
   D1GameAttemptConsumptionRepository,
+  D1CreatorScoreAcceptanceRepository,
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
   type BackblazeB2Config,
@@ -43,6 +44,7 @@ import {
   GameCreatorUseCases,
   SandboxGameUseCases,
   GameAttemptUseCases,
+  CreatorScoreAcceptanceUseCases,
   GameBundlePublisher,
   StaticGameRegistry,
   GAME_DEFINITIONS,
@@ -68,6 +70,7 @@ import {
   type SandboxGameRepository,
   type GameBundleStorageRepository,
   type GameAttemptConsumptionRepository,
+  type CreatorScoreAcceptanceRepository,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
@@ -114,6 +117,10 @@ export interface AppContainer {
    * canonical game/creator metadata, and not yet consulted by any route (see
    * GameAttemptUseCases's own doc comment). */
   gameAttemptRepo: GameAttemptConsumptionRepository;
+  /** Atomic attempt-consume + score-save for Creator games (migration 0028's table again, plus
+   * `scores`) — see CreatorScoreAcceptanceRepository's own doc comment for why this is a
+   * separate port from gameAttemptRepo above rather than an extension of it. */
+  creatorScoreAcceptanceRepo: CreatorScoreAcceptanceRepository;
   gameBundleStorageRepo: GameBundleStorageRepository;
   /** True only when a complete Backblaze B2 config was passed to createContainer — routes should
    * check this (rather than try/catch-ing putBundle) to return a clean 503 before touching the
@@ -146,6 +153,7 @@ export interface AppContainer {
   gameCreatorUseCases: GameCreatorUseCases;
   sandboxGameUseCases: SandboxGameUseCases;
   gameAttemptUseCases: GameAttemptUseCases;
+  creatorScoreAcceptanceUseCases: CreatorScoreAcceptanceUseCases;
   gameBundlePublisher: GameBundlePublisher;
 }
 
@@ -181,6 +189,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const gameCreatorRepo = new D1GameCreatorRepository(db);
   const sandboxGameRepo = new D1SandboxGameRepository(db);
   const gameAttemptRepo = new D1GameAttemptConsumptionRepository(db);
+  const creatorScoreAcceptanceRepo = new D1CreatorScoreAcceptanceRepository(db);
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
     ? new BackblazeB2GameBundleRepository(b2Config)
     : new UnconfiguredGameBundleRepository();
@@ -223,6 +232,10 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameRegistry,
   );
   const gameAttemptUseCases = new GameAttemptUseCases(gameAttemptRepo);
+  const creatorScoreAcceptanceUseCases = new CreatorScoreAcceptanceUseCases(
+    sandboxGameRepo,
+    creatorScoreAcceptanceRepo,
+  );
 
   return {
     userRepo,
@@ -244,6 +257,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameCreatorRepo,
     sandboxGameRepo,
     gameAttemptRepo,
+    creatorScoreAcceptanceRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
     gameRegistry,
@@ -268,6 +282,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameCreatorUseCases,
     sandboxGameUseCases,
     gameAttemptUseCases,
+    creatorScoreAcceptanceUseCases,
     gameBundlePublisher,
   };
 }

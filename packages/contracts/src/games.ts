@@ -88,3 +88,20 @@ export const GameSessionResponseSchema = z.object({
   expiresAt: z.string(),
 });
 export type GameSessionResponse = z.infer<typeof GameSessionResponseSchema>;
+
+/**
+ * POST /api/games/:slug/score — the server-side acceptance request for a Creator game's score.
+ * `token` is the Game Session token from GameSessionResponseSchema, spent exactly once by this
+ * call (see packages/core/src/application/creatorScoreAcceptanceUseCases.ts). No difficulty field
+ * — Creator games have no difficulty tiers today.
+ */
+export const CreatorScoreAcceptRequestSchema = z.object({
+  token: z.string(),
+  score: z.number(),
+});
+export type CreatorScoreAcceptRequest = z.infer<typeof CreatorScoreAcceptRequestSchema>;
+
+export const CreatorScoreAcceptResponseSchema = z.object({
+  success: z.literal(true),
+});
+export type CreatorScoreAcceptResponse = z.infer<typeof CreatorScoreAcceptResponseSchema>;

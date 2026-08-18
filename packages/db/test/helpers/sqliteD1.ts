@@ -20,7 +20,18 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
     prepare(query: string): D1PreparedStatement {
       const stmt = raw.prepare(query);
       let bound: unknown[] = [];
-      const wrapper: D1PreparedStatement = {
+      const runSync = () => {
+        const info = stmt.run(...(bound as never[]));
+        // node:sqlite's own `changes` count and Cloudflare D1's `rows_written` field mean the
+        // same thing for a plain INSERT — mirrored under both names so a caller reading either
+        // one (see D1CreatorScoreAcceptanceRepository, which reads rows_written specifically)
+        // gets a real, correctly-populated value rather than undefined.
+        return {
+          success: true,
+          meta: { changes: Number(info.changes), rows_written: Number(info.changes) },
+        };
+      };
+      const wrapper: D1PreparedStatement & { __runSync: typeof runSync } = {
         bind(...values: unknown[]) {
           bound = values;
           return wrapper;
@@ -34,18 +45,28 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
           return { results: rows as T[] };
         },
         async run() {
-          const info = stmt.run(...(bound as never[]));
-          return { success: true, meta: { changes: Number(info.changes) } };
+          return runSync();
         },
+        // Batch-only escape hatch — see batch() below for why this exists.
+        __runSync: runSync,
       };
       return wrapper;
     },
     async batch(statements: D1PreparedStatement[]) {
-      const results = [];
-      for (const s of statements) {
-        results.push(await s.run());
-      }
-      return results;
+      // Real D1 executes an entire batch() call as one uninterruptible unit — no other
+      // concurrent request's statements can land in between. A naive `for (...) { await s.run() }`
+      // does NOT model that: even though the underlying node:sqlite call is itself synchronous,
+      // wrapping it in `async run()` still yields a microtask between each statement, and under
+      // `Promise.all`-driven concurrent calls another call's own batch can interleave its
+      // statements in that gap. That silently breaks any logic (like a `changes()`-gated second
+      // INSERT) that depends on nothing else running on the connection between this batch's own
+      // statements. Fix: run every statement's underlying SQLite call synchronously back-to-back,
+      // via the sync escape hatch above, with no `await` — and therefore no interleaving
+      // opportunity — between them. Only the outer batch() call is async, matching the real
+      // D1Database interface.
+      return statements.map((s) =>
+        (s as D1PreparedStatement & { __runSync: () => unknown }).__runSync(),
+      );
     },
   };
 
@@ -457,5 +478,59 @@ CREATE TABLE game_attempt_consumptions (
   game_id INTEGER NOT NULL,
   version_id INTEGER NOT NULL,
   consumed_at TEXT NOT NULL
+);
+`;
+
+/** Schema for D1CreatorScoreAcceptanceRepository tests (migration 0028's table again, plus
+ * `scores` from the initial schema) — the atomic attempt-consume + score-save write. */
+export const CREATOR_SCORE_ACCEPTANCE_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE sandbox_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  developer_user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  genre TEXT NOT NULL,
+  visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+  live_version_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE sandbox_game_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id INTEGER NOT NULL,
+  object_key TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  bundle_bytes INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+  uploaded_at TEXT NOT NULL
+);
+
+CREATE TABLE game_attempt_consumptions (
+  attempt_id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  game_id INTEGER NOT NULL,
+  version_id INTEGER NOT NULL,
+  consumed_at TEXT NOT NULL
+);
+
+CREATE TABLE scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  nickname TEXT NOT NULL DEFAULT '게스트',
+  avatar_url TEXT,
+  game_id TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  difficulty TEXT NOT NULL DEFAULT 'normal',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT,
+  deleted_by_admin_id INTEGER
 );
 `;
