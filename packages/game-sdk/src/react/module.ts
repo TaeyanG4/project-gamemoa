@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
-import type { GameManifest } from "./manifest.js";
-import type { GameResult, GameResultValidation } from "./result.js";
+import type { GameManifest } from "../contracts/manifest.js";
+import type { GameResult, GameResultValidation } from "../contracts/result.js";
 import type { GameClientEvent } from "../events/index.js";
 
 export interface GameRuntimeContext {

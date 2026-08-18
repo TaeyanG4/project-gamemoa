@@ -96,8 +96,13 @@ export async function buildRegistrySources(rootDir = process.cwd()): Promise<Reg
   const manifests = gameEntries.map((e) => e.manifest);
 
   // 1. Core Manifest Registry Raw Code
+  // The generated file lands in packages/core, so it imports the framework-independent
+  // "@owogg/game-sdk/contracts" entry rather than the package root — the root re-exports the
+  // React-bound GameModule/GameProps, and core must not depend on React (enforced by
+  // scripts/architecture-rules.ts). The web loader registry below is a browser module and keeps
+  // using the root entry.
   const rawCoreRegistryCode = `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
-import type { GameManifest } from "@owogg/game-sdk";
+import type { GameManifest } from "@owogg/game-sdk/contracts";
 
 export const GAME_MANIFESTS: GameManifest[] = ${JSON.stringify(manifests, null, 2)};
 

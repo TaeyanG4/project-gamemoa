@@ -1585,6 +1585,47 @@ test("isVersionServable matches resolvePublishedFile's own gate: true only for a
   );
 });
 
+/**
+ * An admin takedown has to stop serving through *every* entry point, not just the catalog listing
+ * it is most visibly wired to. deleteGame does this indirectly — it forces visibility back to
+ * PRIVATE in the same write as setting deleted_at — which is a deliberate belt-and-suspenders
+ * design (see SandboxGameRepository.softDelete) but also means the serving gates never check
+ * `deletedAt` themselves. That makes "PRIVATE is forced on delete" a load-bearing invariant rather
+ * than a nicety: if a future change ever soft-deleted a row without touching visibility, a deleted
+ * game would keep serving and nothing else in the suite would notice.
+ */
+test("a soft-deleted game stops serving through every entry point, not just the catalog", async () => {
+  const { useCases, game, version } = await createGameWithLiveVersion();
+  assert.ok(await useCases.resolveLiveVersion("my-game"), "precondition: live before deletion");
+
+  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  assert.equal(await useCases.resolveLiveVersion("my-game"), null, "/play/:slug resolver");
+  assert.equal(
+    await useCases.isVersionServable(game.id, version.id),
+    false,
+    "published-asset availability gate",
+  );
+  assert.equal(
+    await useCases.resolvePublishedFile({
+      gameId: game.id,
+      versionId: version.id,
+      path: "index.html",
+    }),
+    null,
+    "published-asset read",
+  );
+  assert.equal(await useCases.resolvePublicLogo("my-game"), null, "public logo route");
+});
+
+test("deleting a game forces it PRIVATE, which is what the serving gates actually read", async () => {
+  const { useCases, game } = await createGameWithLiveVersion();
+  const deleted = await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  assert.notEqual(deleted.deletedAt, null);
+  assert.equal(deleted.visibility, "PRIVATE");
+});
+
 test("isVersionServable is false for a version belonging to a different game", async () => {
   const { useCases, version } = await createGameWithLiveVersion();
   const other = await useCases.createGame({

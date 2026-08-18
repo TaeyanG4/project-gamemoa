@@ -40,5 +40,13 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # `pnpm test` is `turbo test`, which only runs the `test` script of each *workspace* package
+      # (apps/*, packages/*, games/*). scripts/ is not a workspace member, so its tests — the
+      # architecture guard's own, and the registry generator's — had no runner at all and were
+      # silently never executed. A guard whose tests don't run is how the previous line-based
+      # import matcher degraded unnoticed; this is the step that keeps that from repeating.
+      - name: Test build scripts
+        run: pnpm test:scripts
+
       - name: Build
         run: pnpm build
