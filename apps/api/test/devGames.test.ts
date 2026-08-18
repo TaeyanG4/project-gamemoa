@@ -292,6 +292,29 @@ test("GET /api/admin/sandbox-games/review-queue is denied for non-admin", async 
   assert.equal(res.status, 403);
 });
 
+test("GET /api/admin/sandbox-games is denied for non-admin", async () => {
+  const { db } = createDb({ userId: 7 });
+  const res = await app.request(
+    "/api/admin/sandbox-games",
+    { headers: { Cookie: "owogg_session=valid_session; owogg_admin_session=none" } },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
+test("POST /api/admin/sandbox-games/versions/:versionId/revoke is denied for non-admin", async () => {
+  const { db } = createDb({ userId: 7 });
+  const res = await app.request(
+    "/api/admin/sandbox-games/versions/1/revoke",
+    {
+      method: "POST",
+      headers: { Cookie: "owogg_session=valid_session; owogg_admin_session=none" },
+    },
+    { DB: db, ADMIN_USER_IDS: "1" } as any,
+  );
+  assert.equal(res.status, 403);
+});
+
 // ── review-slot quota over the real route/use-case/repository chain ──────────
 //
 // Separate fake DB from createDb() above: these tests need sandbox_games rows to actually behave
