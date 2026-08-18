@@ -5,7 +5,19 @@
   "compatibility_date": "2026-08-12",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
-  "routes": [{ "pattern": "api.owogg.com", "custom_domain": true }],
+  // play.owogg.com (2026-08-18): the game-hosting host GAME_ORIGIN/VITE_GAME_ORIGIN already
+  // point at (see src/routes/gameServing.ts's origin guard and docs/GAME_CREATION_GUIDE.md
+  // §3.8/§7) -- the app-level wiring (host allowlist, iframe src, deploy.yml's variable-match
+  // check) was already in place, but this worker was never actually bound to the hostname, so
+  // every request to it hit DNS with nothing behind the name (ERR_NAME_NOT_RESOLVED) rather than
+  // reaching gameServingRouter (mounted at /play on this same worker, app.route("/play", ...) in
+  // index.ts). Same worker as api.owogg.com, just a second custom domain on it -- Cloudflare
+  // provisions the DNS record for a custom_domain route automatically on deploy, same as
+  // api.owogg.com's did.
+  "routes": [
+    { "pattern": "api.owogg.com", "custom_domain": true },
+    { "pattern": "play.owogg.com", "custom_domain": true },
+  ],
   "d1_databases": [
     {
       "binding": "DB",
