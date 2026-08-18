@@ -417,3 +417,45 @@ CREATE TABLE sandbox_game_review_audit_log (
   created_at TEXT NOT NULL
 );
 `;
+
+/** Schema for D1GameAttemptConsumptionRepository tests (migration 0028) — the minimal slice of
+ * SANDBOX_GAMES_TEST_SCHEMA the FK columns need (users, sandbox_games, sandbox_game_versions)
+ * plus the table itself. */
+export const GAME_ATTEMPT_CONSUMPTIONS_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE sandbox_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  developer_user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  genre TEXT NOT NULL,
+  visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+  live_version_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE sandbox_game_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id INTEGER NOT NULL,
+  object_key TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  bundle_bytes INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+  uploaded_at TEXT NOT NULL
+);
+
+CREATE TABLE game_attempt_consumptions (
+  attempt_id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  game_id INTEGER NOT NULL,
+  version_id INTEGER NOT NULL,
+  consumed_at TEXT NOT NULL
+);
+`;
