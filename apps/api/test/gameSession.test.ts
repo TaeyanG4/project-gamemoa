@@ -227,3 +227,38 @@ test("a token issued here is rejected under a different secret — the signature
   const result = await verifyGameSession(body.token, "a-different-secret-entirely");
   assert.equal(result.ok, false);
 });
+
+test("is rate limited under the 'game-session' name when RATE_LIMITER is bound and rejects", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const keys: string[] = [];
+  const res = await app.request(
+    "/api/games/ball-dodge/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    {
+      DB: db,
+      GAME_SESSION_SECRET: SESSION_SECRET,
+      RATE_LIMITER: {
+        limit: async ({ key }: { key: string }) => {
+          keys.push(key);
+          return { success: false };
+        },
+      },
+    } as any,
+  );
+  assert.equal(res.status, 429);
+  assert.ok(keys[0]?.startsWith("game-session:"), "keyed under this route's own name prefix");
+});
+
+test("passes through when RATE_LIMITER is bound and allows the request", async () => {
+  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
+  const res = await app.request(
+    "/api/games/ball-dodge/session",
+    { method: "POST", headers: AUTH_HEADERS },
+    {
+      DB: db,
+      GAME_SESSION_SECRET: SESSION_SECRET,
+      RATE_LIMITER: { limit: async () => ({ success: true }) },
+    } as any,
+  );
+  assert.equal(res.status, 200);
+});
