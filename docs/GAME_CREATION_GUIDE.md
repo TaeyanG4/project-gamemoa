@@ -653,11 +653,41 @@ PR의 몫입니다.
   (`prepareBundleFromArchive` — 이번에 `GameBundlePublisher.prepare()`에서 뽑아낸 공용 함수) 전부
   변경 없이 그대로 사용합니다. 새 Worker, 새 라우트, 새 DB 테이블 없음.
 - **아직 안 한 것**: 실제 SYSTEM 게임(React 컴포넌트)을 standalone HTML/JS로 컴파일하는 빌드 도구
-  (Vite 설정 등), Game Bridge SDK 실제 연결, 서빙 라우트(현재 `/games/:gameId/:versionId/*`는
-  D1 정수 ID 기반이라 slug 기반 SYSTEM 게임에는 그대로 안 맞음), 어떤 SYSTEM 게임의 실제 런타임
-  전환. 증명은 `packages/core/test/systemGameBundle*.test.ts`(순수 단위 테스트)와
-  `apps/api/test/systemGameBundlePublishSmokeTest.test.ts`(실제 zip + 실제 B2 서명 어댑터, fetch만
-  스텁 — build → validate → publish → read 전체 경로)로 되어 있습니다.
+  (Vite 설정 등), Game Bridge SDK 실제 연결, 어떤 SYSTEM 게임의 실제 런타임 전환. (서빙 라우트는
+  §3.11에서 이어서 구현했습니다.) 증명은 `packages/core/test/systemGameBundle*.test.ts`(순수 단위
+  테스트)와 `apps/api/test/systemGameBundlePublishSmokeTest.test.ts`(실제 zip + 실제 B2 서명 어댑터,
+  fetch만 스텁 — build → validate → publish → read 전체 경로)로 되어 있습니다.
+
+### 3.11 SYSTEM(공식) 게임 exact-version 서빙 기반 (2026-08-19)
+
+`feat/official-game-serving-foundation` — §3.10이 B2에 올린 `official-games/<slug>/<contentHash>/*`를
+실제로 `play.owogg.com`에서 서빙합니다. Creator의 `GET /games/:gameId/:versionId/*`와 병렬인
+`GET /official-games/:slug/:version/*`를 `apps/api/src/routes/gameServing.ts`에 추가했습니다(같은
+파일, 별도 라우트 — 새 파일도, 새 Worker도 아님).
+
+- **식별자 충돌 없음**: 별도 top-level mount(`/official-games`)를 썼습니다 — `/:gameId/:versionId`
+  같은 숫자 전용 패턴과 같은 라우터에 `/:slug/:version`을 얹으면 Hono 라우팅 우선순위에 기대야
+  하는 애매함이 생기므로, 스토리지 키 prefix(`official-games/`)와 1:1로 대응하는 별도 mount로
+  그 위험 자체를 없앴습니다.
+- **가용성 게이트**: 요청마다 `gameRegistry.findBySlug(slug)`로 실제 등록된 SYSTEM 게임인지 확인
+  (D1 없는 순수 in-memory 조회라 별도 캐시 레이어 불필요 — Creator의 D1 `isVersionServable`이
+  자기 전용 short-TTL 캐시를 쓰는 것과 다른 이유). byte cache보다 먼저 실행되어, 미래에 SYSTEM
+  게임이 registry에서 제거돼도 이미 캐시된 바이트가 계속 서빙되는 일이 없습니다.
+- **manifest 존재 = 발행 증명**: D1 row가 없으므로 "이 (slug, version)이 실제로 발행됐는가"는
+  manifest 객체(항상 파일들 다음, 마지막에 쓰임 — §3.10)의 존재 여부로만 판단합니다. manifest가
+  있으면(한 번 참이면 절대 거짓이 되지 않음 — content-hash 기반 불변) 실제 요청 파일을 키로 직접
+  읽습니다. 요청받은 `version`이 진짜 sha256 hash라는 보장은 라우트 자체가 검증하지 않습니다 —
+  Creator의 D1 배정 versionId를 그냥 신뢰하는 것과 동일한 신뢰 경계입니다.
+- **재사용된 것**: `gameOriginHostGuard`, `gameAssetEdgeCache`(edge byte cache + browser TTL 정책),
+  `assetResponseHeaders`/`fileResponse`(CORS wildcard, HTML CSP, cache HIT에서도 매번 새로 계산되는
+  policy header), `versionedAssetCachePolicy`, `resolveBundleContentType`,
+  `systemGamePublishedManifestObjectKey`/`systemGamePublishedObjectKey`(§3.10) 전부 무변경 재사용.
+  Creator의 `/play`, `/games/:gameId/:versionId/*` 자체는 한 줄도 안 건드렸습니다
+  (`gameServing.test.ts` 기존 테스트 전부 무수정 통과로 확인).
+- **아직 안 한 것**: SYSTEM용 mutable `/play`류 live-version resolver(다음 PR 이후), `GameDefinition`에
+  runtime 필드 추가, 실제 SYSTEM 게임 런타임 전환. 증명은
+  `apps/api/test/officialGameServing.test.ts`(valid/unknown slug, missing manifest/object, CORS,
+  CSP, cache HIT policy 재적용, host guard)로 되어 있습니다.
 
 ---
 
