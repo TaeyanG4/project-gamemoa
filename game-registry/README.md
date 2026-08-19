@@ -33,16 +33,18 @@ accepted from untrusted input.
 ## Current scope: SYSTEM games only
 
 Only games owned by OwOGG itself (`owner.type === "SYSTEM"`) live here. Creator-owned
-games are still described by `sandbox_games` rows in D1; where their canonical
-description will ultimately live is deliberately undecided, and nothing here assumes
-an answer.
+games are still described by `sandbox_games` rows in D1. The direction is a
+B2-backed CreatorGameRegistry, resolved through the same `GameRegistry` port this
+directory feeds — not yet implemented.
 
-## This is not yet the runtime source of truth
+## Runtime status
 
-`GAME_MANIFESTS` / `GAME_MANIFEST_MAP`, generated from `games/*/src/manifest.ts`, is
-still what score validation, difficulty validation and the admin kill switch actually
-read. This directory generates a second artifact — `GAME_DEFINITIONS` — that nothing
-consumes yet.
+This directory generates `GAME_DEFINITIONS`, which the composition root wires into
+`StaticGameRegistry` (`apps/api/src/container.ts`) as the `GameRegistry` that
+`ScoreUseCases` and `GameSettingsUseCases` resolve games through. `GAME_MANIFESTS` /
+`GAME_MANIFEST_MAP`, generated from `games/*/src/manifest.ts`, remains the source for
+everything not yet moved onto that port (achievements, personalization, creator/Discord
+tooling).
 
 The two are held to agreement by a machine check, not by discipline:
 

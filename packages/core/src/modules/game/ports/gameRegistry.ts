@@ -2,18 +2,25 @@
  * Resolves a {@link GameDefinition} by slug — the port that will become the single source of truth
  * for "what is this game, and what are its rules?".
  *
- * **Interface only in this PR.** There is no implementation yet, nothing is wired into the
- * container, and ScoreUseCases/GameSettingsUseCases still read the build-time
- * `GAME_MANIFEST_MAP` exactly as before. Introducing the port on its own keeps the runtime
- * unchanged while giving the next PRs something to implement against.
+ * Wired in production via `StaticGameRegistry(GAME_DEFINITIONS)` (apps/api/src/container.ts).
+ * ScoreUseCases and GameSettingsUseCases resolve games through this port now, not by importing
+ * the build-time `GAME_MANIFEST_MAP` directly — see their own doc comments for what changed.
  *
- * Why this needs to exist at all: score validation, difficulty validation and the admin kill
- * switch all resolve a game through `packages/core/src/registry/gameRegistry.generated.ts`, which
- * is generated from `games/*` at build time. A Game Creator upload has never appeared in that map,
- * so `validateScoreByManifest` rejects it outright — an approved, public creator game currently
- * cannot submit a score, hold a leaderboard entry, earn XP, or be disabled from `/admin/games`.
- * That is not a gap to patch at the call site; it is the registry lookup itself needing to become
- * a port with more than one implementation behind it.
+ * Why this needed to exist at all: score validation, difficulty validation and the admin kill
+ * switch used to resolve a game directly through
+ * `packages/core/src/registry/gameRegistry.generated.ts`, generated from `games/*` at build time.
+ * A Game Creator upload has never appeared in that map, so `validateScoreByManifest` rejected it
+ * outright. Creator score submission and leaderboard reads no longer go through that gap at all —
+ * `CreatorScoreAcceptanceUseCases` and `CreatorLeaderboardUseCases` are separate, parallel paths
+ * built from the same underlying pieces (`ScoreRepository`, `sandboxGameToScorePolicy`) rather
+ * than this port. What's still missing is this port itself resolving creator games: its
+ * production implementation (`StaticGameRegistry(GAME_DEFINITIONS)`) is SYSTEM-only today, so a
+ * creator game still can't earn XP/achievements through that acceptance path
+ * (`CreatorScoreAcceptanceUseCases` deliberately doesn't award them yet — see its own doc
+ * comment) or be disabled from `/admin/games` (`GameSettingsUseCases` resolves games through this
+ * same SYSTEM-only port). That gap isn't fixed by this port existing; it's fixed by a future
+ * implementation that also resolves creator games — this port is what makes that swap possible
+ * without touching every call site again.
  *
  * Asynchronous on purpose. The official-game implementation will be a synchronous read of a
  * generated file, but the migration explicitly allows reading existing D1 sandbox metadata as a
