@@ -60,6 +60,7 @@ export * from "./application/userModerationUseCases.js";
 export * from "./application/gameCreatorUseCases.js";
 export * from "./application/sandboxGameUseCases.js";
 export * from "./application/gameBundlePublisher.js";
+export * from "./application/creatorCanonicalBackfill.js";
 export * from "./application/systemGameBundlePublisher.js";
 export * from "./application/gameAttemptUseCases.js";
 export * from "./application/creatorScoreAcceptanceUseCases.js";

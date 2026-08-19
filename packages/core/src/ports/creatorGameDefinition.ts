@@ -19,8 +19,15 @@ export interface CreatorGameDefinitionRepository {
    * comment) — "nothing was ever written" and "something was written but it's broken" must stay
    * distinguishable, not both collapse into null. */
   findBySlug(slug: string): Promise<CreatorGameCanonicalDocument | null>;
-  /** Overwrites whatever document (if any) currently exists at `document.slug`'s key. Callers are
-   * responsible for constructing a complete, valid document — this port does no merging. */
+  /** Unconditionally overwrites whatever document (if any) currently exists at `document.slug`'s
+   * key — there is no conditional-write/create-if-absent variant on this port, and the production
+   * B2 adapter has none to offer either (B2's S3-compatible API returns HTTP 501 NotImplemented
+   * for an `If-None-Match` PUT — see application/creatorCanonicalBackfill.ts's own top doc comment
+   * for the evidence). Any "don't overwrite an existing document" guarantee is therefore the
+   * CALLER's responsibility, built on top of this always-overwrites primitive (see
+   * `applyBackfill`'s best-effort, explicitly non-atomic pre-write recheck) — never assume calling
+   * `save` alone is safe against a concurrent write. Callers are also responsible for constructing
+   * a complete, valid document — this port does no merging. */
   save(document: CreatorGameCanonicalDocument): Promise<void>;
   /** Idempotent — deleting an already-absent slug is not an error, matching
    * {@link GameBundleStorageRepository.deleteObject}'s own 404-is-success convention. */
