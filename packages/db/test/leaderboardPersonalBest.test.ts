@@ -85,6 +85,53 @@ test("ties break deterministically by earliest created_at, then row id", async (
   assert.equal(leaderboard[1]?.user_id, userA);
 });
 
+// ── decimal scores (fix/decimal-game-score-support) ────────────────────────────
+
+test("decimal scores sort correctly in both directions — SQLite compares REAL/INTEGER by numeric value, not storage class", async () => {
+  const { db, raw } = createSqliteD1(LEADERBOARD_TEST_SCHEMA);
+  const userA = seedUser(raw, "A");
+  const userB = seedUser(raw, "B");
+  const userC = seedUser(raw, "C");
+
+  seedScore(raw, userA, "ball-dodge", 4.4);
+  seedScore(raw, userB, "ball-dodge", 4.35);
+  seedScore(raw, userC, "ball-dodge", 5); // whole-number score in the same decimal-scored game
+
+  const repo = new D1ScoreRepository(db);
+
+  const desc = await repo.getLeaderboard("ball-dodge", 20, "desc");
+  assert.deepEqual(
+    desc.map((r) => r.user_id),
+    [userC, userA, userB],
+  );
+  assert.deepEqual(
+    desc.map((r) => r.score),
+    [5, 4.4, 4.35],
+  );
+
+  const asc = await repo.getLeaderboard("ball-dodge", 20, "asc");
+  assert.deepEqual(
+    asc.map((r) => r.user_id),
+    [userB, userA, userC],
+  );
+});
+
+test("a user's decimal personal best is the correct MIN/MAX among several decimal attempts, not merely an early or late row", async () => {
+  const { db, raw } = createSqliteD1(LEADERBOARD_TEST_SCHEMA);
+  const userA = seedUser(raw, "A");
+  seedScore(raw, userA, "ball-dodge", 4.4);
+  seedScore(raw, userA, "ball-dodge", 12.75);
+  seedScore(raw, userA, "ball-dodge", 8.1);
+
+  const repo = new D1ScoreRepository(db);
+
+  const desc = await repo.getLeaderboard("ball-dodge", 20, "desc"); // higher survival time is better
+  assert.equal(desc[0]?.score, 12.75);
+
+  const asc = await repo.getLeaderboard("ball-dodge", 20, "asc"); // lower-is-better variant
+  assert.equal(asc[0]?.score, 4.4);
+});
+
 test("pagination limit is applied to the deduplicated PB set, not raw rows", async () => {
   const { db, raw } = createSqliteD1(LEADERBOARD_TEST_SCHEMA);
   const ids: number[] = [];

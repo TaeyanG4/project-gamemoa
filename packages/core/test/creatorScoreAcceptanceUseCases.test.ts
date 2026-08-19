@@ -136,6 +136,29 @@ test("a valid token, matching context, and in-policy score is accepted", async (
   ]);
 });
 
+test("a decimal score within bounds is accepted — ball-dodge measures survival time in seconds (e.g. 4.4), not a whole number", async () => {
+  // Pins the actual Production bug this fix resolves: ball-dodge's GAME_COMPLETE score is a
+  // fractional value, and validateScoreAgainstPolicy used to hard-reject anything non-integer.
+  const game = makeGame();
+  const { useCases, acceptanceRepo } = buildUseCases(game);
+  const token = await signGameSession(samplePayload(), SECRET);
+
+  const result = await useCases.accept({
+    slug: "ball-dodge",
+    userId: 1,
+    nickname: "player",
+    avatarUrl: null,
+    token,
+    secret: SECRET,
+    score: 4.4,
+  });
+
+  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(acceptanceRepo.accepted, [
+    { attemptId: "11111111-1111-1111-1111-111111111111", score: 4.4 },
+  ]);
+});
+
 test("an unknown slug is GAME_NOT_AVAILABLE", async () => {
   const { useCases } = buildUseCases(null);
   const token = await signGameSession(samplePayload(), SECRET);
