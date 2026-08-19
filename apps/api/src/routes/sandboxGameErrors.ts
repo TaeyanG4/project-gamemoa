@@ -5,7 +5,7 @@ import type { SandboxGameUseCaseFailure } from "@owogg/core";
  * new failure code can't be mapped to different statuses depending on who hit it — and because
  * these are exhaustive `Record`s, adding a code to the union makes both routers fail to compile
  * until it's handled. */
-export type SandboxGameFailureStatus = 400 | 403 | 404 | 409 | 413 | 422 | 500;
+export type SandboxGameFailureStatus = 400 | 403 | 404 | 409 | 413 | 422 | 500 | 503;
 
 export const SANDBOX_GAME_FAILURE_STATUS: Record<
   SandboxGameUseCaseFailure["code"],
@@ -43,6 +43,14 @@ export const SANDBOX_GAME_FAILURE_STATUS: Record<
   LOGO_REQUIRED: 422,
   LOGO_TOO_LARGE: 422,
   NOT_YET_DELETED: 409,
+  // Stage C-2 (B2 canonical write-through): a rejected metadata mutation, not a server fault.
+  SCORE_POLICY_WOULD_BECOME_INCOMPLETE: 400,
+  AMBIGUOUS_SCORE_POLICY_ACTIVATION: 400,
+  // The request itself was valid; keeping B2 in sync with D1 failed — this can happen before D1
+  // is ever touched (a pre-read failure) or after (a save/parity failure), so the message must
+  // stay neutral about what, if anything, was actually saved. A dependency failure either way,
+  // safely retryable, not the client's fault.
+  CANONICAL_SYNC_FAILED: 503,
 };
 
 export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["code"], string> = {
@@ -81,4 +89,10 @@ export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["cod
     "ZIP 최상위에 로고 이미지(owogg.logo.png/jpg/jpeg/webp/svg 중 하나)가 없습니다. 게임 등록에는 로고가 필요합니다.",
   LOGO_TOO_LARGE: "로고 이미지 용량이 최대 허용치를 초과했습니다.",
   NOT_YET_DELETED: "먼저 삭제(비공개 전환)된 게임만 완전 삭제할 수 있습니다.",
+  SCORE_POLICY_WOULD_BECOME_INCOMPLETE:
+    "이미 점수가 설정된 게임의 필수 점수 항목(단위/방향/최소/최대값)을 비울 수 없습니다.",
+  AMBIGUOUS_SCORE_POLICY_ACTIVATION:
+    "점수 미설정 게임에 점수를 설정하려면 단위/방향/최소/최대값을 이번 요청에서 모두 함께 입력해야 합니다.",
+  CANONICAL_SYNC_FAILED:
+    "게임 정보 동기화(B2)에 실패해 변경을 완료하지 못했습니다. 잠시 후 같은 요청을 다시 시도해주세요.",
 };

@@ -21,6 +21,7 @@ import {
   D1CreatorScoreAcceptanceRepository,
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
+  B2CreatorGameDefinitionRepository,
   type BackblazeB2Config,
 } from "@owogg/db";
 import {
@@ -72,6 +73,7 @@ import {
   type GameBundleStorageRepository,
   type GameAttemptConsumptionRepository,
   type CreatorScoreAcceptanceRepository,
+  type CreatorGameDefinitionRepository,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
@@ -127,6 +129,13 @@ export interface AppContainer {
    * check this (rather than try/catch-ing putBundle) to return a clean 503 before touching the
    * use case. */
   gameBundlesConfigured: boolean;
+  /** Stage C-2's B2 canonical write-through target — composed from the SAME `gameBundleStorageRepo`
+   * above (no new B2 client; see B2CreatorGameDefinitionRepository's own doc comment), so it is
+   * only really backed by B2 when `gameBundlesConfigured` is true. A route calling
+   * `sandboxGameUseCases.updateMetadata` must check `gameBundlesConfigured` itself and return a
+   * clean 503 before doing so — same convention as `gameBundleStorageRepo`, never a silent
+   * D1-only fallback (see adminSandboxGames.ts's metadata PATCH route). */
+  creatorGameDefinitionRepo: CreatorGameDefinitionRepository;
   /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
    * game is not "missing" from here so much as out of scope, see StaticGameRegistry's doc
    * comment. Exposed on the container, not just threaded privately into ScoreUseCases/
@@ -195,6 +204,12 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
     ? new BackblazeB2GameBundleRepository(b2Config)
     : new UnconfiguredGameBundleRepository();
+  // Stage C-2: composed from the same gameBundleStorageRepo above, never a second B2 client — see
+  // B2CreatorGameDefinitionRepository's own doc comment. Real B2 access only when b2Config was
+  // provided (gameBundlesConfigured); routes must check that flag themselves before calling
+  // sandboxGameUseCases.updateMetadata, same as every other B2-dependent route already does.
+  const creatorGameDefinitionRepo: CreatorGameDefinitionRepository =
+    new B2CreatorGameDefinitionRepository(gameBundleStorageRepo);
 
   const scoreUseCases = new ScoreUseCases(scoreRepo, gameRegistry);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -232,6 +247,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameBundleStorageRepo,
     gameBundlePublisher,
     gameRegistry,
+    creatorGameDefinitionRepo,
   );
   const gameAttemptUseCases = new GameAttemptUseCases(gameAttemptRepo);
   const creatorScoreAcceptanceUseCases = new CreatorScoreAcceptanceUseCases(
@@ -263,6 +279,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     creatorScoreAcceptanceRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
+    creatorGameDefinitionRepo,
     gameRegistry,
 
     scoreUseCases,

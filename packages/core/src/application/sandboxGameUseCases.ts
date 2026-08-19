@@ -7,6 +7,8 @@ import type {
   SandboxGamePendingVersionsPage,
   GameBundleStorageRepository,
 } from "../ports/sandboxGames.js";
+import type { CreatorGameDefinitionRepository } from "../ports/creatorGameDefinition.js";
+import type { CreatorGameCanonicalDocument } from "../domain/creatorGameCanonicalDocument.js";
 import type { GameRegistry } from "../modules/game/ports/gameRegistry.js";
 import type { SandboxGameVisibility, SandboxGameMode } from "../domain/sandboxGames.js";
 import {
@@ -30,6 +32,13 @@ import {
   type PreparedBundleFile,
 } from "../domain/sandboxGameBundle.js";
 import { sha256Hex } from "../domain/contentHash.js";
+import { isCreatorScorePolicyConfigured } from "../domain/creatorScorePolicy.js";
+import { mapSandboxGameRecordToCanonical } from "../domain/creatorGameCanonicalMapper.js";
+import {
+  patchCreatorCanonicalDocument,
+  computeCreatorCanonicalScorePatch,
+} from "../domain/creatorGameCanonicalPatch.js";
+import { canonicalDocumentsEqual } from "./creatorCanonicalBackfill.js";
 import type { GameBundlePublisher } from "./gameBundlePublisher.js";
 
 export type SandboxGameUseCaseError =
@@ -85,6 +94,23 @@ export type SandboxGameUseCaseError =
   /** purgeGame was called on a game that hasn't been soft-deleted yet — purge only ever follows
    * deleteGame, never replaces it, so there is nothing to permanently erase yet. */
   | "NOT_YET_DELETED"
+  /** updateMetadata (Stage C-2): the patch would leave an already-configured B2 canonical score
+   * policy with any of its four required fields (unit/direction/min/max) null. Never interpreted
+   * as "switch to score: null" — see domain/creatorGameCanonicalPatch.ts's own doc comment. */
+  | "SCORE_POLICY_WOULD_BECOME_INCOMPLETE"
+  /** updateMetadata (Stage C-2): the B2 canonical is currently `score: null` (deliberately
+   * unscored) and the patch touches a score field, but doesn't supply all four required fields as
+   * explicit, non-null values in this same request — activating a score policy is never inferred
+   * from D1's own possibly-stale leftover score_* columns. */
+  | "AMBIGUOUS_SCORE_POLICY_ACTIVATION"
+  /** updateMetadata (Stage C-2): keeping the B2 canonical document in sync with D1 failed. Covers
+   * three distinct moments, not just one: the initial pre-read (before D1 is ever touched — D1
+   * is NOT updated in this case), a save failure, or a post-write parity mismatch (both of which
+   * happen after D1 has already been updated and audited). There is no cross-store transaction
+   * between D1 and B2 (see sandboxGameUseCases.ts's own doc comment on updateMetadata) — the
+   * caller must treat this as a real failure (never a success) regardless of which moment it came
+   * from, and may safely retry the exact same request, since the whole operation is idempotent. */
+  | "CANONICAL_SYNC_FAILED"
   | SandboxBundleRejection;
 
 export class SandboxGameUseCaseFailure extends Error {
@@ -143,6 +169,11 @@ export class SandboxGameUseCases {
     private storage: GameBundleStorageRepository,
     private publisher: GameBundlePublisher,
     private gameRegistry: GameRegistry,
+    /** Stage C-2's B2 canonical write-through target for updateMetadata — see that method's own
+     * doc comment. Provider-neutral (the composition root decides whether this is a real
+     * B2-backed `B2CreatorGameDefinitionRepository` or, in an unconfigured environment, something
+     * that always fails; see apps/api/src/container.ts). */
+    private canonicalDefinitions: CreatorGameDefinitionRepository,
   ) {}
 
   async getById(id: number): Promise<SandboxGameRecord | null> {
@@ -759,6 +790,51 @@ export class SandboxGameUseCases {
     return updated;
   }
 
+  /**
+   * Stage C-2 of the Creator B2 Canonical Registry migration: D1 stays the compatibility mirror
+   * this metadata PATCH has always written, but a B2 canonical document — when one already
+   * exists, or once this very patch first makes the row canonicalizable — is now kept in sync
+   * with it. See domain/creatorGameCanonicalPatch.ts's own doc comment for why an EXISTING
+   * canonical is always patched (never rebuilt from D1 via `mapSandboxGameRecordToCanonical`,
+   * which would silently drop presentation/requiresAuth/leaderboard/an explicit score:null).
+   *
+   * Ordering, matching this Stage's own task description exactly:
+   *   1. Load the D1 row (404 if unknown, unchanged from before this Stage).
+   *   2. Read the current B2 canonical for this slug — BEFORE touching D1 at all. If this read
+   *      itself throws (malformed document, storage failure), D1 is never mutated: throws
+   *      `CANONICAL_SYNC_FAILED` and stops here, fail-closed.
+   *   3. Validate the score-policy transition (see `computeCreatorCanonicalScorePatch`) against
+   *      the EXISTING B2 canonical's own `policy.score` merged with `input` alone — never D1's
+   *      score_* columns, which can genuinely diverge from B2 (D1 is a migration-period
+   *      compatibility mirror, not a re-derivation source for an already-canonical field; see
+   *      creatorGameCanonicalPatch.ts's own doc comment). Before the D1 write, so an invalid
+   *      mutation (would leave an already-scored canonical's required score fields incomplete, or
+   *      ambiguously "half-activates" a currently-unscored one) never reaches D1 at all.
+   *   4. D1 update, then the review-audit entry — in that order, and unconditionally: once D1 is
+   *      mutated, the audit entry is written regardless of what happens to B2 next, so a D1
+   *      mutation this method commits to is never left looking like it never happened (see
+   *      METADATA_CHANGED's own established semantics).
+   *   5. B2 sync — re-reads the canonical ONE more time immediately before writing (a best-effort
+   *      narrowing of the write race, same reasoning as `applyBackfill`'s own pre-save recheck;
+   *      see PR #56's own doc comments on why B2's S3-compatible API has no real conditional-write
+   *      primitive to build a stronger guarantee on) and branches on THAT freshest read:
+   *        - exists -> patch it (`patchCreatorCanonicalDocument`)
+   *        - missing, row is still pre-canonical (`isCreatorScorePolicyConfigured(updated)` is
+   *          false) -> no B2 write; this is this row's ordinary, current lifecycle state
+   *        - missing, row IS now canonicalizable -> first canonical creation via
+   *          `mapSandboxGameRecordToCanonical(updated)` (the ONLY place in this method that
+   *          mapper is used — never for an already-existing document)
+   *      Every write is followed by a read-back parity check. On ANY failure past this point (a
+   *      save call throwing, a read-back throwing, or the read-back not matching what was just
+   *      written) this method throws `CANONICAL_SYNC_FAILED` — D1 has already been updated and
+   *      audited, but the caller still receives a genuine failure, never a success response for a
+   *      canonical that isn't actually in sync. There is NO cross-store transaction between D1
+   *      and B2 (B2 has no transactional primitive to build one on) — this is fail-closed
+   *      best-effort synchronization, not atomicity, and the whole operation is designed to be
+   *      idempotent so retrying the exact same request converges cleanly.
+   *   6. B2 never gets deleted from here, and a failed/partial write is never rolled back — a
+   *      failure is surfaced, not hidden or silently "fixed" by touching anything else.
+   */
   async updateMetadata(
     gameId: number,
     adminId: number,
@@ -767,6 +843,20 @@ export class SandboxGameUseCases {
     const game = await this.repo.findById(gameId);
     if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
     if (input.title !== undefined) validateTitle(input.title);
+
+    let existingCanonical: CreatorGameCanonicalDocument | null;
+    try {
+      existingCanonical = await this.canonicalDefinitions.findBySlug(game.slug);
+    } catch {
+      throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
+    }
+
+    if (existingCanonical !== null) {
+      const scoreCheck = computeCreatorCanonicalScorePatch(existingCanonical.policy.score, input);
+      if (!scoreCheck.ok) {
+        throw new SandboxGameUseCaseFailure(scoreCheck.reason);
+      }
+    }
 
     const nowIso = new Date().toISOString();
     const updated = await this.repo.updateMetadata(gameId, input, nowIso);
@@ -779,7 +869,62 @@ export class SandboxGameUseCases {
       metadata: input as unknown as Record<string, unknown>,
       nowIso,
     });
+
+    await this.syncCreatorCanonicalAfterMetadataUpdate(updated, input);
+
     return updated;
+  }
+
+  /** The B2-sync half of updateMetadata's step 5 — see that method's own doc comment for the
+   * full ordering/failure-semantics contract this implements. Never called before D1's own
+   * update + audit have already succeeded. */
+  private async syncCreatorCanonicalAfterMetadataUpdate(
+    updated: SandboxGameRecord,
+    input: SandboxGameMetadataInput,
+  ): Promise<void> {
+    let freshCanonical: CreatorGameCanonicalDocument | null;
+    try {
+      freshCanonical = await this.canonicalDefinitions.findBySlug(updated.slug);
+    } catch {
+      throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
+    }
+
+    let nextDocument: CreatorGameCanonicalDocument;
+    if (freshCanonical !== null) {
+      const patched = patchCreatorCanonicalDocument(freshCanonical, updated, input);
+      if (!patched.ok) {
+        // The freshest possible B2 read disagrees with what the earlier (pre-D1-mutation)
+        // validation saw — a genuine concurrent-write race (see this class's updateMetadata doc
+        // comment on why this stays best-effort, not atomic). D1 is already updated and audited;
+        // surfacing this as a sync failure (rather than silently applying a stale-relative-to-B2
+        // patch) is the fail-closed choice — a retry re-validates against the new B2 state.
+        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
+      }
+      nextDocument = patched.document;
+    } else if (isCreatorScorePolicyConfigured(updated)) {
+      const mapped = mapSandboxGameRecordToCanonical(updated);
+      if (!mapped.ok) {
+        // Unreachable given the isCreatorScorePolicyConfigured check just above (both read the
+        // same four columns) — kept as an explicit fail-closed branch rather than a silent
+        // fallthrough, in case that invariant ever drifts.
+        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
+      }
+      nextDocument = mapped.document;
+    } else {
+      // Still pre-canonical — this row's ordinary, current lifecycle state. No B2 write.
+      return;
+    }
+
+    try {
+      await this.canonicalDefinitions.save(nextDocument);
+      const readBack = await this.canonicalDefinitions.findBySlug(nextDocument.slug);
+      if (readBack === null || !canonicalDocumentsEqual(readBack, nextDocument)) {
+        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
+      }
+    } catch (err) {
+      if (err instanceof SandboxGameUseCaseFailure) throw err;
+      throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
+    }
   }
 
   async setVisibility(

@@ -16,6 +16,7 @@ export * from "./domain/sandboxGames.js";
 export * from "./domain/sandboxGameBundle.js";
 export * from "./domain/creatorGameCanonicalDocument.js";
 export * from "./domain/creatorGameCanonicalMapper.js";
+export * from "./domain/creatorGameCanonicalPatch.js";
 export * from "./domain/systemGameBundle.js";
 export * from "./domain/contentHash.js";
 export * from "./domain/gameSession.js";
