@@ -56,7 +56,17 @@ on:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    # Pinned rather than ubuntu-latest specifically because this job now depends on the runner
+    # image shipping a system Google Chrome (see e2e/playwright.config.ts's own `channel: "chrome"`
+    # doc comment) — ubuntu-latest silently moving to an image that dropped it would break this
+    # job with no diff in this repo to point at. ubuntu-24.04 is confirmed to ship Chrome stable.
+    runs-on: ubuntu-24.04
+    # The install step this used to wait on (`playwright install --with-deps chromium`) was the
+    # actual bottleneck — it could stall for 10+ minutes on the runner's apt mirror before the
+    # real test (a couple of seconds) even started. There is no longer a browser/OS-dependency
+    # install step at all (see below), so a real run finishing in a couple of minutes and a hang
+    # both become obvious well within this budget instead of silently eating CI time.
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -70,13 +80,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Chromium only (see e2e/playwright.config.ts's own doc comment for why one engine is
-      # enough for what this suite actually checks) — `--with-deps` additionally installs the
-      # OS-level libraries a real Chromium needs to launch headless on a bare Ubuntu runner.
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
       # Runs entirely against a local fixture — no production B2, no play.owogg.com/owogg.com —
-      # see e2e/prepareLocalGameOrigin.ts and e2e/run.ts's own doc comments for how.
+      # see e2e/prepareLocalGameOrigin.ts and e2e/run.ts's own doc comments for how. Uses the
+      # runner's own preinstalled Chrome (playwright.config.ts's `channel: "chrome"`), so there is
+      # deliberately no `playwright install` step here — see that config's own doc comment for why.
       - name: Browser E2E
         run: pnpm e2e
