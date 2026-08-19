@@ -10,6 +10,7 @@
  */
 
 import { SANDBOX_GAME_POLICY } from "./sandboxGames.js";
+import type { BundleArchiveReader } from "../ports/sandboxGames.js";
 
 // ── Storage key layout ────────────────────────────────────────────────────────
 //
@@ -359,11 +360,41 @@ export function validateBundleEntryMetadata(entries: BundleEntryMetadata[]): voi
 }
 
 /**
+ * Full archive-to-PreparedBundle pipeline: metadata pass (zip-bomb guard, no decompression) →
+ * validate → full decompression → prepare. Extracted from GameBundlePublisher.prepare so a second
+ * publisher (SystemGameBundlePublisher — see application/systemGameBundlePublisher.ts) doesn't
+ * have to duplicate this exact validation sequence; nothing here is Creator-specific — it takes a
+ * {@link BundleArchiveReader} and raw bytes, nothing else, and both publishers pass a real archive
+ * reader implementation of the same port. See GameBundlePublisher.prepare's own doc comment for why
+ * the two passes must stay in this order (metadata-only before paying for full decompression).
+ */
+export function prepareBundleFromArchive(
+  archives: BundleArchiveReader,
+  archive: ArrayBuffer,
+): PreparedBundle {
+  let metadata: BundleEntryMetadata[];
+  try {
+    metadata = archives.readMetadata(archive);
+  } catch {
+    throw new SandboxBundleRejectionError("BUNDLE_MALFORMED");
+  }
+  validateBundleEntryMetadata(metadata);
+
+  let entries: Record<string, Uint8Array>;
+  try {
+    entries = archives.read(archive);
+  } catch {
+    throw new SandboxBundleRejectionError("BUNDLE_MALFORMED");
+  }
+  return prepareBundleEntries(entries);
+}
+
+/**
  * Turns raw, already-decompressed archive entries into the exact set of objects to publish, or
  * throws the matching rejection code. Callers are expected to have already run
  * {@link validateBundleEntryMetadata} against the archive's declared sizes *before* decompressing
- * (see GameBundlePublisher.prepare) — the checks here run again against the real bytes as defense
- * in depth, not as the primary zip-bomb guard.
+ * (see {@link prepareBundleFromArchive}) — the checks here run again against the real bytes as
+ * defense in depth, not as the primary zip-bomb guard.
  */
 export function prepareBundleEntries(entries: Record<string, Uint8Array>): PreparedBundle {
   const named: Array<{ path: string; bytes: Uint8Array }> = [];

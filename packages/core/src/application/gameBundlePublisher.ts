@@ -5,15 +5,13 @@ import type {
   BundleArchiveReader,
 } from "../ports/sandboxGames.js";
 import {
-  prepareBundleEntries,
-  validateBundleEntryMetadata,
+  prepareBundleFromArchive,
   buildBundleManifest,
   publishedObjectKey,
   publishedManifestObjectKey,
   SandboxBundleRejectionError,
   type PreparedBundle,
   type SandboxGameBundleManifest,
-  type BundleEntryMetadata,
 } from "../domain/sandboxGameBundle.js";
 
 /**
@@ -54,21 +52,7 @@ export class GameBundlePublisher {
    *      already bounded by limits already checked.
    */
   prepare(archive: ArrayBuffer): PreparedBundle {
-    let metadata: BundleEntryMetadata[];
-    try {
-      metadata = this.archives.readMetadata(archive);
-    } catch {
-      throw new SandboxBundleRejectionError("BUNDLE_MALFORMED");
-    }
-    validateBundleEntryMetadata(metadata);
-
-    let entries: Record<string, Uint8Array>;
-    try {
-      entries = this.archives.read(archive);
-    } catch {
-      throw new SandboxBundleRejectionError("BUNDLE_MALFORMED");
-    }
-    return prepareBundleEntries(entries);
+    return prepareBundleFromArchive(this.archives, archive);
   }
 
   /**
