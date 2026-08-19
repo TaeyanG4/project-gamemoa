@@ -4,11 +4,16 @@ name: Browser E2E
 # doesn't need on every push/PR — this workflow exists so an agent (or a human) driving the fast
 # CI loop never has to sit through it. Runs on:
 #   - workflow_dispatch: a manual trigger, any time.
-#   - pull_request/push to main, but only when the changed paths could plausibly affect what
-#     e2e/tests/systemGameIframe.spec.ts actually exercises (GameHost/GameFrame/IframeRuntime,
-#     the game registry, an official game's own source, the E2E harness itself, or a dependency
-#     bump via pnpm-lock.yaml) — everything else (docs, an unrelated route, a non-game API
-#     handler) skips this entirely.
+#   - pull_request/push to main, but only when the changed paths could plausibly affect what this
+#     suite actually runs — see each path's own comment below for why it's here. NOT included:
+#     apps/api/** (this suite never talks to it at all — see e2e/config.ts's own WEB_API_PORT
+#     comment: nothing listens there on purpose), game-registry/** (the harness reads the
+#     already-committed packages/core/**/*.generated.ts output, never regenerates it — a
+#     game-registry/ edit with no matching regen is exactly what `pnpm registry:check`, in the
+#     fast CI workflow, already exists to catch), and scripts/** as a whole (only three specific
+#     files under it are ever actually imported/executed by this pipeline, listed individually
+#     below — the registry generator, the architecture guard, and every other script here run
+#     nowhere near this suite).
 #
 # Deploy (deploy.yml) is gated on the "CI" workflow only, not this one — production's own
 # post-deploy "Smoke Test Web Frontend & Provenance" step is the safety net that still runs on
@@ -19,13 +24,30 @@ on:
   pull_request:
     branches: [main]
     paths: &e2e-relevant-paths
+      # The app this suite actually builds and drives via Playwright — pnpm --filter @owogg/web
+      # build is a single Vite build of the whole app, so any file under here is a real build-time
+      # dependency, not just the game-related routes/components.
       - "apps/web/**"
-      - "apps/api/**"
-      - "packages/**"
+      # apps/web's build dynamically imports all four (GAME_LOADERS in
+      # gameLoaders.generated.ts), which Vite resolves and bundles at build time regardless of
+      # which one Playwright actually clicks through — a broken aim-test/memory-test/typing-test
+      # would fail that build too, not just reaction-time's own standalone bundle.
       - "games/**"
+      # Every package here is a real, verified dependency: contracts/core/game-sdk/shared/ui are
+      # all direct deps of apps/web (and core/game-sdk/shared/ui of reaction-time too); db is
+      # pulled in transitively the moment prepareLocalGameOrigin.ts imports anything from
+      # scripts/official-game-bundle-publisher.ts, which imports BackblazeB2GameBundleRepository
+      # at module load time even though this harness never calls it.
+      - "packages/**"
+      # The harness itself — prepare/run scripts, Playwright config, the one spec file.
       - "e2e/**"
-      - "game-registry/**"
-      - "scripts/**"
+      # The exact three scripts/ files this pipeline actually runs, not the whole directory:
+      # official-game-bundle-publisher.ts (imported by prepareLocalGameOrigin.ts to build+hash
+      # the local reaction-time fixture) and prepare-web-build.ts/post-web-build.ts (apps/web's
+      # own "build" script runs both around react-router build).
+      - "scripts/official-game-bundle-publisher.ts"
+      - "scripts/prepare-web-build.ts"
+      - "scripts/post-web-build.ts"
       - "pnpm-lock.yaml"
       - ".github/workflows/e2e.yml"
   push:
