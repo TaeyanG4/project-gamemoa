@@ -171,9 +171,11 @@ test("GET /api/games/:slug 404s the same way for an unknown slug and a PRIVATE c
 });
 
 test("GET /api/games/:slug: SYSTEM wins when a creator game claims an official slug", async () => {
-  // The P-03 gap made concrete: nothing today stops a sandbox_games row from using
-  // "reaction-time" as its slug (assertUniqueSlugs only guards the SYSTEM registry). This is the
-  // read-path guarantee resolvePublicGame provides — not a fix for the registration-time gap.
+  // P-03 is guarded at registration time too now (SandboxGameUseCases.createGame rejects a
+  // SYSTEM-slug collision with SLUG_TAKEN — see packages/core/test/sandboxGameUseCases.test.ts).
+  // This is the read-path guarantee resolvePublicGame provides as a second layer: a row that
+  // predates that guard, or reaches sandbox_games some other way, must still never be served
+  // under the SYSTEM slug.
   const { db } = createDb([
     {
       id: 1,

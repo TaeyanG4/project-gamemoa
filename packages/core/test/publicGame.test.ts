@@ -151,9 +151,9 @@ test("mergePublicGames: a creator game sharing a SYSTEM slug is dropped, leaving
   // The list-level counterpart to resolvePublicGame's single-slug policy: SYSTEM always wins, so
   // the merged list must never show the same slug twice, and a lookup of that slug via
   // GET /api/games/:slug (which goes through resolvePublicGame, not this function) must agree
-  // with whichever single entry appears here. Not a fix for the underlying P-03 collision gap —
-  // creator registration still doesn't check against the SYSTEM registry — only a guarantee that
-  // the read side never contradicts itself.
+  // with whichever single entry appears here. Registration itself is guarded too now
+  // (SandboxGameUseCases.createGame rejects a SYSTEM-slug collision with SLUG_TAKEN) — this test
+  // is the read-side guarantee that holds even for a row that predates that guard.
   const impostor = sandboxRecord({ slug: "reaction-time", title: "가짜 반응속도 게임" });
   const legitimate = sandboxRecord({ slug: "ball-dodge" });
 
@@ -186,10 +186,10 @@ test("resolvePublicGame returns null when neither resolves", () => {
   assert.equal(resolvePublicGame(null, null), null);
 });
 
-test("resolvePublicGame: SYSTEM always wins a same-slug collision — the P-03 gap is not fixed here, only made safe to read through", () => {
-  // A creator game claiming an official slug is not something registration prevents today
-  // (assertUniqueSlugs only guarantees uniqueness within the SYSTEM registry). This test is the
-  // guarantee this function DOES make: even if that collision exists, resolving the official slug
+test("resolvePublicGame: SYSTEM always wins a same-slug collision — a second guarantee alongside the P-03 registration guard, not a replacement for it", () => {
+  // SandboxGameUseCases.createGame now rejects a SYSTEM-slug collision at registration time
+  // (SLUG_TAKEN). This test is the read-side guarantee that holds regardless: even if a colliding
+  // row exists (created before that guard, or by some other path), resolving the official slug
   // must never return the impostor's content.
   const impostor = sandboxRecord({ slug: "reaction-time", title: "가짜 반응속도 게임" });
   const result = resolvePublicGame(REACTION_TIME, impostor);

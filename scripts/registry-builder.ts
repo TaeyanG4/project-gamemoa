@@ -15,8 +15,8 @@ export interface GameEntry {
 export interface RegistryBuildResult {
   coreRegistryCode: string;
   webLoaderCode: string;
-  /** `GAME_DEFINITIONS`, built from game-registry/. Generated and checked in, consumed by nothing
-   * yet — see loadGameDefinitions. */
+  /** `GAME_DEFINITIONS`, built from game-registry/. Generated and checked in; the composition
+   * root wires it into StaticGameRegistry (apps/api/src/container.ts) — see loadGameDefinitions. */
   gameDefinitionsCode: string;
   gameEntries: GameEntry[];
   definitions: GameDefinition[];
@@ -25,11 +25,14 @@ export interface RegistryBuildResult {
 /**
  * Reads `game-registry/games/<slug>/{info,policy}.json` into validated GameDefinitions.
  *
- * This directory is the canonical description of SYSTEM-owned games. It does not yet feed the
- * runtime — `GAME_MANIFESTS` (built from `games/*​/src/manifest.ts`, below) is still what score
- * validation and the admin kill switch read. Both are generated here so that
+ * This directory is the canonical description of SYSTEM-owned games. It does feed the runtime —
+ * the composition root wires `StaticGameRegistry(GAME_DEFINITIONS)` as the `GameRegistry`
+ * ScoreUseCases/GameSettingsUseCases resolve games through (apps/api/src/container.ts) —
+ * alongside `GAME_MANIFESTS` (built from `games/*​/src/manifest.ts`, below), which everything not
+ * yet moved onto that port still reads directly. Both are generated here so that
  * assertDefinitionsMatchManifests can hold them to agreement on every build; that agreement is
- * what makes switching consumers over later a small change instead of a leap of faith.
+ * what makes switching the remaining consumers over later a small change instead of a leap of
+ * faith.
  *
  * Creator-owned games are deliberately absent: where their canonical description will live is an
  * open decision, and nothing here presumes an answer.
@@ -168,6 +171,7 @@ function diffDefinitionAgainstManifest(
   );
   compare("supportsReplay", definition.supportsReplay, manifest.supportsReplay);
   compare("difficulty", definition.difficulty, manifest.difficulty);
+  compare("presentation", definition.presentation, manifest.presentation);
   compare("policy.score", definition.policy.score, manifest.scoreConfig ?? null);
   compare("policy.leaderboard", definition.policy.leaderboard, manifest.supportsLeaderboard);
   compare("policy.requiresAuth", definition.policy.requiresAuth, manifest.requiresAuth);
@@ -325,8 +329,10 @@ ${loaderEntries}
 // Compiled from game-registry/games/<slug>/{info,policy}.json. Edit those files, then run
 // \`pnpm generate:registry\`; \`pnpm registry:check\` fails the build if this drifts from them.
 //
-// SYSTEM-owned games only. Nothing reads this yet — GAME_MANIFESTS (gameRegistry.generated.ts)
-// is still the runtime source of truth for score policy and the admin kill switch.
+// SYSTEM-owned games only. The composition root wires this into StaticGameRegistry
+// (apps/api/src/container.ts), which ScoreUseCases/GameSettingsUseCases resolve games through —
+// GAME_MANIFESTS (gameRegistry.generated.ts) remains the source for everything not yet moved
+// onto that port.
 import type { GameDefinition } from "../modules/game/domain/gameDefinition.js";
 
 export const GAME_DEFINITIONS: GameDefinition[] = ${JSON.stringify(definitions, null, 2)};

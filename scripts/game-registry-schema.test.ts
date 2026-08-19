@@ -12,6 +12,7 @@ import {
 } from "./registry-builder.js";
 import type { GameDefinition } from "../packages/core/src/modules/game/domain/gameDefinition.js";
 import type { GameManifest } from "../packages/game-sdk/src/contracts/manifest.js";
+import type { GamePresentation } from "../packages/game-sdk/src/contracts/presentation.js";
 
 const VALID_INFO = {
   slug: "sample-game",
@@ -228,6 +229,223 @@ test("an empty difficulty level list is rejected", () => {
   );
 });
 
+// ── presentation ─────────────────────────────────────────────────────────────
+//
+// Same synthetic-fixture pattern as the rest of this file — these values are never asserted
+// against a real shipped game's content, only against the schema's own validation rules.
+
+const RESPONSIVE_PRESENTATION = {
+  viewport: { mode: "responsive", minWidth: 320, maxWidth: 1920 },
+  fullscreen: { supported: true, recommended: false },
+  mobile: { support: "supported", orientation: "any" },
+} as const satisfies GamePresentation;
+
+const FIXED_PRESENTATION = {
+  viewport: { mode: "fixed", preferredWidth: 640, preferredHeight: 360 },
+  fullscreen: { supported: false },
+  mobile: { support: "unsupported" },
+} as const satisfies GamePresentation;
+
+test("presentation is optional, and parses when present", () => {
+  assert.equal(parse().presentation, undefined);
+  const withPresentation = parse({ ...VALID_INFO, presentation: RESPONSIVE_PRESENTATION });
+  assert.equal(withPresentation.presentation?.viewport.mode, "responsive");
+  assert.equal(withPresentation.presentation?.fullscreen.supported, true);
+  assert.equal(withPresentation.presentation?.mobile.support, "supported");
+});
+
+test("fixed mode parses with a design resolution", () => {
+  const withPresentation = parse({ ...VALID_INFO, presentation: FIXED_PRESENTATION });
+  assert.equal(withPresentation.presentation?.viewport.mode, "fixed");
+  assert.equal(
+    (withPresentation.presentation?.viewport as { preferredWidth: number }).preferredWidth,
+    640,
+  );
+});
+
+test("fixed mode without a design resolution is rejected — the same invariant GamePresentationFixedViewport enforces at a TypeScript call site", () => {
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: { ...FIXED_PRESENTATION, viewport: { mode: "fixed" } },
+      }),
+    /mode "fixed" requires both preferredWidth and preferredHeight/,
+  );
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...FIXED_PRESENTATION,
+          viewport: { mode: "fixed", preferredWidth: 640 },
+        },
+      }),
+    /mode "fixed" requires both preferredWidth and preferredHeight/,
+  );
+});
+
+test("viewport.mode rejects an unknown value", () => {
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: { ...RESPONSIVE_PRESENTATION, viewport: { mode: "adaptive" } },
+      }),
+    /mode must be one of responsive, fixed/,
+  );
+});
+
+test("viewport dimensions must be positive, finite numbers", () => {
+  for (const bad of [0, -100, NaN, Infinity]) {
+    assertRejects(
+      () =>
+        parse({
+          ...VALID_INFO,
+          presentation: {
+            ...RESPONSIVE_PRESENTATION,
+            viewport: { mode: "responsive", minWidth: bad },
+          },
+        }),
+      /minWidth must be a positive number/,
+    );
+  }
+});
+
+test("minWidth/minHeight must not exceed maxWidth/maxHeight", () => {
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          viewport: { mode: "responsive", minWidth: 1000, maxWidth: 500 },
+        },
+      }),
+    /minWidth \(1000\) must be <= maxWidth \(500\)/,
+  );
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          viewport: { mode: "responsive", minHeight: 1000, maxHeight: 500 },
+        },
+      }),
+    /minHeight \(1000\) must be <= maxHeight \(500\)/,
+  );
+});
+
+test("preferred dimensions must not contradict min/max bounds", () => {
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          viewport: { mode: "responsive", preferredWidth: 100, minWidth: 320 },
+        },
+      }),
+    /preferredWidth \(100\) is below minWidth \(320\)/,
+  );
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          viewport: { mode: "responsive", preferredHeight: 4000, maxHeight: 1080 },
+        },
+      }),
+    /preferredHeight \(4000\) is above maxHeight \(1080\)/,
+  );
+});
+
+test("fullscreen rejects recommended: true when supported is false — the fields would otherwise contradict each other", () => {
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          fullscreen: { supported: false, recommended: true },
+        },
+      }),
+    /recommended cannot be true when supported is false/,
+  );
+});
+
+test("mobile.support and mobile.orientation reject unknown values", () => {
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: { ...RESPONSIVE_PRESENTATION, mobile: { support: "great" } },
+      }),
+    /support must be one of supported, experimental, unsupported/,
+  );
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          mobile: { support: "supported", orientation: "diagonal" },
+        },
+      }),
+    /orientation must be one of any, portrait, landscape/,
+  );
+});
+
+test("presentation, viewport, fullscreen, and mobile each reject an unrecognised nested field", () => {
+  assertRejects(
+    () => parse({ ...VALID_INFO, presentation: { ...RESPONSIVE_PRESENTATION, futureField: true } }),
+    /presentation: unknown field "futureField"/,
+  );
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          viewport: { ...RESPONSIVE_PRESENTATION.viewport, aspectRatio: "16:9" },
+        },
+      }),
+    /presentation\.viewport: unknown field "aspectRatio"/,
+  );
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          fullscreen: { ...RESPONSIVE_PRESENTATION.fullscreen, required: true },
+        },
+      }),
+    /presentation\.fullscreen: unknown field "required"/,
+  );
+  assertRejects(
+    () =>
+      parse({
+        ...VALID_INFO,
+        presentation: {
+          ...RESPONSIVE_PRESENTATION,
+          mobile: { ...RESPONSIVE_PRESENTATION.mobile, controlsScheme: "virtual-joystick" },
+        },
+      }),
+    /presentation\.mobile: unknown field "controlsScheme"/,
+  );
+});
+
+test("presentation requires all three of viewport, fullscreen, and mobile when present at all", () => {
+  const { fullscreen: _fullscreen, ...withoutFullscreen } = RESPONSIVE_PRESENTATION;
+  assertRejects(
+    () => parse({ ...VALID_INFO, presentation: withoutFullscreen }),
+    /fullscreen is required/,
+  );
+});
+
 // ── registry-wide invariants ─────────────────────────────────────────────────
 
 function definitionWithSlug(slug: string): GameDefinition {
@@ -262,6 +480,7 @@ function manifestFor(definition: GameDefinition): GameManifest {
     supportsReplay: definition.supportsReplay,
     version: "0.0.1",
     ...(definition.policy.score ? { scoreConfig: definition.policy.score } : {}),
+    ...(definition.presentation ? { presentation: definition.presentation } : {}),
   };
 }
 
@@ -293,6 +512,16 @@ test("a score policy diverging from the manifest's scoreConfig is caught", () =>
     },
   };
   assert.throws(() => assertDefinitionsMatchManifests([definition], [drifted]), /policy\.score/);
+});
+
+test("a presentation diverging from the manifest's is caught", () => {
+  const definition = parse({ ...VALID_INFO, presentation: RESPONSIVE_PRESENTATION });
+  assert.doesNotThrow(() =>
+    assertDefinitionsMatchManifests([definition], [manifestFor(definition)]),
+  );
+
+  const drifted: GameManifest = { ...manifestFor(definition), presentation: FIXED_PRESENTATION };
+  assert.throws(() => assertDefinitionsMatchManifests([definition], [drifted]), /presentation:/);
 });
 
 test("a game present in one source but not the other is caught", () => {

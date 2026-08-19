@@ -20,6 +20,12 @@ import type {
   ScoreConfig,
 } from "../packages/game-sdk/src/contracts/manifest.js";
 import type {
+  GamePresentation,
+  GamePresentationFullscreen,
+  GamePresentationMobile,
+  GamePresentationViewport,
+} from "../packages/game-sdk/src/contracts/presentation.js";
+import type {
   GameDefinition,
   GamePolicy,
 } from "../packages/core/src/modules/game/domain/gameDefinition.js";
@@ -97,6 +103,32 @@ function optionalInteger(
 function requireBoolean(ctx: FieldContext, obj: Record<string, unknown>, field: string): boolean {
   const value = obj[field];
   if (typeof value !== "boolean") fail(ctx, `${field} is required and must be a boolean`);
+  return value;
+}
+
+function optionalBoolean(
+  ctx: FieldContext,
+  obj: Record<string, unknown>,
+  field: string,
+): boolean | undefined {
+  const value = obj[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean") fail(ctx, `${field} must be a boolean when present`);
+  return value;
+}
+
+/** Viewport dimensions are pixel sizes — finite and > 0, not necessarily integers (matching
+ * GamePresentationViewport's `number` fields, which don't restrict to integers either). */
+function optionalPositiveNumber(
+  ctx: FieldContext,
+  obj: Record<string, unknown>,
+  field: string,
+): number | undefined {
+  const value = obj[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    fail(ctx, `${field} must be a positive number when present`);
+  }
   return value;
 }
 
@@ -217,6 +249,156 @@ function parseScore(ctx: FieldContext, value: unknown): ScoreConfig {
   };
 }
 
+const VIEWPORT_MODES = ["responsive", "fixed"] as const;
+const VIEWPORT_KEYS = [
+  "mode",
+  "preferredWidth",
+  "preferredHeight",
+  "minWidth",
+  "minHeight",
+  "maxWidth",
+  "maxHeight",
+] as const;
+const FULLSCREEN_KEYS = ["supported", "recommended"] as const;
+const MOBILE_SUPPORT = ["supported", "experimental", "unsupported"] as const;
+const MOBILE_ORIENTATIONS = ["any", "portrait", "landscape"] as const;
+const MOBILE_KEYS = ["support", "orientation"] as const;
+const PRESENTATION_KEYS = ["viewport", "fullscreen", "mobile"] as const;
+
+/**
+ * See GamePresentationViewport's own doc comment (packages/game-sdk/src/contracts/presentation.ts)
+ * for what each field means. This is the runtime half of the invariant that type only enforces at
+ * the literal call site: `mode: "fixed"` requires both preferredWidth and preferredHeight here too,
+ * plus the min/max relationships and preferred-doesn't-contradict-bounds checks the type can't
+ * express at all. Positivity and min<=max are checked; arbitrary platform maximums (e.g. 4096) are
+ * deliberately not — no such ceiling exists yet.
+ */
+function parseViewport(ctx: FieldContext, value: unknown): GamePresentationViewport {
+  const viewportCtx = { file: `${ctx.file} presentation.viewport` };
+  const raw = asRecord(viewportCtx, value);
+  rejectUnknownKeys(viewportCtx, raw, VIEWPORT_KEYS);
+
+  const mode = requireString(viewportCtx, raw, "mode");
+  if (!(VIEWPORT_MODES as readonly string[]).includes(mode)) {
+    fail(viewportCtx, `mode must be one of ${VIEWPORT_MODES.join(", ")} (got "${mode}")`);
+  }
+
+  const preferredWidth = optionalPositiveNumber(viewportCtx, raw, "preferredWidth");
+  const preferredHeight = optionalPositiveNumber(viewportCtx, raw, "preferredHeight");
+  const minWidth = optionalPositiveNumber(viewportCtx, raw, "minWidth");
+  const minHeight = optionalPositiveNumber(viewportCtx, raw, "minHeight");
+  const maxWidth = optionalPositiveNumber(viewportCtx, raw, "maxWidth");
+  const maxHeight = optionalPositiveNumber(viewportCtx, raw, "maxHeight");
+
+  if (minWidth !== undefined && maxWidth !== undefined && minWidth > maxWidth) {
+    fail(viewportCtx, `minWidth (${minWidth}) must be <= maxWidth (${maxWidth})`);
+  }
+  if (minHeight !== undefined && maxHeight !== undefined && minHeight > maxHeight) {
+    fail(viewportCtx, `minHeight (${minHeight}) must be <= maxHeight (${maxHeight})`);
+  }
+  if (preferredWidth !== undefined && minWidth !== undefined && preferredWidth < minWidth) {
+    fail(viewportCtx, `preferredWidth (${preferredWidth}) is below minWidth (${minWidth})`);
+  }
+  if (preferredWidth !== undefined && maxWidth !== undefined && preferredWidth > maxWidth) {
+    fail(viewportCtx, `preferredWidth (${preferredWidth}) is above maxWidth (${maxWidth})`);
+  }
+  if (preferredHeight !== undefined && minHeight !== undefined && preferredHeight < minHeight) {
+    fail(viewportCtx, `preferredHeight (${preferredHeight}) is below minHeight (${minHeight})`);
+  }
+  if (preferredHeight !== undefined && maxHeight !== undefined && preferredHeight > maxHeight) {
+    fail(viewportCtx, `preferredHeight (${preferredHeight}) is above maxHeight (${maxHeight})`);
+  }
+
+  const bounds = {
+    ...(minWidth !== undefined ? { minWidth } : {}),
+    ...(minHeight !== undefined ? { minHeight } : {}),
+    ...(maxWidth !== undefined ? { maxWidth } : {}),
+    ...(maxHeight !== undefined ? { maxHeight } : {}),
+  };
+
+  if (mode === "fixed") {
+    // The type-level invariant (GamePresentationFixedViewport) already requires both fields at
+    // any TypeScript call site; this is the same requirement enforced against untyped JSON.
+    if (preferredWidth === undefined || preferredHeight === undefined) {
+      fail(viewportCtx, `mode "fixed" requires both preferredWidth and preferredHeight`);
+    }
+    return { mode: "fixed", preferredWidth, preferredHeight, ...bounds };
+  }
+
+  return {
+    mode: "responsive",
+    ...(preferredWidth !== undefined ? { preferredWidth } : {}),
+    ...(preferredHeight !== undefined ? { preferredHeight } : {}),
+    ...bounds,
+  };
+}
+
+function parseFullscreen(ctx: FieldContext, value: unknown): GamePresentationFullscreen {
+  const fsCtx = { file: `${ctx.file} presentation.fullscreen` };
+  const raw = asRecord(fsCtx, value);
+  rejectUnknownKeys(fsCtx, raw, FULLSCREEN_KEYS);
+
+  const supported = requireBoolean(fsCtx, raw, "supported");
+  const recommended = optionalBoolean(fsCtx, raw, "recommended");
+  if (recommended === true && !supported) {
+    fail(fsCtx, `recommended cannot be true when supported is false`);
+  }
+
+  return {
+    supported,
+    ...(recommended !== undefined ? { recommended } : {}),
+  };
+}
+
+function parseMobile(ctx: FieldContext, value: unknown): GamePresentationMobile {
+  const mobileCtx = { file: `${ctx.file} presentation.mobile` };
+  const raw = asRecord(mobileCtx, value);
+  rejectUnknownKeys(mobileCtx, raw, MOBILE_KEYS);
+
+  const support = requireString(mobileCtx, raw, "support");
+  if (!(MOBILE_SUPPORT as readonly string[]).includes(support)) {
+    fail(mobileCtx, `support must be one of ${MOBILE_SUPPORT.join(", ")} (got "${support}")`);
+  }
+
+  const orientation = optionalString(mobileCtx, raw, "orientation");
+  if (
+    orientation !== undefined &&
+    !(MOBILE_ORIENTATIONS as readonly string[]).includes(orientation)
+  ) {
+    fail(
+      mobileCtx,
+      `orientation must be one of ${MOBILE_ORIENTATIONS.join(", ")} (got "${orientation}")`,
+    );
+  }
+
+  return {
+    support: support as GamePresentationMobile["support"],
+    ...(orientation !== undefined
+      ? { orientation: orientation as GamePresentationMobile["orientation"] }
+      : {}),
+  };
+}
+
+/** `presentation` is entirely optional — omitted, a GameDefinition behaves exactly as it always
+ * has (see GamePresentation's own doc comment). Present, all three of viewport/fullscreen/mobile
+ * are required, matching the type: there is no such thing as a presentation with only some of its
+ * sections declared. */
+function parsePresentation(ctx: FieldContext, value: unknown): GamePresentation {
+  const presCtx = { file: `${ctx.file} presentation` };
+  const raw = asRecord(presCtx, value);
+  rejectUnknownKeys(presCtx, raw, PRESENTATION_KEYS);
+
+  if (!("viewport" in raw)) fail(presCtx, "viewport is required");
+  if (!("fullscreen" in raw)) fail(presCtx, "fullscreen is required");
+  if (!("mobile" in raw)) fail(presCtx, "mobile is required");
+
+  return {
+    viewport: parseViewport(ctx, raw.viewport),
+    fullscreen: parseFullscreen(ctx, raw.fullscreen),
+    mobile: parseMobile(ctx, raw.mobile),
+  };
+}
+
 const INFO_KEYS = [
   "slug",
   "title",
@@ -234,6 +416,7 @@ const INFO_KEYS = [
   "estimatedRoundSeconds",
   "supportsReplay",
   "difficulty",
+  "presentation",
 ] as const;
 
 const POLICY_KEYS = ["score", "leaderboard", "xpPerCompletion", "requiresAuth"] as const;
@@ -311,6 +494,8 @@ export function parseGameDefinition(input: {
   const estimatedRoundSeconds = optionalInteger(ctx, obj, "estimatedRoundSeconds");
   const difficulty =
     obj.difficulty === undefined ? undefined : parseDifficulty(ctx, obj.difficulty);
+  const presentation =
+    obj.presentation === undefined ? undefined : parsePresentation(ctx, obj.presentation);
 
   return {
     slug,
@@ -330,6 +515,7 @@ export function parseGameDefinition(input: {
     ...(estimatedRoundSeconds !== undefined ? { estimatedRoundSeconds } : {}),
     ...(difficulty !== undefined ? { difficulty } : {}),
     supportsReplay: requireBoolean(ctx, obj, "supportsReplay"),
+    ...(presentation !== undefined ? { presentation } : {}),
     policy: parseGamePolicy(input.policyFile, input.policy),
   };
 }
