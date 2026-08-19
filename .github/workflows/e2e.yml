@@ -1,0 +1,60 @@
+name: Browser E2E
+
+# Split out of ci.yml: Playwright's Chromium install + a real browser run add several minutes CI
+# doesn't need on every push/PR — this workflow exists so an agent (or a human) driving the fast
+# CI loop never has to sit through it. Runs on:
+#   - workflow_dispatch: a manual trigger, any time.
+#   - pull_request/push to main, but only when the changed paths could plausibly affect what
+#     e2e/tests/systemGameIframe.spec.ts actually exercises (GameHost/GameFrame/IframeRuntime,
+#     the game registry, an official game's own source, the E2E harness itself, or a dependency
+#     bump via pnpm-lock.yaml) — everything else (docs, an unrelated route, a non-game API
+#     handler) skips this entirely.
+#
+# Deploy (deploy.yml) is gated on the "CI" workflow only, not this one — production's own
+# post-deploy "Smoke Test Web Frontend & Provenance" step is the safety net that still runs on
+# every deploy; this suite is a slower, parallel signal on top of that, not a merge/deploy gate.
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    branches: [main]
+    paths: &e2e-relevant-paths
+      - "apps/web/**"
+      - "apps/api/**"
+      - "packages/**"
+      - "games/**"
+      - "e2e/**"
+      - "game-registry/**"
+      - "scripts/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/e2e.yml"
+  push:
+    branches: [main]
+    paths: *e2e-relevant-paths
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Chromium only (see e2e/playwright.config.ts's own doc comment for why one engine is
+      # enough for what this suite actually checks) — `--with-deps` additionally installs the
+      # OS-level libraries a real Chromium needs to launch headless on a bare Ubuntu runner.
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Runs entirely against a local fixture — no production B2, no play.owogg.com/owogg.com —
+      # see e2e/prepareLocalGameOrigin.ts and e2e/run.ts's own doc comments for how.
+      - name: Browser E2E
+        run: pnpm e2e
