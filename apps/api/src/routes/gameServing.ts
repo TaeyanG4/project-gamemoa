@@ -4,9 +4,12 @@ import {
   BUNDLE_ENTRY_PATH,
   normalizeBundleEntryPath,
   publishedVersionPrefix,
+  resolveBundleContentType,
+  systemGamePublishedManifestObjectKey,
+  systemGamePublishedObjectKey,
   type ServableBundleFile,
 } from "@owogg/core";
-import { createContainer } from "../container.js";
+import { createContainer, gameRegistry } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { readB2Config } from "./devGames.js";
 import { isLocalhost } from "./auth.js";
@@ -51,17 +54,28 @@ const VERSIONED_ASSET_BROWSER_MAX_AGE_SECONDS = 3600;
 const LIVE_RESOLVER_MAX_AGE_SECONDS = 60;
 
 /**
- * Public sandbox-game delivery. Two routers with deliberately different cache semantics:
+ * Public sandbox-game delivery. Three routers with deliberately different cache semantics:
  *
- *   /play/:slug                     → mutable: resolves the game's *current* live version and
- *                                     redirects to that version's entry point.
- *   /games/:gameId/:versionId/*     → immutable: one specific published version's files, served
- *                                     straight from object storage through Cloudflare's cache.
+ *   /play/:slug                          → mutable: resolves a CREATOR game's *current* live
+ *                                          version and redirects to that version's entry point.
+ *   /games/:gameId/:versionId/*          → immutable: one specific published CREATOR version's
+ *                                          files, straight from object storage through
+ *                                          Cloudflare's cache. D1-identified (gameId/versionId).
+ *   /official-games/:slug/:version/*     → immutable: one specific published SYSTEM version's
+ *                                          files — the exact-version counterpart to the route
+ *                                          above, for bundles SystemGameBundlePublisher wrote
+ *                                          (feat/official-game-publisher-foundation). Identified
+ *                                          by (slug, version) — version is that bundle's own
+ *                                          content hash, never a D1 row (SYSTEM games have none —
+ *                                          see modules/game/domain/gameOwner.ts). No mutable
+ *                                          "/play"-style live resolver for SYSTEM games exists
+ *                                          yet — deliberately out of this PR's scope
+ *                                          (feat/official-game-serving-foundation).
  *
- * Both are meant to live on their own hostname (`GAME_ORIGIN`, e.g. play.owogg.com) rather than the
- * main site's, which is what makes the iframe a real origin boundary. Neither the hostname nor the
- * frontend's is hardcoded: this file only ever reads FRONTEND_URL, for the CSP that names who may
- * frame a game.
+ * All three are meant to live on their own hostname (`GAME_ORIGIN`, e.g. play.owogg.com) rather
+ * than the main site's, which is what makes the iframe a real origin boundary. Neither the
+ * hostname nor the frontend's is hardcoded: this file only ever reads FRONTEND_URL, for the CSP
+ * that names who may frame a game.
  *
  * What this code does *not* do, and must never start doing: run game code. A response here is
  * bytes — HTML, JS, WASM, textures, audio. Every frame, physics step, and AI decision happens in
@@ -71,6 +85,7 @@ const LIVE_RESOLVER_MAX_AGE_SECONDS = 60;
  */
 export const gameServingRouter = new Hono<ApiEnv>();
 export const publishedGameAssetsRouter = new Hono<ApiEnv>();
+export const officialGameAssetsRouter = new Hono<ApiEnv>();
 
 /**
  * Origin boundary enforcement (2026-08-17 beta hardening) — registered first on both routers, so
@@ -104,6 +119,7 @@ const gameOriginHostGuard: MiddlewareHandler<ApiEnv> = async (c, next) => {
 
 gameServingRouter.use("*", gameOriginHostGuard);
 publishedGameAssetsRouter.use("*", gameOriginHostGuard);
+officialGameAssetsRouter.use("*", gameOriginHostGuard);
 
 // See middleware/edgeCache.ts's safety note: caching is sound on both routers because responses
 // depend only on the URL — no cookies are read, and nothing varies per viewer.
@@ -185,6 +201,38 @@ const publishedAssetAvailabilityGate: MiddlewareHandler<ApiEnv> = async (c, next
 publishedGameAssetsRouter.use("/:gameId/:versionId/:rest{.+}", publishedAssetAvailabilityGate);
 publishedGameAssetsRouter.use(
   "/:gameId/:versionId/:rest{.+}",
+  gameAssetEdgeCache({
+    edgeTtlSeconds: IMMUTABLE_MAX_AGE_SECONDS,
+    policyFor: versionedAssetCachePolicy,
+  }),
+);
+
+/**
+ * SYSTEM counterpart to publishedAssetAvailabilityGate — same "before the byte cache" positioning
+ * and the same reason: a slug that stops being a real SYSTEM game (removed from game-registry/ in
+ * some future deploy) must not keep being served out of the byte cache. Unlike Creator's gate,
+ * this needs no separate caches.default layer of its own: gameRegistry.findBySlug is a plain
+ * in-memory Map lookup (StaticGameRegistry, compiled from game-registry/ at build time) — there is
+ * no D1 read here to shield with a short-lived cache entry, so checking it fresh on every request
+ * costs nothing extra to begin with.
+ *
+ * Deliberately does NOT check whether `version` was actually published — that's the manifest-read
+ * inside the route handler below (see its own comment), reached only on a byte-cache MISS. Unlike
+ * a game's PUBLIC/PRIVATE flag, a specific (slug, version) manifest's existence never becomes
+ * false once true (content-hash-addressed, immutable — see systemGameBundle.ts), so re-checking
+ * it ahead of an already-cached HIT would guard against a state change that can't happen.
+ */
+const officialGameAvailabilityGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
+  const slug = c.req.param("slug");
+  if (!slug) return notFound(c);
+  const definition = await gameRegistry.findBySlug(slug);
+  if (!definition) return notFound(c);
+  await next();
+};
+
+officialGameAssetsRouter.use("/:slug/:version/:rest{.+}", officialGameAvailabilityGate);
+officialGameAssetsRouter.use(
+  "/:slug/:version/:rest{.+}",
   gameAssetEdgeCache({
     edgeTtlSeconds: IMMUTABLE_MAX_AGE_SECONDS,
     policyFor: versionedAssetCachePolicy,
@@ -471,6 +519,64 @@ publishedGameAssetsRouter.get("/:gameId/:versionId/:rest{.+}", async (c) => {
   const { sandboxGameUseCases } = createContainer(c.env.DB, readB2Config(c.env));
   const file = await sandboxGameUseCases.resolvePublishedFile({ gameId, versionId, path });
   if (!file) return notFound(c);
+
+  return fileResponse(
+    file,
+    path,
+    versionedAssetCachePolicy(path),
+    c.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
+  );
+});
+
+// ── /official-games/:slug/:version/* — immutable published SYSTEM assets ─────
+
+/**
+ * The SYSTEM counterpart to the Creator route above — same policy (versionedAssetCachePolicy,
+ * fileResponse, the shared CORS/CSP/cache header logic), different identity and no D1 read of any
+ * SYSTEM-owned row (see officialGameAvailabilityGate's own comment — there is no such row to
+ * read). `c.env.DB` is still required here, same as every other handler in this file: not because
+ * this route reads SYSTEM data from it, but because gameBundleStorageRepo (the B2 access this
+ * route actually needs) is only ever constructed through createContainer, this file's one
+ * consistent way of reaching infrastructure — see apps/api/src/container.ts's own doc comment on
+ * being the composition root. `gameRegistry` (the actual SYSTEM-game check) is a plain
+ * D1-independent singleton import, used directly in officialGameAvailabilityGate above.
+ *
+ * Two checks, in order, mirroring the two facts Creator's resolvePublishedFile checks (game
+ * exists + version is actually approved/published) with SYSTEM's own equivalents:
+ *   1. The manifest for (slug, version) exists — SystemGameBundlePublisher always writes it LAST,
+ *      so its presence is the proof this exact version was genuinely, completely published (not
+ *      an interrupted publish that only got partway through writing files). No D1 row means the
+ *      manifest itself is the only source of truth for "was this really published."
+ *   2. The specific requested file object exists — same as Creator, no manifest file-list lookup,
+ *      just a direct key read (an absent object still 404s the same way either way).
+ * `version` is trusted to be exactly what SystemGameBundlePublisher.publish() was given: a real
+ * bundle's own sha256 content hash, never an arbitrary caller-supplied string — see
+ * systemGameBundle.ts's own doc comment. This route does not (and structurally cannot) verify
+ * that itself; it only ever reads whatever object happens to exist at the resulting key, which is
+ * exactly as safe as the Creator path's own trust in a D1-assigned versionId.
+ */
+officialGameAssetsRouter.get("/:slug/:version/:rest{.+}", async (c) => {
+  if (!c.env?.DB) return notFound(c);
+
+  const slug = c.req.param("slug");
+  const version = c.req.param("version");
+  const path = normalizeBundleEntryPath(decodeURIComponent(c.req.param("rest")));
+  if (path === null) return notFound(c);
+
+  const { gameBundleStorageRepo } = createContainer(c.env.DB, readB2Config(c.env));
+
+  const manifestBytes = await gameBundleStorageRepo.getObject(
+    systemGamePublishedManifestObjectKey(slug, version),
+  );
+  if (!manifestBytes) return notFound(c);
+
+  const bytes = await gameBundleStorageRepo.getObject(
+    systemGamePublishedObjectKey(slug, version, path),
+  );
+  if (!bytes) return notFound(c);
+
+  const { contentType, contentEncoding } = resolveBundleContentType(path);
+  const file: ServableBundleFile = { bytes, contentType, contentEncoding, published: true };
 
   return fileResponse(
     file,
