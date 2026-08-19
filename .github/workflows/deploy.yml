@@ -123,15 +123,23 @@ jobs:
             CHZZK_REDIRECT_URI:${{ vars.CHZZK_REDIRECT_URI || '' }}
             SOOP_CLIENT_ID:${{ vars.SOOP_CLIENT_ID || '' }}
             SOOP_REDIRECT_URI:${{ vars.SOOP_REDIRECT_URI || '' }}
-          # DISCORD_CLIENT_SECRET is always expected to be configured. The Creator/Admin secrets
-          # below are genuinely optional and are uploaded separately (see next step) —
-          # wrangler-action's `secrets:` input hard-fails the whole action when a listed secret
-          # resolves to an empty string, which every optional secret does until an operator
-          # configures it.
+          # DISCORD_CLIENT_SECRET and GAME_SESSION_SECRET are always expected to be configured —
+          # both go through this list specifically because wrangler-action's `secrets:` input hard
+          # -fails the whole action when a listed secret resolves to an empty string, which is
+          # exactly the loud, fail-closed behavior a required secret needs (a Production deploy
+          # must not silently ship a Worker missing either one). GAME_SESSION_SECRET signs/verifies
+          # the Game Session tokens Creator score acceptance depends on
+          # (packages/core/src/domain/gameSession.ts) — without it, POST /api/games/:slug/session
+          # fails closed with 503 in Production (apps/api/src/routes/games.ts), which is the exact
+          # gap this line closes. The Creator/Admin secrets below are genuinely optional and are
+          # uploaded separately (see next step), which is why they're NOT listed here — this list
+          # is only for secrets a Production deploy cannot proceed without.
           secrets: |
             DISCORD_CLIENT_SECRET
+            GAME_SESSION_SECRET
         env:
           DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
+          GAME_SESSION_SECRET: ${{ secrets.GAME_SESSION_SECRET }}
 
       - name: Upload optional Creator/Admin secrets (skips any that are unconfigured)
         working-directory: apps/api
