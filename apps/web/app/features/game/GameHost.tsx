@@ -26,6 +26,11 @@ import { LegacyReactRuntime } from "./runtime/LegacyReactRuntime";
 import { IframeRuntime } from "./runtime/IframeRuntime";
 import { resolvePresentationLayout } from "./presentationLayoutResolver";
 import {
+  shouldShowFullscreenControl,
+  resolveMobileAdvisory,
+  resolveOrientationAdvisory,
+} from "./presentationAdvisory";
+import {
   SYSTEM_GAME_RELEASES,
   type SystemGameRelease,
 } from "./runtime/systemGameReleaseMap.generated";
@@ -40,6 +45,9 @@ import {
   UserCheck,
   Copy,
   Trophy,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
 } from "lucide-react";
 
 export type SubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
@@ -262,6 +270,102 @@ function useViewportHeight(): number | null {
   return height;
 }
 
+/**
+ * The actual, live fullscreen state — tracked via `document.fullscreenElement`/
+ * `fullscreenchange`, never assumed from React state alone: an ESC-triggered browser exit (or any
+ * other UA-driven exit) must correctly flip the UI back, and only the DOM's own event tells us
+ * that happened.
+ *
+ * `targetRef` is a plain object ref, unlike `useElementSize`'s callback ref — `requestFullscreen`/
+ * the `fullscreenchange` listener only ever run inside a user-gesture click handler or a
+ * document-level effect, both of which read `.current` synchronously at the moment they fire, so
+ * there's no "element mounted after this ran" timing gap to worry about here the way there was
+ * for a ResizeObserver.
+ *
+ * `isFullscreenApiAvailable` gates whether GameHost shows the control at all — see this PR's own
+ * requirement to prefer "don't show it" over a disabled button in an environment with no
+ * Fullscreen API (some in-app browsers, `document.fullscreenEnabled === false` under a
+ * permissions-policy restriction, ...). A rejected `requestFullscreen()`/`exitFullscreen()` is
+ * logged and otherwise ignored — never fails the game itself.
+ */
+function useFullscreen(targetRef: React.RefObject<HTMLElement | null>): {
+  isFullscreen: boolean;
+  isFullscreenApiAvailable: boolean;
+  toggleFullscreen: () => void;
+} {
+  const isFullscreenApiAvailable =
+    typeof document !== "undefined" &&
+    document.fullscreenEnabled === true &&
+    typeof document.documentElement.requestFullscreen === "function";
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    if (!isFullscreenApiAvailable) return;
+    const handleChange = () => setIsFullscreen(document.fullscreenElement === targetRef.current);
+    document.addEventListener("fullscreenchange", handleChange);
+    return () => document.removeEventListener("fullscreenchange", handleChange);
+  }, [isFullscreenApiAvailable, targetRef]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!isFullscreenApiAvailable) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch((err: unknown) => {
+        console.error("Failed to exit fullscreen:", err);
+      });
+      return;
+    }
+    const el = targetRef.current;
+    if (!el) return;
+    el.requestFullscreen().catch((err: unknown) => {
+      console.error("Failed to enter fullscreen:", err);
+    });
+  }, [isFullscreenApiAvailable, targetRef]);
+
+  return { isFullscreen, isFullscreenApiAvailable, toggleFullscreen };
+}
+
+/** A coarse/touch-primary pointer (`matchMedia("(pointer: coarse)")`) — the one platform
+ * heuristic mobile/orientation advisories are based on; see presentationAdvisory.ts's own doc
+ * comment for why this and not `inputMethods` or User-Agent parsing. Tracked live via the
+ * MediaQueryList's own `change` event, not just read once. */
+function useIsMobileLikeEnvironment(): boolean {
+  const [isMobileLike, setIsMobileLike] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(pointer: coarse)");
+    const handleChange = () => setIsMobileLike(mql.matches);
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, []);
+
+  return isMobileLike;
+}
+
+/** The device's actual current orientation, from the native `matchMedia("(orientation:
+ * portrait)")` signal rather than computed from `window.innerWidth`/`innerHeight` arithmetic.
+ * Only meaningful where `useIsMobileLikeEnvironment` is true — a desktop window's aspect ratio
+ * isn't a device orientation, which is why the caller only ever reads this inside that gate. */
+function useActualOrientation(): "portrait" | "landscape" {
+  const [orientation, setOrientation] = useState<"portrait" | "landscape">(() =>
+    typeof window !== "undefined" && window.matchMedia("(orientation: portrait)").matches
+      ? "portrait"
+      : "landscape",
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mql = window.matchMedia("(orientation: portrait)");
+    const handleChange = () => setOrientation(mql.matches ? "portrait" : "landscape");
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, []);
+
+  return orientation;
+}
+
 export interface GameHostProps {
   slug: string;
 }
@@ -359,6 +463,74 @@ export function GameHost({ slug }: GameHostProps) {
           transformOrigin: "top left" as const,
         }
       : undefined;
+
+  // Fullscreen — see useFullscreen's own doc comment. `gameSurfaceRef` is the fullscreen target —
+  // never the iframe/GameFrame itself, and never anything inside it, so requestFullscreen always
+  // targets Host-owned chrome, not a cross-origin document. It's attached to GameHost's own outer
+  // return element (below), NOT the innermost game-surface card: the fullscreen toggle button
+  // lives in the header, a SIBLING of that inner card, and the Fullscreen API renders only the
+  // target element's own subtree while active — a sibling exit button would become inaccessible
+  // (visually covered, no longer reachable) the moment fullscreen started if the target were
+  // scoped any narrower than "the header and the game area together". presentation === undefined
+  // (every shipped game today) always resolves showFullscreenControl to false, via
+  // shouldShowFullscreenControl's own doc comment.
+  const gameSurfaceRef = useRef<HTMLDivElement>(null);
+  const { isFullscreen, isFullscreenApiAvailable, toggleFullscreen } =
+    useFullscreen(gameSurfaceRef);
+  const showFullscreenControl = shouldShowFullscreenControl(
+    manifest?.presentation,
+    isFullscreenApiAvailable,
+  );
+  // A hint only (button prominence / a small badge) — never automatic requestFullscreen. See
+  // GamePresentationFullscreen's own doc comment on why there is deliberately no "required" field
+  // for this to escalate into.
+  const fullscreenRecommended = manifest?.presentation?.fullscreen.recommended === true;
+
+  // Mobile/orientation advisories — see presentationAdvisory.ts's own doc comment. Both resolvers
+  // return "no advisory" outright whenever isMobileLikeEnvironment is false, so nothing here ever
+  // shows on desktop regardless of what a game's presentation.mobile declares.
+  const isMobileLikeEnvironment = useIsMobileLikeEnvironment();
+  const actualOrientation = useActualOrientation();
+  const mobileAdvisory = resolveMobileAdvisory(manifest?.presentation, isMobileLikeEnvironment);
+  const orientationAdvisory = resolveOrientationAdvisory(
+    manifest?.presentation,
+    isMobileLikeEnvironment,
+    actualOrientation,
+  );
+  const presentationAdvisoryBanner =
+    mobileAdvisory !== "none" || orientationAdvisory.kind !== "none" ? (
+      <div className="flex w-full max-w-6xl flex-col gap-1.5">
+        {mobileAdvisory === "unsupported" && (
+          <div
+            data-testid="mobile-advisory-unsupported"
+            className="flex items-center gap-2 rounded-lg border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs font-semibold text-accent-red"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {dict.gamePlay.mobileUnsupportedNotice}
+          </div>
+        )}
+        {mobileAdvisory === "experimental" && (
+          <div
+            data-testid="mobile-advisory-experimental"
+            className="flex items-center gap-2 rounded-lg border border-accent-yellow/30 bg-accent-yellow/10 px-3 py-2 text-xs font-semibold text-accent-yellow"
+          >
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {dict.gamePlay.mobileExperimentalNotice}
+          </div>
+        )}
+        {orientationAdvisory.kind === "mismatch" && (
+          <div
+            data-testid="orientation-advisory"
+            className="flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-2 text-xs font-semibold text-text-secondary"
+          >
+            <RotateCcw className="h-4 w-4 shrink-0" />
+            {orientationAdvisory.preferred === "portrait"
+              ? dict.gamePlay.orientationPortraitHint
+              : dict.gamePlay.orientationLandscapeHint}
+          </div>
+        )}
+      </div>
+    ) : null;
 
   // Difficulty selection — only meaningful for games with manifest.difficulty. Resets to the
   // game's default whenever navigating between games. A change here only affects the NEXT
@@ -968,7 +1140,7 @@ export function GameHost({ slug }: GameHostProps) {
   const isAuthBlocked = manifest?.requiresAuth && !isAuthenticated;
 
   return (
-    <div className="flex flex-col flex-1 bg-[#09090b] select-none">
+    <div ref={gameSurfaceRef} className="flex flex-col flex-1 bg-[#09090b] select-none">
       {/* Game Header */}
       <div className="h-14 border-b border-border bg-surface flex items-center px-4 justify-between shrink-0">
         <div className="flex items-center gap-4">
@@ -1028,11 +1200,48 @@ export function GameHost({ slug }: GameHostProps) {
               <span className="hidden sm:inline">{dict.gameRanking.eyebrow}</span>
             </Link>
           )}
+
+          {/* Host chrome, not iframe-internal UI — see useFullscreen's own doc comment on why
+              gameSurfaceRef (not the iframe) is the requestFullscreen target. Hidden entirely
+              (not disabled) whenever presentation.fullscreen.supported is false or the browser
+              has no Fullscreen API — never shown for presentation === undefined, which is every
+              shipped game today. */}
+          {showFullscreenControl && (
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              // Locale-independent E2E hook (see e2e/tests/fullscreen.spec.ts) — the visible
+              // label/title text is localized, so a test can't rely on it staying stable.
+              data-testid="fullscreen-toggle"
+              title={
+                isFullscreen ? dict.gamePlay.fullscreenExitCta : dict.gamePlay.fullscreenEnterCta
+              }
+              aria-label={
+                isFullscreen ? dict.gamePlay.fullscreenExitCta : dict.gamePlay.fullscreenEnterCta
+              }
+              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
+                fullscreenRecommended && !isFullscreen
+                  ? "bg-brand/10 text-brand hover:bg-brand/20"
+                  : "text-text-secondary hover:bg-surface-raised hover:text-text-primary"
+              }`}
+            >
+              {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              <span className="hidden sm:inline">
+                {isFullscreen ? dict.gamePlay.fullscreenExitCta : dict.gamePlay.fullscreenEnterCta}
+              </span>
+              {fullscreenRecommended && !isFullscreen && (
+                <span className="hidden md:inline text-[10px] font-black uppercase tracking-wider opacity-70">
+                  {dict.gamePlay.fullscreenRecommendedHint}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Game Area Container */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden p-4">
+      <div className="flex-1 relative flex flex-col items-center justify-center gap-3 overflow-hidden p-4">
+        {presentationAdvisoryBanner}
         {isLoading ? (
           <div className="flex flex-col items-center gap-4">
             <div className="w-10 h-10 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />

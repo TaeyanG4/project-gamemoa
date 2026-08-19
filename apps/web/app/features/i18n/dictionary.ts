@@ -1046,6 +1046,23 @@ export interface Dictionary {
     leaderboardTitle: string;
     leaderboardEmpty: string;
     viewFullRanking: string;
+    /** Shown only when manifest.presentation?.fullscreen.supported is true — see GameHost.tsx's
+     * useFullscreen. Toggles based on the live document.fullscreenElement state, not assumed
+     * React state, so it stays correct even after an ESC-triggered exit. */
+    fullscreenEnterCta: string;
+    fullscreenExitCta: string;
+    /** A small badge/hint next to the button when fullscreen.recommended is true — never implies
+     * automatic fullscreen, which this PR explicitly never does. */
+    fullscreenRecommendedHint: string;
+    /** Non-blocking advisories shown only in a mobile-like (coarse-pointer) environment — see
+     * presentationAdvisory.ts. Never shown on desktop regardless of the game's own
+     * presentation.mobile value, and never block PLAY. */
+    mobileExperimentalNotice: string;
+    mobileUnsupportedNotice: string;
+    /** Shown only when the game's presentation.mobile.orientation preference doesn't match the
+     * device's actual current orientation — a hint, never a lock/forced rotation. */
+    orientationPortraitHint: string;
+    orientationLandscapeHint: string;
   };
   /** /games/:slug/ranking — a dedicated per-game leaderboard page (osu!-style: ranking recorded
    * per map/game, not just one combined table). Table column headers are shared with dict.ranking
@@ -2331,6 +2348,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       leaderboardTitle: "리더보드",
       leaderboardEmpty: "아직 등록된 기록이 없습니다.",
       viewFullRanking: "전체 순위 보기 →",
+      fullscreenEnterCta: "전체 화면",
+      fullscreenExitCta: "전체 화면 종료",
+      fullscreenRecommendedHint: "권장",
+      mobileExperimentalNotice: "모바일 지원은 실험적입니다.",
+      mobileUnsupportedNotice: "이 게임은 모바일 환경을 지원하지 않을 수 있습니다.",
+      orientationPortraitHint: "이 게임은 세로 화면에 최적화되어 있습니다.",
+      orientationLandscapeHint: "이 게임은 가로 화면에 최적화되어 있습니다.",
     },
     gameRanking: {
       eyebrow: "게임별 순위",
@@ -3626,6 +3650,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       leaderboardTitle: "Leaderboard",
       leaderboardEmpty: "No records yet.",
       viewFullRanking: "View full ranking →",
+      fullscreenEnterCta: "Fullscreen",
+      fullscreenExitCta: "Exit fullscreen",
+      fullscreenRecommendedHint: "Recommended",
+      mobileExperimentalNotice: "Mobile support is experimental.",
+      mobileUnsupportedNotice: "This game may not support mobile devices.",
+      orientationPortraitHint: "This game is optimized for portrait orientation.",
+      orientationLandscapeHint: "This game is optimized for landscape orientation.",
     },
     gameRanking: {
       eyebrow: "Game Ranking",
@@ -4921,6 +4952,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       leaderboardTitle: "リーダーボード",
       leaderboardEmpty: "まだ記録がありません。",
       viewFullRanking: "全体ランキングを見る →",
+      fullscreenEnterCta: "全画面表示",
+      fullscreenExitCta: "全画面表示を終了",
+      fullscreenRecommendedHint: "おすすめ",
+      mobileExperimentalNotice: "モバイル対応は実験的な機能です。",
+      mobileUnsupportedNotice: "このゲームはモバイル環境に対応していない場合があります。",
+      orientationPortraitHint: "このゲームは縦画面に最適化されています。",
+      orientationLandscapeHint: "このゲームは横画面に最適化されています。",
     },
     gameRanking: {
       eyebrow: "ゲーム別ランキング",
@@ -6160,6 +6198,13 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       leaderboardTitle: "排行榜",
       leaderboardEmpty: "暂无记录。",
       viewFullRanking: "查看完整排行榜 →",
+      fullscreenEnterCta: "全屏",
+      fullscreenExitCta: "退出全屏",
+      fullscreenRecommendedHint: "推荐",
+      mobileExperimentalNotice: "移动端支持为实验性功能。",
+      mobileUnsupportedNotice: "此游戏可能不支持移动设备。",
+      orientationPortraitHint: "此游戏针对竖屏进行了优化。",
+      orientationLandscapeHint: "此游戏针对横屏进行了优化。",
     },
     gameRanking: {
       eyebrow: "游戏排行榜",
