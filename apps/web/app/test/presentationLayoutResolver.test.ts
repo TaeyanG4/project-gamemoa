@@ -110,3 +110,22 @@ test("fixed display size never exceeds the available box in either dimension", (
   assert.ok(displayWidth <= 200);
   assert.ok(displayHeight <= 900);
 });
+
+// ── fail-safe: no measurement yet, or an invalid one, never collapses the iframe to 0px ───────
+
+test("a presentation-bearing game with no measurement yet (available === null) falls back to legacy, not a 0x0 layout", () => {
+  const layout = resolvePresentationLayout(responsive({ preferredWidth: 800 }), null);
+  assert.deepEqual(layout, { kind: "legacy" });
+});
+
+test("a zero or negative available width or height also falls back to legacy — a transient/invalid reading, not a real 0px viewport", () => {
+  assert.deepEqual(resolvePresentationLayout(responsive(), { width: 0, height: 800 }), {
+    kind: "legacy",
+  });
+  assert.deepEqual(resolvePresentationLayout(responsive(), { width: 800, height: 0 }), {
+    kind: "legacy",
+  });
+  assert.deepEqual(resolvePresentationLayout(fixed(1280, 720), { width: -1, height: 480 }), {
+    kind: "legacy",
+  });
+});

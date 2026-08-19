@@ -43,7 +43,10 @@ export interface GameFrameProps {
    * sized to the game's own logical/design resolution (so the framed document sees that as its
    * viewport) and then visually scaled down with `transform: scale(...)` to fit the displayed
    * surface `frameStyle` shapes — see GameHost.tsx's own doc comment on why that's a `transform`
-   * on the iframe and not a change to `frameStyle`/the wrapper. */
+   * on the iframe and not a change to `frameStyle`/the wrapper. `transform: scale()` shrinks how
+   * the iframe paints, not its layout box (still the full, unscaled logical size) — the wrapper
+   * below carries its own `overflow-hidden` specifically so that box never contributes scrollable
+   * overflow beyond the (smaller) displayed surface. */
   iframeStyle?: React.CSSProperties | undefined;
   /** Fires once per iframe `load` event, after GameFrame's own loading-overlay state is cleared —
    * the hook a runtime (see runtime/IframeRuntime.tsx) uses to establish the Game Bridge once the
@@ -105,7 +108,7 @@ export function GameFrame({
   if (!started) {
     return (
       <div className={className}>
-        <div className={`relative ${frameClassName ?? ""}`} style={frameStyle}>
+        <div className={`relative overflow-hidden ${frameClassName ?? ""}`} style={frameStyle}>
           {poster}
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
             <button
@@ -123,7 +126,7 @@ export function GameFrame({
 
   return (
     <div className={className}>
-      <div className={`relative ${frameClassName ?? ""}`} style={frameStyle}>
+      <div className={`relative overflow-hidden ${frameClassName ?? ""}`} style={frameStyle}>
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-raised">
             <span className="text-xs font-bold text-text-muted">불러오는 중...</span>

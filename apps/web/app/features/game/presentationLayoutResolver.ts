@@ -3,8 +3,9 @@ import type { GamePresentation } from "@owogg/game-sdk";
 /**
  * Pure math for turning a game's {@link GamePresentation} preference into the concrete box
  * GameHost renders IframeRuntime/GameFrame into. No React, no DOM — `available` is whatever
- * GameHost has already measured the Game Area Container to be (see its own `useElementSize` call)
- * so this stays trivially testable with plain numbers, exercised directly in
+ * GameHost has already measured (width from its own `useElementSize` ResizeObserver, height from
+ * `useViewportHeight` — deliberately two different, independent sources; see GameHost.tsx's own
+ * doc comments on why) so this stays trivially testable with plain numbers, exercised directly in
  * apps/web/app/test/presentationLayoutResolver.test.ts.
  *
  * The one principle every branch below enforces: `Game preference ∩ Platform constraints ∩ Actual
@@ -48,11 +49,23 @@ export type PresentationLayout =
       readonly scale: number;
     };
 
+/**
+ * `available` is `null | AvailableViewport` rather than always-required: GameHost doesn't always
+ * have a real, independent measurement to hand this yet (no ResizeObserver/viewport reading has
+ * landed, or landed with a bogus 0/negative value — see GameHost.tsx's own doc comments on why
+ * height specifically has to come from `window`/`visualViewport`, not a DOM measurement of
+ * anything this layout itself sizes). Folding that fail-safe in here, rather than leaving it as
+ * untested conditional logic in GameHost, is what makes it something this module's own test suite
+ * actually covers: an invalid measurement is exactly as "no measurement yet" as `available` being
+ * `null` outright, and both fall back to `legacy` the same way `presentation` being absent does —
+ * never a collapsed 0px iframe.
+ */
 export function resolvePresentationLayout(
   presentation: GamePresentation | undefined,
-  available: AvailableViewport,
+  available: AvailableViewport | null,
 ): PresentationLayout {
-  if (!presentation) return { kind: "legacy" };
+  if (!presentation || !available) return { kind: "legacy" };
+  if (available.width <= 0 || available.height <= 0) return { kind: "legacy" };
 
   return presentation.viewport.mode === "fixed"
     ? resolveFixedLayout(presentation.viewport, available)
