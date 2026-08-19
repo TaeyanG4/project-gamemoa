@@ -57,13 +57,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-      # Chromium only (see e2e/playwright.config.ts's own doc comment for why one engine is
-      # enough for what this suite actually checks) — `--with-deps` additionally installs the
-      # OS-level libraries a real Chromium needs to launch headless on a bare Ubuntu runner.
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
-      # Runs entirely against a local fixture — no production B2, no play.owogg.com/owogg.com —
-      # see e2e/prepareLocalGameOrigin.ts and e2e/run.ts's own doc comments for how.
-      - name: Browser E2E
-        run: pnpm e2e
+      # Browser E2E (Playwright) is a separate workflow (.github/workflows/e2e.yml) — Chromium
+      # install + a real browser run add several minutes this fast feedback loop doesn't need on
+      # every push/PR. See that workflow's own doc comment for when it runs instead.
