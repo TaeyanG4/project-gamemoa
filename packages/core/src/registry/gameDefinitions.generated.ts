@@ -16,7 +16,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
     title: "에임 테스트",
     shortDescription: "화면에 나타나는 타겟을 빠른 속도로 조준하고 클릭하세요!",
     description:
-      "무작위로 생성되는 31개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
+      "무작위로 생성되는 30개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
     status: "published",
     categories: ["aim", "reaction", "popular"],
     tags: ["에임", "조준", "반응속도", "클릭"],
@@ -78,7 +78,7 @@ export const GAME_DEFINITIONS: GameDefinition[] = [
       score: {
         unit: "Level",
         direction: "desc",
-        min: 1,
+        min: 0,
         max: 50,
         displayPrefix: "Level ",
       },
@@ -165,7 +165,7 @@ export const GAME_DEFINITION_MAP: Record<string, GameDefinition> = {
     title: "에임 테스트",
     shortDescription: "화면에 나타나는 타겟을 빠른 속도로 조준하고 클릭하세요!",
     description:
-      "무작위로 생성되는 31개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
+      "무작위로 생성되는 30개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
     status: "published",
     categories: ["aim", "reaction", "popular"],
     tags: ["에임", "조준", "반응속도", "클릭"],
@@ -227,7 +227,7 @@ export const GAME_DEFINITION_MAP: Record<string, GameDefinition> = {
       score: {
         unit: "Level",
         direction: "desc",
-        min: 1,
+        min: 0,
         max: 50,
         displayPrefix: "Level ",
       },

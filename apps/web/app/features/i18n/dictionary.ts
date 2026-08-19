@@ -987,6 +987,10 @@ export interface Dictionary {
     metadataTargetsHit: string;
     metadataMisses: string;
     metadataLevel: string;
+    metadataTargets: string;
+    metadataAvgPerTargetMs: string;
+    metadataSequenceLength: string;
+    metadataGrade: string;
     guestNoticeTitle: string;
     guestNoticeBody: string;
     guestLoginCta: string;
@@ -2255,7 +2259,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         title: "에임 테스트",
         shortDescription: "화면에 나타나는 타겟을 빠른 속도로 조준하고 클릭하세요!",
         description:
-          "무작위로 생성되는 31개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
+          "무작위로 생성되는 30개의 타겟을 정확하고 빠르게 조준하여 클릭하세요. 반응 속도와 정확도를 측정합니다.",
         tags: ["에임", "조준", "반응속도", "클릭"],
       },
       "typing-test": {
@@ -2295,6 +2299,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       metadataTargetsHit: "적중 타겟",
       metadataMisses: "실패 타겟",
       metadataLevel: "달성 레벨",
+      metadataTargets: "타겟 수",
+      metadataAvgPerTargetMs: "타겟당 평균 (ms)",
+      metadataSequenceLength: "패턴 길이",
+      metadataGrade: "등급",
       guestNoticeTitle: "게스트 기록은 이 기기에만 저장됩니다.",
       guestNoticeBody: "로그인하면 다음 플레이부터 랭킹에 참여할 수 있습니다.",
       guestLoginCta: "로그인",
@@ -3545,7 +3553,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         title: "Aim Test",
         shortDescription: "Aim and click on targets appearing on the screen quickly!",
         description:
-          "Accurately and quickly aim and click 31 randomly generated targets. Measures your reaction speed and accuracy.",
+          "Accurately and quickly aim and click 30 randomly generated targets. Measures your reaction speed and accuracy.",
         tags: ["Aim", "Targeting", "Reaction Time", "Click"],
       },
       "typing-test": {
@@ -3586,6 +3594,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       metadataTargetsHit: "Targets hit",
       metadataMisses: "Misses",
       metadataLevel: "Level reached",
+      metadataTargets: "Targets",
+      metadataAvgPerTargetMs: "Avg. per target (ms)",
+      metadataSequenceLength: "Pattern length",
+      metadataGrade: "Grade",
       guestNoticeTitle: "Guest records are saved only on this device.",
       guestNoticeBody: "Sign in to join the leaderboard starting with your next play.",
       guestLoginCta: "Sign in",
@@ -4834,7 +4846,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
         title: "エイムテスト",
         shortDescription: "画面に表示されるターゲットを素早く狙ってクリックしてください！",
         description:
-          "ランダムに生成される31個のターゲットを正確かつ迅速に狙ってクリックしてください。反応速度と正確性を測定します。",
+          "ランダムに生成される30個のターゲットを正確かつ迅速に狙ってクリックしてください。反応速度と正確性を測定します。",
         tags: ["エイム", "照準", "反射神経", "クリック"],
       },
       "typing-test": {
@@ -4876,6 +4888,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       metadataTargetsHit: "命中ターゲット",
       metadataMisses: "失敗ターゲット",
       metadataLevel: "到達レベル",
+      metadataTargets: "ターゲット数",
+      metadataAvgPerTargetMs: "ターゲット毎の平均（ms）",
+      metadataSequenceLength: "パターンの長さ",
+      metadataGrade: "評価",
       guestNoticeTitle: "ゲストの記録はこの端末にのみ保存されます。",
       guestNoticeBody: "ログインすると、次回のプレイからランキングに参加できます。",
       guestLoginCta: "ログイン",
@@ -6073,7 +6089,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       "aim-test": {
         title: "瞄准测试",
         shortDescription: "快速瞄准并点击屏幕上出现的目标！",
-        description: "准确且快速地瞄准并点击随机生成的31个目标。测量您的反应速度和准确度。",
+        description: "准确且快速地瞄准并点击随机生成的30个目标。测量您的反应速度和准确度。",
         tags: ["瞄准", "对准", "反应速度", "点击"],
       },
       "typing-test": {
@@ -6112,6 +6128,10 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       metadataTargetsHit: "命中目标",
       metadataMisses: "未命中",
       metadataLevel: "达到等级",
+      metadataTargets: "目标数",
+      metadataAvgPerTargetMs: "每目标平均用时（ms）",
+      metadataSequenceLength: "序列长度",
+      metadataGrade: "评级",
       guestNoticeTitle: "访客记录仅保存在本设备。",
       guestNoticeBody: "登录后，从下一次游玩开始即可参与排行榜。",
       guestLoginCta: "登录",

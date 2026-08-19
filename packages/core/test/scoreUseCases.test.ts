@@ -106,6 +106,24 @@ test("ScoreUseCases - submitScore validates score payload before persistence", a
   assert.equal(validRes.saved?.score, 250);
 });
 
+test("ScoreUseCases - submitScore accepts memory-test's score 0 (a real, valid result — a first-color miss completes 0 levels)", async () => {
+  // MemoryGameUI.tsx's handleColorClick computes completedLevels as Math.max(0, level - 1) with
+  // level starting at 1, so a player who misjudges the very first color in the sequence
+  // legitimately completes a round with score 0 — not a sentinel for "no attempt" or "error".
+  // game-registry/games/memory-test/policy.json's score.min must stay 0, never 1, or this
+  // completely ordinary outcome gets rejected by validateScoreAgainstPolicy as out of range.
+  const useCases = newUseCases();
+
+  const res = await useCases.submitScore({
+    userId: 101,
+    gameId: "memory-test",
+    score: 0,
+    nickname: "Tester",
+  });
+  assert.equal(res.valid, true);
+  assert.equal(res.saved?.score, 0);
+});
+
 test("ScoreUseCases - submitScore rejects a game id absent from the registry and never persists it (2026-08-17 beta hardening)", async () => {
   const useCases = newUseCases();
 
