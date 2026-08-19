@@ -5,6 +5,7 @@ import { createReadContainer } from "../readReplica.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { scoreSubmissionSchema } from "@owogg/contracts";
+import type { FormattedScoreRecord } from "@owogg/core";
 import type { ApiEnv } from "./auth.js";
 
 export const scoresRouter = new Hono<ApiEnv>();
@@ -194,63 +195,91 @@ scoresRouter.get("/user/me", async (c) => {
   }
 });
 
+/** Shared row shape for both the SYSTEM and Creator branches below — one game's worth of already
+ * PB-deduped, already-formatted rows plus the resolved title (resolved once per request, not
+ * re-looked-up per row — lets the web client drop its own GAME_MANIFEST_MAP-based title lookup,
+ * see apps/web/app/features/scores/api.ts). */
+function formatLeaderboardEntry(item: FormattedScoreRecord, gameTitle: string) {
+  return {
+    id: item.id,
+    user_id: item.user_id,
+    nickname: item.nickname,
+    playerName: item.playerName,
+    avatar_url: item.avatar_url,
+    avatarUrl: item.avatar_url,
+    gameId: item.game_id,
+    gameTitle,
+    score: item.score,
+    formattedScore: item.formattedScore,
+    difficulty: item.difficulty,
+    createdAt: item.created_at?.split("T")[0] ?? item.created_at,
+    created_at: item.created_at,
+  };
+}
+
 // GET /api/scores/:gameId — public leaderboard. Edge-cached: the response depends only on
 // gameId + the ?difficulty query (both in the URL), never on who is asking, so one cached entry
 // per URL correctly serves every visitor. This is the single hottest read path in the app.
+//
+// SYSTEM games resolve through the shared GameRegistry singleton (see container.ts) exactly as
+// before this generalization — same lookup, same difficulty handling, same response shape, same
+// cache. A slug that ISN'T a SYSTEM game now gets a second chance through the Creator path
+// (CreatorLeaderboardUseCases: PUBLIC + live + score policy configured) before this falls back to
+// INVALID_GAME_ID — the same "can't distinguish unknown from private/unconfigured" posture used
+// everywhere else a Creator game is read publicly. No new endpoint, no new `scores` table, no new
+// ranking SQL: both branches call the exact same D1ScoreRepository.getLeaderboard PB-dedup query,
+// just resolved against a different registry.
 scoresRouter.get("/:gameId", edgeCache({ ttlSeconds: 30 }), async (c) => {
   const gameId = c.req.param("gameId");
 
-  // Resolved through the shared GameRegistry singleton (see container.ts), not a DB-bound
-  // container — this validation must run (and INVALID_GAME_ID must still be returned) even in an
-  // environment with no D1 binding, matching the check this replaced (GAME_MANIFEST_MAP was a
-  // plain in-memory lookup with the same property). Only covers SYSTEM games today; a creator
-  // slug is correctly INVALID_GAME_ID here, same as before — see ScoreUseCases's own doc comment
-  // on creator score submission being unsupported.
   const definition = await gameRegistry.findBySlug(gameId);
-  if (!definition) {
-    return c.json(
-      { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
-      400,
-    );
+
+  if (definition) {
+    if (!c.env?.DB) {
+      return c.json({ game_id: gameId, leaderboard: [] });
+    }
+
+    try {
+      // Read-replica eligible: this is a public leaderboard already served with a 30s edge cache,
+      // so it is explicitly allowed to lag — a replica cannot make it staler than the cache TTL
+      // already does. See readReplica.ts for why auth/session reads deliberately stay on primary.
+      const { scoreUseCases } = createReadContainer(c.env.DB);
+      const difficulty = c.req.query("difficulty");
+      const leaderboard = await scoreUseCases.getLeaderboard(gameId, 20, difficulty);
+
+      return c.json({
+        game_id: gameId,
+        leaderboard: leaderboard.map((item) => formatLeaderboardEntry(item, definition.title)),
+      });
+    } catch (err) {
+      console.error("Get Leaderboard Error:", err);
+      return c.json({ game_id: gameId, leaderboard: [] });
+    }
   }
 
-  if (!c.env?.DB) {
-    return c.json({ game_id: gameId, leaderboard: [] });
+  // Not a SYSTEM game — try the Creator path before giving up.
+  if (c.env?.DB) {
+    try {
+      const { creatorLeaderboardUseCases } = createReadContainer(c.env.DB);
+      const creatorLeaderboard = await creatorLeaderboardUseCases.getLeaderboard(gameId, 20);
+      if (creatorLeaderboard) {
+        return c.json({
+          game_id: gameId,
+          leaderboard: creatorLeaderboard.rows.map((item) =>
+            formatLeaderboardEntry(item, creatorLeaderboard.gameTitle),
+          ),
+        });
+      }
+    } catch (err) {
+      console.error("Get Creator Leaderboard Error:", err);
+      // Falls through to INVALID_GAME_ID below — same as any other unexpected failure resolving
+      // this slug, never a 200 with an empty/partial leaderboard for a request that never actually
+      // resolved a real game.
+    }
   }
 
-  try {
-    // Read-replica eligible: this is a public leaderboard already served with a 30s edge cache,
-    // so it is explicitly allowed to lag — a replica cannot make it staler than the cache TTL
-    // already does. See readReplica.ts for why auth/session reads deliberately stay on primary.
-    const { scoreUseCases } = createReadContainer(c.env.DB);
-    const difficulty = c.req.query("difficulty");
-    const leaderboard = await scoreUseCases.getLeaderboard(gameId, 20, difficulty);
-
-    const formattedLeaderboard = leaderboard.map((item) => ({
-      id: item.id,
-      user_id: item.user_id,
-      nickname: item.nickname,
-      playerName: item.playerName,
-      avatar_url: item.avatar_url,
-      avatarUrl: item.avatar_url,
-      gameId: item.game_id,
-      // Resolved once above (the same game every row belongs to — scoreUseCases.getLeaderboard
-      // is already scoped to one gameId), not re-looked-up per row. Lets the web client drop its
-      // own GAME_MANIFEST_MAP-based title lookup — see apps/web/app/features/scores/api.ts.
-      gameTitle: definition.title,
-      score: item.score,
-      formattedScore: item.formattedScore,
-      difficulty: item.difficulty,
-      createdAt: item.created_at?.split("T")[0] ?? item.created_at,
-      created_at: item.created_at,
-    }));
-
-    return c.json({
-      game_id: gameId,
-      leaderboard: formattedLeaderboard,
-    });
-  } catch (err) {
-    console.error("Get Leaderboard Error:", err);
-    return c.json({ game_id: gameId, leaderboard: [] });
-  }
+  return c.json(
+    { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
+    400,
+  );
 });

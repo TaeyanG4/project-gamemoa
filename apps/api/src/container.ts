@@ -45,6 +45,7 @@ import {
   SandboxGameUseCases,
   GameAttemptUseCases,
   CreatorScoreAcceptanceUseCases,
+  CreatorLeaderboardUseCases,
   GameBundlePublisher,
   StaticGameRegistry,
   GAME_DEFINITIONS,
@@ -154,6 +155,7 @@ export interface AppContainer {
   sandboxGameUseCases: SandboxGameUseCases;
   gameAttemptUseCases: GameAttemptUseCases;
   creatorScoreAcceptanceUseCases: CreatorScoreAcceptanceUseCases;
+  creatorLeaderboardUseCases: CreatorLeaderboardUseCases;
   gameBundlePublisher: GameBundlePublisher;
 }
 
@@ -236,6 +238,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     creatorScoreAcceptanceRepo,
   );
+  const creatorLeaderboardUseCases = new CreatorLeaderboardUseCases(sandboxGameRepo, scoreRepo);
 
   return {
     userRepo,
@@ -283,6 +286,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameUseCases,
     gameAttemptUseCases,
     creatorScoreAcceptanceUseCases,
+    creatorLeaderboardUseCases,
     gameBundlePublisher,
   };
 }
