@@ -35,12 +35,21 @@
 import type { GameDefinition } from "../domain/gameDefinition.js";
 
 export interface GameRegistry {
-  /** `null` for an unknown slug. Callers must treat that as "not a game", never as "unrestricted" —
-   * the loose fallback that behaviour replaced was a real hole (see docs/GAME_CREATION_GUIDE.md
-   * §3.5's 2026-08-17 note). */
+  /** `null` for an unknown slug OR a known-but-not-yet-registry-resolvable one — callers must
+   * treat both the same, "not a game right now", never as "unrestricted" (the loose fallback that
+   * behaviour replaced was a real hole — see docs/GAME_CREATION_GUIDE.md §3.5's 2026-08-17 note).
+   * A CREATOR implementation in particular may have an upstream row (e.g. a `sandbox_games` D1
+   * submission) that exists but genuinely has no `GameDefinition` to return yet — see that
+   * implementation's own doc comment for what "not yet resolvable" means for it; this port does
+   * not require every upstream submission to resolve, only every submission this port has already
+   * decided IS a registry entry. */
   findBySlug(slug: string): Promise<GameDefinition | null>;
 
-  /** Every known game, both SYSTEM and CREATOR. Used by catalog listing and the admin games panel,
-   * which today can only see the four built-in manifests. */
+  /** Every registry-resolvable game, both SYSTEM and CREATOR — not necessarily every row an
+   * upstream submission/review workflow has ever created. Used by catalog listing and the admin
+   * games panel, which today can only see the four built-in manifests. Never confuse this with a
+   * pending-submission or review queue: a row that exists upstream but isn't resolvable yet (see
+   * `findBySlug`'s own doc comment) is excluded here, the same way it resolves `null` there — not
+   * a bug, and not something a caller of this port needs a separate check for. */
   listAll(): Promise<readonly GameDefinition[]>;
 }

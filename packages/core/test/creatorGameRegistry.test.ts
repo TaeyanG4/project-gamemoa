@@ -343,6 +343,95 @@ test("findBySlug: a soft-deleted row resolves null — the same 'not found' as a
   assert.equal(result, null);
 });
 
+// ── pre-canonical Creator rows (not yet canonicalizable — normal, not corruption) ──
+//
+// A freshly-created Creator game has every score_* column null until an admin configures one
+// (SandboxGameUseCases.createGame's own contract) — Stage B-1's mapper already refuses to
+// canonicalize that state (SCORE_POLICY_NOT_CONFIGURED), so a D1 row in this state having no B2
+// document is expected, ongoing lifecycle, not a registry inconsistency.
+
+function preCanonicalRow(overrides: Partial<SandboxGameRecord> = {}): SandboxGameRecord {
+  return sandboxRow({
+    scoreUnit: null,
+    scoreDirection: null,
+    scoreMin: null,
+    scoreMax: null,
+    ...overrides,
+  });
+}
+
+test("findBySlug: a fresh row (every score_* column null) with no B2 document resolves null — not CANONICAL_MISSING", async () => {
+  const row = preCanonicalRow();
+  const registry = new CreatorGameRegistry(fakeSandboxGameRepo([row]), fakeCanonicalRepo({}));
+
+  const result = await registry.findBySlug(row.slug);
+  assert.equal(result, null);
+});
+
+test("findBySlug: a partially-configured score policy (some but not all score_* columns set) with no B2 document is still pre-canonical -> null, matching Stage B-1's own incomplete-policy semantics", async () => {
+  const row = preCanonicalRow({ scoreUnit: "pts", scoreDirection: "desc" }); // min/max still null
+  const registry = new CreatorGameRegistry(fakeSandboxGameRepo([row]), fakeCanonicalRepo({}));
+
+  const result = await registry.findBySlug(row.slug);
+  assert.equal(result, null);
+});
+
+test("findBySlug: pre-canonical resolution never falls back to D1's own title/description/genre to synthesize a definition", async () => {
+  const row = preCanonicalRow({ title: "D1's own title", genre: "d1-genre" });
+  const registry = new CreatorGameRegistry(fakeSandboxGameRepo([row]), fakeCanonicalRepo({}));
+
+  // The only possible non-error outcome is a strict null — there is no partial/synthesized
+  // GameDefinition built from D1 alone for this case.
+  const result = await registry.findBySlug(row.slug);
+  assert.equal(result, null);
+});
+
+test("findBySlug: a fully-configured score policy with no B2 document IS CANONICAL_MISSING — canonicalization was possible but never happened", async () => {
+  const row = sandboxRow(); // fixture default: fully-configured score policy
+  const registry = new CreatorGameRegistry(fakeSandboxGameRepo([row]), fakeCanonicalRepo({}));
+
+  await assert.rejects(registry.findBySlug(row.slug), (err) => {
+    assert.ok(err instanceof CreatorGameRegistryError);
+    assert.equal(err.reason, "CANONICAL_MISSING");
+    return true;
+  });
+});
+
+test("findBySlug: a B2 canonical document is used even when D1's own score policy currently looks incomplete — B2 is the source of truth regardless of D1 readiness", async () => {
+  const row = preCanonicalRow();
+  const doc = canonicalDoc();
+  const registry = new CreatorGameRegistry(
+    fakeSandboxGameRepo([row]),
+    fakeCanonicalRepo({ [row.slug]: doc }),
+  );
+
+  const result = await registry.findBySlug(row.slug);
+  assert.ok(result && isCreatorGameDefinition(result));
+  if (result && isCreatorGameDefinition(result)) {
+    assert.equal(result.title, doc.title);
+    assert.deepEqual(result.policy, doc.policy);
+  }
+});
+
+test("findBySlug: a storage failure while reading B2 propagates even for a pre-canonical row — never silently resolved to null", async () => {
+  const row = preCanonicalRow();
+  const sentinel = new Error("simulated storage failure");
+  const canonicalRepo: CreatorGameDefinitionRepository = {
+    findBySlug: async () => {
+      throw sentinel;
+    },
+    save: async () => {
+      throw new Error("unused");
+    },
+    delete: async () => {
+      throw new Error("unused");
+    },
+  };
+  const registry = new CreatorGameRegistry(fakeSandboxGameRepo([row]), canonicalRepo);
+
+  await assert.rejects(registry.findBySlug(row.slug), (err) => err === sentinel);
+});
+
 // ── listAll ───────────────────────────────────────────────────────────────────
 
 test("listAll: enumerates through SandboxGameRepository.listAll(), not any B2 prefix listing", async () => {
@@ -455,4 +544,35 @@ test("listAll: one row's storage/malformed-document failure fails the whole call
   const registry = new CreatorGameRegistry(fakeSandboxGameRepo([rowA, rowB]), canonicalRepo);
 
   await assert.rejects(registry.listAll(), (err) => err === sentinel);
+});
+
+test("listAll: a pre-canonical row is silently skipped while a normal canonical game is still returned", async () => {
+  const canonicalGame = sandboxRow({ slug: "canonical-game", id: 1 });
+  const draftGame = preCanonicalRow({ slug: "draft-game", id: 2 });
+  const registry = new CreatorGameRegistry(
+    fakeSandboxGameRepo([canonicalGame, draftGame]),
+    fakeCanonicalRepo({ "canonical-game": canonicalDoc({ slug: "canonical-game" }) }),
+  );
+
+  const result = await registry.listAll();
+  assert.deepEqual(
+    result.map((d) => d.slug),
+    ["canonical-game"],
+  );
+});
+
+test("listAll: a canonical-ready row with no B2 document still fails the whole call, even alongside other pre-canonical rows", async () => {
+  const draftGame = preCanonicalRow({ slug: "draft-game", id: 1 });
+  const inconsistentGame = sandboxRow({ slug: "inconsistent-game", id: 2 }); // fully configured, no B2 doc
+  const registry = new CreatorGameRegistry(
+    fakeSandboxGameRepo([draftGame, inconsistentGame]),
+    fakeCanonicalRepo({}),
+  );
+
+  await assert.rejects(registry.listAll(), (err) => {
+    assert.ok(err instanceof CreatorGameRegistryError);
+    assert.equal(err.reason, "CANONICAL_MISSING");
+    assert.equal(err.slug, "inconsistent-game");
+    return true;
+  });
 });

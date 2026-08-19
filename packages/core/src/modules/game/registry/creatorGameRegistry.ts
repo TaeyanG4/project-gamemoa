@@ -21,14 +21,34 @@
  * duplicate copies are simply never consulted for those fields, which is what makes B2 the source
  * of truth structurally, not by convention.
  *
- * Fail-closed, not fallback-to-D1, when B2 disagrees with what D1's identity implies:
- *   - D1 has an identity row but no canonical document exists at all → `CreatorGameRegistryError`
- *     ("CANONICAL_MISSING"), never a silent `null` (a `null` would read as "not a game", but a
- *     game_id genuinely exists — this is a real inconsistency, not an absent game).
- *   - The canonical document is malformed, or the storage read itself fails →
- *     `CreatorGameDefinitionRepository.findBySlug` already throws in both cases (see that port's
- *     own doc comment); this registry does not catch either one. Never caught, never swallowed,
- *     never turned into a fallback read of D1's own duplicate metadata columns.
+ * Not every D1 row with no B2 document is an inconsistency, though — a freshly-created Creator
+ * game is NORMAL, expected D1 state: `SandboxGameUseCases.createGame` inserts a row with every
+ * `score_*` column null, and nothing canonicalizes it until an admin finishes configuring a score
+ * policy (the same "incomplete score policy" gate Stage B-1's `mapSandboxGameRecordToCanonical`
+ * already refuses to canonicalize — see `isCreatorScorePolicyConfigured`,
+ * domain/creatorScorePolicy.ts). So "D1 row exists, B2 document doesn't" splits into two real
+ * cases, not one:
+ *   - The row's score policy isn't configured yet (pre-canonical) → this is the row's ordinary,
+ *     current lifecycle state, not corruption — `findBySlug` returns `null` (the same "not
+ *     resolvable yet" answer as an unknown slug) and `listAll` silently excludes it. Critically,
+ *     nothing here falls back to D1's own title/description/genre columns to synthesize a
+ *     definition for it — a pre-canonical row simply isn't resolvable, the same as if it didn't
+ *     exist yet.
+ *   - The row's score policy IS configured — meaning Stage B-1's mapper could canonicalize it
+ *     right now — but no B2 document exists anyway → a genuine inconsistency (canonicalization
+ *     should have already happened) → `CreatorGameRegistryError("CANONICAL_MISSING")`, fail-closed.
+ *
+ * Whenever a B2 document DOES exist, it is used regardless of the row's current D1 score-policy
+ * state (including a row whose score_* columns have since gone back to looking "incomplete" by
+ * this same gate, which can't happen today but isn't assumed impossible) — this pre-canonical
+ * check only ever runs in the branch where B2 already came back empty. A canonical document's own
+ * `policy.score: null` (deliberately unscored) is a completely different, legitimate state that
+ * this check never touches or reinterprets.
+ *
+ * The canonical document is malformed, or the storage read itself fails →
+ * `CreatorGameDefinitionRepository.findBySlug` already throws in both cases (see that port's own
+ * doc comment); this registry does not catch either one. Never caught, never swallowed, never
+ * turned into a fallback read of D1's own duplicate metadata columns.
  *
  * NOT done in this PR (see this Stage's own task description): no composition-root wiring
  * (apps/api/src/container.ts stays untouched — GameRegistry is still `StaticGameRegistry
@@ -38,6 +58,7 @@
 import type { GameDefinition } from "../domain/gameDefinition.js";
 import type { CreatorGameCanonicalDocument } from "../../../domain/creatorGameCanonicalDocument.js";
 import { projectCreatorGameStatus } from "../domain/creatorGameStatus.js";
+import { isCreatorScorePolicyConfigured } from "../../../domain/creatorScorePolicy.js";
 import type { GameRegistry } from "../ports/gameRegistry.js";
 import type { SandboxGameRecord, SandboxGameRepository } from "../../../ports/sandboxGames.js";
 import type { CreatorGameDefinitionRepository } from "../../../ports/creatorGameDefinition.js";
@@ -119,19 +140,30 @@ export class CreatorGameRegistry implements GameRegistry {
     // propagate exactly as CreatorGameDefinitionRepository.findBySlug throws it — see this file's
     // own top doc comment on why nothing here swallows or falls back for either case.
     const document = await this.canonicalDefinitions.findBySlug(slug);
-    if (document === null) {
-      throw new CreatorGameRegistryError("CANONICAL_MISSING", slug);
+    if (document !== null) {
+      return projectCreatorGameDefinition(row, document);
     }
 
-    return projectCreatorGameDefinition(row, document);
+    // No B2 document — see this file's own top doc comment for the two real cases this splits
+    // into. A row whose score policy isn't configured yet is ordinary pre-canonical state, not a
+    // registry inconsistency: resolves null, the same as an unknown slug, and never falls back to
+    // D1's own title/description/genre columns to synthesize a definition.
+    if (!isCreatorScorePolicyConfigured(row)) {
+      return null;
+    }
+
+    throw new CreatorGameRegistryError("CANONICAL_MISSING", slug);
   }
 
   /**
    * Enumerates every non-deleted Creator D1 row, in D1's own `listAll()` order (never re-sorted
-   * here), and projects each one's canonical document. One row's `CANONICAL_MISSING` — or a
-   * malformed document, or a storage failure — aborts the whole call rather than silently
-   * producing a registry that's missing a known row: a partial list here would read as "this game
-   * doesn't exist" to every caller, which is false for a row D1 still has an identity for.
+   * here), and projects each one's canonical document. A pre-canonical row (score policy not yet
+   * configured, no B2 document) is silently excluded — that is its normal, current state, not a
+   * gap. Any row whose score policy IS configured but still has no B2 document is a genuine
+   * inconsistency — that (or a malformed document, or a storage failure) aborts the WHOLE call
+   * rather than silently producing a registry that's missing a known row: a partial list here
+   * would read as "this game doesn't exist" to every caller, which is false for a row D1 still
+   * has a canonicalizable identity for.
    */
   async listAll(): Promise<readonly GameDefinition[]> {
     const rows = await this.sandboxGames.listAll();
@@ -141,10 +173,16 @@ export class CreatorGameRegistry implements GameRegistry {
       if (row.deletedAt !== null) continue;
 
       const document = await this.canonicalDefinitions.findBySlug(row.slug);
-      if (document === null) {
-        throw new CreatorGameRegistryError("CANONICAL_MISSING", row.slug);
+      if (document !== null) {
+        definitions.push(projectCreatorGameDefinition(row, document));
+        continue;
       }
-      definitions.push(projectCreatorGameDefinition(row, document));
+
+      if (!isCreatorScorePolicyConfigured(row)) {
+        continue;
+      }
+
+      throw new CreatorGameRegistryError("CANONICAL_MISSING", row.slug);
     }
 
     return definitions;
