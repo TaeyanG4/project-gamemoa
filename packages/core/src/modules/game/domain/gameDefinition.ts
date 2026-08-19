@@ -9,14 +9,15 @@
  *   sandbox_games                 (D1 row, runtime, Game Creator uploads)
  *
  * Deliberately built on `@owogg/game-sdk/contracts`' existing vocabulary (GameMode, InputMethod,
- * DifficultyConfig, ScoreConfig) rather than redeclaring parallel copies of it. A definition must
- * be expressible from today's GameManifest without loss, or the migration would start by throwing
- * away catalog metadata that already works.
+ * DifficultyConfig, ScoreConfig, GamePresentation) rather than redeclaring parallel copies of it.
+ * A definition must be expressible from today's GameManifest without loss, or the migration would
+ * start by throwing away catalog metadata that already works.
  */
 
 import type {
   DifficultyConfig,
   GameMode,
+  GamePresentation,
   GameStatus,
   InputMethod,
   ScoreConfig,
@@ -90,6 +91,13 @@ export interface GameDefinition {
   readonly supportsReplay: boolean;
 
   readonly policy: GamePolicy;
+
+  /** Reuses `@owogg/game-sdk/contracts`' GamePresentation verbatim — see that type's own doc
+   * comment. Undefined for every SYSTEM game today (game-registry/'s JSON sources don't carry it
+   * yet, and this PR deliberately doesn't add it to any of them); a definition without one behaves
+   * exactly as it always has. Nothing reads this field yet — see GamePresentation's own doc
+   * comment for what's still a later PR's job. */
+  readonly presentation?: GamePresentation | undefined;
 }
 
 /** Whether a submitted score is even meaningful for this game. */
