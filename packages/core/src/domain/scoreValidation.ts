@@ -22,8 +22,14 @@ export function validateScoreAgainstPolicy(
   policy: GamePolicy | null,
   score: number,
 ): { valid: boolean; reason?: string } {
-  if (typeof score !== "number" || Number.isNaN(score) || !Number.isInteger(score) || score < 0) {
-    return { valid: false, reason: "점수는 0 이상의 정수이어야 합니다." };
+  // Score is any finite, non-negative number — not integer-only. Several games genuinely measure
+  // fractional units (e.g. seconds survived, 4.4s), and the wire contracts already agreed on this
+  // (scoreSubmissionSchema/SubmitScoreRequestSchema use plain z.number()/`.finite()`, never
+  // `.int()`) — this was the one place still silently narrower than what the rest of the stack
+  // already allowed through. `Number.isFinite` alone (not the global `isFinite`, which coerces)
+  // rejects NaN and +/-Infinity without a separate NaN check.
+  if (typeof score !== "number" || !Number.isFinite(score) || score < 0) {
+    return { valid: false, reason: "점수는 0 이상의 숫자여야 합니다." };
   }
 
   if (!policy) {

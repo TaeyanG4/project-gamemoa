@@ -36,10 +36,23 @@ test("validateScoreAgainstPolicy rejects a score outside the policy's bounds", (
   assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 15000).valid, false); // above max
 });
 
-test("validateScoreAgainstPolicy rejects negative scores, NaN, and non-integers regardless of policy", () => {
+test("validateScoreAgainstPolicy rejects negative scores, NaN, and +/-Infinity regardless of policy", () => {
   assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, -5).valid, false);
   assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, NaN).valid, false);
-  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 12.34).valid, false);
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, Infinity).valid, false);
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, -Infinity).valid, false);
+});
+
+test("validateScoreAgainstPolicy accepts a decimal score within bounds — score is a finite number, not integer-only", () => {
+  // Pins the fix this test file's own name change documents: some games genuinely measure
+  // fractional units (survival time in seconds, e.g. ball-dodge's 4.4), and the wire contracts
+  // (scoreSubmissionSchema/CreatorScoreAcceptRequestSchema) never required an integer either.
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 123.45).valid, true);
+});
+
+test("validateScoreAgainstPolicy still enforces bounds on a decimal score exactly the same as an integer one", () => {
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 49.99).valid, false); // just below min (50)
+  assert.equal(validateScoreAgainstPolicy(REACTION_TIME_POLICY, 10000.01).valid, false); // just above max
 });
 
 test("validateScoreAgainstPolicy rejects null policy — an unknown game, not a loose fallback (2026-08-17 beta hardening)", () => {
@@ -58,6 +71,7 @@ test("validateScoreAgainstPolicy accepts anything non-negative when the game is 
   // Distinct from `null`: this game exists, and has explicitly opted out of score bounds.
   assert.equal(validateScoreAgainstPolicy(UNSCORED_POLICY, 0).valid, true);
   assert.equal(validateScoreAgainstPolicy(UNSCORED_POLICY, 999999999).valid, true);
+  assert.equal(validateScoreAgainstPolicy(UNSCORED_POLICY, 42.195).valid, true);
 });
 
 // ── difficulty ───────────────────────────────────────────────────────────────

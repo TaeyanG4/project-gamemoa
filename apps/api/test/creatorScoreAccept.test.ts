@@ -324,6 +324,16 @@ test("a valid token, matching context, and in-policy score is accepted and reach
   assert.equal(scores[0]?.userId, 7);
 });
 
+test("a decimal score (e.g. ball-dodge's 4.4 seconds survived) is accepted end-to-end through the HTTP route", async () => {
+  const { db, scores } = createDb({ userId: 7, game: LIVE_GAME, version: LIVE_VERSION });
+  const token = await signGameSession(samplePayload(), SESSION_SECRET);
+  const res = await postScore(db, { token, score: 4.4 });
+
+  assert.equal(res.status, 200);
+  assert.equal(scores.length, 1);
+  assert.equal(scores[0]?.score, 4.4);
+});
+
 test("the same token presented twice is accepted once, then 409 ALREADY_CONSUMED — the token is not left half-spent", async () => {
   const { db, scores } = createDb({ userId: 7, game: LIVE_GAME, version: LIVE_VERSION });
   const token = await signGameSession(samplePayload(), SESSION_SECRET);
