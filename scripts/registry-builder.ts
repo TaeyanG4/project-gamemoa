@@ -179,6 +179,58 @@ function diffDefinitionAgainstManifest(
   return mismatches;
 }
 
+/**
+ * Pure string-rendering half of the core manifest registry — separated from `buildRegistrySources`
+ * (which reads `games/*` off disk, writes the result to `packages/core/src/registry/
+ * gameRegistry.generated.ts`, and applies Prettier) the same way `renderReleaseMapModule` is split
+ * from `writeReleaseMap` in scripts/official-game-bundle-publisher.ts: this can be called directly
+ * with any manifest list, with no filesystem involved.
+ *
+ * That's what lets e2e/prepareLocalGameOrigin.ts reuse the exact real codegen — not a hand-copied
+ * second template that could drift — to build a *temporary* registry module containing the real
+ * manifests plus a couple of synthetic, E2E-only ones, restored via `git checkout` once the whole
+ * `pnpm e2e` run finishes (see that file's own doc comment).
+ */
+export function renderCoreRegistryModule(manifests: readonly GameManifest[]): string {
+  return `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
+import type { GameManifest } from "@owogg/game-sdk/contracts";
+
+export const GAME_MANIFESTS: GameManifest[] = ${JSON.stringify(manifests, null, 2)};
+
+export const GAME_MANIFEST_MAP: Record<string, GameManifest> = ${JSON.stringify(
+    Object.fromEntries(manifests.map((m) => [m.id || m.slug, m])),
+    null,
+    2,
+  )};
+
+export function validateScoreByManifest(gameId: string, score: number): { valid: boolean; reason?: string } {
+  if (typeof score !== "number" || Number.isNaN(score) || !Number.isInteger(score) || score < 0) {
+    return { valid: false, reason: "점수는 0 이상의 정수이어야 합니다." };
+  }
+
+  const manifest = GAME_MANIFEST_MAP[gameId];
+  if (!manifest) {
+    // Deliberately not an "accept anything under a million" fallback (2026-08-17 beta hardening)
+    // - that let ANY unrecognized game id, sandbox games included, submit an arbitrary score with
+    // almost no bounds check, since sandbox games are never in this static registry. Sandbox game
+    // score submission is explicitly unsupported until a dedicated DB-backed validation path is
+    // built for it - this is that decision enforced, not a gap.
+    return { valid: false, reason: "지원하지 않는 게임입니다." };
+  }
+  if (!manifest.scoreConfig) {
+    return { valid: true };
+  }
+
+  const { min, max } = manifest.scoreConfig;
+  if (score < min || score > max) {
+    return { valid: false, reason: \`유효하지 않은 점수입니다 (\${min}~\${max}).\` };
+  }
+
+  return { valid: true };
+}
+`;
+}
+
 export async function buildRegistrySources(rootDir = process.cwd()): Promise<RegistryBuildResult> {
   const gamesDir = path.join(rootDir, "games");
 
@@ -264,49 +316,9 @@ export async function buildRegistrySources(rootDir = process.cwd()): Promise<Reg
   const definitions = loadGameDefinitions(rootDir);
   assertDefinitionsMatchManifests(definitions, manifests);
 
-  // 1. Core Manifest Registry Raw Code
-  // The generated file lands in packages/core, so it imports the framework-independent
-  // "@owogg/game-sdk/contracts" entry rather than the package root — the root re-exports the
-  // React-bound GameModule/GameProps, and core must not depend on React (enforced by
-  // scripts/architecture-rules.ts). The web loader registry below is a browser module and keeps
-  // using the root entry.
-  const rawCoreRegistryCode = `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
-import type { GameManifest } from "@owogg/game-sdk/contracts";
-
-export const GAME_MANIFESTS: GameManifest[] = ${JSON.stringify(manifests, null, 2)};
-
-export const GAME_MANIFEST_MAP: Record<string, GameManifest> = ${JSON.stringify(
-    Object.fromEntries(manifests.map((m) => [m.id || m.slug, m])),
-    null,
-    2,
-  )};
-
-export function validateScoreByManifest(gameId: string, score: number): { valid: boolean; reason?: string } {
-  if (typeof score !== "number" || Number.isNaN(score) || !Number.isInteger(score) || score < 0) {
-    return { valid: false, reason: "점수는 0 이상의 정수이어야 합니다." };
-  }
-
-  const manifest = GAME_MANIFEST_MAP[gameId];
-  if (!manifest) {
-    // Deliberately not an "accept anything under a million" fallback (2026-08-17 beta hardening)
-    // - that let ANY unrecognized game id, sandbox games included, submit an arbitrary score with
-    // almost no bounds check, since sandbox games are never in this static registry. Sandbox game
-    // score submission is explicitly unsupported until a dedicated DB-backed validation path is
-    // built for it - this is that decision enforced, not a gap.
-    return { valid: false, reason: "지원하지 않는 게임입니다." };
-  }
-  if (!manifest.scoreConfig) {
-    return { valid: true };
-  }
-
-  const { min, max } = manifest.scoreConfig;
-  if (score < min || score > max) {
-    return { valid: false, reason: \`유효하지 않은 점수입니다 (\${min}~\${max}).\` };
-  }
-
-  return { valid: true };
-}
-`;
+  // 1. Core Manifest Registry Raw Code — see renderCoreRegistryModule's own doc comment for why
+  // this is a separately exported, pure function rather than inlined here.
+  const rawCoreRegistryCode = renderCoreRegistryModule(manifests);
 
   // 2. Web Loader Registry Raw Code
   const loaderEntries = gameEntries
