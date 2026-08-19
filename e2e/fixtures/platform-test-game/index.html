@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>OwOGG Platform E2E Fixture</title>
+  </head>
+  <body>
+    <!--
+      Not a game. This is the platform E2E suite's own fixture (see
+      e2e/prepareLocalGameOrigin.ts) — deliberately no gameplay, no score, no Game Bridge
+      handshake, nothing beyond what an iframe-security/Presentation-layout assertion needs:
+      proof this exact document loaded (the marker below), and a way to read its own logical
+      viewport. Served under BOTH e2e-responsive and e2e-fixed slugs — the same static bytes
+      exercise two different GamePresentation viewport modes, since presentation is catalog
+      metadata the platform decides how to size, not something this document has any say in.
+
+      Kept deliberately reusable for a future Game Bridge E2E PR (not this one — see this PR's
+      own scope note) rather than the absolute minimum possible markup.
+    -->
+    <div id="e2e-fixture-marker" data-fixture="platform-test-game">platform-test-game</div>
+  </body>
+</html>
