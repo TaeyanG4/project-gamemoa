@@ -1,17 +1,30 @@
 /**
  * What a game *is*, independent of how it is stored or who uploaded it.
  *
- * This is the type the unified Game Registry will resolve (see ../ports/gameRegistry.ts). Nothing
- * in this PR produces or consumes one yet — it exists so the following PRs have a single agreed
- * shape to converge the two current sources on:
+ * This is the type the unified Game Registry resolves (see ../ports/gameRegistry.ts). Two
+ * sources feed it today:
  *
- *   games/<name>/src/manifest.ts  (GameManifest, build-time, official games)
- *   sandbox_games                 (D1 row, runtime, Game Creator uploads)
+ *   game-registry/games/<slug>/{info,policy}.json  (SYSTEM, build-time, compiled to
+ *                                                    registry/gameDefinitions.generated.ts)
+ *   B2 CreatorGameCanonicalDocument + sandbox_games (CREATOR, D1 identity/runtime + B2 canonical
+ *                                                    metadata/policy — see
+ *                                                    domain/creatorGameCanonicalDocument.ts and
+ *                                                    registry/creatorGameRegistry.ts)
  *
- * Deliberately built on `@owogg/game-sdk/contracts`' existing vocabulary (GameMode, InputMethod,
- * DifficultyConfig, ScoreConfig, GamePresentation) rather than redeclaring parallel copies of it.
- * A definition must be expressible from today's GameManifest without loss, or the migration would
- * start by throwing away catalog metadata that already works.
+ * Deliberately a discriminated union on `owner.type`, not one flat shape with optional fields on
+ * both sides — the same reasoning `./publicGame.ts`'s `PublicGame` union already documents for the
+ * public-facing shape this mirrors. A SYSTEM game has a fixed category/tag taxonomy, a fixed set of
+ * input methods and a bundled thumbnail asset; a CREATOR game has a free-text genre, a coarser
+ * single/multi mode, and a logo served from its own byte endpoint. Forcing both into one
+ * optional-everything shape would mean either inventing categories/tags/thumbnail a creator game
+ * doesn't have (this migration's own B2 canonical schema deliberately has no such fields — see
+ * domain/creatorGameCanonicalDocument.ts's own doc comment on the known genre/categories gap being
+ * real and NOT resolved by inventing a mapping here) or silently dropping genre/mode from a
+ * SYSTEM one. `{@link GameDefinitionCommon}` holds only what both owners genuinely share.
+ *
+ * Built on `@owogg/game-sdk/contracts`' existing vocabulary (GameMode, InputMethod,
+ * DifficultyConfig, ScoreConfig, GamePresentation) rather than redeclaring parallel copies of it. A
+ * SYSTEM definition must be expressible from today's GameManifest without loss.
  */
 
 import type {
@@ -22,7 +35,8 @@ import type {
   InputMethod,
   ScoreConfig,
 } from "@owogg/game-sdk/contracts";
-import type { GameOwner } from "./gameOwner.js";
+import type { CreatorGameOwner, SystemGameOwner } from "./gameOwner.js";
+import type { SandboxGameMode } from "../../../domain/sandboxGames.js";
 
 /**
  * The half a game's author does NOT get to decide.
@@ -55,25 +69,47 @@ export interface GamePolicy {
 /** Multiple separately-scored difficulty tiers, or `undefined` for the single-tier default. */
 export type GameDifficulty = DifficultyConfig;
 
-export interface GameDefinition {
+/**
+ * Fields every game has, regardless of owner. Nothing here presumes a fixed taxonomy, a player
+ * count, or a thumbnail asset — those are SYSTEM-specific (see {@link SystemGameDefinition}).
+ */
+export interface GameDefinitionCommon {
   /**
-   * Global identity, and the only one. A GameManifest carries both `id` and `slug` (identical in
-   * all four shipped games); scores, leaderboards, favorites and recent-plays are all keyed by it,
-   * so it must never change once a game ships — see docs/GAME_CREATION_GUIDE.md and the migration
-   * plan's "slug is identity" rule.
+   * Global identity, and the only one. Scores, leaderboards, favorites and recent-plays are all
+   * keyed by it, so it must never change once a game ships — see docs/GAME_CREATION_GUIDE.md and
+   * the migration plan's "slug is identity" rule.
    *
    * Uniqueness is global across SYSTEM and CREATOR games, which is what today's schema cannot
    * express: `sandbox_games.slug` is UNIQUE only among sandbox rows, so nothing currently stops an
    * uploaded game from claiming `reaction-time`. The registry is where that gets enforced.
    */
   readonly slug: string;
-  readonly owner: GameOwner;
 
   readonly title: string;
   readonly shortDescription: string;
   readonly description: string;
 
   readonly status: GameStatus;
+
+  readonly difficulty?: GameDifficulty | undefined;
+  /** Whether the game can record/replay a session. Every game is `false` today. */
+  readonly supportsReplay: boolean;
+
+  readonly policy: GamePolicy;
+
+  /** Reuses `@owogg/game-sdk/contracts`' GamePresentation verbatim — see that type's own doc
+   * comment. `undefined` for a game that hasn't declared one; a definition without one behaves
+   * exactly as it always has. */
+  readonly presentation?: GamePresentation | undefined;
+}
+
+/** An official game maintained in this repository — game-registry/, compiled at build time into
+ * registry/gameDefinitions.generated.ts's `GAME_DEFINITIONS`. Fixed category/tag taxonomy, a
+ * bundled thumbnail asset path, and the richer `GameMode`/`InputMethod` vocabulary — none of which
+ * a CREATOR game has any equivalent for (see this file's own top doc comment). */
+export interface SystemGameDefinition extends GameDefinitionCommon {
+  readonly owner: SystemGameOwner;
+
   readonly categories: readonly string[];
   readonly tags: readonly string[];
 
@@ -85,19 +121,45 @@ export interface GameDefinition {
   readonly thumbnail: string;
   readonly accent?: string | undefined;
   readonly estimatedRoundSeconds?: number | undefined;
+}
 
-  readonly difficulty?: GameDifficulty | undefined;
-  /** Whether the game can record/replay a session. Every game is `false` today. */
-  readonly supportsReplay: boolean;
+/** A game uploaded through the Game Creator program — D1 identity/runtime
+ * (`sandbox_games`/`SandboxGameRepository`) combined with its B2 canonical metadata/policy
+ * (`CreatorGameCanonicalDocument`/`CreatorGameDefinitionRepository`); see
+ * registry/creatorGameRegistry.ts for the projection that builds one of these. */
+export interface CreatorGameDefinition extends GameDefinitionCommon {
+  readonly owner: CreatorGameOwner;
 
-  readonly policy: GamePolicy;
+  /** Free-text, not one of SYSTEM's fixed `categories` — see this file's own top doc comment on
+   * why this migration does not invent a mapping between the two. */
+  readonly genre: string;
+  /** `"single" | "multi"` — sandbox_games' own coarser player-count vocabulary (see
+   * domain/sandboxGames.ts's SandboxGameMode), never translated into SYSTEM's richer
+   * `"local-multi" | "online-multi"` distinction, which a Creator submission has no way to
+   * declare (OwOGG runs no server-side game-state relay — see
+   * docs/GAME_CREATION_GUIDE.md §3.2.2). */
+  readonly mode: SandboxGameMode;
+  /** Whether this game has an uploaded logo — mirrors `SandboxGameRecord.logoKey !== null`
+   * (`toPublicCreatorGame` derives the same `hasLogo` boolean from the same column for the same
+   * reason: the client fetches the logo from its own byte endpoint, never a raw storage key). */
+  readonly hasLogo: boolean;
+}
 
-  /** Reuses `@owogg/game-sdk/contracts`' GamePresentation verbatim — see that type's own doc
-   * comment. Undefined for every SYSTEM game today (game-registry/'s JSON sources don't carry it
-   * yet, and this PR deliberately doesn't add it to any of them); a definition without one behaves
-   * exactly as it always has. Nothing reads this field yet — see GamePresentation's own doc
-   * comment for what's still a later PR's job. */
-  readonly presentation?: GamePresentation | undefined;
+export type GameDefinition = SystemGameDefinition | CreatorGameDefinition;
+
+/** Narrows a {@link GameDefinition} to its SYSTEM variant — the owner-narrowing pattern this
+ * file's own top doc comment points to `./publicGame.ts`'s `PublicGame` union for. */
+export function isSystemGameDefinition(
+  definition: GameDefinition,
+): definition is SystemGameDefinition {
+  return definition.owner.type === "SYSTEM";
+}
+
+/** Narrows a {@link GameDefinition} to its CREATOR variant — see {@link isSystemGameDefinition}. */
+export function isCreatorGameDefinition(
+  definition: GameDefinition,
+): definition is CreatorGameDefinition {
+  return definition.owner.type === "CREATOR";
 }
 
 /** Whether a submitted score is even meaningful for this game. */

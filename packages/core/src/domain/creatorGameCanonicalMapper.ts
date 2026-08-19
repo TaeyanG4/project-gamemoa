@@ -17,6 +17,7 @@ import {
   CREATOR_GAME_DEFINITION_SCHEMA_VERSION,
   type CreatorGameCanonicalDocument,
 } from "./creatorGameCanonicalDocument.js";
+import { isCreatorScorePolicyConfigured } from "./creatorScorePolicy.js";
 import type { SandboxGameRecord } from "../ports/sandboxGames.js";
 
 /** Exactly the fields this mapper reads — see this file's own top doc comment for why this is a
@@ -43,9 +44,11 @@ export type SandboxGameRecordCanonicalSource = Pick<
  * The one case this mapper refuses to guess at, rather than silently producing a document that
  * misrepresents the game: a `SandboxGameRecord` whose score_* columns are only *partially* set
  * (some, but not all, of scoreUnit/scoreDirection/scoreMin/scoreMax non-null) — or, just as
- * importantly, entirely unset. `domain/creatorScorePolicy.ts`'s own `sandboxGameToScorePolicy`
- * (the existing, production adapter this reuses the exact same "any column null -> incomplete"
- * gate from) already documents why: for a Creator game, unlike a SYSTEM manifest, "no score
+ * importantly, entirely unset. `domain/creatorScorePolicy.ts`'s own
+ * `isCreatorScorePolicyConfigured` (the shared "any column null -> incomplete" gate this mapper,
+ * `sandboxGameToScorePolicy`, and `CreatorGameRegistry`'s own pre-canonical classification all
+ * call, rather than each re-declaring it) already documents why: for a Creator game, unlike a
+ * SYSTEM manifest, "no score
  * columns set yet" and "deliberately unscored" are NOT distinguishable from D1 alone — there is
  * no separate "this game is intentionally unscored" flag anywhere in `sandbox_games`. Collapsing
  * that into `score: null` (this document's spelling of "deliberately unscored") would silently
@@ -113,12 +116,7 @@ export type CreatorCanonicalMappingResult =
 export function mapSandboxGameRecordToCanonical(
   record: SandboxGameRecordCanonicalSource,
 ): CreatorCanonicalMappingResult {
-  if (
-    record.scoreUnit === null ||
-    record.scoreDirection === null ||
-    record.scoreMin === null ||
-    record.scoreMax === null
-  ) {
+  if (!isCreatorScorePolicyConfigured(record)) {
     return { ok: false, reason: "SCORE_POLICY_NOT_CONFIGURED" };
   }
 

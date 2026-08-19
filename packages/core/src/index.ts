@@ -36,9 +36,11 @@ export * from "./ports/creatorScoreAcceptance.js";
 // review, publishing, and gameServing's security boundary are untouched by this module.
 export * from "./modules/game/domain/gameOwner.js";
 export * from "./modules/game/domain/gameDefinition.js";
+export * from "./modules/game/domain/creatorGameStatus.js";
 export * from "./modules/game/domain/publicGame.js";
 export * from "./modules/game/ports/gameRegistry.js";
 export * from "./modules/game/registry/staticGameRegistry.js";
+export * from "./modules/game/registry/creatorGameRegistry.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";

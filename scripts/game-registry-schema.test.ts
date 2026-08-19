@@ -10,7 +10,7 @@ import {
   assertUniqueSlugs,
   loadGameDefinitions,
 } from "./registry-builder.js";
-import type { GameDefinition } from "../packages/core/src/modules/game/domain/gameDefinition.js";
+import type { SystemGameDefinition } from "../packages/core/src/modules/game/domain/gameDefinition.js";
 import type { GameManifest } from "../packages/game-sdk/src/contracts/manifest.js";
 import type { GamePresentation } from "../packages/game-sdk/src/contracts/presentation.js";
 
@@ -37,7 +37,7 @@ const VALID_POLICY = {
   requiresAuth: false,
 };
 
-function parse(info: unknown = VALID_INFO, policy: unknown = VALID_POLICY): GameDefinition {
+function parse(info: unknown = VALID_INFO, policy: unknown = VALID_POLICY): SystemGameDefinition {
   return parseGameDefinition({
     slug: "sample-game",
     infoFile: "game-registry/games/sample-game/info.json",
@@ -448,7 +448,7 @@ test("presentation requires all three of viewport, fullscreen, and mobile when p
 
 // ── registry-wide invariants ─────────────────────────────────────────────────
 
-function definitionWithSlug(slug: string): GameDefinition {
+function definitionWithSlug(slug: string): SystemGameDefinition {
   return { ...parse(), slug };
 }
 
@@ -460,7 +460,7 @@ test("assertUniqueSlugs rejects a collision — the guarantee no schema provides
   );
 });
 
-function manifestFor(definition: GameDefinition): GameManifest {
+function manifestFor(definition: SystemGameDefinition): GameManifest {
   return {
     id: definition.slug,
     slug: definition.slug,
