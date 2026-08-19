@@ -33,9 +33,9 @@ accepted from untrusted input.
 ## Current scope: SYSTEM games only
 
 Only games owned by OwOGG itself (`owner.type === "SYSTEM"`) live here. Creator-owned
-games are still described by `sandbox_games` rows in D1; where their canonical
-description will ultimately live is deliberately undecided, and nothing here assumes
-an answer.
+games are still described by `sandbox_games` rows in D1. The direction is a
+B2-backed CreatorGameRegistry, resolved through the same `GameRegistry` port this
+directory feeds — not yet implemented.
 
 ## Runtime status
 

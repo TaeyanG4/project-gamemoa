@@ -10,12 +10,17 @@
  * switch used to resolve a game directly through
  * `packages/core/src/registry/gameRegistry.generated.ts`, generated from `games/*` at build time.
  * A Game Creator upload has never appeared in that map, so `validateScoreByManifest` rejected it
- * outright — an approved, public creator game still cannot submit a score, hold a leaderboard
- * entry, earn XP, or be disabled from `/admin/games`, because this port's production
- * implementation is SYSTEM-only today too (`GAME_DEFINITIONS` covers the same four built-in
- * games `GAME_MANIFESTS` does). That gap isn't fixed by this port existing; it's fixed by a
- * future implementation that also resolves creator games — this port is what makes that swap
- * possible without touching every call site again.
+ * outright. Creator score submission and leaderboard reads no longer go through that gap at all —
+ * `CreatorScoreAcceptanceUseCases` and `CreatorLeaderboardUseCases` are separate, parallel paths
+ * built from the same underlying pieces (`ScoreRepository`, `sandboxGameToScorePolicy`) rather
+ * than this port. What's still missing is this port itself resolving creator games: its
+ * production implementation (`StaticGameRegistry(GAME_DEFINITIONS)`) is SYSTEM-only today, so a
+ * creator game still can't earn XP/achievements through that acceptance path
+ * (`CreatorScoreAcceptanceUseCases` deliberately doesn't award them yet — see its own doc
+ * comment) or be disabled from `/admin/games` (`GameSettingsUseCases` resolves games through this
+ * same SYSTEM-only port). That gap isn't fixed by this port existing; it's fixed by a future
+ * implementation that also resolves creator games — this port is what makes that swap possible
+ * without touching every call site again.
  *
  * Asynchronous on purpose. The official-game implementation will be a synchronous read of a
  * generated file, but the migration explicitly allows reading existing D1 sandbox metadata as a
