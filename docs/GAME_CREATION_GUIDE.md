@@ -628,6 +628,37 @@ secret**입니다 — 그래서 `apps/api/wrangler.jsonc`를 건드릴 필요가
   별도 설계는 [`docs/MULTIPLAYER_GAME_DESIGN.md`](MULTIPLAYER_GAME_DESIGN.md) 참고.
 - 네이티브 바이너리, 파일 시스템 접근이 필요한 게임(브라우저 샌드박스의 한계).
 
+### 3.10 SYSTEM(공식) 게임 standalone bundle 발행 기반 (2026-08-19)
+
+`modules/game/domain/gameOwner.ts`가 이미 명시한 방향대로, SYSTEM과 CREATOR 게임은 "등록·버전관리·
+불변 오브젝트 스토리지 발행·격리된 게임 오리진에서 서빙·같은 호스트로 플레이"라는 배포 방식으로
+수렴하도록 설계되어 있습니다. `feat/official-game-publisher-foundation`은 이 수렴의 **발행(publish)
+계층**만 먼저 놓은 기반 작업입니다 — 실제 SYSTEM 게임(예: reaction-time)을 이 경로로 옮기는 건 다음
+PR의 몫입니다.
+
+- `packages/core/src/domain/systemGameBundle.ts` — Creator의 `sandboxGameBundle.ts`와 병렬 구조.
+  키 레이아웃은 `official-uploads/<slug>/<hash>.zip`, `official-games/<slug>/<version>/*` — Creator의
+  `uploads/`, `games/` prefix와 절대 겹치지 않습니다. `version`은 번들 자체의 content hash(기존
+  `sha256Hex` 재사용)이며 **DB row가 전혀 필요 없습니다** — SYSTEM 게임은 `sandbox_games` 같은 D1
+  테이블이 없으므로(no developer, no review lifecycle), 식별자를 (slug, version) 문자열 조합으로
+  잡아 D1 의존 없이 불변 버전 URL을 만듭니다.
+- `packages/core/src/application/systemGameBundlePublisher.ts` — `GameBundlePublisher`를 확장하지
+  않고 별도 클래스로 둡니다. 이유: `GameBundlePublisher.publish()`는 D1 `sandbox_game_versions` row의
+  상태(PUBLISHING/READY/FAILED)를 커밋 기록으로 씁니다 — SYSTEM 게임에 review/PENDING_REVIEW 같은
+  Creator 업로드 lifecycle을 억지로 얹지 않기 위해, `SystemGameBundlePublisher`는 D1 없이 **manifest
+  객체 자체(파일들 먼저, manifest 마지막)를 커밋 기록으로 사용**합니다 — `readManifest`가 null이면
+  "발행 안 됨"입니다.
+- **재사용된 것**: `GameBundleStorageRepository`/`BundleArchiveReader` 포트,
+  `BackblazeB2GameBundleRepository`/`FflateBundleArchiveReader` 구현, 번들 검증/압축해제 파이프라인
+  (`prepareBundleFromArchive` — 이번에 `GameBundlePublisher.prepare()`에서 뽑아낸 공용 함수) 전부
+  변경 없이 그대로 사용합니다. 새 Worker, 새 라우트, 새 DB 테이블 없음.
+- **아직 안 한 것**: 실제 SYSTEM 게임(React 컴포넌트)을 standalone HTML/JS로 컴파일하는 빌드 도구
+  (Vite 설정 등), Game Bridge SDK 실제 연결, 서빙 라우트(현재 `/games/:gameId/:versionId/*`는
+  D1 정수 ID 기반이라 slug 기반 SYSTEM 게임에는 그대로 안 맞음), 어떤 SYSTEM 게임의 실제 런타임
+  전환. 증명은 `packages/core/test/systemGameBundle*.test.ts`(순수 단위 테스트)와
+  `apps/api/test/systemGameBundlePublishSmokeTest.test.ts`(실제 zip + 실제 B2 서명 어댑터, fetch만
+  스텁 — build → validate → publish → read 전체 경로)로 되어 있습니다.
+
 ---
 
 ## 4. 착수 순서
