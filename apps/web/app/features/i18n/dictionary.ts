@@ -1002,6 +1002,10 @@ export interface Dictionary {
     creatorScoreSubmittingLabel: string;
     creatorScoreSuccessLabel: string;
     creatorScoreErrorFallback: string;
+    /** Marks the current player's own row in CreatorGameHost's leaderboard preview — reuses
+     * leaderboardTitle/leaderboardEmpty above as-is (already generic, no ranking-page-specific
+     * wording), this is the one new string that preview needed. */
+    leaderboardYou: string;
     retryGameCta: string;
     backToListResult: string;
     /** Generic difficulty tier labels, reused across every difficulty-supporting game (rather
@@ -2302,6 +2306,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorScoreSubmittingLabel: "점수 저장 중...",
       creatorScoreSuccessLabel: "점수가 저장되었습니다!",
       creatorScoreErrorFallback: "점수 저장에 실패했습니다.",
+      leaderboardYou: "나",
       retryGameCta: "🔄 다시 하기",
       backToListResult: "목록으로",
       difficultyNormal: "보통",
@@ -3592,6 +3597,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorScoreSubmittingLabel: "Saving your score...",
       creatorScoreSuccessLabel: "Your score has been saved!",
       creatorScoreErrorFallback: "Failed to save your score.",
+      leaderboardYou: "You",
       retryGameCta: "🔄 Play again",
       backToListResult: "Back to list",
       difficultyNormal: "Normal",
@@ -4881,6 +4887,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorScoreSubmittingLabel: "スコアを保存中...",
       creatorScoreSuccessLabel: "スコアが保存されました！",
       creatorScoreErrorFallback: "スコアの保存に失敗しました。",
+      leaderboardYou: "自分",
       retryGameCta: "🔄 もう一度プレイ",
       backToListResult: "リストに戻る",
       difficultyNormal: "ノーマル",
@@ -6116,6 +6123,7 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       creatorScoreSubmittingLabel: "正在保存分数...",
       creatorScoreSuccessLabel: "分数已保存！",
       creatorScoreErrorFallback: "分数保存失败。",
+      leaderboardYou: "我",
       retryGameCta: "🔄 再玩一次",
       backToListResult: "返回列表",
       difficultyNormal: "普通",

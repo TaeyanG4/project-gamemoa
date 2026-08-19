@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
-import type { PublicCreatorGame } from "@owogg/contracts";
+import { useNavigate, Link } from "react-router";
+import type { PublicCreatorGame, LeaderRecord } from "@owogg/contracts";
 import { formatScore } from "@owogg/game-sdk";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n/I18nContext";
@@ -9,7 +9,8 @@ import { sandboxGamePlayUrl } from "../../lib/api/config";
 import { fetchGameSession } from "./gameSessionApi";
 import { acceptCreatorScore } from "./creatorScoreAcceptApi";
 import { createCreatorScoreFlow, type CreatorScoreSubmissionState } from "./creatorScoreFlow";
-import { ArrowLeft, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
+import { fetchCreatorLeaderboardPreview } from "./creatorLeaderboardPreview";
+import { ArrowLeft, AlertCircle, CheckCircle2, RefreshCw, Trophy } from "lucide-react";
 
 export interface CreatorGameHostProps {
   slug: string;
@@ -29,12 +30,13 @@ interface CreatorGameCompleteResult {
  *
  * GAME_COMPLETE now feeds Creator score acceptance (creatorScoreFlow.ts) when a score is present
  * and the player is logged in — see that module's own doc comment for the full lifecycle
- * contract. Still stops short of a leaderboard preview or any XP/achievement/guild XP; Creator
- * score/XP/leaderboard *display* does not exist yet, only the acceptance write this now performs.
+ * contract. A successful save also fetches a compact leaderboard preview (top 5, via the same
+ * generalized GET /api/scores/:slug the SYSTEM leaderboard already uses — see
+ * creatorLeaderboardPreview.ts). Still stops short of any XP/achievement/guild XP connection.
  */
 export function CreatorGameHost({ slug, game }: CreatorGameHostProps) {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading, openLoginModal } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, openLoginModal } = useAuth();
   const { dict } = useI18n();
 
   const [attemptKey, setAttemptKey] = useState(0);
@@ -42,6 +44,7 @@ export function CreatorGameHost({ slug, game }: CreatorGameHostProps) {
   const [bridgeError, setBridgeError] = useState<string | null>(null);
   const [submissionState, setSubmissionState] = useState<CreatorScoreSubmissionState>("idle");
   const [submissionMessage, setSubmissionMessage] = useState<string | undefined>(undefined);
+  const [leaderboardPreview, setLeaderboardPreview] = useState<LeaderRecord[] | null>(null);
 
   // One controller per slug — see creatorScoreFlow.ts's own doc comment for why this is a plain
   // factory function rather than a hook (apps/web has no component-render test harness, so the
@@ -79,6 +82,22 @@ export function CreatorGameHost({ slug, game }: CreatorGameHostProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scoreFlow, attemptKey, authLoading]);
 
+  // Leaderboard preview — fetched only after the score actually saved (not at round-end
+  // regardless of outcome, unlike GameHost's own preview): a guest or a failed/rejected
+  // submission has nothing new to show. Re-fires on every fresh "success" (including a
+  // subsequent retry's own successful save, since submissionState passes back through
+  // "idle"/"submitting" in between, which React sees as a real dependency change).
+  useEffect(() => {
+    if (submissionState !== "success") return;
+    let isMounted = true;
+    void fetchCreatorLeaderboardPreview(slug).then((records) => {
+      if (isMounted) setLeaderboardPreview(records);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [submissionState, slug]);
+
   const handleComplete = useCallback(
     (completeResult: CreatorGameCompleteResult) => {
       // The local result is set unconditionally and first — a failed or skipped score
@@ -103,6 +122,7 @@ export function CreatorGameHost({ slug, game }: CreatorGameHostProps) {
   const handleRetry = useCallback(() => {
     setResult(null);
     setBridgeError(null);
+    setLeaderboardPreview(null);
     setAttemptKey((prev) => prev + 1);
   }, []);
 
@@ -141,9 +161,9 @@ export function CreatorGameHost({ slug, game }: CreatorGameHostProps) {
           </div>
         ) : (
           <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
-            {/* Result overlay — same layout/classes as GameHost's. Score save status is shown
-                below (mirroring GameHost's submissionState block); leaderboard preview and share
-                stay out, same as before — Creator games don't have either yet. */}
+            {/* Result overlay — same layout/classes as GameHost's. Score save status and a
+                leaderboard preview are shown below (mirroring GameHost's own submissionState/
+                resultLeaderboard blocks); share stays out — Creator games don't have that yet. */}
             {result ? (
               <div className="absolute inset-0 z-50 overflow-y-auto bg-black/90">
                 <div className="flex min-h-full flex-col items-center justify-center gap-6 p-6 text-center md:p-8">
@@ -224,6 +244,64 @@ export function CreatorGameHost({ slug, game }: CreatorGameHostProps) {
                           <AlertCircle className="w-4 h-4" />
                           {submissionMessage || dict.gamePlay.creatorScoreErrorFallback}
                         </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Leaderboard preview — only once a save has actually succeeded (see the
+                      fetch effect above). Same visual style as GameHost's own preview block; no
+                      "view full ranking" link, since /games/:slug/ranking is still SYSTEM-only. */}
+                  {submissionState === "success" && leaderboardPreview && (
+                    <div className="w-full max-w-md rounded-2xl border border-border bg-surface-raised p-4 text-left">
+                      <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-text-muted">
+                        <Trophy className="h-3.5 w-3.5 text-accent-yellow" />
+                        {dict.gamePlay.leaderboardTitle}
+                      </p>
+                      {leaderboardPreview.length === 0 ? (
+                        <p className="py-3 text-center text-xs text-text-muted">
+                          {dict.gamePlay.leaderboardEmpty}
+                        </p>
+                      ) : (
+                        <ol className="space-y-1">
+                          {leaderboardPreview.map((record, i) => {
+                            const isMe = user !== null && record.userId === user.id;
+                            return (
+                              <li
+                                key={record.id}
+                                className={`flex items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-xs ${
+                                  isMe ? "bg-brand/10 ring-1 ring-brand/40" : "bg-surface"
+                                }`}
+                              >
+                                {record.userId !== null && record.userId !== undefined ? (
+                                  <Link
+                                    to={`/users/${record.userId}`}
+                                    className={`flex items-center gap-2 truncate font-semibold hover:underline ${
+                                      isMe ? "text-brand" : "text-brand-light"
+                                    }`}
+                                  >
+                                    <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                                    <span className="truncate">{record.playerName}</span>
+                                    {isMe && (
+                                      <span className="shrink-0 text-[10px] font-black text-brand">
+                                        ({dict.gamePlay.leaderboardYou})
+                                      </span>
+                                    )}
+                                  </Link>
+                                ) : (
+                                  <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
+                                    <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                                    <span className="truncate">{record.playerName}</span>
+                                  </span>
+                                )}
+                                <span
+                                  className={`shrink-0 font-black ${isMe ? "text-brand" : "text-brand-light"}`}
+                                >
+                                  {record.formattedScore}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ol>
                       )}
                     </div>
                   )}
