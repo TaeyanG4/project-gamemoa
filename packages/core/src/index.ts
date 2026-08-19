@@ -58,6 +58,7 @@ export * from "./application/sandboxGameUseCases.js";
 export * from "./application/gameBundlePublisher.js";
 export * from "./application/gameAttemptUseCases.js";
 export * from "./application/creatorScoreAcceptanceUseCases.js";
+export * from "./application/creatorLeaderboardUseCases.js";
 export * from "./registry/gameRegistry.generated.js";
 // Compiled from game-registry/. Exported so tests and the next PR's wiring can reach it; no
 // runtime consumer yet — GAME_MANIFESTS above is still what score/settings/catalog read.
