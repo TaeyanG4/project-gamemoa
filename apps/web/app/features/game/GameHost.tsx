@@ -23,6 +23,12 @@ import { localizedDifficultyLabel } from "../catalog/difficultyLabels";
 import { GameThumbnail } from "../../components/ui/GameThumbnail";
 import { XIcon } from "../../components/ui/XIcon";
 import { LegacyReactRuntime } from "./runtime/LegacyReactRuntime";
+import { IframeRuntime } from "./runtime/IframeRuntime";
+import {
+  SYSTEM_GAME_RELEASES,
+  type SystemGameRelease,
+} from "./runtime/systemGameReleaseMap.generated";
+import { officialGameEntryUrl } from "../../lib/api/config";
 import type { Dictionary } from "../i18n/dictionary";
 import type { LeaderRecord } from "@owogg/contracts";
 import {
@@ -61,6 +67,64 @@ export function formatMetadataValue(key: string, value: unknown): string {
     return `${value}%`;
   }
   return String(value);
+}
+
+/**
+ * Which runtime a SYSTEM game's slug plays through — the ONE place that decision is made. Driven
+ * entirely by the release map's own presence, not a hardcoded per-slug switch: the map (built at
+ * deploy time by scripts/publish-official-game-bundles.ts, see systemGameReleaseMap.generated.ts's
+ * own doc comment) already encodes exactly which SYSTEM games have been migrated to a standalone
+ * iframe bundle, so re-deriving that list here would just be a second copy that could drift.
+ * Deliberately NOT read off GameDefinition/GameManifest — the release map is deployment/runtime
+ * state (which published bundle version is currently live), not catalog metadata a game's own
+ * manifest should ever carry.
+ *
+ * A slug absent from the map — because it was never migrated (aim-test/memory-test/typing-test
+ * today), or because a deploy's publish step failed and left the previous map in place — always
+ * resolves to "legacy", never a broken iframe URL. That fallback is what makes "publish
+ * failed/missing hash → the new iframe URL is never deployed" hold structurally, not just by
+ * convention: GameHost has no code path that renders IframeRuntime without a release map entry to
+ * point it at.
+ */
+export function resolveGameRuntimeKind(
+  slug: string,
+  releases: Readonly<Record<string, SystemGameRelease>>,
+): "iframe" | "legacy" {
+  return releases[slug] ? "iframe" : "legacy";
+}
+
+/**
+ * Adapts the Game Bridge's reduced GAME_COMPLETE payload ({score?, metadata?}) into the full
+ * GameResult shape runtime.complete (below) already expects, so the iframe path can feed the exact
+ * same score/local-best/leaderboard/share pipeline LegacyReactRuntime's games use — no duplicated
+ * submission logic, no changed /api/scores contract.
+ *
+ * Returns null for a completion with no score: runtime.complete's downstream (saveLocalBestScore,
+ * handleScoreSubmission) has nothing meaningful to do with an absent score, so GameHost simply
+ * doesn't call it rather than synthesizing a fake one (mirrors CreatorGameHost's own `result.score
+ * !== undefined` guard around its score-submission call).
+ *
+ * gameId/sessionId/durationMs/clientStartedAt/clientEndedAt are all placeholder-filled where the
+ * Bridge doesn't carry them: GameHost's runtime.complete only ever reads `.score`/`.metadata` off
+ * its argument (see the result-overlay JSX and handleScoreSubmission below) — nothing consumes the
+ * placeholders, so synthesizing them here has zero behavioral effect while still satisfying
+ * GameResult's required shape.
+ */
+export function buildGameResultFromBridgeComplete(
+  bridgeResult: { score?: number; metadata?: Record<string, unknown> },
+  context: { slug: string; sessionId: string },
+): GameResult | null {
+  if (bridgeResult.score === undefined) return null;
+  const now = Date.now();
+  return {
+    gameId: context.slug,
+    sessionId: context.sessionId,
+    score: bridgeResult.score,
+    durationMs: 0,
+    ...(bridgeResult.metadata !== undefined ? { metadata: bridgeResult.metadata } : {}),
+    clientStartedAt: now,
+    clientEndedAt: now,
+  };
 }
 
 // Metadata keys that get their own dedicated presentation elsewhere in the result screen (e.g.
@@ -114,6 +178,11 @@ export function GameHost({ slug }: GameHostProps) {
   const localizedTitle = manifest ? getLocalizedGameContent(dict, manifest).title : undefined;
   const isDisabled = useIsGameDisabled(manifest?.id ?? slug);
 
+  // See resolveGameRuntimeKind's own doc comment — the release map's presence is the only signal
+  // that decides IframeRuntime vs. LegacyReactRuntime for this slug.
+  const release = SYSTEM_GAME_RELEASES[slug];
+  const runtimeKind = resolveGameRuntimeKind(slug, SYSTEM_GAME_RELEASES);
+
   // Difficulty selection — only meaningful for games with manifest.difficulty. Resets to the
   // game's default whenever navigating between games. A change here only affects the NEXT
   // attempt (handleStart, inside the game component) — an already-in-progress round keeps
@@ -123,8 +192,17 @@ export function GameHost({ slug }: GameHostProps) {
     setSelectedDifficultyId(manifest?.difficulty?.defaultLevelId ?? "normal");
   }, [manifest]);
 
-  // Load Game Module
+  // Load Game Module — skipped entirely for a slug the release map resolves to "iframe": the
+  // game's React component never enters this host's own JS bundle at all in that case (it runs
+  // standalone, inside the iframe's own bundle instead), so there is no module for loadGame() to
+  // fetch. GameComponent simply stays null and the iframe branch below never reads it.
   useEffect(() => {
+    if (runtimeKind === "iframe") {
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
     let isMounted = true;
     extractPlayTokenFromLocation();
 
@@ -161,7 +239,7 @@ export function GameHost({ slug }: GameHostProps) {
     // loadGame() dynamic-imports the module, which the bundler caches per specifier — re-running
     // this on a locale switch is just a cache hit, not a real re-fetch, so it's safe to depend on
     // these two dict strings the same way exhaustive-deps wants.
-  }, [slug, dict.gamePlay.errorGameNotFound, dict.gamePlay.errorLoadFailed]);
+  }, [slug, runtimeKind, dict.gamePlay.errorGameNotFound, dict.gamePlay.errorLoadFailed]);
 
   // Handle Score Submission (Authenticated Attempts Only)
   const handleScoreSubmission = useCallback(
@@ -371,6 +449,270 @@ export function GameHost({ slug }: GameHostProps) {
     ],
   );
 
+  // IframeRuntime callbacks — the Bridge-driven counterpart to the `runtime` object above.
+  // Deliberately funnel into the SAME `runtime.complete`/`recordRecentPlay`/`navigate` calls
+  // LegacyReactRuntime's games already use, rather than a parallel result pipeline: score
+  // submission, local-best tracking, the leaderboard preview effect, and share all stay exactly as
+  // they are today (see buildGameResultFromBridgeComplete's own doc comment for why this is safe).
+  const handleIframeStarted = useCallback(() => {
+    void recordRecentPlay(slug);
+  }, [recordRecentPlay, slug]);
+
+  const handleIframeComplete = useCallback(
+    (bridgeResult: { score?: number; metadata?: Record<string, unknown> }) => {
+      const gameResult = buildGameResultFromBridgeComplete(bridgeResult, { slug, sessionId });
+      if (gameResult) void runtime.complete(gameResult);
+    },
+    [runtime, slug, sessionId],
+  );
+
+  const handleIframeError = useCallback(
+    (message?: string) => {
+      console.error("Game bridge error:", slug, message);
+      setError(dict.gamePlay.errorLoadFailed);
+    },
+    [slug, dict.gamePlay.errorLoadFailed],
+  );
+
+  // Game Result & Score Submission Overlay — shared verbatim between the iframe and legacy
+  // branches below (result/submissionState/resultLeaderboard/share state are all populated
+  // identically by either runtime's own path into runtime.complete, so the overlay itself has no
+  // reason to differ). overflow-y-auto + min-h-full (rather than a fixed-height flex-center with
+  // no scroll) is what actually fixes two things at once: the result staying visually centered
+  // when it fits, and the retry/back-to-list buttons no longer clipping off the bottom edge when
+  // the content (card + status + leaderboard + share row) is taller than the viewport —
+  // previously there was nowhere for that overflow to go.
+  const resultOverlay = result ? (
+    <div className="absolute inset-0 z-50 overflow-y-auto bg-black/90">
+      <div className="flex min-h-full flex-col items-center justify-center gap-6 p-6 text-center md:p-8">
+        <h3 className="text-3xl font-extrabold text-white">{dict.gamePlay.resultTitle}</h3>
+
+        {/* The score card is now its own self-contained box — everything inside this
+            ref is what handleCopyScreenshot captures, and owogg.com is genuinely its
+            last/bottom element now that submission status, leaderboard, and share
+            buttons live in a separate section below instead of the same bordered box. */}
+        <div
+          ref={shareCardRef}
+          className="w-full max-w-md rounded-2xl border border-border bg-surface-raised p-6"
+        >
+          <div className="mb-3 flex items-center justify-center gap-2">
+            <GameThumbnail
+              thumbnail={manifest?.thumbnail ?? ""}
+              title={localizedTitle ?? ""}
+              accent={manifest?.accent}
+              className="h-6 w-6"
+              rounded="rounded-md"
+            />
+            <span className="text-sm font-bold text-text-secondary">{localizedTitle}</span>
+          </div>
+          <p className="text-text-secondary text-sm mb-1">
+            {isAuthenticated ? dict.gamePlay.finalScoreLabel : dict.gamePlay.deviceBestLabel}
+          </p>
+          <p className="text-5xl font-black text-brand mb-1">
+            {formatScore(result.score, manifest?.scoreConfig)}
+          </p>
+
+          {resultTier && (
+            <span
+              className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-black text-white shadow-md"
+              style={{
+                backgroundImage: `linear-gradient(to right, ${resultTier.colorFrom}, ${resultTier.colorTo})`,
+              }}
+            >
+              {resultTier.label}
+            </span>
+          )}
+
+          {/* Metadata Formatters */}
+          {result.metadata &&
+            Object.entries(result.metadata).filter(([key]) => !METADATA_GRID_EXCLUDED_KEYS.has(key))
+              .length > 0 && (
+              <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/80">
+                {Object.entries(result.metadata)
+                  .filter(([key]) => !METADATA_GRID_EXCLUDED_KEYS.has(key))
+                  .map(([key, value]) => (
+                    <div
+                      key={key}
+                      className="bg-surface/50 p-2.5 rounded-xl border border-border/40"
+                    >
+                      <p className="text-xs text-text-muted font-bold mb-0.5">
+                        {formatMetadataKey(key, dict.gamePlay)}
+                      </p>
+                      <p className="font-extrabold text-text-primary text-sm">
+                        {formatMetadataValue(key, value)}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+          <p className="mt-6 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+            owogg.com
+          </p>
+        </div>
+
+        {/* Everything below is deliberately outside shareCardRef (not part of the
+            screenshot) — submission status, leaderboard, share actions. Only shown to
+            guests (submissionState only ever becomes "guest" when signed out — see
+            runtime.complete), so an already-logged-in player never sees it. */}
+        <div className="w-full max-w-md flex flex-col gap-4">
+          {submissionState === "guest" && (
+            <div className="flex flex-col items-center gap-1.5">
+              <span className="text-xs font-bold text-text-secondary">
+                {dict.gamePlay.guestNoticeTitle}
+              </span>
+              <span className="text-[11px] text-text-muted">{dict.gamePlay.guestNoticeBody}</span>
+              <button
+                type="button"
+                onClick={openLoginModal}
+                className="mt-1 px-4 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-extrabold rounded-xl transition-colors cursor-pointer"
+              >
+                {dict.gamePlay.guestLoginCta}
+              </button>
+            </div>
+          )}
+          {submissionState === "submitting" && (
+            <span className="inline-flex items-center justify-center gap-2 text-xs font-bold text-brand animate-pulse">
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              {dict.gamePlay.submittingLabel}
+            </span>
+          )}
+          {submissionState === "success" && (
+            <span className="inline-flex items-center justify-center gap-2 text-xs font-bold text-emerald-400">
+              <CheckCircle2 className="w-4 h-4" />
+              {dict.gamePlay.successLabel}
+            </span>
+          )}
+          {submissionState === "error" && (
+            <div className="flex flex-col items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400">
+                <AlertCircle className="w-4 h-4" />
+                {submissionError || dict.gamePlay.errorSubmitFallback}
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleScoreSubmission(result.score)}
+                className="px-3 py-1 bg-surface border border-border hover:bg-surface-overlay text-text-primary text-xs font-bold rounded-lg transition-colors cursor-pointer"
+              >
+                {dict.gamePlay.retrySubmitCta}
+              </button>
+            </div>
+          )}
+
+          {/* Leaderboard preview — skipped for games with supportsLeaderboard: false */}
+          {manifest?.supportsLeaderboard && resultLeaderboard && (
+            <div className="rounded-2xl border border-border bg-surface-raised p-4 text-left">
+              <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-text-muted">
+                <Trophy className="h-3.5 w-3.5 text-accent-yellow" />
+                {dict.gamePlay.leaderboardTitle}
+              </p>
+              {resultLeaderboard.length === 0 ? (
+                <p className="py-3 text-center text-xs text-text-muted">
+                  {dict.gamePlay.leaderboardEmpty}
+                </p>
+              ) : (
+                <ol className="space-y-1">
+                  {resultLeaderboard.map((record, i) => (
+                    <li
+                      key={record.id}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs"
+                    >
+                      {record.userId !== null && record.userId !== undefined ? (
+                        <Link
+                          to={`/users/${record.userId}`}
+                          className="flex items-center gap-2 truncate font-semibold text-brand-light hover:underline"
+                        >
+                          <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                          <span className="truncate">{record.playerName}</span>
+                        </Link>
+                      ) : (
+                        <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
+                          <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
+                          <span className="truncate">{record.playerName}</span>
+                        </span>
+                      )}
+                      <span className="shrink-0 font-black text-brand-light">
+                        {record.formattedScore}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <Link
+                to={`/games/${slug}/ranking`}
+                className="mt-2 inline-block text-[11px] font-bold text-brand-light hover:underline"
+              >
+                {dict.gamePlay.viewFullRanking}
+              </Link>
+            </div>
+          )}
+
+          {/* Share row — icon-only (X's official wordmark, a plain copy icon for the
+              screenshot+text action) with a native title tooltip standing in for the
+              text labels these used to carry. A brief checkmark swap is the only
+              per-button feedback now that there's no label text to change; the X
+              button additionally gets a one-line hint below the row since "screenshot
+              copied, paste it yourself" needs actual explaining. */}
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => void handleShareX()}
+              title={dict.gamePlay.shareXCta}
+              aria-label={dict.gamePlay.shareXCta}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
+            >
+              {xShareState === "shared" ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              ) : (
+                <XIcon className="h-5 w-5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleCopyScreenshot()}
+              disabled={screenshotState === "copying"}
+              title={dict.gamePlay.screenshotCopyCta}
+              aria-label={dict.gamePlay.screenshotCopyCta}
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer disabled:opacity-50"
+            >
+              {screenshotState === "copying" ? (
+                <RefreshCw className="h-5 w-5 animate-spin" />
+              ) : screenshotState === "copied" || screenshotState === "downloaded" ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              ) : screenshotState === "error" ? (
+                <AlertCircle className="h-5 w-5 text-rose-400" />
+              ) : (
+                <Copy className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+          {xShareState === "shared" && (
+            <p className="-mt-2 text-[11px] font-semibold text-text-muted">
+              {dict.gamePlay.shareXScreenshotHint}
+            </p>
+          )}
+        </div>
+
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={handleRetryGame}
+            className="px-8 py-3 bg-brand text-white rounded-xl font-extrabold hover:bg-brand-light shadow-lg shadow-brand/25 transition-all cursor-pointer"
+          >
+            {dict.gamePlay.retryGameCta}
+          </button>
+          <button
+            type="button"
+            onClick={() => void navigate("/games")}
+            className="px-8 py-3 bg-surface text-text-primary border border-border rounded-xl font-extrabold hover:bg-surface-raised transition-colors cursor-pointer"
+          >
+            {dict.gamePlay.backToListResult}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   if (error) {
     return (
       <div className="container mx-auto px-4 py-20 flex flex-col items-center justify-center flex-1 select-none">
@@ -498,254 +840,26 @@ export function GameHost({ slug }: GameHostProps) {
               {dict.gamePlay.authRequiredCta}
             </button>
           </div>
+        ) : runtimeKind === "iframe" ? (
+          release ? (
+            <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
+              {resultOverlay}
+              <div className="p-6">
+                <IframeRuntime
+                  src={officialGameEntryUrl(slug, release)}
+                  title={localizedTitle ?? slug}
+                  attemptKey={attemptKey}
+                  onStarted={handleIframeStarted}
+                  onComplete={handleIframeComplete}
+                  onCancel={runtime.cancel}
+                  onError={handleIframeError}
+                />
+              </div>
+            </div>
+          ) : null
         ) : GameComponent ? (
           <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
-            {/* Game Result & Score Submission Overlay.
-                overflow-y-auto + min-h-full (rather than a fixed-height flex-center with no
-                scroll) is what actually fixes two things at once: the result staying visually
-                centered when it fits, and the retry/back-to-list buttons no longer clipping off
-                the bottom edge when the content (card + status + leaderboard + share row) is
-                taller than the viewport — previously there was nowhere for that overflow to go. */}
-            {result ? (
-              <div className="absolute inset-0 z-50 overflow-y-auto bg-black/90">
-                <div className="flex min-h-full flex-col items-center justify-center gap-6 p-6 text-center md:p-8">
-                  <h3 className="text-3xl font-extrabold text-white">
-                    {dict.gamePlay.resultTitle}
-                  </h3>
-
-                  {/* The score card is now its own self-contained box — everything inside this
-                      ref is what handleCopyScreenshot captures, and owogg.com is genuinely its
-                      last/bottom element now that submission status, leaderboard, and share
-                      buttons live in a separate section below instead of the same bordered box. */}
-                  <div
-                    ref={shareCardRef}
-                    className="w-full max-w-md rounded-2xl border border-border bg-surface-raised p-6"
-                  >
-                    <div className="mb-3 flex items-center justify-center gap-2">
-                      <GameThumbnail
-                        thumbnail={manifest?.thumbnail ?? ""}
-                        title={localizedTitle ?? ""}
-                        accent={manifest?.accent}
-                        className="h-6 w-6"
-                        rounded="rounded-md"
-                      />
-                      <span className="text-sm font-bold text-text-secondary">
-                        {localizedTitle}
-                      </span>
-                    </div>
-                    <p className="text-text-secondary text-sm mb-1">
-                      {isAuthenticated
-                        ? dict.gamePlay.finalScoreLabel
-                        : dict.gamePlay.deviceBestLabel}
-                    </p>
-                    <p className="text-5xl font-black text-brand mb-1">
-                      {formatScore(result.score, manifest?.scoreConfig)}
-                    </p>
-
-                    {resultTier && (
-                      <span
-                        className="mt-2 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-black text-white shadow-md"
-                        style={{
-                          backgroundImage: `linear-gradient(to right, ${resultTier.colorFrom}, ${resultTier.colorTo})`,
-                        }}
-                      >
-                        {resultTier.label}
-                      </span>
-                    )}
-
-                    {/* Metadata Formatters */}
-                    {result.metadata &&
-                      Object.entries(result.metadata).filter(
-                        ([key]) => !METADATA_GRID_EXCLUDED_KEYS.has(key),
-                      ).length > 0 && (
-                        <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-border/80">
-                          {Object.entries(result.metadata)
-                            .filter(([key]) => !METADATA_GRID_EXCLUDED_KEYS.has(key))
-                            .map(([key, value]) => (
-                              <div
-                                key={key}
-                                className="bg-surface/50 p-2.5 rounded-xl border border-border/40"
-                              >
-                                <p className="text-xs text-text-muted font-bold mb-0.5">
-                                  {formatMetadataKey(key, dict.gamePlay)}
-                                </p>
-                                <p className="font-extrabold text-text-primary text-sm">
-                                  {formatMetadataValue(key, value)}
-                                </p>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-
-                    <p className="mt-6 text-[10px] font-bold uppercase tracking-wider text-text-muted">
-                      owogg.com
-                    </p>
-                  </div>
-
-                  {/* Everything below is deliberately outside shareCardRef (not part of the
-                      screenshot) — submission status, leaderboard, share actions. Only shown to
-                      guests (submissionState only ever becomes "guest" when signed out — see
-                      runtime.complete), so an already-logged-in player never sees it. */}
-                  <div className="w-full max-w-md flex flex-col gap-4">
-                    {submissionState === "guest" && (
-                      <div className="flex flex-col items-center gap-1.5">
-                        <span className="text-xs font-bold text-text-secondary">
-                          {dict.gamePlay.guestNoticeTitle}
-                        </span>
-                        <span className="text-[11px] text-text-muted">
-                          {dict.gamePlay.guestNoticeBody}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={openLoginModal}
-                          className="mt-1 px-4 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand text-xs font-extrabold rounded-xl transition-colors cursor-pointer"
-                        >
-                          {dict.gamePlay.guestLoginCta}
-                        </button>
-                      </div>
-                    )}
-                    {submissionState === "submitting" && (
-                      <span className="inline-flex items-center justify-center gap-2 text-xs font-bold text-brand animate-pulse">
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        {dict.gamePlay.submittingLabel}
-                      </span>
-                    )}
-                    {submissionState === "success" && (
-                      <span className="inline-flex items-center justify-center gap-2 text-xs font-bold text-emerald-400">
-                        <CheckCircle2 className="w-4 h-4" />
-                        {dict.gamePlay.successLabel}
-                      </span>
-                    )}
-                    {submissionState === "error" && (
-                      <div className="flex flex-col items-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400">
-                          <AlertCircle className="w-4 h-4" />
-                          {submissionError || dict.gamePlay.errorSubmitFallback}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => void handleScoreSubmission(result.score)}
-                          className="px-3 py-1 bg-surface border border-border hover:bg-surface-overlay text-text-primary text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                        >
-                          {dict.gamePlay.retrySubmitCta}
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Leaderboard preview — skipped for games with supportsLeaderboard: false */}
-                    {manifest?.supportsLeaderboard && resultLeaderboard && (
-                      <div className="rounded-2xl border border-border bg-surface-raised p-4 text-left">
-                        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-text-muted">
-                          <Trophy className="h-3.5 w-3.5 text-accent-yellow" />
-                          {dict.gamePlay.leaderboardTitle}
-                        </p>
-                        {resultLeaderboard.length === 0 ? (
-                          <p className="py-3 text-center text-xs text-text-muted">
-                            {dict.gamePlay.leaderboardEmpty}
-                          </p>
-                        ) : (
-                          <ol className="space-y-1">
-                            {resultLeaderboard.map((record, i) => (
-                              <li
-                                key={record.id}
-                                className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-1.5 text-xs"
-                              >
-                                {record.userId !== null && record.userId !== undefined ? (
-                                  <Link
-                                    to={`/users/${record.userId}`}
-                                    className="flex items-center gap-2 truncate font-semibold text-brand-light hover:underline"
-                                  >
-                                    <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
-                                    <span className="truncate">{record.playerName}</span>
-                                  </Link>
-                                ) : (
-                                  <span className="flex items-center gap-2 truncate font-semibold text-text-secondary">
-                                    <span className="w-4 shrink-0 text-text-muted">#{i + 1}</span>
-                                    <span className="truncate">{record.playerName}</span>
-                                  </span>
-                                )}
-                                <span className="shrink-0 font-black text-brand-light">
-                                  {record.formattedScore}
-                                </span>
-                              </li>
-                            ))}
-                          </ol>
-                        )}
-                        <Link
-                          to={`/games/${slug}/ranking`}
-                          className="mt-2 inline-block text-[11px] font-bold text-brand-light hover:underline"
-                        >
-                          {dict.gamePlay.viewFullRanking}
-                        </Link>
-                      </div>
-                    )}
-
-                    {/* Share row — icon-only (X's official wordmark, a plain copy icon for the
-                        screenshot+text action) with a native title tooltip standing in for the
-                        text labels these used to carry. A brief checkmark swap is the only
-                        per-button feedback now that there's no label text to change; the X
-                        button additionally gets a one-line hint below the row since "screenshot
-                        copied, paste it yourself" needs actual explaining. */}
-                    <div className="flex items-center justify-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => void handleShareX()}
-                        title={dict.gamePlay.shareXCta}
-                        aria-label={dict.gamePlay.shareXCta}
-                        className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer"
-                      >
-                        {xShareState === "shared" ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                        ) : (
-                          <XIcon className="h-5 w-5" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleCopyScreenshot()}
-                        disabled={screenshotState === "copying"}
-                        title={dict.gamePlay.screenshotCopyCta}
-                        aria-label={dict.gamePlay.screenshotCopyCta}
-                        className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:bg-surface-overlay hover:text-text-primary cursor-pointer disabled:opacity-50"
-                      >
-                        {screenshotState === "copying" ? (
-                          <RefreshCw className="h-5 w-5 animate-spin" />
-                        ) : screenshotState === "copied" || screenshotState === "downloaded" ? (
-                          <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                        ) : screenshotState === "error" ? (
-                          <AlertCircle className="h-5 w-5 text-rose-400" />
-                        ) : (
-                          <Copy className="h-5 w-5" />
-                        )}
-                      </button>
-                    </div>
-                    {xShareState === "shared" && (
-                      <p className="-mt-2 text-[11px] font-semibold text-text-muted">
-                        {dict.gamePlay.shareXScreenshotHint}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex gap-4">
-                    <button
-                      type="button"
-                      onClick={handleRetryGame}
-                      className="px-8 py-3 bg-brand text-white rounded-xl font-extrabold hover:bg-brand-light shadow-lg shadow-brand/25 transition-all cursor-pointer"
-                    >
-                      {dict.gamePlay.retryGameCta}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void navigate("/games")}
-                      className="px-8 py-3 bg-surface text-text-primary border border-border rounded-xl font-extrabold hover:bg-surface-raised transition-colors cursor-pointer"
-                    >
-                      {dict.gamePlay.backToListResult}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
+            {resultOverlay}
             <div className="p-6">
               <LegacyReactRuntime
                 GameComponent={GameComponent}

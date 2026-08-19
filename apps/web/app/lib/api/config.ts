@@ -40,3 +40,18 @@ export const GAME_ORIGIN = getGameOrigin();
 export function sandboxGamePlayUrl(slug: string): string {
   return `${GAME_ORIGIN.replace(/\/+$/, "")}/play/${encodeURIComponent(slug)}`;
 }
+
+/**
+ * URL a migrated SYSTEM game's standalone iframe bundle is played from — the exact-version
+ * counterpart to {@link sandboxGamePlayUrl} above. Unlike a Creator game, a SYSTEM game has no
+ * D1-backed "current live version" to resolve server-side, so the caller must already know which
+ * published version to point at — see systemGameReleaseMap.generated.ts (built by
+ * scripts/publish-official-game-bundles.ts) and gameServing.ts's
+ * `/official-games/:slug/:version/*` route.
+ */
+export function officialGameEntryUrl(
+  slug: string,
+  release: { version: string; entry: string },
+): string {
+  return `${GAME_ORIGIN.replace(/\/+$/, "")}/official-games/${encodeURIComponent(slug)}/${encodeURIComponent(release.version)}/${release.entry}`;
+}
