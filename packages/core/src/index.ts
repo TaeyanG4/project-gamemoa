@@ -14,6 +14,7 @@ export * from "./domain/adminUserQuery.js";
 export * from "./domain/gameCreator.js";
 export * from "./domain/sandboxGames.js";
 export * from "./domain/sandboxGameBundle.js";
+export * from "./domain/creatorGameCanonicalDocument.js";
 export * from "./domain/systemGameBundle.js";
 export * from "./domain/contentHash.js";
 export * from "./domain/gameSession.js";
@@ -24,6 +25,7 @@ export * from "./ports/adminAuth.js";
 export * from "./ports/adminAccounts.js";
 export * from "./ports/gameCreator.js";
 export * from "./ports/sandboxGames.js";
+export * from "./ports/creatorGameDefinition.js";
 export * from "./ports/gameAttempt.js";
 export * from "./ports/creatorScoreAcceptance.js";
 
