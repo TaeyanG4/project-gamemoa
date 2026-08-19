@@ -12,6 +12,12 @@ build/
 coverage/
 .claude/
 
+# e2e/ — local-only fixtures and Playwright's own run output. See e2e/prepareLocalGameOrigin.ts
+# and e2e/playwright.config.ts's own doc comments for why these are transient/generated.
+e2e/.local-game-origin/
+e2e/test-results/
+e2e/playwright-report/
+
 
 # Python backend
 backend/.venv/
