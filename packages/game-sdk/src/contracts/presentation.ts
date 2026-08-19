@@ -43,8 +43,7 @@ export interface GamePresentation {
  * where they were always optional to begin with.
  */
 export type GamePresentationViewport =
-  | GamePresentationResponsiveViewport
-  | GamePresentationFixedViewport;
+  GamePresentationResponsiveViewport | GamePresentationFixedViewport;
 
 export interface GamePresentationResponsiveViewport {
   readonly mode: "responsive";
