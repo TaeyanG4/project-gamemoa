@@ -1,3 +1,5 @@
+import type { GamePresentation } from "./presentation.js";
+
 export type GameMode = "single" | "local-multi" | "online-multi";
 
 export type GameStatus = "draft" | "beta" | "published" | "hidden";
@@ -77,4 +79,8 @@ export interface GameManifest {
    * any semver contract or release process; purely a "this build changed" marker for debugging. */
   readonly version: string;
   readonly scoreConfig?: ScoreConfig | undefined;
+  /** Viewport/fullscreen/mobile presentation preferences — see {@link GamePresentation}'s own doc
+   * comment. Undefined for every game shipped today; nothing reads this field yet (a host-side PR
+   * that actually computes a viewport from it comes later). */
+  readonly presentation?: GamePresentation | undefined;
 }

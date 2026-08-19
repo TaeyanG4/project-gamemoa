@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { GameManifest } from "@owogg/game-sdk/contracts";
+import type { GameManifest, GamePresentation } from "@owogg/game-sdk/contracts";
 import {
   GAME_MANIFESTS,
   GAME_OWNER_TYPES,
@@ -39,6 +39,7 @@ function asDefinition(manifest: GameManifest, owner: GameOwner): GameDefinition 
     estimatedRoundSeconds: manifest.estimatedRoundSeconds,
     difficulty: manifest.difficulty,
     supportsReplay: manifest.supportsReplay,
+    presentation: manifest.presentation,
     policy: {
       score: manifest.scoreConfig ?? null,
       leaderboard: manifest.supportsLeaderboard,
@@ -66,7 +67,45 @@ test("every shipped built-in manifest is expressible as a GameDefinition without
     assert.equal(definition.policy.requiresAuth, manifest.requiresAuth);
     assert.deepEqual(definition.policy.score, manifest.scoreConfig ?? null);
     assert.deepEqual(definition.difficulty, manifest.difficulty);
+    assert.deepEqual(definition.presentation, manifest.presentation);
   }
+});
+
+// Deliberately does NOT assert anything about GAME_MANIFESTS' current presentation state (whether
+// it's present or absent for any real shipped game) — a platform contract test must not pin an
+// individual game's current metadata; see packages/game-sdk/test/presentation.test.ts's own
+// synthetic-manifest tests for the backward-compatibility guarantee ("GameManifest works with no
+// presentation field at all") and forward-compatibility guarantee ("also accepts a real
+// presentation value") this file doesn't need to re-prove at the GameDefinition level beyond the
+// lossless-conversion property the test above already covers.
+test("GameDefinition accepts a real presentation value, reusing GamePresentation verbatim — no parallel type declared in core", () => {
+  const presentation: GamePresentation = {
+    viewport: { mode: "fixed", preferredWidth: 640, preferredHeight: 360 },
+    fullscreen: { supported: true, recommended: true },
+    mobile: { support: "unsupported" },
+  };
+  const syntheticManifest: GameManifest = {
+    id: "synthetic-example",
+    slug: "synthetic-example",
+    title: "Synthetic Example",
+    shortDescription: "A synthetic manifest for this test only",
+    description: "A synthetic manifest for this test only — not a real shipped game",
+    modes: ["single"],
+    status: "draft",
+    categories: [],
+    tags: [],
+    minPlayers: 1,
+    maxPlayers: 1,
+    thumbnail: "/thumb.svg",
+    requiresAuth: false,
+    supportsLeaderboard: false,
+    inputMethods: ["mouse"],
+    supportsReplay: false,
+    version: "0.0.1",
+    presentation,
+  };
+  const definition = asDefinition(syntheticManifest, { type: "SYSTEM" });
+  assert.deepEqual(definition.presentation, presentation);
 });
 
 test("a manifest's id and slug agree today, which is why a definition keeps only slug", () => {
