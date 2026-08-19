@@ -32,12 +32,32 @@ export interface ReleaseMapEntry {
   entry: string;
 }
 
+/** Every SYSTEM game that has been migrated onto the standalone-bundle + Game Bridge + IframeRuntime
+ * path (see GameHost.tsx's resolveGameRuntimeKind) — all four as of 2026-08-19. Adding a slug here
+ * is the ONE thing that turns it on: publishAllMigratedGames below builds+publishes it and adds it
+ * to the release map, and GameHost.tsx switches it to IframeRuntime the moment the release map has
+ * an entry for it — no other code path needs to change. */
 export function migratedGames(repoRoot: string): readonly MigratedGame[] {
   return [
     {
       slug: "reaction-time",
       pkg: "@owogg/game-reaction-time",
       distDir: path.join(repoRoot, "games", "reaction-time", "standalone", "dist"),
+    },
+    {
+      slug: "aim-test",
+      pkg: "@owogg/game-aim-test",
+      distDir: path.join(repoRoot, "games", "aim-test", "standalone", "dist"),
+    },
+    {
+      slug: "memory-test",
+      pkg: "@owogg/game-memory-test",
+      distDir: path.join(repoRoot, "games", "memory-test", "standalone", "dist"),
+    },
+    {
+      slug: "typing-test",
+      pkg: "@owogg/game-typing-test",
+      distDir: path.join(repoRoot, "games", "typing-test", "standalone", "dist"),
     },
   ];
 }

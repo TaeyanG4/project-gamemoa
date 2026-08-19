@@ -196,19 +196,37 @@ importers:
       react:
         specifier: ^19.1.0
         version: 19.2.8
+      react-dom:
+        specifier: ^19.1.0
+        version: 19.2.8(react@19.2.8)
     devDependencies:
+      "@tailwindcss/vite":
+        specifier: ^4.1.0
+        version: 4.3.3(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       "@types/node":
         specifier: ^22.10.0
         version: 22.20.1
       "@types/react":
         specifier: ^19.1.0
         version: 19.2.18
+      "@types/react-dom":
+        specifier: ^19.1.0
+        version: 19.2.4(@types/react@19.2.18)
+      "@vitejs/plugin-react":
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      tailwindcss:
+        specifier: ^4.1.0
+        version: 4.3.3
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
+      vite:
+        specifier: ^6.3.0
+        version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
   games/memory-test:
     dependencies:
@@ -219,24 +237,39 @@ importers:
         specifier: ^0.479.0
         version: 0.479.0(react@19.2.8)
       react:
-        specifier: ^19.0.0
+        specifier: ^19.1.0
         version: 19.2.8
       react-dom:
-        specifier: ^19.0.0
+        specifier: ^19.1.0
         version: 19.2.8(react@19.2.8)
     devDependencies:
+      "@tailwindcss/vite":
+        specifier: ^4.1.0
+        version: 4.3.3(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       "@types/node":
         specifier: ^22.10.0
         version: 22.20.1
       "@types/react":
         specifier: ^19.0.0
         version: 19.2.18
+      "@types/react-dom":
+        specifier: ^19.1.0
+        version: 19.2.4(@types/react@19.2.18)
+      "@vitejs/plugin-react":
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      tailwindcss:
+        specifier: ^4.1.0
+        version: 4.3.3
       tsx:
         specifier: ^4.19.2
         version: 4.23.12
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
+      vite:
+        specifier: ^6.3.0
+        version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
   games/reaction-time:
     dependencies:
@@ -298,19 +331,37 @@ importers:
       react:
         specifier: ^19.1.0
         version: 19.2.8
+      react-dom:
+        specifier: ^19.1.0
+        version: 19.2.8(react@19.2.8)
     devDependencies:
+      "@tailwindcss/vite":
+        specifier: ^4.1.0
+        version: 4.3.3(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
       "@types/node":
         specifier: ^22.10.0
         version: 22.20.1
       "@types/react":
         specifier: ^19.1.0
         version: 19.2.18
+      "@types/react-dom":
+        specifier: ^19.1.0
+        version: 19.2.4(@types/react@19.2.18)
+      "@vitejs/plugin-react":
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12))
+      tailwindcss:
+        specifier: ^4.1.0
+        version: 4.3.3
       tsx:
         specifier: ^4.23.12
         version: 4.23.12
       typescript:
         specifier: ^5.8.0
         version: 5.9.3
+      vite:
+        specifier: ^6.3.0
+        version: 6.4.3(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.12)
 
   packages/contracts:
     dependencies:

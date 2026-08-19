@@ -70,6 +70,17 @@ test("sends exactly one HOST_INIT bootstrap, wildcard target, carrying one port"
   gamePortFrom(bootstrap).close();
 });
 
+test("sends the given difficultyId in HOST_INIT when one is passed", () => {
+  const fake = createFakeIframeWindow();
+  const host = createGameBridgeHost(fake.windowLike, {}, { difficultyId: "hard" });
+
+  const bootstrap = fake.getBootstrap();
+  assert.deepEqual(bootstrap.message, { type: "HOST_INIT", difficultyId: "hard" });
+
+  host.close();
+  gamePortFrom(bootstrap).close();
+});
+
 test("dispatches GAME_READY, GAME_STARTED, and GAME_CANCEL to their callbacks", async () => {
   const fake = createFakeIframeWindow();
   const calls: string[] = [];

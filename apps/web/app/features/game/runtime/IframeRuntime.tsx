@@ -14,6 +14,12 @@ export interface IframeRuntimeProps {
    * state, a real reload — not just a Bridge reset) exactly the way "다시 시작" already worked;
    * the Bridge for the previous attempt is torn down in the same effect that reacts to this. */
   attemptKey: number;
+  /** Threaded into HOST_INIT's own optional `difficultyId` field (see gameBridgeHost.ts /
+   * protocol.ts's HostInitMessage) — only a game with real difficulty tiers (aim-test) needs
+   * this; every other caller simply omits it. Bootstrap-only: this protocol has no live-update
+   * message, so a difficulty change reaching a game already mid-session requires a fresh mount
+   * (a new `attemptKey`) — see GameHost.tsx's own doc comment for how that's enforced. */
+  difficultyId?: string;
   onReady?: () => void;
   onStarted?: () => void;
   onComplete?: (result: { score?: number; metadata?: Record<string, unknown> }) => void;
@@ -36,6 +42,7 @@ export function IframeRuntime({
   className,
   frameClassName,
   attemptKey,
+  difficultyId,
   onReady,
   onStarted,
   onComplete,
@@ -66,15 +73,19 @@ export function IframeRuntime({
       const contentWindow = iframe.contentWindow;
       if (!contentWindow) return;
 
-      bridgeRef.current = createGameBridgeHost(contentWindow, {
-        ...(onReady ? { onReady } : {}),
-        ...(onStarted ? { onStarted } : {}),
-        ...(onComplete ? { onComplete } : {}),
-        ...(onCancel ? { onCancel } : {}),
-        ...(onError ? { onError } : {}),
-      });
+      bridgeRef.current = createGameBridgeHost(
+        contentWindow,
+        {
+          ...(onReady ? { onReady } : {}),
+          ...(onStarted ? { onStarted } : {}),
+          ...(onComplete ? { onComplete } : {}),
+          ...(onCancel ? { onCancel } : {}),
+          ...(onError ? { onError } : {}),
+        },
+        difficultyId ? { difficultyId } : undefined,
+      );
     },
-    [closeBridge, onReady, onStarted, onComplete, onCancel, onError],
+    [closeBridge, onReady, onStarted, onComplete, onCancel, onError, difficultyId],
   );
 
   return (

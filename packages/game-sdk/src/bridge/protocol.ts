@@ -16,10 +16,22 @@
 
 /** Bootstrap message, Host -> Game. The only host-originated message in this protocol — see
  * the host controller's doc comment for why sending it is the one place `postMessage(..., "*")`
- * (rather than a MessagePort) is used at all. */
+ * (rather than a MessagePort) is used at all.
+ *
+ * `difficultyId` (2026-08-19) is the one deliberate, backward-compatible expansion of this
+ * message: optional, so every existing bootstrap that never set it (reaction-time, Creator games,
+ * ball-dodge) keeps validating exactly as before — see isHostInitMessage. Only a game with real
+ * difficulty tiers (aim-test) reads it; every other standalone game's own bridgeRuntime.ts simply
+ * ignores an absent value and falls back to its own default. Never auth/token/API address — the
+ * Game Bridge's own boundary (see gameBridgeHost.ts) still carries nothing else. */
 export interface HostInitMessage {
   readonly type: "HOST_INIT";
+  readonly difficultyId?: string;
 }
+
+/** Same order-of-magnitude cap as GAME_ERROR's `message` — bounds an arbitrary-length string a
+ * compromised/buggy host could otherwise send, even though the host is OwOGG's own code today. */
+const MAX_DIFFICULTY_ID_LENGTH = 100;
 
 export interface GameReadyMessage {
   readonly type: "GAME_READY";
@@ -123,10 +135,25 @@ export function isJsonSafeValue(value: unknown, maxDepth = JSON_SAFE_MAX_DEPTH):
 }
 
 /** Validates the one host-originated message. Called by the game-side client when it receives the
- * bootstrap postMessage — see client.ts. Exact shape: an extra field makes this `false`, the same
- * "no smuggled data" posture `parseGameToHostMessage` takes on every game -> host message. */
+ * bootstrap postMessage — see client.ts. Exact shape: any key besides `type`/`difficultyId` makes
+ * this `false`, the same "no smuggled data" posture `parseGameToHostMessage` takes on every
+ * game -> host message. `difficultyId` itself is optional (see HostInitMessage's own doc comment)
+ * but must be a real, bounded, non-empty string when present — an empty string is never a
+ * meaningful difficulty id, so it's rejected the same as a wrong type. */
 export function isHostInitMessage(data: unknown): data is HostInitMessage {
-  return isPlainObject(data) && Object.keys(data).length === 1 && data.type === "HOST_INIT";
+  if (!isPlainObject(data) || data.type !== "HOST_INIT") return false;
+
+  const keys = Object.keys(data);
+  if (!keys.every((k) => k === "type" || k === "difficultyId")) return false;
+
+  if ("difficultyId" in data && data.difficultyId !== undefined) {
+    if (typeof data.difficultyId !== "string") return false;
+    if (data.difficultyId.length === 0 || data.difficultyId.length > MAX_DIFFICULTY_ID_LENGTH) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /** Validates any message the game may send. Called by the host-side bridge controller for every

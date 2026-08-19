@@ -49,12 +49,19 @@ test("readB2ConfigFromEnv: maps every var when all five are present", () => {
   });
 });
 
-test("migratedGames: reaction-time is the one migrated SYSTEM game, pointing at its standalone dist output", () => {
+test("migratedGames: all four SYSTEM games, each pointing at its own standalone dist output", () => {
   const games = migratedGames("/repo");
-  assert.equal(games.length, 1);
-  assert.equal(games[0]?.slug, "reaction-time");
-  assert.equal(games[0]?.pkg, "@owogg/game-reaction-time");
-  assert.ok(games[0]?.distDir.endsWith(path.join("games", "reaction-time", "standalone", "dist")));
+  assert.deepEqual(
+    games.map((g) => g.slug),
+    ["reaction-time", "aim-test", "memory-test", "typing-test"],
+  );
+  for (const game of games) {
+    assert.equal(game.pkg, `@owogg/game-${game.slug}`);
+    assert.ok(
+      game.distDir.endsWith(path.join("games", game.slug, "standalone", "dist")),
+      game.slug,
+    );
+  }
 });
 
 test("releaseMapPath: points at the exact file GameHost.tsx imports", () => {

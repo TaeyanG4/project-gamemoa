@@ -94,6 +94,31 @@ export function resolveGameRuntimeKind(
 }
 
 /**
+ * Whether a difficulty-selector change should force IframeRuntime to remount (a fresh
+ * `attemptKey`, and therefore a fresh HOST_INIT carrying the new `difficultyId`) — the Game
+ * Bridge's bootstrap is a one-time handshake, so an already-connected iframe has no way to learn
+ * a NEW difficulty short of a full reload (see the effect in GameHost that calls this).
+ *
+ * `previousDifficultyId` is `undefined` specifically for "no iframe attempt has been tracked yet
+ * for this slug" (a fresh mount, or just navigated here) — that case always returns `false`: the
+ * very first mount already reads the CURRENT `selectedDifficultyId` via the `difficultyId` prop,
+ * so forcing an extra remount before anything has even loaded once would be pure waste.
+ * `hasDifficultyTiers` gates every other game (memory-test, typing-test, and reaction-time today)
+ * out entirely — an iframe-runtime game with no difficulty tiers has no selector to change in the
+ * first place, so this must never fire for it even if some caller mistakenly passed a difficulty
+ * value.
+ */
+export function shouldRemountIframeOnDifficultyChange(
+  previousDifficultyId: string | undefined,
+  nextDifficultyId: string,
+  context: { runtimeKind: "iframe" | "legacy"; hasDifficultyTiers: boolean },
+): boolean {
+  if (context.runtimeKind !== "iframe" || !context.hasDifficultyTiers) return false;
+  if (previousDifficultyId === undefined) return false;
+  return previousDifficultyId !== nextDifficultyId;
+}
+
+/**
  * Adapts the Game Bridge's reduced GAME_COMPLETE payload ({score?, metadata?}) into the full
  * GameResult shape runtime.complete (below) already expects, so the iframe path can feed the exact
  * same score/local-best/leaderboard/share pipeline LegacyReactRuntime's games use — no duplicated
@@ -185,11 +210,19 @@ export function GameHost({ slug }: GameHostProps) {
 
   // Difficulty selection — only meaningful for games with manifest.difficulty. Resets to the
   // game's default whenever navigating between games. A change here only affects the NEXT
-  // attempt (handleStart, inside the game component) — an already-in-progress round keeps
-  // whatever it captured when it started, never flips difficulty mid-round.
+  // attempt: for LegacyReactRuntime that's handleStart inside the game component (an
+  // already-in-progress round keeps whatever it captured when it started, never flips difficulty
+  // mid-round); for IframeRuntime, "next attempt" means the next iframe mount — see the
+  // iframeAttemptDifficultyRef effect below for why an already-mounted iframe can't be updated
+  // live.
   const [selectedDifficultyId, setSelectedDifficultyId] = useState<string>("normal");
+  // Tracks the difficulty the CURRENTLY-mounted iframe attempt was actually bootstrapped with.
+  // undefined means "no iframe attempt tracked yet for this slug" — see the effect below, which is
+  // the only other place this ref is written.
+  const iframeAttemptDifficultyRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     setSelectedDifficultyId(manifest?.difficulty?.defaultLevelId ?? "normal");
+    iframeAttemptDifficultyRef.current = undefined;
   }, [manifest]);
 
   // Load Game Module — skipped entirely for a slug the release map resolves to "iframe": the
@@ -289,6 +322,37 @@ export function GameHost({ slug }: GameHostProps) {
     setSessionId(crypto.randomUUID());
     setAttemptKey((prev) => prev + 1);
   }, []);
+
+  // Forces a fresh iframe mount when the difficulty selector changes for an iframe-runtime game
+  // that has real difficulty tiers (aim-test today). The Game Bridge's HOST_INIT bootstrap is a
+  // one-time handshake — unlike LegacyReactRuntime, which re-reads runtime.difficultyId fresh
+  // every time the game component itself calls handleStart, an already-connected iframe has no
+  // way to learn a NEW difficulty short of a full reload. Reusing handleRetryGame's own reset
+  // (new sessionId, cleared result/leaderboard, bumped attemptKey) is what remounts IframeRuntime
+  // — see its `key={attemptKey}` in GameFrame — with the new value baked into its next HOST_INIT.
+  //
+  // Skips the very first render for a slug (iframeAttemptDifficultyRef.current still undefined,
+  // reset by the manifest effect above): the FIRST iframe mount already reads the current
+  // selectedDifficultyId via the `difficultyId` prop passed to IframeRuntime below, so forcing an
+  // extra remount before anything has even loaded once would be pure waste.
+  useEffect(() => {
+    const hasDifficultyTiers = Boolean(manifest?.difficulty);
+    if (
+      shouldRemountIframeOnDifficultyChange(
+        iframeAttemptDifficultyRef.current,
+        selectedDifficultyId,
+        {
+          runtimeKind,
+          hasDifficultyTiers,
+        },
+      )
+    ) {
+      handleRetryGame();
+    }
+    if (runtimeKind === "iframe" && hasDifficultyTiers) {
+      iframeAttemptDifficultyRef.current = selectedDifficultyId;
+    }
+  }, [selectedDifficultyId, runtimeKind, manifest, handleRetryGame]);
 
   // Fetch a compact leaderboard preview as soon as the game ends (not gated on score
   // submission succeeding — guests and rejected submissions still get competitive context).
@@ -849,6 +913,7 @@ export function GameHost({ slug }: GameHostProps) {
                   src={officialGameEntryUrl(slug, release)}
                   title={localizedTitle ?? slug}
                   attemptKey={attemptKey}
+                  {...(manifest?.difficulty ? { difficultyId: selectedDifficultyId } : {})}
                   onStarted={handleIframeStarted}
                   onComplete={handleIframeComplete}
                   onCancel={runtime.cancel}

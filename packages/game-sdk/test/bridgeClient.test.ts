@@ -187,6 +187,38 @@ test("a duplicate HOST_INIT after bootstrap is a no-op — the listener is alrea
   channelB.port2.close();
 });
 
+// ── HOST_INIT's optional difficultyId (2026-08-19, aim-test) ─────────────────
+
+test("client.difficultyId is undefined when the host's HOST_INIT carried none — every existing bootstrap", async () => {
+  const parent = {};
+  const fakeWindow = createFakeWindow(parent);
+  const channel = new MessageChannel();
+
+  const clientPromise = connectGameBridge(fakeWindow);
+  fakeWindow.dispatch(fakeMessageEvent({ type: "HOST_INIT" }, parent, [channel.port2]));
+
+  const client = await clientPromise;
+  assert.equal(client.difficultyId, undefined);
+  channel.port1.close();
+  channel.port2.close();
+});
+
+test("client.difficultyId carries the host's HOST_INIT difficultyId when present", async () => {
+  const parent = {};
+  const fakeWindow = createFakeWindow(parent);
+  const channel = new MessageChannel();
+
+  const clientPromise = connectGameBridge(fakeWindow);
+  fakeWindow.dispatch(
+    fakeMessageEvent({ type: "HOST_INIT", difficultyId: "hard" }, parent, [channel.port2]),
+  );
+
+  const client = await clientPromise;
+  assert.equal(client.difficultyId, "hard");
+  channel.port1.close();
+  channel.port2.close();
+});
+
 // ── the returned client's message-sending methods ────────────────────────────
 
 async function connectedClient() {
