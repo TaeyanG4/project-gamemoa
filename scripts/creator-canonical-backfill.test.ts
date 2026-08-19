@@ -1,12 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { CreatorGameDefinitionRepository, CreatorGameCanonicalDocument } from "@owogg/core";
+import type {
+  CreatorGameDefinitionRepository,
+  CreatorGameCanonicalDocument,
+  BackfillApplyOutcome,
+} from "@owogg/core";
 import { classifyBackfillRows, applyBackfill } from "@owogg/core";
 import {
   parseBackfillCliArgs,
   parseBackfillInputRows,
   formatBackfillReport,
   formatBackfillApplyReport,
+  determineBackfillExitCode,
+  hasFatalApplyFailure,
   runCreatorCanonicalBackfillCli,
 } from "./creator-canonical-backfill.js";
 
@@ -188,7 +194,7 @@ test("runCreatorCanonicalBackfillCli: dry-run reads the input file, classifies, 
   };
 
   const logs: string[] = [];
-  await runCreatorCanonicalBackfillCli(
+  const exitCode = await runCreatorCanonicalBackfillCli(
     { inputPath: "rows.json", apply: false },
     {
       readFile: () => JSON.stringify([validRowJson({ slug: "dry-run-game" })]),
@@ -200,13 +206,14 @@ test("runCreatorCanonicalBackfillCli: dry-run reads the input file, classifies, 
   assert.equal(saveCalls, 0, "dry-run must perform zero writes");
   assert.equal(logs.length, 1);
   assert.match(logs[0]!, /MISSING\s+dry-run-game/);
+  assert.equal(exitCode, 0, "a plain MISSING-only dry-run is clean");
 });
 
 test("runCreatorCanonicalBackfillCli: apply mode writes MISSING rows and logs a write-outcome report", async () => {
   const repo = fakeRepo();
   const logs: string[] = [];
 
-  await runCreatorCanonicalBackfillCli(
+  const exitCode = await runCreatorCanonicalBackfillCli(
     { inputPath: "rows.json", apply: true },
     {
       readFile: () => JSON.stringify([validRowJson({ slug: "apply-game" })]),
@@ -218,6 +225,7 @@ test("runCreatorCanonicalBackfillCli: apply mode writes MISSING rows and logs a 
   assert.equal(repo.documents.size, 1);
   assert.ok(repo.documents.has("apply-game"));
   assert.match(logs[0]!, /CREATED\s+apply-game/);
+  assert.equal(exitCode, 0, "a clean CREATED-only apply is exit 0");
 });
 
 test("runCreatorCanonicalBackfillCli: a malformed input file fails closed before any repository call", async () => {
@@ -242,4 +250,167 @@ test("runCreatorCanonicalBackfillCli: a malformed input file fails closed before
     ),
   );
   assert.equal(repoCalled, false);
+});
+
+// ── determineBackfillExitCode / hasFatalApplyFailure ─────────────────────────
+//
+// The exit code contract (see determineBackfillExitCode's own doc comment): 0 = clean,
+// 1 = fatal (ERROR / a broken write path), 2 = needs-attention-but-not-broken (CONFLICT /
+// RACE_LOST). BLOCKED never changes the exit code on its own — it's ordinary, expected, ongoing
+// Creator-game state, not a fault.
+
+function summaryWithCounts(
+  counts: Partial<Record<"MISSING" | "MATCH" | "BLOCKED" | "CONFLICT" | "ERROR", number>>,
+) {
+  return {
+    statuses: [],
+    counts: { MISSING: 0, MATCH: 0, BLOCKED: 0, CONFLICT: 0, ERROR: 0, ...counts },
+  };
+}
+
+test("hasFatalApplyFailure: true only for WRITE_FAILED/PARITY_MISMATCH_AFTER_WRITE, not for SKIPPED/RACE_LOST/CREATED", () => {
+  const outcomesOf = (kind: BackfillApplyOutcome["kind"]): BackfillApplyOutcome[] => {
+    switch (kind) {
+      case "CREATED":
+        return [{ kind: "CREATED", slug: "x" }];
+      case "SKIPPED":
+        return [{ kind: "SKIPPED", slug: "x", status: "MATCH" }];
+      case "RACE_LOST":
+        return [{ kind: "RACE_LOST", slug: "x" }];
+      case "WRITE_FAILED":
+        return [{ kind: "WRITE_FAILED", slug: "x", message: "boom" }];
+      case "PARITY_MISMATCH_AFTER_WRITE":
+        return [{ kind: "PARITY_MISMATCH_AFTER_WRITE", slug: "x" }];
+    }
+  };
+  assert.equal(hasFatalApplyFailure(outcomesOf("CREATED")), false);
+  assert.equal(hasFatalApplyFailure(outcomesOf("SKIPPED")), false);
+  assert.equal(hasFatalApplyFailure(outcomesOf("RACE_LOST")), false);
+  assert.equal(hasFatalApplyFailure(outcomesOf("WRITE_FAILED")), true);
+  assert.equal(hasFatalApplyFailure(outcomesOf("PARITY_MISMATCH_AFTER_WRITE")), true);
+});
+
+test("determineBackfillExitCode: dry-run with only MISSING/MATCH is exit 0", () => {
+  const code = determineBackfillExitCode({
+    mode: "dry-run",
+    summary: summaryWithCounts({ MISSING: 2, MATCH: 3 }),
+  });
+  assert.equal(code, 0);
+});
+
+test("determineBackfillExitCode: dry-run BLOCKED alone stays exit 0 — expected, ongoing state, not a fault", () => {
+  const code = determineBackfillExitCode({
+    mode: "dry-run",
+    summary: summaryWithCounts({ BLOCKED: 5 }),
+  });
+  assert.equal(code, 0);
+});
+
+test("determineBackfillExitCode: dry-run CONFLICT is exit 2 — needs attention, but the tool itself didn't fail", () => {
+  const code = determineBackfillExitCode({
+    mode: "dry-run",
+    summary: summaryWithCounts({ CONFLICT: 1 }),
+  });
+  assert.equal(code, 2);
+});
+
+test("determineBackfillExitCode: dry-run ERROR is exit 1 — the tool couldn't even determine the state", () => {
+  const code = determineBackfillExitCode({
+    mode: "dry-run",
+    summary: summaryWithCounts({ ERROR: 1 }),
+  });
+  assert.equal(code, 1);
+});
+
+test("determineBackfillExitCode: apply WRITE_FAILED is exit 1", () => {
+  const code = determineBackfillExitCode({
+    mode: "apply",
+    result: {
+      summary: summaryWithCounts({ MISSING: 1 }),
+      outcomes: [{ kind: "WRITE_FAILED", slug: "x", message: "boom" }],
+    },
+  });
+  assert.equal(code, 1);
+});
+
+test("determineBackfillExitCode: apply PARITY_MISMATCH_AFTER_WRITE is exit 1", () => {
+  const code = determineBackfillExitCode({
+    mode: "apply",
+    result: {
+      summary: summaryWithCounts({ MISSING: 1 }),
+      outcomes: [{ kind: "PARITY_MISMATCH_AFTER_WRITE", slug: "x" }],
+    },
+  });
+  assert.equal(code, 1);
+});
+
+test("determineBackfillExitCode: apply RACE_LOST is exit 2, not fatal — apply correctly declined the write", () => {
+  const code = determineBackfillExitCode({
+    mode: "apply",
+    result: {
+      summary: summaryWithCounts({ MISSING: 1 }),
+      outcomes: [{ kind: "RACE_LOST", slug: "x" }],
+    },
+  });
+  assert.equal(code, 2);
+});
+
+test("determineBackfillExitCode: a clean apply (CREATED + SKIPPED-for-MATCH/BLOCKED only) is exit 0", () => {
+  const code = determineBackfillExitCode({
+    mode: "apply",
+    result: {
+      summary: summaryWithCounts({ MISSING: 1, MATCH: 1, BLOCKED: 1 }),
+      outcomes: [
+        { kind: "CREATED", slug: "a" },
+        { kind: "SKIPPED", slug: "b", status: "MATCH" },
+        { kind: "SKIPPED", slug: "c", status: "BLOCKED" },
+      ],
+    },
+  });
+  assert.equal(code, 0);
+});
+
+// ── runCreatorCanonicalBackfillCli exit-code propagation ─────────────────────
+
+test("runCreatorCanonicalBackfillCli: dry-run propagates exit code 1 when a row is ERROR", async () => {
+  const repo: CreatorGameDefinitionRepository = {
+    findBySlug: () => {
+      throw new Error("simulated malformed stored document");
+    },
+    save: async () => {},
+    delete: async () => {},
+  };
+
+  const exitCode = await runCreatorCanonicalBackfillCli(
+    { inputPath: "rows.json", apply: false },
+    {
+      readFile: () => JSON.stringify([validRowJson({ slug: "broken-game" })]),
+      repo,
+      log: () => {},
+    },
+  );
+
+  assert.equal(exitCode, 1);
+});
+
+test("runCreatorCanonicalBackfillCli: apply propagates exit code 1 when a write fails", async () => {
+  const repo = fakeRepo();
+  const failingRepo: CreatorGameDefinitionRepository = {
+    findBySlug: (slug) => repo.findBySlug(slug),
+    save: () => {
+      throw new Error("simulated storage failure");
+    },
+    delete: (slug) => repo.delete(slug),
+  };
+
+  const exitCode = await runCreatorCanonicalBackfillCli(
+    { inputPath: "rows.json", apply: true },
+    {
+      readFile: () => JSON.stringify([validRowJson({ slug: "will-fail" })]),
+      repo: failingRepo,
+      log: () => {},
+    },
+  );
+
+  assert.equal(exitCode, 1);
 });

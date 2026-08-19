@@ -15,6 +15,21 @@
  * functions, not one function with an `apply: boolean` parameter — that's deliberate: there is no
  * boolean a caller could default, forget, or accidentally flip to turn a dry-run into a write.
  * Calling `applyBackfill` at all is the "explicit flag" this Stage's own requirement calls for.
+ *
+ * IMPORTANT — no-overwrite is best-effort, not atomic: {@link CreatorGameDefinitionRepository.save}
+ * (and, underneath it, `B2CreatorGameDefinitionRepository`'s `PUT`) has no conditional-write
+ * primitive to build on. `BackblazeB2GameBundleRepository` talks to B2's S3-compatible API via
+ * aws4fetch, and that API returns HTTP 501 NotImplemented for an `If-None-Match` PUT header —
+ * confirmed against multiple independent tools that hit the exact same limitation integrating
+ * with B2 specifically (Terraform's S3 backend, terraform-providers/terraform#37143; Proxmox
+ * Backup Server's B2 S3 target; rclone's B2 provider, which documents a "Skip If-None-Match
+ * header" quirk it applies for B2). There is no atomic create-if-absent available here without
+ * adding B2 Native API support — a genuinely new B2 client, out of scope for this Stage (see this
+ * file's own reuse constraint above). `applyBackfill` therefore re-checks `findBySlug`
+ * immediately before every `save` (see its own doc comment) to shrink the unsafe window as far as
+ * this port allows — that is a real, disclosed reduction, not a claim of atomicity: a true
+ * simultaneous write from two callers inside that final round-trip can still race. Treat this tool
+ * as single-operator, non-concurrent by operational convention, not because the code enforces it.
  */
 
 import type { SandboxGameRecordCanonicalSource } from "../domain/creatorGameCanonicalMapper.js";
@@ -164,6 +179,7 @@ export async function classifyBackfillRows(
 export type BackfillApplyOutcome =
   | { readonly kind: "CREATED"; readonly slug: string }
   | { readonly kind: "SKIPPED"; readonly slug: string; readonly status: BackfillRowStatus["kind"] }
+  | { readonly kind: "RACE_LOST"; readonly slug: string }
   | { readonly kind: "WRITE_FAILED"; readonly slug: string; readonly message: string }
   | { readonly kind: "PARITY_MISMATCH_AFTER_WRITE"; readonly slug: string };
 
@@ -178,18 +194,28 @@ export interface BackfillApplyResult {
  * Apply mode: classifies every row exactly like {@link classifyBackfillRows} (so the same summary
  * counts are available), then writes ONLY the rows classified `MISSING` — `MATCH` is a no-op,
  * and `BLOCKED`/`CONFLICT`/`ERROR` are always `SKIPPED`, never written, with no override or
- * force option anywhere in this module. There is deliberately no way to make this overwrite an
- * existing B2 document: `save` is only ever called for a slug `findBySlug` just confirmed is
- * `null`.
+ * force option anywhere in this module.
  *
- * Each MISSING row is written and independently re-read to confirm parity — `save` succeeding is
- * not itself treated as proof the document is now correctly readable back (a defensive check
- * against, e.g., an adapter bug or an eventually-consistent store surfacing something other than
- * what was just written). A row's write failure or parity mismatch never stops the loop — every
- * other MISSING row is still attempted, and nothing already written by this same run (or any
- * earlier one) is ever deleted or rolled back. The full set of independent per-row outcomes is
- * returned so the caller can decide what to do about any failures; this function itself never
- * throws for a single row's failure.
+ * No-overwrite is enforced as strongly as this port allows, but is NOT atomic — see this file's
+ * own top doc comment for why (B2's S3-compatible API has no conditional-write primitive to build
+ * on). Concretely: `classifyBackfillRows` above already confirms `findBySlug` is `null` for every
+ * `MISSING` row, but that check happened before this loop started, and other rows ahead of it in
+ * this same batch (or a fully separate concurrent run) had time to write in between. So
+ * immediately before each `save`, this function re-checks `findBySlug` one more time — if a
+ * document now exists (created by anything since the original classification), the row becomes
+ * `RACE_LOST` and `save` is never called; the racing document is left exactly as that other writer
+ * left it. This closes the "created by another row earlier in this same batch" case completely and
+ * shrinks a genuinely concurrent writer's window down to the single round-trip between this
+ * recheck and the `save` call itself — a real reduction, not a guarantee that window is zero.
+ *
+ * Each MISSING row that passes the recheck is written and independently re-read to confirm parity
+ * — `save` succeeding is not itself treated as proof the document is now correctly readable back
+ * (a defensive check against, e.g., an adapter bug or an eventually-consistent store surfacing
+ * something other than what was just written). A row's write failure, recheck failure, or parity
+ * mismatch never stops the loop — every other MISSING row is still attempted, and nothing already
+ * written by this same run (or any earlier one) is ever deleted or rolled back. The full set of
+ * independent per-row outcomes is returned so the caller can decide what to do about any failures;
+ * this function itself never throws for a single row's failure.
  */
 export async function applyBackfill(
   rows: readonly SandboxGameRecordCanonicalSource[],
@@ -201,6 +227,24 @@ export async function applyBackfill(
   for (const status of summary.statuses) {
     if (status.kind !== "MISSING") {
       outcomes.push({ kind: "SKIPPED", slug: status.slug, status: status.kind });
+      continue;
+    }
+
+    // Best-effort TOCTOU-window reduction, not an atomic conditional-create — see this function's
+    // own doc comment and the file's top doc comment for why.
+    let recheck: CreatorGameCanonicalDocument | null;
+    try {
+      recheck = await repo.findBySlug(status.slug);
+    } catch (err) {
+      outcomes.push({
+        kind: "WRITE_FAILED",
+        slug: status.slug,
+        message: `pre-write race recheck failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      continue;
+    }
+    if (recheck !== null) {
+      outcomes.push({ kind: "RACE_LOST", slug: status.slug });
       continue;
     }
 

@@ -5,6 +5,7 @@ import type {
   SandboxGameRecordCanonicalSource,
   BackfillSummary,
   BackfillApplyResult,
+  BackfillApplyOutcome,
 } from "@owogg/core";
 import { classifyBackfillRows, applyBackfill } from "@owogg/core";
 
@@ -23,10 +24,12 @@ import { classifyBackfillRows, applyBackfill } from "@owogg/core";
  * scripts/ for a live D1 connection outside a Worker (registry/verify-production.ts scripts only
  * ever hit the deployed public API over HTTP), and this migration's own task explicitly disallows
  * adding a production API endpoint or request path for it. Instead, an operator exports the
- * relevant `sandbox_games` rows to a JSON file externally (e.g.
- * `wrangler d1 execute --remote --json`) and passes that file's path via `--input`. This keeps the
- * tool itself simple, keeps production D1 access entirely out of this PR, and matches the row
- * shape {@link SandboxGameRecordCanonicalSource} already needs.
+ * relevant `sandbox_games` rows to a JSON file externally — see
+ * creator-canonical-backfill-export.sql (its own header comment has the exact `wrangler d1
+ * execute` + `jq` command to produce a file this CLI's `--input` accepts directly, already aliased
+ * from D1's snake_case columns to this contract's camelCase shape) — and passes that file's path
+ * via `--input`. This keeps the tool itself simple, keeps production D1 access entirely out of
+ * this PR, and matches the row shape {@link SandboxGameRecordCanonicalSource} already needs.
  */
 
 export interface BackfillCliArgs {
@@ -210,6 +213,11 @@ export function formatBackfillApplyReport(result: BackfillApplyResult): string {
       case "SKIPPED":
         lines.push(`SKIPPED               ${outcome.slug}  (status: ${outcome.status})`);
         break;
+      case "RACE_LOST":
+        lines.push(
+          `RACE_LOST             ${outcome.slug}  (another writer created this document between classification and save — left untouched; see this tool's own no-overwrite doc comment)`,
+        );
+        break;
       case "WRITE_FAILED":
         lines.push(`WRITE_FAILED          ${outcome.slug}  (${outcome.message})`);
         break;
@@ -221,6 +229,60 @@ export function formatBackfillApplyReport(result: BackfillApplyResult): string {
     }
   }
   return lines.join("\n");
+}
+
+/**
+ * The three-tier exit code contract this tool follows — deliberately not a flat "any
+ * non-MISSING/MATCH row = failure" rule, since BLOCKED and CONFLICT mean very different things
+ * operationally:
+ *
+ *   - `0` (clean): every row is MISSING/MATCH (dry-run), or every apply outcome is
+ *     CREATED/SKIPPED-for-MATCH/SKIPPED-for-BLOCKED — nothing here needs a human right now.
+ *   - `1` (fatal): an `ERROR` row (a malformed stored document or a real storage failure — the
+ *     tool itself couldn't determine the state), or, in apply mode, a `WRITE_FAILED` or
+ *     `PARITY_MISMATCH_AFTER_WRITE` outcome (the write path itself misbehaved). A CI/cron
+ *     invocation of this tool should treat this as "something is broken, page someone."
+ *   - `2` (attention): a `CONFLICT` row, or (apply mode) a `RACE_LOST` outcome — the tool ran
+ *     correctly and made no unsafe write, but the B2 canonical registry disagrees with D1 (or
+ *     something else wrote to this slug concurrently) and a human needs to look, even though
+ *     nothing is actually broken.
+ *
+ * `BLOCKED` (an unconfigured score policy) is deliberately excluded from both 1 and 2: it is an
+ * ordinary, expected, ongoing state for Creator games an admin hasn't finished configuring yet —
+ * not a fault of this tool, this run, or the backfill process, so it never on its own changes the
+ * exit code.
+ */
+export type BackfillRunOutcome =
+  | { readonly mode: "dry-run"; readonly summary: BackfillSummary }
+  | { readonly mode: "apply"; readonly result: BackfillApplyResult };
+
+/** `true` when apply actually wrote something incorrectly or couldn't confirm what it wrote — the
+ * two outcome kinds that mean the write path itself misbehaved, as opposed to `RACE_LOST`/
+ * `SKIPPED`, which mean apply correctly declined to write. */
+export function hasFatalApplyFailure(outcomes: readonly BackfillApplyOutcome[]): boolean {
+  return outcomes.some(
+    (outcome) => outcome.kind === "WRITE_FAILED" || outcome.kind === "PARITY_MISMATCH_AFTER_WRITE",
+  );
+}
+
+/** Maps a finished dry-run or apply run to this tool's process exit code — see the exit-code
+ * contract doc comment just above for what each tier means and why BLOCKED is excluded from both
+ * non-zero tiers. Pure: takes only the already-computed summary/result, no I/O. */
+export function determineBackfillExitCode(outcome: BackfillRunOutcome): 0 | 1 | 2 {
+  const summary = outcome.mode === "dry-run" ? outcome.summary : outcome.result.summary;
+  const fatalApplyFailure =
+    outcome.mode === "apply" && hasFatalApplyFailure(outcome.result.outcomes);
+  if (summary.counts.ERROR > 0 || fatalApplyFailure) {
+    return 1;
+  }
+
+  const raceLost =
+    outcome.mode === "apply" && outcome.result.outcomes.some((o) => o.kind === "RACE_LOST");
+  if (summary.counts.CONFLICT > 0 || raceLost) {
+    return 2;
+  }
+
+  return 0;
 }
 
 export function buildCreatorGameDefinitionRepositoryFromB2Config(
@@ -236,24 +298,31 @@ export interface CreatorCanonicalBackfillCliDeps {
   readonly log: (message: string) => void;
 }
 
-/** The CLI's own top-level flow — reads the input file, classifies (dry-run) or classifies+writes
- * (apply), and logs the formatted report. Takes its file/repo/log dependencies injected so this is
- * testable against a fake repository and an in-memory "file", with no real fs/B2 access — the
- * runner script (run-creator-canonical-backfill.ts) is the only place real fs.readFileSync and a
- * real B2-backed repository get constructed and passed in. */
+/**
+ * The CLI's own top-level flow — reads the input file, classifies (dry-run) or classifies+writes
+ * (apply), logs the formatted report, and returns the process exit code
+ * {@link determineBackfillExitCode} computes for the run (0/1/2 — see that function's own doc
+ * comment). The report is always logged BEFORE this returns, so a caller that acts on a non-zero
+ * exit code still has the full per-row detail already printed, not just a bare number. Takes its
+ * file/repo/log dependencies injected so this is testable against a fake repository and an
+ * in-memory "file", with no real fs/B2 access — the runner script
+ * (run-creator-canonical-backfill.ts) is the only place real fs.readFileSync, a real B2-backed
+ * repository, and `process.exitCode` itself get touched.
+ */
 export async function runCreatorCanonicalBackfillCli(
   args: BackfillCliArgs,
   deps: CreatorCanonicalBackfillCliDeps,
-): Promise<void> {
+): Promise<0 | 1 | 2> {
   const jsonText = deps.readFile(args.inputPath);
   const rows = parseBackfillInputRows(jsonText);
 
   if (!args.apply) {
     const summary = await classifyBackfillRows(rows, deps.repo);
     deps.log(formatBackfillReport(summary));
-    return;
+    return determineBackfillExitCode({ mode: "dry-run", summary });
   }
 
   const result = await applyBackfill(rows, deps.repo);
   deps.log(formatBackfillApplyReport(result));
+  return determineBackfillExitCode({ mode: "apply", result });
 }

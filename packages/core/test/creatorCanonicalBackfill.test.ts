@@ -293,3 +293,75 @@ test("apply is idempotent — running it twice in a row only creates each MISSIN
   ]);
   assert.equal(repo.documents.size, 1);
 });
+
+// ── best-effort no-overwrite under a concurrent writer (RACE_LOST) ──────────────
+//
+// B2's S3-compatible API has no conditional-write primitive (see this module's own top doc
+// comment for the evidence), so applyBackfill cannot make save() a true atomic create-if-absent.
+// What it does instead is re-check findBySlug immediately before save() — these tests simulate a
+// second writer creating the document in the gap between the original classification and that
+// final recheck, and assert the racing writer's document always wins, never this run's.
+
+function createRaceSimulatingRepo(
+  raceSlug: string,
+  concurrentDocument: CreatorGameCanonicalDocument,
+): CreatorGameDefinitionRepository & { documents: Map<string, CreatorGameCanonicalDocument> } {
+  const documents = new Map<string, CreatorGameCanonicalDocument>();
+  let findCallsForRaceSlug = 0;
+  return {
+    documents,
+    async findBySlug(slug) {
+      if (slug === raceSlug) {
+        findCallsForRaceSlug++;
+        // The 2nd call is applyBackfill's own pre-save recheck (the 1st was the original
+        // classification) — simulate another writer having created the document in between.
+        if (findCallsForRaceSlug === 2) {
+          documents.set(raceSlug, concurrentDocument);
+        }
+      }
+      return documents.get(slug) ?? null;
+    },
+    async save(document) {
+      documents.set(document.slug, document);
+    },
+    async delete(slug) {
+      documents.delete(slug);
+    },
+  };
+}
+
+test("apply never overwrites a document another writer created between classification and save — RACE_LOST, not CREATED", async () => {
+  const row = fullyConfiguredRow({ slug: "raced-game" });
+  const concurrentDocument = expectedDocument(
+    fullyConfiguredRow({ slug: "raced-game", title: "Created By The Other Writer" }),
+  );
+  const repo = createRaceSimulatingRepo("raced-game", concurrentDocument);
+
+  const result = await applyBackfill([row], repo);
+
+  assert.deepEqual(result.outcomes, [{ kind: "RACE_LOST", slug: "raced-game" }]);
+  assert.deepEqual(
+    repo.documents.get("raced-game"),
+    concurrentDocument,
+    "the racing writer's document must be left exactly as it was — never overwritten",
+  );
+});
+
+test("a failure during the pre-save race recheck itself is reported as WRITE_FAILED, never silently proceeds to save", async () => {
+  const repo = createFakeRepo();
+  let findCalls = 0;
+  const originalFindBySlug = repo.findBySlug.bind(repo);
+  repo.findBySlug = async (slug: string) => {
+    findCalls++;
+    if (slug === "recheck-fails" && findCalls === 2) {
+      throw new Error("simulated storage failure during race recheck");
+    }
+    return originalFindBySlug(slug);
+  };
+
+  const result = await applyBackfill([fullyConfiguredRow({ slug: "recheck-fails" })], repo);
+
+  assert.equal(result.outcomes.length, 1);
+  assert.equal(result.outcomes[0]!.kind, "WRITE_FAILED");
+  assert.equal(repo.documents.has("recheck-fails"), false);
+});
