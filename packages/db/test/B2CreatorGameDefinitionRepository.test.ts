@@ -165,3 +165,22 @@ test("an underlying storage failure on read propagates, not swallowed into null"
 
   await assert.rejects(() => repo.findBySlug("flaky-game"), /simulated storage failure/);
 });
+
+test("a deep-invalid stored presentation (e.g. fixed mode with no design resolution) propagates through the adapter, not just the pure parser", async () => {
+  const storage = createFakeStorage();
+  const repo = new B2CreatorGameDefinitionRepository(storage);
+  const raw = {
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "fixed" }, // missing preferredWidth/preferredHeight
+      fullscreen: { supported: false },
+      mobile: { support: "unsupported" },
+    },
+  };
+  storage.objects.set(creatorGameDefinitionObjectKey(raw.slug), {
+    bytes: new TextEncoder().encode(JSON.stringify(raw)),
+    contentType: "application/json",
+  });
+
+  await assert.rejects(() => repo.findBySlug(raw.slug), /INVALID_DOCUMENT/);
+});

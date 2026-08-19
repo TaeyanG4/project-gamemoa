@@ -238,3 +238,184 @@ test("a presentation field that isn't an object fails closed with INVALID_DOCUME
       err instanceof CreatorGameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
   );
 });
+
+// ── presentation: deep validation ───────────────────────────────────────────
+//
+// Fail-closed shape validation matching scripts/game-registry-schema.ts's own semantics — see
+// creatorGameCanonicalDocument.ts's own "presentation" section for why this is a second,
+// independent implementation rather than a shared import.
+
+function rejects(raw: unknown, expectedSlug = "my-cool-game"): void {
+  assert.throws(
+    () => parseCreatorGameCanonicalDocument(JSON.stringify(raw), expectedSlug),
+    (err: unknown) =>
+      err instanceof CreatorGameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+}
+
+test("presentation: {} rejects — viewport/fullscreen/mobile are all required once presentation is present at all", () => {
+  rejects({ ...validDocument(), presentation: {} });
+});
+
+test("an invalid viewport.mode fails closed", () => {
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "garbage" },
+      fullscreen: { supported: false },
+      mobile: { support: "unsupported" },
+    },
+  });
+});
+
+test("fixed mode without both preferred dimensions fails closed", () => {
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "fixed" },
+      fullscreen: { supported: false },
+      mobile: { support: "unsupported" },
+    },
+  });
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "fixed", preferredWidth: 640 },
+      fullscreen: { supported: false },
+      mobile: { support: "unsupported" },
+    },
+  });
+});
+
+test("a non-positive or non-finite viewport dimension fails closed", () => {
+  for (const bad of [0, -100, NaN, Infinity]) {
+    rejects({
+      ...validDocument(),
+      presentation: {
+        viewport: { mode: "responsive", minWidth: bad },
+        fullscreen: { supported: false },
+        mobile: { support: "unsupported" },
+      },
+    });
+  }
+});
+
+test("minWidth > maxWidth (or minHeight > maxHeight) fails closed", () => {
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "responsive", minWidth: 1000, maxWidth: 500 },
+      fullscreen: { supported: false },
+      mobile: { support: "unsupported" },
+    },
+  });
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "responsive", minHeight: 1000, maxHeight: 500 },
+      fullscreen: { supported: false },
+      mobile: { support: "unsupported" },
+    },
+  });
+});
+
+test("fullscreen.recommended: true with supported: false fails closed", () => {
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "responsive" },
+      fullscreen: { supported: false, recommended: true },
+      mobile: { support: "unsupported" },
+    },
+  });
+});
+
+test("an invalid mobile.support value fails closed", () => {
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "responsive" },
+      fullscreen: { supported: false },
+      mobile: { support: "great" },
+    },
+  });
+});
+
+test("an invalid mobile.orientation value fails closed", () => {
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "responsive" },
+      fullscreen: { supported: false },
+      mobile: { support: "supported", orientation: "diagonal" },
+    },
+  });
+});
+
+test("a fully valid presentation still round-trips after adding deep validation", () => {
+  const doc = validDocument({
+    presentation: {
+      viewport: { mode: "fixed", preferredWidth: 1280, preferredHeight: 720 },
+      fullscreen: { supported: true, recommended: true },
+      mobile: { support: "experimental", orientation: "landscape" },
+    },
+  });
+  const parsed = parseCreatorGameCanonicalDocument(
+    serializeCreatorGameCanonicalDocument(doc),
+    doc.slug,
+  );
+  assert.deepEqual(parsed, doc);
+});
+
+// ── unknown-key rejection ────────────────────────────────────────────────────
+
+test("an unknown top-level field fails closed with INVALID_DOCUMENT", () => {
+  const raw: Record<string, unknown> = { ...validDocument() };
+  raw.titel = "typo";
+  rejects(raw);
+});
+
+test("an unknown policy field fails closed", () => {
+  const doc = validDocument();
+  rejects({ ...doc, policy: { ...doc.policy, unexpectedField: true } });
+});
+
+test("an unknown policy.score field fails closed", () => {
+  const doc = validDocument();
+  rejects({
+    ...doc,
+    policy: { ...doc.policy, score: { ...doc.policy.score, unexpectedField: true } },
+  });
+});
+
+test("an unknown presentation field fails closed", () => {
+  rejects({
+    ...validDocument(),
+    presentation: {
+      viewport: { mode: "responsive" },
+      fullscreen: { supported: false },
+      mobile: { support: "unsupported" },
+      futureField: true,
+    },
+  });
+});
+
+test("an unknown nested field in viewport/fullscreen/mobile each fails closed", () => {
+  const base = {
+    viewport: { mode: "responsive" as const },
+    fullscreen: { supported: false },
+    mobile: { support: "unsupported" as const },
+  };
+  rejects({
+    ...validDocument(),
+    presentation: { ...base, viewport: { ...base.viewport, aspectRatio: "16:9" } },
+  });
+  rejects({
+    ...validDocument(),
+    presentation: { ...base, fullscreen: { ...base.fullscreen, required: true } },
+  });
+  rejects({
+    ...validDocument(),
+    presentation: { ...base, mobile: { ...base.mobile, controlsScheme: "virtual-joystick" } },
+  });
+});

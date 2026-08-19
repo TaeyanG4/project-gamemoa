@@ -174,10 +174,67 @@ function requireNumber(obj: Record<string, unknown>, field: string): number {
   return value;
 }
 
+function optionalBoolean(obj: Record<string, unknown>, field: string): boolean | undefined {
+  const value = obj[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== "boolean")
+    fail("INVALID_DOCUMENT", `${field} must be a boolean when present`);
+  return value;
+}
+
+/** Matches scripts/game-registry-schema.ts's own `optionalPositiveNumber` semantics for the same
+ * field family (viewport dimensions) — see this file's own top doc comment on why the two
+ * parsers stay independent copies rather than a shared import (Creator's canonical parser must
+ * never import from scripts/, which isn't a workspace package core is allowed to depend on, and
+ * scripts/ must never import from a wider core surface than the registry-builder helpers it
+ * already reuses). */
+function optionalPositiveNumber(obj: Record<string, unknown>, field: string): number | undefined {
+  const value = obj[field];
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    fail("INVALID_DOCUMENT", `${field} must be a positive number when present`);
+  }
+  return value;
+}
+
+/** Rejects unrecognised keys at `context` — v1's `schemaVersion` exists precisely so a typo'd or
+ * stray field fails loudly instead of being silently dropped and looking configured when it
+ * isn't (same reasoning scripts/game-registry-schema.ts's own `rejectUnknownKeys` documents). */
+function rejectUnknownKeys(
+  obj: Record<string, unknown>,
+  allowed: readonly string[],
+  context: string,
+): void {
+  for (const key of Object.keys(obj)) {
+    if (!allowed.includes(key)) {
+      fail(
+        "INVALID_DOCUMENT",
+        `${context}: unknown field "${key}" (allowed: ${allowed.join(", ")})`,
+      );
+    }
+  }
+}
+
+const TOP_LEVEL_KEYS = [
+  "schemaVersion",
+  "slug",
+  "title",
+  "shortDescription",
+  "description",
+  "genre",
+  "mode",
+  "policy",
+  "presentation",
+  "updatedAt",
+] as const;
+const POLICY_KEYS = ["score", "leaderboard", "xpPerCompletion", "requiresAuth"] as const;
+const SCORE_KEYS = ["unit", "direction", "min", "max", "displayPrefix", "displaySuffix"] as const;
 const SCORE_DIRECTIONS = ["asc", "desc"] as const;
 
 function parseScoreConfig(value: unknown): ScoreConfig {
   const raw = asRecord(value, "policy.score");
+  rejectUnknownKeys(raw, SCORE_KEYS, "policy.score");
+
   const direction = requireString(raw, "direction");
   if (!(SCORE_DIRECTIONS as readonly string[]).includes(direction)) {
     fail(
@@ -207,6 +264,7 @@ function parseScoreConfig(value: unknown): ScoreConfig {
 
 function parsePolicy(value: unknown): CreatorGameCanonicalPolicy {
   const raw = asRecord(value, "policy");
+  rejectUnknownKeys(raw, POLICY_KEYS, "policy");
   if (!("score" in raw))
     fail("INVALID_DOCUMENT", "policy.score is required (use null if unscored)");
   const score = raw.score === null ? null : parseScoreConfig(raw.score);
@@ -218,18 +276,173 @@ function parsePolicy(value: unknown): CreatorGameCanonicalPolicy {
   };
 }
 
+// ── presentation ─────────────────────────────────────────────────────────────
+//
+// Mirrors scripts/game-registry-schema.ts's own Presentation validation semantics field-for-field
+// (mode enum, positive finite dimensions, min<=max, preferred-doesn't-contradict-bounds, fixed
+// requires both preferred dimensions, fullscreen's recommended/supported non-contradiction,
+// mobile's support/orientation enums, unknown-key rejection at every level) — deliberately a
+// second, independent implementation rather than a shared import: this parser must stay
+// importable from `packages/core` alone (scripts/ is not a workspace package `@owogg/core` may
+// depend on), and scripts/'s own parser must stay free of any Creator-specific concept. Runtime
+// validation (positivity, min/max relationships) was always this parser's job per the original
+// GamePresentation contract's own design — see that type's doc comment — this just applies the
+// same rules Stage A's own review found missing before storing a Creator-authored value.
+
+const VIEWPORT_MODES = ["responsive", "fixed"] as const;
+const VIEWPORT_KEYS = [
+  "mode",
+  "preferredWidth",
+  "preferredHeight",
+  "minWidth",
+  "minHeight",
+  "maxWidth",
+  "maxHeight",
+] as const;
+const FULLSCREEN_KEYS = ["supported", "recommended"] as const;
+const MOBILE_SUPPORT = ["supported", "experimental", "unsupported"] as const;
+const MOBILE_ORIENTATIONS = ["any", "portrait", "landscape"] as const;
+const MOBILE_KEYS = ["support", "orientation"] as const;
+const PRESENTATION_KEYS = ["viewport", "fullscreen", "mobile"] as const;
+
+function parseViewport(value: unknown): GamePresentation["viewport"] {
+  const raw = asRecord(value, "presentation.viewport");
+  rejectUnknownKeys(raw, VIEWPORT_KEYS, "presentation.viewport");
+
+  const mode = requireString(raw, "mode");
+  if (!(VIEWPORT_MODES as readonly string[]).includes(mode)) {
+    fail(
+      "INVALID_DOCUMENT",
+      `presentation.viewport.mode must be one of ${VIEWPORT_MODES.join(", ")}`,
+    );
+  }
+
+  const preferredWidth = optionalPositiveNumber(raw, "preferredWidth");
+  const preferredHeight = optionalPositiveNumber(raw, "preferredHeight");
+  const minWidth = optionalPositiveNumber(raw, "minWidth");
+  const minHeight = optionalPositiveNumber(raw, "minHeight");
+  const maxWidth = optionalPositiveNumber(raw, "maxWidth");
+  const maxHeight = optionalPositiveNumber(raw, "maxHeight");
+
+  if (minWidth !== undefined && maxWidth !== undefined && minWidth > maxWidth) {
+    fail("INVALID_DOCUMENT", "presentation.viewport.minWidth must be <= maxWidth");
+  }
+  if (minHeight !== undefined && maxHeight !== undefined && minHeight > maxHeight) {
+    fail("INVALID_DOCUMENT", "presentation.viewport.minHeight must be <= maxHeight");
+  }
+  if (preferredWidth !== undefined && minWidth !== undefined && preferredWidth < minWidth) {
+    fail("INVALID_DOCUMENT", "presentation.viewport.preferredWidth is below minWidth");
+  }
+  if (preferredWidth !== undefined && maxWidth !== undefined && preferredWidth > maxWidth) {
+    fail("INVALID_DOCUMENT", "presentation.viewport.preferredWidth is above maxWidth");
+  }
+  if (preferredHeight !== undefined && minHeight !== undefined && preferredHeight < minHeight) {
+    fail("INVALID_DOCUMENT", "presentation.viewport.preferredHeight is below minHeight");
+  }
+  if (preferredHeight !== undefined && maxHeight !== undefined && preferredHeight > maxHeight) {
+    fail("INVALID_DOCUMENT", "presentation.viewport.preferredHeight is above maxHeight");
+  }
+
+  const bounds = {
+    ...(minWidth !== undefined ? { minWidth } : {}),
+    ...(minHeight !== undefined ? { minHeight } : {}),
+    ...(maxWidth !== undefined ? { maxWidth } : {}),
+    ...(maxHeight !== undefined ? { maxHeight } : {}),
+  };
+
+  if (mode === "fixed") {
+    if (preferredWidth === undefined || preferredHeight === undefined) {
+      fail(
+        "INVALID_DOCUMENT",
+        'presentation.viewport: mode "fixed" requires both preferredWidth and preferredHeight',
+      );
+    }
+    return { mode: "fixed", preferredWidth, preferredHeight, ...bounds };
+  }
+
+  return {
+    mode: "responsive",
+    ...(preferredWidth !== undefined ? { preferredWidth } : {}),
+    ...(preferredHeight !== undefined ? { preferredHeight } : {}),
+    ...bounds,
+  };
+}
+
+function parseFullscreen(value: unknown): GamePresentation["fullscreen"] {
+  const raw = asRecord(value, "presentation.fullscreen");
+  rejectUnknownKeys(raw, FULLSCREEN_KEYS, "presentation.fullscreen");
+
+  const supported = requireBoolean(raw, "supported");
+  const recommended = optionalBoolean(raw, "recommended");
+  if (recommended === true && !supported) {
+    fail(
+      "INVALID_DOCUMENT",
+      "presentation.fullscreen.recommended cannot be true when supported is false",
+    );
+  }
+
+  return { supported, ...(recommended !== undefined ? { recommended } : {}) };
+}
+
+function parseMobile(value: unknown): GamePresentation["mobile"] {
+  const raw = asRecord(value, "presentation.mobile");
+  rejectUnknownKeys(raw, MOBILE_KEYS, "presentation.mobile");
+
+  const support = requireString(raw, "support");
+  if (!(MOBILE_SUPPORT as readonly string[]).includes(support)) {
+    fail(
+      "INVALID_DOCUMENT",
+      `presentation.mobile.support must be one of ${MOBILE_SUPPORT.join(", ")}`,
+    );
+  }
+
+  const orientation = raw.orientation;
+  if (orientation !== undefined) {
+    if (
+      typeof orientation !== "string" ||
+      !(MOBILE_ORIENTATIONS as readonly string[]).includes(orientation)
+    ) {
+      fail(
+        "INVALID_DOCUMENT",
+        `presentation.mobile.orientation must be one of ${MOBILE_ORIENTATIONS.join(", ")}`,
+      );
+    }
+  }
+
+  return {
+    support: support as GamePresentation["mobile"]["support"],
+    ...(typeof orientation === "string"
+      ? { orientation: orientation as GamePresentation["mobile"]["orientation"] }
+      : {}),
+  };
+}
+
+function parsePresentation(value: unknown): GamePresentation {
+  const raw = asRecord(value, "presentation");
+  rejectUnknownKeys(raw, PRESENTATION_KEYS, "presentation");
+
+  if (!("viewport" in raw)) fail("INVALID_DOCUMENT", "presentation.viewport is required");
+  if (!("fullscreen" in raw)) fail("INVALID_DOCUMENT", "presentation.fullscreen is required");
+  if (!("mobile" in raw)) fail("INVALID_DOCUMENT", "presentation.mobile is required");
+
+  return {
+    viewport: parseViewport(raw.viewport),
+    fullscreen: parseFullscreen(raw.fullscreen),
+    mobile: parseMobile(raw.mobile),
+  };
+}
+
 const SANDBOX_GAME_MODE_VALUES = ["single", "multi"] as const;
 
 /**
  * Parses and validates a stored canonical document's JSON text against every fail-closed
  * condition Stage A requires: malformed JSON, an unsupported `schemaVersion`, a stored `slug`
- * that doesn't match what the caller actually requested, or a shape that isn't a valid document
- * at all. None of these ever produce a silent empty/default document — every failure throws
- * {@link CreatorGameCanonicalDocumentError}, which callers (the B2 adapter) propagate rather than
- * swallow. `presentation`, if present, is only shape-checked as a plain object here — it is
- * unpopulated by anything in this PR, so deep-validating its internal shape is deferred to
- * whichever future PR actually starts writing one (see scripts/game-registry-schema.ts's
- * `parsePresentation` for what that will eventually reuse).
+ * that doesn't match what the caller actually requested, an unrecognised field at any level
+ * (top-level document, `policy`, `policy.score`, `presentation` and each of its three sections),
+ * or any other shape that isn't a valid document at all — including a full deep validation of
+ * `presentation` (see this file's own "presentation" section above). None of these ever produce a
+ * silent empty/default document — every failure throws {@link CreatorGameCanonicalDocumentError},
+ * which callers (the B2 adapter) propagate rather than swallow.
  */
 export function parseCreatorGameCanonicalDocument(
   jsonText: string,
@@ -243,6 +456,7 @@ export function parseCreatorGameCanonicalDocument(
   }
 
   const obj = asRecord(parsed, "document");
+  rejectUnknownKeys(obj, TOP_LEVEL_KEYS, "document");
 
   const schemaVersion = obj.schemaVersion;
   if (schemaVersion !== CREATOR_GAME_DEFINITION_SCHEMA_VERSION) {
@@ -262,13 +476,8 @@ export function parseCreatorGameCanonicalDocument(
   if (!("policy" in obj)) fail("INVALID_DOCUMENT", "policy is required");
   const policy = parsePolicy(obj.policy);
 
-  let presentation: GamePresentation | undefined;
-  if (obj.presentation !== undefined) {
-    // Shape-only check — see this function's own doc comment on why a deep GamePresentation
-    // validation isn't duplicated here.
-    asRecord(obj.presentation, "presentation");
-    presentation = obj.presentation as GamePresentation;
-  }
+  const presentation =
+    obj.presentation !== undefined ? parsePresentation(obj.presentation) : undefined;
 
   return {
     schemaVersion: CREATOR_GAME_DEFINITION_SCHEMA_VERSION,
