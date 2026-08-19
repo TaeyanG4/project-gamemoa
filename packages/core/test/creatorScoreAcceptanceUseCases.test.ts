@@ -8,6 +8,7 @@ import type {
   SandboxGameVersionRecord,
 } from "../src/ports/sandboxGames.js";
 import type { CreatorScoreAcceptanceRepository } from "../src/ports/creatorScoreAcceptance.js";
+import { tamperSignedToken } from "./helpers/tamperSignature.js";
 
 // The atomic accept-or-reject write itself is proven against real SQLite in
 // packages/db/test/D1CreatorScoreAcceptanceRepository.test.ts. This file exercises everything
@@ -196,7 +197,7 @@ test("a tampered token is INVALID_TOKEN, and the repository is never reached", a
   const game = makeGame();
   const { useCases, acceptanceRepo } = buildUseCases(game);
   const token = await signGameSession(samplePayload(), SECRET);
-  const tampered = token.slice(0, -1) + (token.endsWith("A") ? "B" : "A");
+  const tampered = tamperSignedToken(token);
 
   const result = await useCases.accept({
     slug: "ball-dodge",
