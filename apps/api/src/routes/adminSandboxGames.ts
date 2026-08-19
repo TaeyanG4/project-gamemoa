@@ -278,6 +278,12 @@ adminSandboxGamesRouter.patch("/:id/live-version", async (c) => {
 
 // PATCH /api/admin/sandbox-games/:id/metadata — generalized, admin-adjustable metadata
 // (title/description/genre/XP/score config), independent of any bundle re-upload.
+//
+// Stage C-2: this now also keeps a B2 canonical document in sync (see SandboxGameUseCases.
+// updateMetadata's own doc comment), which requires the same real Backblaze B2 config every
+// bundle-upload route already requires — so this route checks `gameBundlesConfigured` and returns
+// a clean 503 up front, exactly like devGames.ts's upload route, rather than ever silently
+// degrading to a D1-only update when B2 isn't configured for this environment.
 adminSandboxGamesRouter.patch("/:id/metadata", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;
@@ -291,9 +297,21 @@ adminSandboxGamesRouter.patch("/:id/metadata", async (c) => {
     return c.json({ error: { code: "INVALID_REQUEST", message: "잘못된 메타데이터입니다." } }, 400);
   }
 
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  if (!container.gameBundlesConfigured) {
+    return c.json(
+      {
+        error: {
+          code: "GAME_BUNDLES_NOT_CONFIGURED",
+          message: "번들 저장소(Backblaze B2)가 아직 이 환경에 구성되지 않았습니다.",
+        },
+      },
+      503,
+    );
+  }
+
   try {
-    const { sandboxGameUseCases } = createContainer(c.env.DB);
-    const game = await sandboxGameUseCases.updateMetadata(id, admin.userId, parsed.data);
+    const game = await container.sandboxGameUseCases.updateMetadata(id, admin.userId, parsed.data);
     return c.json(SandboxGameRecordSchema.parse(toSandboxGameRecordResponse(game)), 200);
   } catch (err) {
     const { body: errBody, status } = failureResponse(err);

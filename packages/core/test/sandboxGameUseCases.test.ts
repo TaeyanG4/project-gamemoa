@@ -14,6 +14,9 @@ import type {
   GameBundleStorageRepository,
   BundleArchiveReader,
 } from "../src/ports/sandboxGames.js";
+import type { CreatorGameDefinitionRepository } from "../src/ports/creatorGameDefinition.js";
+import type { CreatorGameCanonicalDocument } from "../src/domain/creatorGameCanonicalDocument.js";
+import { CREATOR_GAME_DEFINITION_SCHEMA_VERSION } from "../src/domain/creatorGameCanonicalDocument.js";
 import { SANDBOX_GAME_POLICY } from "../src/domain/sandboxGames.js";
 import type { SandboxGameBundleManifest } from "../src/domain/sandboxGameBundle.js";
 import { GAME_REGISTRATION_MANIFEST_FILENAME } from "../src/domain/sandboxGameBundle.js";
@@ -341,6 +344,39 @@ function createFakeStorage(): GameBundleStorageRepository & {
   };
 }
 
+/** In-memory fake `CreatorGameDefinitionRepository` — Stage C-2's B2 canonical write-through
+ * target. `throwOnFindFor`/`throwOnSaveFor` simulate the two real failure modes the production
+ * adapter can propagate (a malformed/unreadable stored document or a raw storage failure — see
+ * B2CreatorGameDefinitionRepository's own doc comment), same convention as
+ * creatorCanonicalBackfill.test.ts's own fake. */
+function createFakeCanonicalRepo(): CreatorGameDefinitionRepository & {
+  documents: Map<string, CreatorGameCanonicalDocument>;
+  saveCalls: CreatorGameCanonicalDocument[];
+  throwOnFindFor?: string;
+  throwOnSaveFor?: string;
+} {
+  return {
+    documents: new Map(),
+    saveCalls: [],
+    async findBySlug(slug) {
+      if (this.throwOnFindFor === slug) {
+        throw new Error(`simulated malformed/unreadable document at ${slug}`);
+      }
+      return this.documents.get(slug) ?? null;
+    },
+    async save(document) {
+      if (this.throwOnSaveFor === document.slug) {
+        throw new Error(`simulated storage failure saving ${document.slug}`);
+      }
+      this.saveCalls.push(document);
+      this.documents.set(document.slug, document);
+    },
+    async delete(slug) {
+      this.documents.delete(slug);
+    },
+  };
+}
+
 // Empty by default: none of the arbitrary slugs these tests invent (`my-game`, `ball-dodge`, ...)
 // collide with a real SYSTEM game, so the default keeps every existing test's behaviour exactly
 // as it was before SandboxGameUseCases took a GameRegistry at all. Tests exercising the P-03
@@ -350,13 +386,14 @@ function createFakeStorage(): GameBundleStorageRepository & {
 function createUseCases(
   entries?: Record<string, Uint8Array>,
   registry: GameRegistry = new StaticGameRegistry([]),
+  canonicalRepo: ReturnType<typeof createFakeCanonicalRepo> = createFakeCanonicalRepo(),
 ) {
   const repo = createFakeRepo();
   const storage = createFakeStorage();
   const archives = createFakeArchiveReader(entries);
   const publisher = new GameBundlePublisher(repo, storage, archives);
-  const useCases = new SandboxGameUseCases(repo, storage, publisher, registry);
-  return { useCases, repo, storage, archives, publisher, registry };
+  const useCases = new SandboxGameUseCases(repo, storage, publisher, registry, canonicalRepo);
+  return { useCases, repo, storage, archives, publisher, registry, canonicalRepo };
 }
 
 async function createGameWithLiveVersion(entries?: Record<string, Uint8Array>) {
@@ -767,6 +804,382 @@ test("updateMetadata rejects an out-of-policy title without writing anything", a
   assert.equal(repo.games.get(game.id)?.title, "Game");
 });
 
+// ── updateMetadata: Stage C-2 B2 canonical write-through ─────────────────────
+
+function fixtureCanonicalDoc(
+  slug: string,
+  overrides: Partial<CreatorGameCanonicalDocument> = {},
+): CreatorGameCanonicalDocument {
+  return {
+    schemaVersion: CREATOR_GAME_DEFINITION_SCHEMA_VERSION,
+    slug,
+    title: "Canonical Title",
+    shortDescription: "Canonical short",
+    description: "Canonical long",
+    genre: "puzzle",
+    mode: "single",
+    policy: {
+      score: { unit: "pts", direction: "desc", min: 0, max: 100 },
+      leaderboard: true,
+      xpPerCompletion: 10,
+      requiresAuth: false,
+    },
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+async function createBareGame(useCases: SandboxGameUseCases) {
+  return useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Original Title",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+}
+
+// -- pre-canonical --
+
+test("updateMetadata: pre-canonical row + title-only patch + score still incomplete -> D1 updates, zero B2 writes", async () => {
+  const { useCases, repo, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+
+  const updated = await useCases.updateMetadata(game.id, 99, { title: "New Title" });
+
+  assert.equal(updated.title, "New Title");
+  assert.equal(repo.games.get(game.id)?.title, "New Title");
+  assert.equal(canonicalRepo.saveCalls.length, 0);
+  assert.equal(canonicalRepo.documents.size, 0);
+});
+
+test("updateMetadata: pre-canonical row + a partial score config patch stays pre-canonical, no B2 write", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+
+  await useCases.updateMetadata(game.id, 99, { scoreUnit: "pts", scoreDirection: "desc" });
+
+  assert.equal(canonicalRepo.saveCalls.length, 0);
+  assert.equal(canonicalRepo.documents.size, 0);
+});
+
+test("updateMetadata: pre-canonical row + a patch that completes all four required score fields creates the first canonical document", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+
+  const updated = await useCases.updateMetadata(game.id, 99, {
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 100,
+  });
+
+  assert.equal(canonicalRepo.saveCalls.length, 1);
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.ok(doc);
+  assert.deepEqual(doc?.policy.score, { unit: "pts", direction: "desc", min: 0, max: 100 });
+  assert.equal(doc?.policy.requiresAuth, false);
+  assert.equal(doc?.policy.leaderboard, true);
+  assert.equal(doc?.updatedAt, updated.updatedAt);
+});
+
+// -- existing canonical --
+
+test("updateMetadata: title change updates only B2 title, presentation preserved", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  const presentation = {
+    viewport: { mode: "fixed" as const, preferredWidth: 640, preferredHeight: 360 },
+    fullscreen: { supported: true, recommended: false },
+    mobile: { support: "unsupported" as const },
+  };
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug, { presentation }));
+
+  await useCases.updateMetadata(game.id, 99, { title: "Brand New Title" });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.equal(doc?.title, "Brand New Title");
+  assert.deepEqual(doc?.presentation, presentation);
+});
+
+test("updateMetadata: genre/description change leaves every other canonical field untouched", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  const existing = fixtureCanonicalDoc(game.slug);
+  canonicalRepo.documents.set(game.slug, existing);
+
+  await useCases.updateMetadata(game.id, 99, { genre: "arcade", description: "New desc" });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.equal(doc?.genre, "arcade");
+  assert.equal(doc?.description, "New desc");
+  assert.equal(doc?.title, existing.title);
+  assert.equal(doc?.shortDescription, existing.shortDescription);
+  assert.deepEqual(doc?.policy, existing.policy);
+});
+
+test("updateMetadata: xpPerCompletion change preserves requiresAuth/leaderboard", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+
+  await useCases.updateMetadata(game.id, 99, { xpPerCompletion: 75 });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.equal(doc?.policy.xpPerCompletion, 75);
+  assert.equal(doc?.policy.requiresAuth, false);
+  assert.equal(doc?.policy.leaderboard, true);
+});
+
+test("updateMetadata: a partial score patch keeps the rest of the existing ScoreConfig, decimal bounds preserved", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  // D1's own score_* columns must be complete too — the pre-D1-mutation validation step merges
+  // THIS request onto D1's current row, not onto whatever B2 happens to hold (see
+  // computeCreatorCanonicalScorePatch's own doc comment) — so bootstrap a fully-scored game
+  // through the real flow first, which naturally keeps D1 and B2 consistent with each other.
+  await useCases.updateMetadata(game.id, 99, {
+    scoreUnit: "s",
+    scoreDirection: "asc",
+    scoreMin: 0.5,
+    scoreMax: 99.9,
+  });
+  canonicalRepo.saveCalls.length = 0;
+
+  await useCases.updateMetadata(game.id, 99, { scoreMax: 199.5 });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.deepEqual(doc?.policy.score, { unit: "s", direction: "asc", min: 0.5, max: 199.5 });
+});
+
+test("updateMetadata: a patch that would null out a required score field is rejected before any D1 or B2 write", async () => {
+  const { useCases, repo, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  await useCases.updateMetadata(game.id, 99, {
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 100,
+  });
+  canonicalRepo.saveCalls.length = 0;
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { scoreMax: null }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure &&
+      err.code === "SCORE_POLICY_WOULD_BECOME_INCOMPLETE",
+  );
+
+  assert.equal(repo.games.get(game.id)?.scoreMax, 100, "D1 must be untouched");
+  assert.equal(canonicalRepo.saveCalls.length, 0);
+});
+
+test("updateMetadata: canonical score:null + title-only patch keeps score:null", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: { score: null, leaderboard: false, xpPerCompletion: 0, requiresAuth: false },
+    }),
+  );
+
+  await useCases.updateMetadata(game.id, 99, { title: "Renamed" });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.equal(doc?.policy.score, null);
+  assert.equal(doc?.title, "Renamed");
+});
+
+test("updateMetadata: canonical score:null + an incomplete score patch is rejected as ambiguous", async () => {
+  const { useCases, repo, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: { score: null, leaderboard: false, xpPerCompletion: 0, requiresAuth: false },
+    }),
+  );
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { scoreUnit: "pts" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "AMBIGUOUS_SCORE_POLICY_ACTIVATION",
+  );
+  assert.equal(repo.games.get(game.id)?.scoreUnit, null, "D1 must be untouched");
+  assert.equal(canonicalRepo.saveCalls.length, 0);
+});
+
+test("updateMetadata: canonical score:null + all four required score fields explicitly patched transitions to a real ScoreConfig", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: { score: null, leaderboard: false, xpPerCompletion: 0, requiresAuth: false },
+    }),
+  );
+
+  await useCases.updateMetadata(game.id, 99, {
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 50,
+  });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.deepEqual(doc?.policy.score, { unit: "pts", direction: "desc", min: 0, max: 50 });
+});
+
+// -- failure semantics --
+
+test("updateMetadata: a B2 pre-read failure leaves D1 untouched", async () => {
+  const { useCases, repo, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.throwOnFindFor = game.slug;
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  assert.equal(repo.games.get(game.id)?.title, "Original Title");
+});
+
+test("updateMetadata: a D1 update failure never reaches B2 at all", async () => {
+  const { repo, storage, canonicalRepo } = createUseCases();
+  const publisher = new GameBundlePublisher(repo, storage, createFakeArchiveReader());
+  const failingRepo: SandboxGameRepository = {
+    ...repo,
+    async updateMetadata(): Promise<SandboxGameRecord> {
+      throw new Error("simulated D1 write failure");
+    },
+  };
+  const useCases = new SandboxGameUseCases(
+    failingRepo,
+    storage,
+    publisher,
+    new StaticGameRegistry([]),
+    canonicalRepo,
+  );
+  const game = await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Original Title",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+
+  await assert.rejects(() => useCases.updateMetadata(game.id, 99, { title: "New Title" }));
+  assert.equal(canonicalRepo.saveCalls.length, 0);
+});
+
+test("updateMetadata: a B2 save failure after a successful D1 update never returns success", async () => {
+  const { useCases, repo, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  canonicalRepo.throwOnSaveFor = game.slug;
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  // D1 was already committed — the failure is in keeping B2 in sync, not hidden as a full no-op.
+  assert.equal(repo.games.get(game.id)?.title, "New Title");
+});
+
+test("updateMetadata: a B2 read-back parity mismatch after save is surfaced as a sync failure", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  const realSave = canonicalRepo.save.bind(canonicalRepo);
+  canonicalRepo.save = async (document) => {
+    await realSave(document);
+    // Corrupt what's actually stored right after saving, simulating a read-back that doesn't
+    // match what was just written.
+    canonicalRepo.documents.set(document.slug, { ...document, title: "corrupted-in-storage" });
+  };
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+});
+
+test("updateMetadata: a canonical document created by a concurrent writer between the first-create decision and the actual save is patched, not overwritten", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  // No document exists yet, so this metadata patch (which completes the score policy) would
+  // normally trigger first-canonical creation — but simulate another writer creating a real
+  // document with its own presentation in between the use case's own pre-read and its final
+  // pre-save recheck by making findBySlug return null once, then something real afterward.
+  let findCalls = 0;
+  const concurrentDoc = fixtureCanonicalDoc(game.slug, { title: "Created By Someone Else" });
+  const originalFindBySlug = canonicalRepo.findBySlug.bind(canonicalRepo);
+  canonicalRepo.findBySlug = async (slug: string) => {
+    findCalls++;
+    if (slug === game.slug && findCalls === 2) {
+      canonicalRepo.documents.set(game.slug, concurrentDoc);
+    }
+    return originalFindBySlug(slug);
+  };
+
+  await useCases.updateMetadata(game.id, 99, {
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 100,
+  });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  // The concurrent writer's title must survive — this patched onto their document rather than
+  // overwriting it with a freshly-mapped one.
+  assert.equal(doc?.title, "Created By Someone Else");
+});
+
+test("updateMetadata: B2-only presentation survives an unrelated metadata patch end to end", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  const presentation = {
+    viewport: { mode: "scale-to-fit" as const, minWidth: 320, minHeight: 240 },
+    fullscreen: { supported: false, recommended: false },
+    mobile: { support: "supported" as const, orientation: "any" as const },
+  };
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug, { presentation }));
+
+  await useCases.updateMetadata(game.id, 99, { description: "updated description" });
+
+  assert.deepEqual(canonicalRepo.documents.get(game.slug)?.presentation, presentation);
+});
+
+test("updateMetadata: existing requiresAuth/leaderboard are preserved verbatim by an unrelated patch", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: {
+        score: { unit: "pts", direction: "desc", min: 0, max: 100 },
+        leaderboard: false,
+        xpPerCompletion: 10,
+        requiresAuth: false,
+      },
+    }),
+  );
+
+  await useCases.updateMetadata(game.id, 99, { title: "New Title" });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.equal(doc?.policy.leaderboard, false);
+  assert.equal(doc?.policy.requiresAuth, false);
+});
+
 test("uploadVersion cleans up the orphaned storage object when the D1 write fails after a successful put, and surfaces PUBLISH_FAILED rather than the raw D1 error", async () => {
   const repo = createFakeRepo();
   const storage = createFakeStorage();
@@ -782,6 +1195,7 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
     storage,
     publisher,
     new StaticGameRegistry([]),
+    createFakeCanonicalRepo(),
   );
 
   const game = await useCases.createGame({
