@@ -3,6 +3,43 @@ import assert from "node:assert/strict";
 import { app } from "../src/index.js";
 import { signGameSession, type GameSessionPayload } from "@owogg/core";
 
+/**
+ * Deterministically corrupts a signed token's signature segment — see
+ * packages/core/test/helpers/tamperSignature.ts's own (much longer) doc comment for the full
+ * reasoning this is a local copy of: swapping a token's last CHARACTER for a fixed replacement
+ * (the previous approach here) is flaky, because base64url's last character encodes fewer than 6
+ * significant bits for a 32-byte HMAC-SHA256 signature — some replacements decode to
+ * byte-identical signatures, letting a "tampered" token pass verification by chance roughly 1 run
+ * in 4. Flipping one real byte via XOR after decoding is deterministic instead. Duplicated here
+ * rather than imported from packages/core/test/ — apps/api and packages/core are separate
+ * workspace packages, and this repo doesn't import across another package's test/ directory (only
+ * across its published `src` surface, via @owogg/core above) — this one small pure function is
+ * cheaper to keep in sync by hand than to invent a new shared-test-utils package for.
+ */
+function tamperSignedToken(token: string): string {
+  const lastDot = token.lastIndexOf(".");
+  const prefix = lastDot === -1 ? "" : token.slice(0, lastDot + 1);
+  const segment = lastDot === -1 ? token : token.slice(lastDot + 1);
+
+  const padded = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const withPadding = padded + "=".repeat((4 - (padded.length % 4)) % 4);
+  const binary = atob(withPadding);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  if (bytes.length === 0) return `${token}x`;
+
+  const lastIndex = bytes.length - 1;
+  bytes[lastIndex] = (bytes[lastIndex] ?? 0) ^ 0x01;
+
+  let tamperedBinary = "";
+  for (let i = 0; i < bytes.length; i++) tamperedBinary += String.fromCharCode(bytes[i] ?? 0);
+  const tamperedSegment = btoa(tamperedBinary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return prefix + tamperedSegment;
+}
+
 // POST /api/games/:slug/score — route-layer wiring only. The atomic accept-or-reject write is
 // proven against real SQLite in packages/db/test/D1CreatorScoreAcceptanceRepository.test.ts, and
 // every pre-write check (availability, token validity, context match, score policy) is proven
@@ -267,7 +304,7 @@ test("an unknown slug is 404 GAME_NOT_AVAILABLE", async () => {
 test("a tampered token is 401 INVALID_TOKEN", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
   const token = await signGameSession(samplePayload(), SESSION_SECRET);
-  const tampered = token.slice(0, -1) + (token.endsWith("A") ? "B" : "A");
+  const tampered = tamperSignedToken(token);
   const res = await postScore(db, { token: tampered, score: 10 });
   assert.equal(res.status, 401);
   const responseBody = (await res.json()) as { error: { code: string } };

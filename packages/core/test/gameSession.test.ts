@@ -7,6 +7,7 @@ import {
   GAME_SESSION_POLICY,
   type GameSessionPayload,
 } from "../src/domain/gameSession.js";
+import { tamperBase64UrlSegment } from "./helpers/tamperSignature.js";
 
 const SECRET = "test-secret-do-not-use-in-prod";
 
@@ -55,7 +56,7 @@ test("tampering with the payload segment invalidates the signature", async () =>
 test("tampering with the signature segment is rejected as a bad signature", async () => {
   const token = await signGameSession(samplePayload(), SECRET);
   const [version, payload, signature] = token.split(".");
-  const tamperedSignature = signature!.slice(0, -1) + (signature!.endsWith("A") ? "B" : "A");
+  const tamperedSignature = tamperBase64UrlSegment(signature!);
   const tampered = `${version}.${payload}.${tamperedSignature}`;
 
   const result = await verifyGameSession(tampered, SECRET);

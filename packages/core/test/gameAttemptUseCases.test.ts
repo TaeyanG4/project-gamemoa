@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { GameAttemptUseCases } from "../src/application/gameAttemptUseCases.js";
 import { signGameSession, type GameSessionPayload } from "../src/domain/gameSession.js";
 import type { GameAttemptConsumptionRepository } from "../src/ports/gameAttempt.js";
+import { tamperSignedToken } from "./helpers/tamperSignature.js";
 
 // The atomicity guarantee itself (real concurrent D1 requests racing on the same attemptId) is
 // proven against real SQLite in packages/db/test/D1GameAttemptConsumptionRepository.test.ts —
@@ -66,7 +67,7 @@ test("a tampered token is rejected as INVALID_TOKEN — the repository is never 
   const repo = createFakeRepo();
   const useCases = new GameAttemptUseCases(repo);
   const token = await signGameSession(samplePayload(), SECRET);
-  const tampered = token.slice(0, -1) + (token.endsWith("A") ? "B" : "A");
+  const tampered = tamperSignedToken(token);
 
   const result = await useCases.consume({ token: tampered, secret: SECRET, expected: EXPECTED });
   assert.deepEqual(result, { ok: false, error: "INVALID_TOKEN" });
