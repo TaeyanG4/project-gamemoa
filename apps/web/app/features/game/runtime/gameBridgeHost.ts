@@ -46,9 +46,18 @@ export interface GameBridgeHost {
  * (convenience-only) duplicate guard and write directly to the port, so the host cannot treat that
  * guard as its security boundary.
  */
+export interface GameBridgeHostOptions {
+  /** Threaded into HOST_INIT's own optional `difficultyId` field (see protocol.ts's
+   * HostInitMessage) — only a game with real difficulty tiers (aim-test) reads it; every other
+   * caller omits this and the bootstrap stays exactly the bare `{type:"HOST_INIT"}` it always was.
+   * Never auth/token/API address — see this file's own doc comment on what HOST_INIT carries. */
+  difficultyId?: string;
+}
+
 export function createGameBridgeHost(
   iframeWindow: GameBridgeIframeWindowLike,
   callbacks: GameBridgeHostCallbacks,
+  options?: GameBridgeHostOptions,
 ): GameBridgeHost {
   const channel = new MessageChannel();
   let completed = false;
@@ -86,7 +95,11 @@ export function createGameBridgeHost(
   // `.start()` call needed (that's only required for the addEventListener("message", ...) style,
   // which this deliberately doesn't use).
 
-  iframeWindow.postMessage({ type: "HOST_INIT" }, "*", [channel.port2]);
+  iframeWindow.postMessage(
+    { type: "HOST_INIT", ...(options?.difficultyId ? { difficultyId: options.difficultyId } : {}) },
+    "*",
+    [channel.port2],
+  );
 
   return {
     close() {

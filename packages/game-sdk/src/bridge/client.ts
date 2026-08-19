@@ -14,6 +14,13 @@ export interface GameBridgeWindowLike {
 }
 
 export interface GameBridgeClient {
+  /** The `difficultyId` the host's HOST_INIT bootstrap carried, or `undefined` when the host
+   * didn't send one — every existing bootstrap (reaction-time, Creator games, ball-dodge) and
+   * every game with no difficulty tiers. Read once at connect time and never updated after: this
+   * protocol has no live-update message, so a host-side difficulty change means a fresh iframe
+   * mount (a new HOST_INIT), not a change to an already-connected client — see
+   * apps/web/app/features/game/GameHost.tsx's own doc comment on why. */
+  readonly difficultyId?: string;
   /** Call once the game's own assets have finished loading and it's ready to be shown. */
   ready(): void;
   /** Call when the player actually starts a round (as opposed to e.g. sitting on a menu). */
@@ -68,14 +75,14 @@ export function connectGameBridge(
 
       settled = true;
       windowLike.removeEventListener("message", onMessage);
-      resolve(createClient(port));
+      resolve(createClient(port, event.data.difficultyId));
     }
 
     windowLike.addEventListener("message", onMessage);
   });
 }
 
-function createClient(port: MessagePort): GameBridgeClient {
+function createClient(port: MessagePort, difficultyId?: string): GameBridgeClient {
   let completed = false;
   let disconnected = false;
 
@@ -95,6 +102,7 @@ function createClient(port: MessagePort): GameBridgeClient {
   }
 
   return {
+    ...(difficultyId !== undefined ? { difficultyId } : {}),
     ready() {
       send({ type: "GAME_READY" });
     },

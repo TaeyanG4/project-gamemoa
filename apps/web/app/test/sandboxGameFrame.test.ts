@@ -4,7 +4,12 @@ import {
   SANDBOX_GAME_IFRAME_SANDBOX,
   SANDBOX_GAME_IFRAME_ALLOW,
 } from "../components/games/SandboxGameFrame";
-import { getGameOrigin, sandboxGamePlayUrl, API_URL } from "../lib/api/config";
+import {
+  getGameOrigin,
+  sandboxGamePlayUrl,
+  officialGameEntryUrl,
+  API_URL,
+} from "../lib/api/config";
 
 // The iframe sandbox policy is the boundary protecting the main app from uploaded third-party game
 // code, so it is asserted rather than left to review — a well-meaning "just add allow-same-origin
@@ -45,4 +50,18 @@ test("the game origin is resolved from configuration, not hardcoded to one hostn
 test("sandboxGamePlayUrl points at the live-version resolver and escapes the slug", () => {
   assert.equal(sandboxGamePlayUrl("my-game"), `${API_URL}/play/my-game`);
   assert.equal(sandboxGamePlayUrl("a b"), `${API_URL}/play/a%20b`);
+});
+
+test("officialGameEntryUrl points at the exact published SYSTEM bundle version, never a live resolver", () => {
+  assert.equal(
+    officialGameEntryUrl("reaction-time", { version: "abc123", entry: "index.html" }),
+    `${API_URL}/official-games/reaction-time/abc123/index.html`,
+  );
+});
+
+test("officialGameEntryUrl escapes the slug and version but leaves the entry filename as-is", () => {
+  assert.equal(
+    officialGameEntryUrl("a b", { version: "c d", entry: "index.html" }),
+    `${API_URL}/official-games/a%20b/c%20d/index.html`,
+  );
 });

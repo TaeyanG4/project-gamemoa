@@ -39,6 +39,33 @@ test("isHostInitMessage rejects an extra field even when every other field is ex
   assert.equal(isHostInitMessage({ type: "HOST_INIT", origin: "https://evil.example" }), false);
 });
 
+// ── HOST_INIT's optional difficultyId (2026-08-19, aim-test) ─────────────────
+
+test("isHostInitMessage accepts an optional, valid difficultyId — backward compatible with the bare {type} shape", () => {
+  assert.equal(isHostInitMessage({ type: "HOST_INIT", difficultyId: "hard" }), true);
+  assert.equal(isHostInitMessage({ type: "HOST_INIT", difficultyId: "normal" }), true);
+  // The pre-existing shape (no difficultyId at all) must keep validating exactly as before —
+  // every game that doesn't know this field exists (reaction-time, Creator games, ball-dodge)
+  // depends on that.
+  assert.equal(isHostInitMessage({ type: "HOST_INIT" }), true);
+});
+
+test("isHostInitMessage rejects a non-string, empty, or oversized difficultyId", () => {
+  for (const bad of [123, true, null, [], {}, ""]) {
+    assert.equal(
+      isHostInitMessage({ type: "HOST_INIT", difficultyId: bad }),
+      false,
+      JSON.stringify(bad),
+    );
+  }
+  assert.equal(isHostInitMessage({ type: "HOST_INIT", difficultyId: "x".repeat(101) }), false);
+  assert.equal(isHostInitMessage({ type: "HOST_INIT", difficultyId: "x".repeat(100) }), true);
+});
+
+test("isHostInitMessage still rejects an unrelated extra field alongside a valid difficultyId", () => {
+  assert.equal(isHostInitMessage({ type: "HOST_INIT", difficultyId: "hard", sneaky: true }), false);
+});
+
 // ── parseGameToHostMessage: the five well-formed shapes ──────────────────────
 
 test("parseGameToHostMessage accepts each of the five game->host message types", () => {
