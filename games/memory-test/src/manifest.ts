@@ -24,7 +24,10 @@ export const memoryTestManifest: GameManifest = {
   scoreConfig: {
     unit: "Level",
     direction: "desc",
-    min: 1,
+    // 0, not 1 — a player who fails on their very first color submits a real, valid
+    // completedLevels of 0 (see MemoryGameUI.tsx's handleColorClick: Math.max(0, level - 1) with
+    // level starting at 1). A min of 1 rejected that as an invalid score at /api/scores.
+    min: 0,
     max: 50,
     displayPrefix: "Level ",
   },

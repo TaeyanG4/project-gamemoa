@@ -58,6 +58,12 @@ export function formatMetadataKey(key: string, dict: Dictionary["gamePlay"]): st
     targetsHit: dict.metadataTargetsHit,
     misses: dict.metadataMisses,
     level: dict.metadataLevel,
+    // aim-test: games/aim-test/src/game.tsx's runtime.complete metadata.
+    targets: dict.metadataTargets,
+    avgPerTargetMs: dict.metadataAvgPerTargetMs,
+    // memory-test: games/memory-test/src/ui/MemoryGameUI.tsx's runtime.complete metadata.
+    sequenceLength: dict.metadataSequenceLength,
+    grade: dict.metadataGrade,
   };
   return map[key] ?? key;
 }
@@ -155,8 +161,10 @@ export function buildGameResultFromBridgeComplete(
 // Metadata keys that get their own dedicated presentation elsewhere in the result screen (e.g.
 // "tier" renders as a colored badge below the score, "rounds" is the raw per-round ms array used
 // only for the tier calculation) or aren't meaningful to show as a raw key/value pair ("mode" is
-// an internal typing-test mode id, e.g. "ko-short") — kept out of the generic key/value grid.
-export const METADATA_GRID_EXCLUDED_KEYS = new Set(["tier", "rounds", "mode"]);
+// an internal typing-test mode id, e.g. "ko-short"; "difficultyId" is aim-test's own internal tier
+// id, e.g. "hard" — already visible via the difficulty selector in the header, not something a
+// second raw grid row adds anything to) — kept out of the generic key/value grid.
+export const METADATA_GRID_EXCLUDED_KEYS = new Set(["tier", "rounds", "mode", "difficultyId"]);
 
 export interface GameHostProps {
   slug: string;
@@ -913,6 +921,16 @@ export function GameHost({ slug }: GameHostProps) {
                   src={officialGameEntryUrl(slug, release)}
                   title={localizedTitle ?? slug}
                   attemptKey={attemptKey}
+                  // IframeRuntime/GameFrame render the iframe at `h-full w-full` of whatever this
+                  // wraps — with no frameClassName at all that collapses to a near-zero height,
+                  // since nothing here otherwise constrains it. LegacyReactRuntime's games never
+                  // hit this because each sizes its own arena internally (e.g. aim-test's own
+                  // `aspect-[16/10] min-h-[380px]` on its play area) — GameHost has no visibility
+                  // into what an iframe-runtime game renders internally, so this gives every
+                  // migrated SYSTEM game a shared, generously-sized responsive viewport instead:
+                  // roughly 70% of viewport height, never below a legacy-game-sized 480px, never
+                  // beyond 720px on very tall screens.
+                  frameClassName="h-[70vh] min-h-[480px] max-h-[720px] w-full"
                   {...(manifest?.difficulty ? { difficultyId: selectedDifficultyId } : {})}
                   onStarted={handleIframeStarted}
                   onComplete={handleIframeComplete}

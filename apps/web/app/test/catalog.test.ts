@@ -12,6 +12,9 @@ test("Manifest score validation enforces score bounds correctly", () => {
   assert.equal(validateScoreByManifest("reaction-time", 200).valid, true);
   assert.equal(validateScoreByManifest("reaction-time", 10).valid, false);
   assert.equal(validateScoreByManifest("memory-test", 15).valid, true);
-  assert.equal(validateScoreByManifest("memory-test", 0).valid, false);
+  // min is 0, not 1 — a player who fails on their very first color legitimately completes 0
+  // levels (see MemoryGameUI.tsx's handleColorClick), so this must be a VALID score, not rejected.
+  assert.equal(validateScoreByManifest("memory-test", 0).valid, true);
+  assert.equal(validateScoreByManifest("memory-test", -1).valid, false);
   assert.equal(validateScoreByManifest("memory-test", 99).valid, false);
 });
