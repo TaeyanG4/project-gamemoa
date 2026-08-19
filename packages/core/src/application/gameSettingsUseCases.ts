@@ -19,9 +19,12 @@ export type SetGameEnabledResult =
 /**
  * Resolves the set of known games through the injected {@link GameRegistry} rather than the
  * build-time `GAME_MANIFESTS` this class used to import directly — see ScoreUseCases's doc
- * comment for the same reasoning. The registry holds SYSTEM games only today (creator games are
- * not resolved through it yet), so the admin kill switch's reach is unchanged: it still only ever
- * covers the four built-in games, just no longer by hardcoding that source in this file.
+ * comment for the same reasoning. The composition root wires this to `systemGameRegistry`
+ * (SYSTEM-only), not the unified SYSTEM+CREATOR `CompositeGameRegistry` Stage C-3 added — the
+ * admin kill switch's reach is unchanged: it still only ever covers the built-in games. That's
+ * deliberate: nothing on the Creator serving/session/score path actually enforces this
+ * `enabled`/`disabledReason` override yet, so listing a Creator game here would make the admin
+ * panel show a toggle that does nothing — Creator kill-switch convergence is a later Stage.
  */
 export class GameSettingsUseCases {
   constructor(

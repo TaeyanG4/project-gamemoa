@@ -49,6 +49,8 @@ import {
   CreatorLeaderboardUseCases,
   GameBundlePublisher,
   StaticGameRegistry,
+  CreatorGameRegistry,
+  CompositeGameRegistry,
   GAME_DEFINITIONS,
   type GameRegistry,
   type UserRepository,
@@ -79,7 +81,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
 
 /**
- * Built once from the compiled game-registry/ output (packages/core/src/registry/
+ * SYSTEM-only — built once from the compiled game-registry/ output (packages/core/src/registry/
  * gameDefinitions.generated.ts), not per `createContainer` call — SYSTEM games are fixed at
  * deploy time, so there is nothing request-specific to rebuild the way the D1-backed repositories
  * below need a fresh handle each call. Held to agreement with GAME_MANIFESTS by `pnpm
@@ -87,13 +89,21 @@ import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleAr
  * behaviourally the same catalog ScoreUseCases/GameSettingsUseCases resolved through
  * GAME_MANIFEST_MAP/GAME_MANIFESTS before.
  *
- * Exported directly (not only reachable via `createContainer(db).gameRegistry`) because it
+ * Named explicitly `systemGameRegistry`, not `gameRegistry` (Stage C-3) — `createContainer`'s own
+ * `gameRegistry` field is now the unified SYSTEM+CREATOR `CompositeGameRegistry`, and this export
+ * is what every consumer that must stay SYSTEM-only (ScoreUseCases, GameSettingsUseCases,
+ * SandboxGameUseCases' own SYSTEM-slug-collision check, gameServing.ts's official-bundle gate,
+ * scores.ts's SYSTEM/CREATOR branch decision) is wired to instead — see each call site's own
+ * comment for why swapping it for the composite would be a real security/behavior regression, not
+ * a harmless generalization.
+ *
+ * Exported directly (not only reachable via `createContainer(db).systemGameRegistry`) because it
  * genuinely needs no `db` argument to exist — a route that only wants to resolve a game id
  * (routes/scores.ts's leaderboard gameId validation, in particular) can import this without first
  * needing a D1 binding to be present, matching the validation-before-DB-check ordering that route
  * already had.
  */
-export const gameRegistry: GameRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
+export const systemGameRegistry: GameRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
 
 export interface AppContainer {
   userRepo: UserRepository;
@@ -136,11 +146,20 @@ export interface AppContainer {
    * clean 503 before doing so — same convention as `gameBundleStorageRepo`, never a silent
    * D1-only fallback (see adminSandboxGames.ts's metadata PATCH route). */
   creatorGameDefinitionRepo: CreatorGameDefinitionRepository;
-  /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
-   * game is not "missing" from here so much as out of scope, see StaticGameRegistry's doc
-   * comment. Exposed on the container, not just threaded privately into ScoreUseCases/
-   * GameSettingsUseCases, so a future route that needs to resolve a game directly has one place
-   * to get it from rather than reaching back into a generated file. */
+  /** SYSTEM games only (game-registry/, compiled to GAME_DEFINITIONS) — the same instance as the
+   * module-level `systemGameRegistry` export above. This is what ScoreUseCases/
+   * GameSettingsUseCases/SandboxGameUseCases are actually wired to, and what any route needing a
+   * SYSTEM-only lookup (never resolving a CREATOR slug, even on a SYSTEM miss) should use — see
+   * `systemGameRegistry`'s own doc comment for the full list of why-SYSTEM-only call sites and
+   * the invariants each one is protecting. */
+  systemGameRegistry: GameRegistry;
+  /** Unified SYSTEM+CREATOR read surface (Stage C-3) — `CompositeGameRegistry(systemGameRegistry,
+   * creatorGameRegistry)`. SYSTEM always wins a same-slug collision and a SYSTEM hit never
+   * touches the CREATOR half at all (see CompositeGameRegistry's own doc comment). Deliberately
+   * NOT wired into ScoreUseCases/GameSettingsUseCases/SandboxGameUseCases in this Stage — see
+   * `systemGameRegistry`'s own doc comment for why swapping any of those to this composite would
+   * be a real regression, not a generalization. This is the single entry point a *future*
+   * owner-agnostic consumer should resolve games through; nothing production-facing does yet. */
   gameRegistry: GameRegistry;
 
   scoreUseCases: ScoreUseCases;
@@ -210,8 +229,28 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   // sandboxGameUseCases.updateMetadata, same as every other B2-dependent route already does.
   const creatorGameDefinitionRepo: CreatorGameDefinitionRepository =
     new B2CreatorGameDefinitionRepository(gameBundleStorageRepo);
+  // Stage C-3: reuses the same sandboxGameRepo/creatorGameDefinitionRepo above — no new B2/D1
+  // client. An unconfigured B2 environment doesn't need special-casing here: CreatorGameRegistry
+  // itself already fails closed on a real read failure (never swallowed to "unknown game"), and
+  // nothing SYSTEM-facing ever reaches this registry at all (see systemGameRegistry's own doc
+  // comment) — so there is no "downgrade the unified registry to SYSTEM-only" behavior to build.
+  const creatorGameRegistry: GameRegistry = new CreatorGameRegistry(
+    sandboxGameRepo,
+    creatorGameDefinitionRepo,
+  );
+  // Unified SYSTEM+CREATOR read surface — see AppContainer.gameRegistry's own doc comment for
+  // what this is (and isn't yet) wired into.
+  const gameRegistry: GameRegistry = new CompositeGameRegistry(
+    systemGameRegistry,
+    creatorGameRegistry,
+  );
 
-  const scoreUseCases = new ScoreUseCases(scoreRepo, gameRegistry);
+  // Deliberately `systemGameRegistry`, not the unified `gameRegistry` above — see
+  // systemGameRegistry's own doc comment for why: SYSTEM score submission
+  // (POST /api/scores -> ScoreUseCases) must never resolve a CREATOR slug, which would let it
+  // bypass CreatorScoreAcceptanceUseCases' own Game Session verification + one-use attempt replay
+  // protection (see routes/scores.ts's own comment on this exact boundary).
+  const scoreUseCases = new ScoreUseCases(scoreRepo, systemGameRegistry);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
   const identityUseCases = new IdentityUseCases(userRepo);
   const accountMergeUseCases = new AccountMergeUseCases(
@@ -230,7 +269,10 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const creatorUseCases = new CreatorUseCases(creatorRepo, creatorReviewRepo);
   const adminAuthUseCases = new AdminAuthUseCases(adminAuthRepo);
   const adminAccountUseCases = new AdminAccountUseCases(adminAccountRepo, adminAuthRepo);
-  const gameSettingsUseCases = new GameSettingsUseCases(gameSettingsRepo, gameRegistry);
+  // Deliberately systemGameRegistry — the admin kill-switch this drives has no Creator-runtime
+  // enforcement yet (see AppContainer.gameRegistry's own doc comment); wiring the unified
+  // registry here would let the admin panel show a CREATOR toggle that does nothing.
+  const gameSettingsUseCases = new GameSettingsUseCases(gameSettingsRepo, systemGameRegistry);
   const userModerationUseCases = new UserModerationUseCases(
     userModerationRepo,
     sessionRepo,
@@ -242,11 +284,16 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameBundleStorageRepo,
     new FflateBundleArchiveReader(),
   );
+  // Deliberately systemGameRegistry — createGame only uses this to reject a SYSTEM-slug
+  // collision (Creator-vs-Creator uniqueness is SandboxGameRepository.slugExists' own job, not
+  // this registry's); it must never depend on B2/CreatorGameRegistry availability, or a
+  // brand-new (pre-canonical, no B2 document yet) Creator registration could start failing
+  // because of Creator-registry lookups it never actually needed.
   const sandboxGameUseCases = new SandboxGameUseCases(
     sandboxGameRepo,
     gameBundleStorageRepo,
     gameBundlePublisher,
-    gameRegistry,
+    systemGameRegistry,
     creatorGameDefinitionRepo,
   );
   const gameAttemptUseCases = new GameAttemptUseCases(gameAttemptRepo);
@@ -280,6 +327,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
     creatorGameDefinitionRepo,
+    systemGameRegistry,
     gameRegistry,
 
     scoreUseCases,

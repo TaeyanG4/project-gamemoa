@@ -42,6 +42,7 @@ export * from "./modules/game/domain/publicGame.js";
 export * from "./modules/game/ports/gameRegistry.js";
 export * from "./modules/game/registry/staticGameRegistry.js";
 export * from "./modules/game/registry/creatorGameRegistry.js";
+export * from "./modules/game/registry/compositeGameRegistry.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";

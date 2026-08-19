@@ -9,7 +9,7 @@ import {
   systemGamePublishedObjectKey,
   type ServableBundleFile,
 } from "@owogg/core";
-import { createContainer, gameRegistry } from "../container.js";
+import { createContainer, systemGameRegistry } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { readB2Config } from "./devGames.js";
 import { isLocalhost } from "./auth.js";
@@ -211,10 +211,17 @@ publishedGameAssetsRouter.use(
  * SYSTEM counterpart to publishedAssetAvailabilityGate — same "before the byte cache" positioning
  * and the same reason: a slug that stops being a real SYSTEM game (removed from game-registry/ in
  * some future deploy) must not keep being served out of the byte cache. Unlike Creator's gate,
- * this needs no separate caches.default layer of its own: gameRegistry.findBySlug is a plain
+ * this needs no separate caches.default layer of its own: systemGameRegistry.findBySlug is a plain
  * in-memory Map lookup (StaticGameRegistry, compiled from game-registry/ at build time) — there is
  * no D1 read here to shield with a short-lived cache entry, so checking it fresh on every request
  * costs nothing extra to begin with.
+ *
+ * Deliberately `systemGameRegistry`, never the unified `gameRegistry` (Stage C-3,
+ * container.ts) — this gate decides whether the *official SYSTEM bundle* asset path serves a
+ * request at all; a CREATOR slug must never pass it (Creator games have their own, entirely
+ * separate serving path — sandboxGameServingRouter, above), so swapping in the composite registry
+ * here would let a Creator slug that happens to also resolve through it start being treated as a
+ * valid official-bundle game.
  *
  * Deliberately does NOT check whether `version` was actually published — that's the manifest-read
  * inside the route handler below (see its own comment), reached only on a byte-cache MISS. Unlike
@@ -225,7 +232,7 @@ publishedGameAssetsRouter.use(
 const officialGameAvailabilityGate: MiddlewareHandler<ApiEnv> = async (c, next) => {
   const slug = c.req.param("slug");
   if (!slug) return notFound(c);
-  const definition = await gameRegistry.findBySlug(slug);
+  const definition = await systemGameRegistry.findBySlug(slug);
   if (!definition) return notFound(c);
   await next();
 };
@@ -538,7 +545,7 @@ publishedGameAssetsRouter.get("/:gameId/:versionId/:rest{.+}", async (c) => {
  * this route reads SYSTEM data from it, but because gameBundleStorageRepo (the B2 access this
  * route actually needs) is only ever constructed through createContainer, this file's one
  * consistent way of reaching infrastructure — see apps/api/src/container.ts's own doc comment on
- * being the composition root. `gameRegistry` (the actual SYSTEM-game check) is a plain
+ * being the composition root. `systemGameRegistry` (the actual SYSTEM-game check) is a plain
  * D1-independent singleton import, used directly in officialGameAvailabilityGate above.
  *
  * Two checks, in order, mirroring the two facts Creator's resolvePublishedFile checks (game

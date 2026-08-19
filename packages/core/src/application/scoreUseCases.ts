@@ -14,11 +14,18 @@ export interface FormattedScoreRecord extends Score {
 /**
  * Resolves games through the injected {@link GameRegistry} rather than the build-time
  * `GAME_MANIFEST_MAP` this class used to import directly. Behaviourally unchanged for every
- * SYSTEM game today — the composition root wires a `StaticGameRegistry(GAME_DEFINITIONS)`, which
- * is held to agreement with `GAME_MANIFESTS` by `pnpm registry:check` (see
- * scripts/registry-builder.ts's assertDefinitionsMatchManifests) — but the lookup is no longer
- * hardcoded to that one source, which is the whole point: a registry that also resolves
- * creator-owned games can be substituted here without this class changing.
+ * SYSTEM game today — the composition root wires this to `systemGameRegistry`
+ * (`StaticGameRegistry(GAME_DEFINITIONS)`, held to agreement with `GAME_MANIFESTS` by `pnpm
+ * registry:check` — see scripts/registry-builder.ts's assertDefinitionsMatchManifests), not the
+ * unified SYSTEM+CREATOR `CompositeGameRegistry` a later Stage (C-3) added alongside it.
+ *
+ * That's deliberate, not an oversight: `submitScore` below is `POST /api/scores`'s SYSTEM
+ * submission path, with none of `CreatorScoreAcceptanceUseCases`' own guarantees — a signed Game
+ * Session, an exact game/version context, one-use attempt replay protection. If this class
+ * resolved a CREATOR slug through the unified registry, a request could submit a Creator score
+ * through this path instead and bypass every one of those checks. Creator score submission stays
+ * on its own separate path (`CreatorScoreAcceptanceUseCases`, `POST /api/games/:slug/score`) for
+ * exactly this reason — this class does not, and must not, grow the ability to resolve one.
  */
 export class ScoreUseCases {
   constructor(

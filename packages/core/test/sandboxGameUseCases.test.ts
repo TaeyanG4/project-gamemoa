@@ -352,13 +352,16 @@ function createFakeStorage(): GameBundleStorageRepository & {
 function createFakeCanonicalRepo(): CreatorGameDefinitionRepository & {
   documents: Map<string, CreatorGameCanonicalDocument>;
   saveCalls: CreatorGameCanonicalDocument[];
+  findBySlugCalls: string[];
   throwOnFindFor?: string;
   throwOnSaveFor?: string;
 } {
   return {
     documents: new Map(),
     saveCalls: [],
+    findBySlugCalls: [],
     async findBySlug(slug) {
+      this.findBySlugCalls.push(slug);
       if (this.throwOnFindFor === slug) {
         throw new Error(`simulated malformed/unreadable document at ${slug}`);
       }
@@ -2324,6 +2327,22 @@ test("createGame claims a review slot, visible on the returned record", async ()
     mode: "single",
   });
   assert.equal(game.reviewSlot, 1);
+});
+
+test("createGame never touches the CreatorGameDefinitionRepository (B2) at all — a brand-new, pre-canonical Creator registration cannot fail because of B2 availability (Stage C-3)", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  await useCases.createGame({
+    slug: "my-game",
+    developerUserId: 1,
+    title: "Game",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+
+  assert.deepEqual(canonicalRepo.findBySlugCalls, []);
+  assert.deepEqual(canonicalRepo.saveCalls, []);
 });
 
 test("a third concurrent submission is rejected with SUBMISSION_LIMIT_REACHED", async () => {

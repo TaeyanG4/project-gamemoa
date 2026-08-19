@@ -136,9 +136,14 @@ gamesRouter.get("/sandbox/:slug/logo", edgeCache({ ttlSeconds: 3600 }), async (c
 gamesRouter.get("/", edgeCache({ ttlSeconds: 60 }), async (c) => {
   if (!c.env?.DB) return c.json(PublicGameListResponseSchema.parse({ games: [] }), 200);
 
-  const { gameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
+  // Deliberately systemGameRegistry, not the unified `gameRegistry` composite (Stage C-3,
+  // container.ts) — this route's own D1 Creator-projection half (sandboxGameUseCases.listPublic)
+  // is what stays the Creator source here; switching this SYSTEM half to the composite would be
+  // mixing two different Creator read paths in the same response. See container.ts's own doc
+  // comment on systemGameRegistry for why every SYSTEM-only call site stays pinned to it.
+  const { systemGameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
   const [systemGames, creatorGames] = await Promise.all([
-    gameRegistry.listAll(),
+    systemGameRegistry.listAll(),
     sandboxGameUseCases.listPublic(),
   ]);
 
@@ -156,10 +161,11 @@ gamesRouter.get("/", edgeCache({ ttlSeconds: 60 }), async (c) => {
 gamesRouter.get("/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
 
-  const { gameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
+  // Deliberately systemGameRegistry — see the GET "/" handler's own comment just above.
+  const { systemGameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
   const slug = c.req.param("slug");
 
-  const systemGame = await gameRegistry.findBySlug(slug);
+  const systemGame = await systemGameRegistry.findBySlug(slug);
   const creatorResolved = systemGame ? null : await sandboxGameUseCases.resolveLiveVersion(slug);
   const game = resolvePublicGame(systemGame, creatorResolved?.game ?? null);
   if (!game) return c.text("Not Found", 404);

@@ -1,32 +1,35 @@
 /**
- * Resolves a {@link GameDefinition} by slug — the port that will become the single source of truth
- * for "what is this game, and what are its rules?".
+ * Resolves a {@link GameDefinition} by slug — the single source of truth for "what is this game,
+ * and what are its rules?", implemented by three classes today (all `apps/api/src/container.ts`):
  *
- * Wired in production via `StaticGameRegistry(GAME_DEFINITIONS)` (apps/api/src/container.ts).
- * ScoreUseCases and GameSettingsUseCases resolve games through this port now, not by importing
- * the build-time `GAME_MANIFEST_MAP` directly — see their own doc comments for what changed.
+ *   - `StaticGameRegistry(GAME_DEFINITIONS)` — SYSTEM-only, exported as `systemGameRegistry`.
+ *   - `CreatorGameRegistry` — CREATOR-only (D1 identity/runtime + B2 canonical metadata/policy).
+ *   - `CompositeGameRegistry(systemGameRegistry, creatorGameRegistry)` — the unified SYSTEM+CREATOR
+ *     read surface, exposed as `container.gameRegistry` (Stage C-3).
+ *
+ * A unified implementation existing does NOT mean every consumer resolves through it — SYSTEM
+ * score submission (`ScoreUseCases`), the admin kill switch (`GameSettingsUseCases`), and Creator
+ * registration's own SYSTEM-slug-collision check (`SandboxGameUseCases.createGame`) are all
+ * deliberately still wired to `systemGameRegistry`, never the composite; see
+ * `apps/api/src/container.ts`'s own doc comment on `systemGameRegistry` for exactly why each one
+ * would be a real regression, not a generalization, if swapped. `container.gameRegistry` is the
+ * single entry point a *future* owner-agnostic consumer should resolve games through — nothing
+ * production-facing does yet.
  *
  * Why this needed to exist at all: score validation, difficulty validation and the admin kill
  * switch used to resolve a game directly through
  * `packages/core/src/registry/gameRegistry.generated.ts`, generated from `games/*` at build time.
  * A Game Creator upload has never appeared in that map, so `validateScoreByManifest` rejected it
- * outright. Creator score submission and leaderboard reads no longer go through that gap at all —
- * `CreatorScoreAcceptanceUseCases` and `CreatorLeaderboardUseCases` are separate, parallel paths
- * built from the same underlying pieces (`ScoreRepository`, `sandboxGameToScorePolicy`) rather
- * than this port. What's still missing is this port itself resolving creator games: its
- * production implementation (`StaticGameRegistry(GAME_DEFINITIONS)`) is SYSTEM-only today, so a
- * creator game still can't earn XP/achievements through that acceptance path
- * (`CreatorScoreAcceptanceUseCases` deliberately doesn't award them yet — see its own doc
- * comment) or be disabled from `/admin/games` (`GameSettingsUseCases` resolves games through this
- * same SYSTEM-only port). That gap isn't fixed by this port existing; it's fixed by a future
- * implementation that also resolves creator games — this port is what makes that swap possible
- * without touching every call site again.
+ * outright. Creator score submission and leaderboard reads still don't go through this port at all
+ * — `CreatorScoreAcceptanceUseCases` and `CreatorLeaderboardUseCases` remain separate, parallel
+ * paths built from the same underlying pieces (`ScoreRepository`, `sandboxGameToScorePolicy`)
+ * rather than this port, and that boundary is deliberate (see `ScoreUseCases`'s own doc comment) —
+ * not a gap this port's unified implementation is meant to close by itself.
  *
- * Asynchronous on purpose. The official-game implementation will be a synchronous read of a
- * generated file, but the migration explicitly allows reading existing D1 sandbox metadata as a
- * temporary compatibility source for creator games, and that cannot be synchronous. A port whose
- * signature only fits the easy implementation would have to be rewritten the moment the second one
- * arrives.
+ * Asynchronous on purpose. The SYSTEM implementation is a synchronous read of a generated file,
+ * but the CREATOR one has to read D1 (and, once canonicalized, B2), and that cannot be
+ * synchronous. A port whose signature only fits the easy implementation would have to be
+ * rewritten the moment the second one arrives.
  *
  * Deliberately read-only. Registration, review and publishing already have their own use cases and
  * are not becoming registry concerns; this answers questions, it does not accept writes.

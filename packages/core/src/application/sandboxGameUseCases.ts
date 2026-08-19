@@ -231,7 +231,10 @@ export class SandboxGameUseCases {
     // creator could register e.g. "reaction-time" and silently shadow or collide with the
     // built-in game at every place that resolves a slug through the unified registry (catalog,
     // scoring, /play/:slug). P-03: a Creator registration must be rejected the same way a
-    // Creator-vs-Creator collision already is, before any row is written.
+    // Creator-vs-Creator collision already is, before any row is written. `this.gameRegistry` is
+    // wired to the SYSTEM-only registry (see the composition root's own doc comment) — this check
+    // exists purely to catch a SYSTEM-slug collision, never to depend on Creator/B2 lookups, so
+    // registration can never fail because a *different* Creator repository is unavailable.
     if (await this.gameRegistry.findBySlug(slug)) throw new SandboxGameUseCaseFailure("SLUG_TAKEN");
 
     // slugExists checks the raw DB constraint (includes soft-deleted rows), not just currently

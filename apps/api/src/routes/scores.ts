@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { createContainer, evaluateAchievementsForUser, gameRegistry } from "../container.js";
+import { createContainer, evaluateAchievementsForUser, systemGameRegistry } from "../container.js";
 import { createReadContainer } from "../readReplica.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { rateLimit } from "../middleware/rateLimit.js";
@@ -221,18 +221,20 @@ function formatLeaderboardEntry(item: FormattedScoreRecord, gameTitle: string) {
 // gameId + the ?difficulty query (both in the URL), never on who is asking, so one cached entry
 // per URL correctly serves every visitor. This is the single hottest read path in the app.
 //
-// SYSTEM games resolve through the shared GameRegistry singleton (see container.ts) exactly as
-// before this generalization — same lookup, same difficulty handling, same response shape, same
-// cache. A slug that ISN'T a SYSTEM game now gets a second chance through the Creator path
-// (CreatorLeaderboardUseCases: PUBLIC + live + score policy configured) before this falls back to
-// INVALID_GAME_ID — the same "can't distinguish unknown from private/unconfigured" posture used
-// everywhere else a Creator game is read publicly. No new endpoint, no new `scores` table, no new
-// ranking SQL: both branches call the exact same D1ScoreRepository.getLeaderboard PB-dedup query,
-// just resolved against a different registry.
+// SYSTEM games resolve through the SYSTEM-only `systemGameRegistry` singleton (see
+// container.ts — deliberately NOT the unified `gameRegistry` composite Stage C-3 added there;
+// see that export's own doc comment) exactly as before this generalization — same lookup, same
+// difficulty handling, same response shape, same cache. A slug that ISN'T a SYSTEM game now gets
+// a second chance through the Creator path (CreatorLeaderboardUseCases: PUBLIC + live + score
+// policy configured) before this falls back to INVALID_GAME_ID — the same "can't distinguish
+// unknown from private/unconfigured" posture used everywhere else a Creator game is read
+// publicly. No new endpoint, no new `scores` table, no new ranking SQL: both branches call the
+// exact same D1ScoreRepository.getLeaderboard PB-dedup query, just resolved against a different
+// registry.
 scoresRouter.get("/:gameId", edgeCache({ ttlSeconds: 30 }), async (c) => {
   const gameId = c.req.param("gameId");
 
-  const definition = await gameRegistry.findBySlug(gameId);
+  const definition = await systemGameRegistry.findBySlug(gameId);
 
   if (definition) {
     if (!c.env?.DB) {
