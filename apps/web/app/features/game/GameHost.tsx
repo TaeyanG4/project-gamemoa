@@ -24,6 +24,7 @@ import { GameThumbnail } from "../../components/ui/GameThumbnail";
 import { XIcon } from "../../components/ui/XIcon";
 import { LegacyReactRuntime } from "./runtime/LegacyReactRuntime";
 import { IframeRuntime } from "./runtime/IframeRuntime";
+import { resolvePresentationLayout } from "./presentationLayoutResolver";
 import {
   SYSTEM_GAME_RELEASES,
   type SystemGameRelease,
@@ -166,6 +167,49 @@ export function buildGameResultFromBridgeComplete(
 // second raw grid row adds anything to) — kept out of the generic key/value grid.
 export const METADATA_GRID_EXCLUDED_KEYS = new Set(["tier", "rounds", "mode", "difficultyId"]);
 
+// Today's fallback for every shipped game (none declares `presentation` yet — see
+// presentationLayoutResolver.ts's own doc comment): the exact `frameClassName` restored in #44,
+// unchanged. Kept as a named constant rather than inlined so the one call site building the
+// iframe's actual layout props (below) can't drift from it by accident.
+const LEGACY_IFRAME_FRAME_CLASS_NAME = "h-[70vh] min-h-[480px] max-h-[720px] w-full";
+
+/**
+ * Measures a DOM element's content box, live across resizes. The one piece of DOM measurement
+ * `resolvePresentationLayout` itself deliberately has none of (pure function, no DOM — see its
+ * own doc comment); this is the thin wiring around it, same split as
+ * transitionalCreatorGameResolver.ts's resolveGameSource/useGameSourceResolution.
+ *
+ * Returns a callback ref rather than accepting a `useRef` object: the element this measures
+ * (the iframe area, below) is conditionally rendered — not present on GameHost's very first
+ * render, since `isLoading` starts `true` even for the iframe runtime kind. An object ref's
+ * `.current` mutation is invisible to `useEffect`'s dependency array, so an effect keyed on a
+ * stable ref object would only ever attach a ResizeObserver if the element happened to already
+ * exist on the first render. A callback ref fires on every actual attach/detach, which is what
+ * lets the `node` state (and therefore the effect below) update correctly whenever the element
+ * later mounts.
+ */
+function useElementSize(): [
+  (node: HTMLElement | null) => void,
+  { width: number; height: number } | null,
+] {
+  const [node, setNode] = useState<HTMLElement | null>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
+
+  useEffect(() => {
+    if (!node) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      setSize({ width, height });
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [node]);
+
+  return [setNode, size];
+}
+
 export interface GameHostProps {
   slug: string;
 }
@@ -215,6 +259,44 @@ export function GameHost({ slug }: GameHostProps) {
   // that decides IframeRuntime vs. LegacyReactRuntime for this slug.
   const release = SYSTEM_GAME_RELEASES[slug];
   const runtimeKind = resolveGameRuntimeKind(slug, SYSTEM_GAME_RELEASES);
+
+  // Presentation layout — see presentationLayoutResolver.ts's own doc comment for the math, and
+  // useElementSize's for why this is a callback ref. `iframeAreaRef` goes on the innermost box
+  // that actually bounds the iframe (the `p-6`-padded wrapper below), not some outer container:
+  // that's the one measurement that needs no hardcoded knowledge of the max-w-6xl/rounded-card
+  // chrome around it. `availableSize` stays null until the first ResizeObserver callback lands,
+  // which resolvePresentationLayout's caller below treats as "legacy" — never a bogus 0x0 layout
+  // for the one render before a real measurement exists.
+  const [iframeAreaRef, availableSize] = useElementSize();
+  const presentationLayout = useMemo(
+    () =>
+      availableSize
+        ? resolvePresentationLayout(manifest?.presentation, availableSize)
+        : ({ kind: "legacy" } as const),
+    [manifest?.presentation, availableSize],
+  );
+  // Game preference ∩ Platform constraints ∩ Actual available viewport → Host decides (see
+  // GamePresentation's own doc comment). "legacy" is every shipped game today: the exact
+  // frameClassName restored in #44, untouched — no frameStyle/iframeStyle at all, so GameFrame's
+  // rendering for this branch is byte-identical to before this PR.
+  const iframeFrameClassName =
+    presentationLayout.kind === "legacy" ? LEGACY_IFRAME_FRAME_CLASS_NAME : "mx-auto max-w-full";
+  const iframeFrameStyle =
+    presentationLayout.kind === "legacy"
+      ? undefined
+      : { width: presentationLayout.displayWidth, height: presentationLayout.displayHeight };
+  // Only "fixed" mode needs this: the iframe element itself is sized to the game's own logical
+  // design resolution (so its document sees that as its viewport) and then visually scaled down
+  // to fit iframeFrameStyle's box — see GameFrame.tsx's own iframeStyle doc comment.
+  const iframeElementStyle =
+    presentationLayout.kind === "fixed"
+      ? {
+          width: presentationLayout.logicalWidth,
+          height: presentationLayout.logicalHeight,
+          transform: `scale(${presentationLayout.scale})`,
+          transformOrigin: "top left" as const,
+        }
+      : undefined;
 
   // Difficulty selection — only meaningful for games with manifest.difficulty. Resets to the
   // game's default whenever navigating between games. A change here only affects the NEXT
@@ -916,21 +998,24 @@ export function GameHost({ slug }: GameHostProps) {
           release ? (
             <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
               {resultOverlay}
-              <div className="p-6">
+              <div className="p-6" ref={iframeAreaRef}>
                 <IframeRuntime
                   src={officialGameEntryUrl(slug, release)}
                   title={localizedTitle ?? slug}
                   attemptKey={attemptKey}
                   // IframeRuntime/GameFrame render the iframe at `h-full w-full` of whatever this
-                  // wraps — with no frameClassName at all that collapses to a near-zero height,
-                  // since nothing here otherwise constrains it. LegacyReactRuntime's games never
-                  // hit this because each sizes its own arena internally (e.g. aim-test's own
+                  // wraps — with no sizing at all that collapses to a near-zero height, since
+                  // nothing here otherwise constrains it. LegacyReactRuntime's games never hit
+                  // this because each sizes its own arena internally (e.g. aim-test's own
                   // `aspect-[16/10] min-h-[380px]` on its play area) — GameHost has no visibility
-                  // into what an iframe-runtime game renders internally, so this gives every
-                  // migrated SYSTEM game a shared, generously-sized responsive viewport instead:
-                  // roughly 70% of viewport height, never below a legacy-game-sized 480px, never
-                  // beyond 720px on very tall screens.
-                  frameClassName="h-[70vh] min-h-[480px] max-h-[720px] w-full"
+                  // into what an iframe-runtime game renders internally, so absent a presentation
+                  // preference this falls back to a shared, generously-sized responsive viewport
+                  // instead (LEGACY_IFRAME_FRAME_CLASS_NAME, restored in #44): roughly 70% of
+                  // viewport height, never below a legacy-game-sized 480px, never beyond 720px on
+                  // very tall screens. See presentationLayoutResolver.ts for the general case.
+                  frameClassName={iframeFrameClassName}
+                  frameStyle={iframeFrameStyle}
+                  iframeStyle={iframeElementStyle}
                   {...(manifest?.difficulty ? { difficultyId: selectedDifficultyId } : {})}
                   onStarted={handleIframeStarted}
                   onComplete={handleIframeComplete}

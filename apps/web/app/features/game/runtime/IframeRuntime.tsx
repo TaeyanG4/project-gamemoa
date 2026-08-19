@@ -9,6 +9,8 @@ export interface IframeRuntimeProps {
   poster?: ReactNode;
   className?: string;
   frameClassName?: string;
+  frameStyle?: React.CSSProperties | undefined;
+  iframeStyle?: React.CSSProperties | undefined;
   /** Bumped by GameHost's retry handler — same convention as LegacyReactRuntime's attemptKey.
    * Applied as GameFrame's `key`, so a retry fully remounts the iframe (fresh `started`/loading
    * state, a real reload — not just a Bridge reset) exactly the way "다시 시작" already worked;
@@ -41,6 +43,8 @@ export function IframeRuntime({
   poster,
   className,
   frameClassName,
+  frameStyle,
+  iframeStyle,
   attemptKey,
   difficultyId,
   onReady,
@@ -96,6 +100,8 @@ export function IframeRuntime({
       poster={poster}
       className={className}
       frameClassName={frameClassName}
+      frameStyle={frameStyle}
+      iframeStyle={iframeStyle}
       onFrameLoad={handleFrameLoad}
     />
   );

@@ -33,6 +33,18 @@ export interface GameFrameProps {
    * instead) — lets a page control the frame's aspect ratio independent of the poster's own
    * layout. Defaults to filling `className`'s box. */
   frameClassName?: string | undefined;
+  /** Inline sizing for the same wrapper `frameClassName` styles — for a caller (GameHost, via
+   * presentationLayoutResolver.ts) that computed an exact pixel box rather than a static Tailwind
+   * class. Merges over `frameClassName`; inline `style` always wins over a class in the cascade,
+   * so this is additive, not a replacement. */
+  frameStyle?: React.CSSProperties | undefined;
+  /** Inline sizing/transform for the `<iframe>` element itself, overriding its default `h-full
+   * w-full`. The one case this exists for: `mode: "fixed"` presentation, where the iframe must be
+   * sized to the game's own logical/design resolution (so the framed document sees that as its
+   * viewport) and then visually scaled down with `transform: scale(...)` to fit the displayed
+   * surface `frameStyle` shapes — see GameHost.tsx's own doc comment on why that's a `transform`
+   * on the iframe and not a change to `frameStyle`/the wrapper. */
+  iframeStyle?: React.CSSProperties | undefined;
   /** Fires once per iframe `load` event, after GameFrame's own loading-overlay state is cleared —
    * the hook a runtime (see runtime/IframeRuntime.tsx) uses to establish the Game Bridge once the
    * framed document actually exists to receive it. Absent for a plain embed with no Bridge (the
@@ -63,6 +75,8 @@ export function GameFrame({
   poster,
   className,
   frameClassName,
+  frameStyle,
+  iframeStyle,
   onFrameLoad,
 }: GameFrameProps) {
   const [started, setStarted] = useState(false);
@@ -91,7 +105,7 @@ export function GameFrame({
   if (!started) {
     return (
       <div className={className}>
-        <div className={`relative ${frameClassName ?? ""}`}>
+        <div className={`relative ${frameClassName ?? ""}`} style={frameStyle}>
           {poster}
           <div className="absolute inset-0 flex items-center justify-center bg-black/30">
             <button
@@ -109,7 +123,7 @@ export function GameFrame({
 
   return (
     <div className={className}>
-      <div className={`relative ${frameClassName ?? ""}`}>
+      <div className={`relative ${frameClassName ?? ""}`} style={frameStyle}>
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-raised">
             <span className="text-xs font-bold text-text-muted">불러오는 중...</span>
@@ -119,6 +133,7 @@ export function GameFrame({
           ref={iframeRef}
           key={reloadKey}
           className="h-full w-full"
+          style={iframeStyle}
           src={src}
           title={title}
           sandbox={GAME_IFRAME_SANDBOX}
