@@ -50,10 +50,16 @@ test("a fully-configured row maps to a complete canonical document", () => {
       score: { unit: "pts", direction: "desc", min: 0, max: 1000 },
       leaderboard: true,
       xpPerCompletion: 25,
-      requiresAuth: true,
+      requiresAuth: false,
     },
     updatedAt: "2026-08-15T09:30:00.000Z",
   });
+});
+
+test("requiresAuth is false — Creator games allow guest play today, the same policy toPublicCreatorGame already hardcodes", () => {
+  const result = mapSandboxGameRecordToCanonical(fullyConfiguredRow());
+  assert.equal(result.ok, true);
+  assert.equal(result.ok ? result.document.policy.requiresAuth : null, false);
 });
 
 test("score displayPrefix/displaySuffix pass through when present", () => {

@@ -53,7 +53,7 @@ export type SandboxGameRecordCanonicalSource = Pick<
  * fact, not a missing one. So this mapper does not produce a document for that row at all; the
  * caller gets an explicit `{ ok: false }` instead. See {@link mapSandboxGameRecordToCanonical}'s
  * own doc comment for the full mapping rules, including why `leaderboard`/`requiresAuth` don't
- * have this same problem.
+ * have this same ambiguity.
  */
 export type CreatorCanonicalMappingBlockReason = "SCORE_POLICY_NOT_CONFIGURED";
 
@@ -91,12 +91,19 @@ export type CreatorCanonicalMappingResult =
  *     adapter zeroes it deliberately for an unrelated reason — see its own doc comment on why XP
  *     isn't connected to Creator score submission yet — which has nothing to do with what this
  *     canonical document should record as the game's own configured policy value).
- *   - `policy.requiresAuth`: always `true` — not row data (no such column exists on
- *     `sandbox_games`), but a verified, currently-uniform platform fact:
- *     `CreatorScoreAcceptanceUseCases.accept` requires an authenticated session's own `userId` on
- *     every call, for every Creator game, with no per-game exception anywhere in that path today.
- *     Written as an explicit constant with this comment, not silently inlined, so it's visible
- *     and searchable the moment that stops being true platform-wide.
+ *   - `policy.requiresAuth`: always `false` — not row data (no such column exists on
+ *     `sandbox_games`), but a verified, currently-uniform platform fact about the field's ACTUAL
+ *     meaning. `GamePolicy.requiresAuth` (gameDefinition.ts's own doc comment) is "whether a
+ *     player must be signed in to PLAY at all" — a distinct concern from score-*submission*
+ *     authentication, which `CreatorScoreAcceptanceUseCases.accept` requiring a session's `userId`
+ *     is actually about, and has no bearing on this field. The real, current answer to "must a
+ *     player sign in to play a Creator game" is no: `CreatorGameHost` never gates play on
+ *     `isAuthenticated` (guest play is the default, matching every other unauthenticated-visitor
+ *     surface), and `toPublicCreatorGame` (domain/publicGame.ts) already hardcodes
+ *     `requiresAuth: false` on the exact same reasoning for the read model this mapper's
+ *     canonical document is meant to eventually replace the D1 half of. Written as an explicit
+ *     constant with this comment, not silently inlined, so it's visible and searchable the moment
+ *     Creator games gain a real per-game play-gate and this stops being uniformly false.
  *   - `presentation`: omitted entirely — Creator Presentation wiring hasn't happened yet (see
  *     domain/creatorGameCanonicalDocument.ts's own doc comment); there is nothing to map from.
  *   - `updatedAt`: the D1 row's own `updatedAt` — never `new Date()`. This document's own
@@ -134,7 +141,9 @@ export function mapSandboxGameRecordToCanonical(
       },
       leaderboard: true,
       xpPerCompletion: record.xpPerCompletion,
-      requiresAuth: true,
+      // Guest play is the current, real Creator platform behavior — see this function's own
+      // doc comment for why this is `false`, not `true`.
+      requiresAuth: false,
     },
     updatedAt: record.updatedAt,
   };
