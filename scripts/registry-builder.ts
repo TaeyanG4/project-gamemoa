@@ -3,8 +3,13 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import prettier from "prettier";
 import type { GameManifest } from "../packages/game-sdk/src/contracts/manifest.js";
-import type { GameDefinition } from "../packages/core/src/modules/game/domain/gameDefinition.js";
+import type { SystemGameDefinition } from "../packages/core/src/modules/game/domain/gameDefinition.js";
 import { parseGameDefinition } from "./game-registry-schema.js";
+
+/** This module only ever builds/holds SYSTEM definitions (`game-registry/` describes SYSTEM games
+ * exclusively — see loadGameDefinitions' own doc comment) — `GameDefinition` in every signature
+ * below is deliberately the narrower `SystemGameDefinition`, not the full SYSTEM|CREATOR union. */
+type GameDefinition = SystemGameDefinition;
 
 export interface GameEntry {
   dirName: string;

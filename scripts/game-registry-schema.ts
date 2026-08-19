@@ -26,9 +26,10 @@ import type {
   GamePresentationViewport,
 } from "../packages/game-sdk/src/contracts/presentation.js";
 import type {
-  GameDefinition,
   GamePolicy,
+  SystemGameDefinition,
 } from "../packages/core/src/modules/game/domain/gameDefinition.js";
+import type { SystemGameOwner } from "../packages/core/src/modules/game/domain/gameOwner.js";
 
 const GAME_MODES: readonly GameMode[] = ["single", "local-multi", "online-multi"];
 const GAME_STATUSES: readonly GameStatus[] = ["draft", "beta", "published", "hidden"];
@@ -456,10 +457,11 @@ export function parseGamePolicy(file: string, raw: unknown): GamePolicy {
 }
 
 /**
- * Builds a complete {@link GameDefinition} from one game's two files. `owner` is supplied by the
- * caller rather than read from the data: this directory holds SYSTEM games only, and letting a
+ * Builds a complete {@link SystemGameDefinition} from one game's two files. `owner` is supplied by
+ * the caller rather than read from the data: this directory holds SYSTEM games only, and letting a
  * data file declare its own owner is exactly the kind of thing a creator-supplied file must never
- * be able to do.
+ * be able to do. Typed as `SystemGameOwner`, not the general `GameOwner`, for the same reason —
+ * this function only ever builds a SYSTEM definition.
  */
 export function parseGameDefinition(input: {
   slug: string;
@@ -467,8 +469,8 @@ export function parseGameDefinition(input: {
   policyFile: string;
   info: unknown;
   policy: unknown;
-  owner: GameDefinition["owner"];
-}): GameDefinition {
+  owner: SystemGameOwner;
+}): SystemGameDefinition {
   const ctx = { file: input.infoFile };
   const obj = asRecord(ctx, input.info);
   rejectUnknownKeys(ctx, obj, INFO_KEYS);

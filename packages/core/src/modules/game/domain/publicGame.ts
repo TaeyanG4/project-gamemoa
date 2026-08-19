@@ -19,7 +19,8 @@
  * duplicated logic.
  */
 
-import type { GameDefinition } from "./gameDefinition.js";
+import type { GameDefinition, SystemGameDefinition } from "./gameDefinition.js";
+import { isSystemGameDefinition } from "./gameDefinition.js";
 import type { SandboxGameRecord } from "../../../ports/sandboxGames.js";
 import type { SandboxGameMode } from "../../../domain/sandboxGames.js";
 
@@ -29,11 +30,11 @@ export interface PublicSystemGame {
   readonly title: string;
   readonly shortDescription: string;
   readonly description: string;
-  readonly status: GameDefinition["status"];
-  readonly categories: GameDefinition["categories"];
-  readonly tags: GameDefinition["tags"];
-  readonly modes: GameDefinition["modes"];
-  readonly inputMethods: GameDefinition["inputMethods"];
+  readonly status: SystemGameDefinition["status"];
+  readonly categories: SystemGameDefinition["categories"];
+  readonly tags: SystemGameDefinition["tags"];
+  readonly modes: SystemGameDefinition["modes"];
+  readonly inputMethods: SystemGameDefinition["inputMethods"];
   readonly minPlayers: number;
   readonly maxPlayers: number;
   readonly thumbnail: string;
@@ -63,6 +64,16 @@ export interface PublicCreatorGame {
 export type PublicGame = PublicSystemGame | PublicCreatorGame;
 
 export function toPublicSystemGame(definition: GameDefinition): PublicSystemGame {
+  // Signature deliberately stays `GameDefinition`, not `SystemGameDefinition` — narrowing here
+  // (rather than at every call site) keeps mergePublicGames/resolvePublicGame's own signatures,
+  // and therefore every existing caller (apps/api/src/routes/games.ts), untouched by the
+  // CreatorGameDefinition variant now existing. See gameDefinition.ts's own doc comment for why
+  // this owner-narrowing pattern mirrors PublicGame's.
+  if (!isSystemGameDefinition(definition)) {
+    throw new Error(
+      `toPublicSystemGame called with a non-SYSTEM definition (slug "${definition.slug}", owner "${definition.owner.type}")`,
+    );
+  }
   return {
     ownerType: "SYSTEM",
     slug: definition.slug,

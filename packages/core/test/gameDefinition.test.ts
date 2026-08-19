@@ -5,10 +5,15 @@ import {
   GAME_MANIFESTS,
   GAME_OWNER_TYPES,
   isCreatorOwned,
+  isCreatorGameDefinition,
   isScored,
+  isSystemGameDefinition,
   isValidGameOwnerType,
+  type CreatorGameDefinition,
   type GameDefinition,
   type GameOwner,
+  type SystemGameOwner,
+  type SystemGameDefinition,
 } from "../src/index.js";
 
 /**
@@ -20,7 +25,7 @@ import {
  * This is not the migration adapter (that belongs with the registry itself) — it is the smallest
  * thing that fails when the shapes drift apart.
  */
-function asDefinition(manifest: GameManifest, owner: GameOwner): GameDefinition {
+function asDefinition(manifest: GameManifest, owner: SystemGameOwner): SystemGameDefinition {
   return {
     slug: manifest.slug,
     owner,
@@ -144,4 +149,76 @@ test("only SYSTEM and CREATOR are owner types — sandbox is not a kind of game"
   assert.ok(isValidGameOwnerType("CREATOR"));
   assert.ok(!isValidGameOwnerType("SANDBOX"));
   assert.ok(!isValidGameOwnerType(undefined));
+});
+
+// ── SYSTEM/CREATOR discriminated-union narrowing (Stage C-1) ────────────────────
+//
+// GameDefinition mirrors PublicGame's own owner-narrowing pattern (see publicGame.ts) — SYSTEM's
+// fixed taxonomy fields (categories/tags/modes/inputMethods/minPlayers/maxPlayers/thumbnail) and
+// CREATOR's own fields (genre/mode/hasLogo) only exist after narrowing by `owner.type`.
+
+function fakeCreatorDefinition(
+  overrides: Partial<CreatorGameDefinition> = {},
+): CreatorGameDefinition {
+  return {
+    slug: "a-creator-game",
+    owner: { type: "CREATOR", userId: 7 },
+    title: "A Creator Game",
+    shortDescription: "short",
+    description: "long",
+    status: "published",
+    supportsReplay: false,
+    policy: { score: null, leaderboard: false, xpPerCompletion: 0, requiresAuth: false },
+    genre: "puzzle",
+    mode: "single",
+    hasLogo: true,
+    ...overrides,
+  };
+}
+
+test("a SYSTEM GameDefinition narrows via isSystemGameDefinition, keeping every existing field accessible unchanged", () => {
+  const manifest = GAME_MANIFESTS[0];
+  assert.ok(manifest, "at least one built-in manifest must exist for this test to be meaningful");
+  const definition: GameDefinition = asDefinition(manifest, { type: "SYSTEM" });
+
+  assert.equal(isSystemGameDefinition(definition), true);
+  assert.equal(isCreatorGameDefinition(definition), false);
+  if (isSystemGameDefinition(definition)) {
+    // Every field that existed on GameDefinition before this Stage is still reachable, unchanged,
+    // once narrowed — the union split added a CREATOR variant, it didn't take anything away from
+    // SYSTEM's.
+    assert.deepEqual(definition.categories, manifest.categories);
+    assert.deepEqual(definition.tags, manifest.tags);
+    assert.deepEqual(definition.modes, manifest.modes);
+    assert.deepEqual(definition.inputMethods, manifest.inputMethods);
+    assert.equal(definition.minPlayers, manifest.minPlayers);
+    assert.equal(definition.maxPlayers, manifest.maxPlayers);
+    assert.equal(definition.thumbnail, manifest.thumbnail);
+  }
+});
+
+test("a CREATOR GameDefinition narrows via isCreatorGameDefinition, exposing genre/mode/hasLogo — no SYSTEM taxonomy fields required", () => {
+  // fakeCreatorDefinition's own object literal is the real assertion here: it compiles with no
+  // categories/tags/modes/inputMethods/minPlayers/maxPlayers/thumbnail at all — a CREATOR
+  // definition genuinely does not need SYSTEM's fields invented as placeholders.
+  const definition: GameDefinition = fakeCreatorDefinition();
+
+  assert.equal(isCreatorGameDefinition(definition), true);
+  assert.equal(isSystemGameDefinition(definition), false);
+  if (isCreatorGameDefinition(definition)) {
+    assert.equal(definition.genre, "puzzle");
+    assert.equal(definition.mode, "single");
+    assert.equal(definition.hasLogo, true);
+  }
+});
+
+test("isSystemGameDefinition/isCreatorGameDefinition are mutually exclusive and exhaustive over the union", () => {
+  const manifest = GAME_MANIFESTS[0];
+  assert.ok(manifest);
+  const systemDef: GameDefinition = asDefinition(manifest, { type: "SYSTEM" });
+  const creatorDef: GameDefinition = fakeCreatorDefinition();
+
+  for (const definition of [systemDef, creatorDef]) {
+    assert.notEqual(isSystemGameDefinition(definition), isCreatorGameDefinition(definition));
+  }
 });
