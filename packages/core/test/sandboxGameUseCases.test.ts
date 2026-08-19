@@ -1112,6 +1112,89 @@ test("updateMetadata: a B2 read-back parity mismatch after save is surfaced as a
   );
 });
 
+test("updateMetadata: end to end, a D1/B2-diverged score policy only changes the field the PATCH names — B2 stays the source of truth for the rest", async () => {
+  const { useCases, repo, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  // B2 canonical: a real, complete ScoreConfig.
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: {
+        score: { unit: "seconds", direction: "asc", min: 0.5, max: 100, displayPrefix: "T:" },
+        leaderboard: true,
+        xpPerCompletion: 10,
+        requiresAuth: false,
+      },
+    }),
+  );
+  // D1's own score_* columns are deliberately different (a stale/diverged mirror) — directly
+  // written to the fake repo's underlying map, bypassing updateMetadata, to simulate D1 having
+  // drifted from B2 without going through this same sync path.
+  const diverged = repo.games.get(game.id);
+  assert.ok(diverged);
+  repo.games.set(game.id, {
+    ...diverged,
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 999,
+    scoreDisplayPrefix: "OLD",
+  });
+
+  await useCases.updateMetadata(game.id, 99, { scoreMax: 200 });
+
+  const doc = canonicalRepo.documents.get(game.slug);
+  assert.deepEqual(doc?.policy.score, {
+    unit: "seconds",
+    direction: "asc",
+    min: 0.5,
+    max: 200,
+    displayPrefix: "T:",
+  });
+});
+
+test("updateMetadata: a B2 save failure followed by a retry still preserves the untouched canonical score fields — no fallback to D1's mirror on the second attempt either", async () => {
+  const { useCases, canonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: {
+        score: { unit: "seconds", direction: "asc", min: 0.5, max: 100, displayPrefix: "T:" },
+        leaderboard: true,
+        xpPerCompletion: 10,
+        requiresAuth: false,
+      },
+    }),
+  );
+  canonicalRepo.throwOnSaveFor = game.slug;
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { scoreMax: 200 }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  // The failed attempt must not have partially written anything.
+  assert.deepEqual(canonicalRepo.documents.get(game.slug)?.policy.score, {
+    unit: "seconds",
+    direction: "asc",
+    min: 0.5,
+    max: 100,
+    displayPrefix: "T:",
+  });
+
+  canonicalRepo.throwOnSaveFor = undefined;
+  await useCases.updateMetadata(game.id, 99, { scoreMax: 200 });
+
+  assert.deepEqual(canonicalRepo.documents.get(game.slug)?.policy.score, {
+    unit: "seconds",
+    direction: "asc",
+    min: 0.5,
+    max: 200,
+    displayPrefix: "T:",
+  });
+});
+
 test("updateMetadata: a canonical document created by a concurrent writer between the first-create decision and the actual save is patched, not overwritten", async () => {
   const { useCases, canonicalRepo } = createUseCases();
   const game = await createBareGame(useCases);

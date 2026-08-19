@@ -37,7 +37,6 @@ import { mapSandboxGameRecordToCanonical } from "../domain/creatorGameCanonicalM
 import {
   patchCreatorCanonicalDocument,
   computeCreatorCanonicalScorePatch,
-  type EffectiveScoreFields,
 } from "../domain/creatorGameCanonicalPatch.js";
 import { canonicalDocumentsEqual } from "./creatorCanonicalBackfill.js";
 import type { GameBundlePublisher } from "./gameBundlePublisher.js";
@@ -104,12 +103,13 @@ export type SandboxGameUseCaseError =
    * explicit, non-null values in this same request — activating a score policy is never inferred
    * from D1's own possibly-stale leftover score_* columns. */
   | "AMBIGUOUS_SCORE_POLICY_ACTIVATION"
-  /** updateMetadata (Stage C-2): D1 metadata was already updated (and audited) successfully, but
-   * keeping the B2 canonical document in sync with it failed — a pre-read failure, a save
-   * failure, or a post-write parity mismatch. There is no cross-store transaction between D1 and
-   * B2 (see sandboxGameUseCases.ts's own doc comment on updateMetadata) — the caller must treat
-   * this as a real failure (never a success), and may safely retry the exact same request, since
-   * the whole operation is idempotent. */
+  /** updateMetadata (Stage C-2): keeping the B2 canonical document in sync with D1 failed. Covers
+   * three distinct moments, not just one: the initial pre-read (before D1 is ever touched — D1
+   * is NOT updated in this case), a save failure, or a post-write parity mismatch (both of which
+   * happen after D1 has already been updated and audited). There is no cross-store transaction
+   * between D1 and B2 (see sandboxGameUseCases.ts's own doc comment on updateMetadata) — the
+   * caller must treat this as a real failure (never a success) regardless of which moment it came
+   * from, and may safely retry the exact same request, since the whole operation is idempotent. */
   | "CANONICAL_SYNC_FAILED"
   | SandboxBundleRejection;
 
@@ -141,32 +141,6 @@ function validateTitle(title: string): string {
     throw new SandboxGameUseCaseFailure("INVALID_TITLE");
   }
   return trimmed;
-}
-
-/** Simulates what a metadata PATCH's score_* fields would merge to onto the row's CURRENT
- * (pre-mutation) values — used only to validate a score-policy transition BEFORE the real D1
- * write happens (see updateMetadata's own doc comment). Once the real write has happened,
- * `SandboxGameRepository.updateMetadata`'s own return value already IS this merge for real — this
- * function exists only for the "before" side, never called again after the D1 update. */
-function mergeEffectiveScoreFields(
-  current: EffectiveScoreFields,
-  input: SandboxGameMetadataInput,
-): EffectiveScoreFields {
-  return {
-    scoreUnit: input.scoreUnit !== undefined ? input.scoreUnit : current.scoreUnit,
-    scoreDirection:
-      input.scoreDirection !== undefined ? input.scoreDirection : current.scoreDirection,
-    scoreMin: input.scoreMin !== undefined ? input.scoreMin : current.scoreMin,
-    scoreMax: input.scoreMax !== undefined ? input.scoreMax : current.scoreMax,
-    scoreDisplayPrefix:
-      input.scoreDisplayPrefix !== undefined
-        ? input.scoreDisplayPrefix
-        : current.scoreDisplayPrefix,
-    scoreDisplaySuffix:
-      input.scoreDisplaySuffix !== undefined
-        ? input.scoreDisplaySuffix
-        : current.scoreDisplaySuffix,
-  };
 }
 
 /** What the game-serving routes need to answer one request, resolved in one place so the
@@ -830,10 +804,12 @@ export class SandboxGameUseCases {
    *      itself throws (malformed document, storage failure), D1 is never mutated: throws
    *      `CANONICAL_SYNC_FAILED` and stops here, fail-closed.
    *   3. Validate the score-policy transition (see `computeCreatorCanonicalScorePatch`) against
-   *      the row's CURRENT (pre-mutation) score_* columns merged with `input` — before the D1
-   *      write, so an invalid mutation (would leave an already-scored canonical's required score
-   *      fields incomplete, or ambiguously "half-activates" a currently-unscored one) never
-   *      reaches D1 at all.
+   *      the EXISTING B2 canonical's own `policy.score` merged with `input` alone — never D1's
+   *      score_* columns, which can genuinely diverge from B2 (D1 is a migration-period
+   *      compatibility mirror, not a re-derivation source for an already-canonical field; see
+   *      creatorGameCanonicalPatch.ts's own doc comment). Before the D1 write, so an invalid
+   *      mutation (would leave an already-scored canonical's required score fields incomplete, or
+   *      ambiguously "half-activates" a currently-unscored one) never reaches D1 at all.
    *   4. D1 update, then the review-audit entry — in that order, and unconditionally: once D1 is
    *      mutated, the audit entry is written regardless of what happens to B2 next, so a D1
    *      mutation this method commits to is never left looking like it never happened (see
@@ -876,12 +852,7 @@ export class SandboxGameUseCases {
     }
 
     if (existingCanonical !== null) {
-      const simulated = mergeEffectiveScoreFields(game, input);
-      const scoreCheck = computeCreatorCanonicalScorePatch(
-        existingCanonical.policy.score,
-        simulated,
-        input,
-      );
+      const scoreCheck = computeCreatorCanonicalScorePatch(existingCanonical.policy.score, input);
       if (!scoreCheck.ok) {
         throw new SandboxGameUseCaseFailure(scoreCheck.reason);
       }

@@ -3,23 +3,10 @@ import assert from "node:assert/strict";
 import {
   computeCreatorCanonicalScorePatch,
   patchCreatorCanonicalDocument,
-  type EffectiveScoreFields,
 } from "../src/domain/creatorGameCanonicalPatch.js";
 import { CREATOR_GAME_DEFINITION_SCHEMA_VERSION } from "../src/domain/creatorGameCanonicalDocument.js";
 import type { CreatorGameCanonicalDocument } from "../src/domain/creatorGameCanonicalDocument.js";
 import type { SandboxGameMetadataInput, SandboxGameRecord } from "../src/ports/sandboxGames.js";
-
-function scoreFields(overrides: Partial<EffectiveScoreFields> = {}): EffectiveScoreFields {
-  return {
-    scoreUnit: "pts",
-    scoreDirection: "desc",
-    scoreMin: 0,
-    scoreMax: 100,
-    scoreDisplayPrefix: null,
-    scoreDisplaySuffix: null,
-    ...overrides,
-  };
-}
 
 function canonicalDoc(
   overrides: Partial<CreatorGameCanonicalDocument> = {},
@@ -73,52 +60,56 @@ function updatedRow(overrides: Partial<SandboxGameRecord> = {}): SandboxGameReco
 }
 
 // ── computeCreatorCanonicalScorePatch ────────────────────────────────────────
+//
+// B2 (`existingScore`) is always the base — D1 is never read by this function at all (no
+// SandboxGameRecord parameter exists). Only the fields `input` explicitly names are ever
+// overridden.
 
 test("score patch: existing ScoreConfig + patch touching no score field -> unchanged", () => {
   const existing = { unit: "pts", direction: "desc" as const, min: 0, max: 100 };
-  const result = computeCreatorCanonicalScorePatch(existing, scoreFields(), {});
+  const result = computeCreatorCanonicalScorePatch(existing, {});
   assert.deepEqual(result, { ok: true, score: existing });
 });
 
-test("score patch: existing ScoreConfig + partial patch that keeps all four required fields non-null -> new ScoreConfig", () => {
-  const existing = { unit: "pts", direction: "desc" as const, min: 0, max: 100 };
-  const input: SandboxGameMetadataInput = { scoreMax: 999 };
-  const effective = scoreFields({ scoreMax: 999 });
-  const result = computeCreatorCanonicalScorePatch(existing, effective, input);
+test("score patch: existing ScoreConfig + partial patch overrides only the named field, everything else from B2", () => {
+  const existing = {
+    unit: "seconds",
+    direction: "asc" as const,
+    min: 0.5,
+    max: 100,
+    displayPrefix: "T:",
+  };
+  const input: SandboxGameMetadataInput = { scoreMax: 200 };
+  const result = computeCreatorCanonicalScorePatch(existing, input);
   assert.deepEqual(result, {
     ok: true,
-    score: { unit: "pts", direction: "desc", min: 0, max: 999 },
+    score: { unit: "seconds", direction: "asc", min: 0.5, max: 200, displayPrefix: "T:" },
   });
 });
 
 test("score patch: existing ScoreConfig + patch that would null out a required field -> rejected before ever becoming score:null", () => {
   const existing = { unit: "pts", direction: "desc" as const, min: 0, max: 100 };
   const input: SandboxGameMetadataInput = { scoreMax: null };
-  const effective = scoreFields({ scoreMax: null });
-  const result = computeCreatorCanonicalScorePatch(existing, effective, input);
+  const result = computeCreatorCanonicalScorePatch(existing, input);
   assert.deepEqual(result, { ok: false, reason: "SCORE_POLICY_WOULD_BECOME_INCOMPLETE" });
 });
 
-test("score patch: existing ScoreConfig + decimal min/max are preserved without truncation", () => {
+test("score patch: existing ScoreConfig + decimal min/max are preserved without truncation when untouched", () => {
   const existing = { unit: "s", direction: "asc" as const, min: 0.5, max: 99.9 };
-  const result = computeCreatorCanonicalScorePatch(
-    existing,
-    scoreFields({ scoreUnit: "s", scoreDirection: "asc", scoreMin: 0.5, scoreMax: 99.9 }),
-    {},
-  );
+  const result = computeCreatorCanonicalScorePatch(existing, {});
   assert.equal(result.ok, true);
   assert.equal(result.ok ? result.score?.min : null, 0.5);
   assert.equal(result.ok ? result.score?.max : null, 99.9);
 });
 
 test("score patch: existing score:null + patch touching no score field -> stays null", () => {
-  const result = computeCreatorCanonicalScorePatch(null, scoreFields(), {});
+  const result = computeCreatorCanonicalScorePatch(null, {});
   assert.deepEqual(result, { ok: true, score: null });
 });
 
 test("score patch: existing score:null + an incomplete score patch -> rejected as ambiguous, never partially activated", () => {
   const input: SandboxGameMetadataInput = { scoreUnit: "pts", scoreDirection: "desc" }; // min/max missing
-  const result = computeCreatorCanonicalScorePatch(null, scoreFields(), input);
+  const result = computeCreatorCanonicalScorePatch(null, input);
   assert.deepEqual(result, { ok: false, reason: "AMBIGUOUS_SCORE_POLICY_ACTIVATION" });
 });
 
@@ -129,30 +120,95 @@ test("score patch: existing score:null + all four required fields explicitly pro
     scoreMin: 0,
     scoreMax: 100,
   };
-  const result = computeCreatorCanonicalScorePatch(null, scoreFields(), input);
+  const result = computeCreatorCanonicalScorePatch(null, input);
   assert.deepEqual(result, {
     ok: true,
     score: { unit: "pts", direction: "desc", min: 0, max: 100 },
   });
 });
 
-test("score patch: existing score:null + D1 has stale leftover score_* columns, but the request itself doesn't supply all four -> still rejected, never inferred from D1", () => {
-  // `effective` simulates D1 already having some old score data sitting around (e.g. from before
-  // an admin explicitly cleared it to score:null) — the request only touches scoreUnit.
-  const input: SandboxGameMetadataInput = { scoreUnit: "new-unit" };
-  const staleEffective = scoreFields({ scoreUnit: "new-unit" }); // direction/min/max "leftover" from D1
-  const result = computeCreatorCanonicalScorePatch(null, staleEffective, input);
-  assert.deepEqual(result, { ok: false, reason: "AMBIGUOUS_SCORE_POLICY_ACTIVATION" });
-});
-
-test("score patch: existing ScoreConfig + displayPrefix/displaySuffix omitted entirely when absent", () => {
+test("score patch: existing ScoreConfig + displayPrefix/displaySuffix omitted entirely when absent from both B2 and the request", () => {
   const existing = { unit: "pts", direction: "desc" as const, min: 0, max: 100 };
-  const result = computeCreatorCanonicalScorePatch(existing, scoreFields({ scoreMin: 5 }), {
-    scoreMin: 5,
-  });
+  const result = computeCreatorCanonicalScorePatch(existing, { scoreMin: 5 });
   assert.equal(result.ok, true);
   assert.ok(result.ok && result.score && !("displayPrefix" in result.score));
   assert.ok(result.ok && result.score && !("displaySuffix" in result.score));
+});
+
+// -- B2 source-of-truth regression tests (this PR's own fix) --
+
+test("score patch [A]: D1 diverged from B2 on unit/direction/min/displayPrefix — a scoreMax-only PATCH changes ONLY scoreMax, everything else stays B2's", () => {
+  // B2: unit=seconds direction=asc min=0.5 max=100 displayPrefix=T:
+  // D1 (stale/diverged, never consulted): unit=pts direction=desc min=0 max=999 displayPrefix=OLD
+  const existing = {
+    unit: "seconds",
+    direction: "asc" as const,
+    min: 0.5,
+    max: 100,
+    displayPrefix: "T:",
+  };
+  const input: SandboxGameMetadataInput = { scoreMax: 200 };
+
+  const result = computeCreatorCanonicalScorePatch(existing, input);
+
+  assert.deepEqual(result, {
+    ok: true,
+    score: { unit: "seconds", direction: "asc", min: 0.5, max: 200, displayPrefix: "T:" },
+  });
+});
+
+test("score patch [B]: D1's required score columns are incomplete/stale, but B2's ScoreConfig is complete — a scoreMax-only PATCH is still a valid canonical patch, D1 state is irrelevant to this decision", () => {
+  // computeCreatorCanonicalScorePatch takes no D1 row at all — this test's own name is the
+  // assertion: there is no D1 input to this function that could make it reject.
+  const existing = { unit: "seconds", direction: "asc" as const, min: 0.5, max: 100 };
+  const result = computeCreatorCanonicalScorePatch(existing, { scoreMax: 200 });
+  assert.equal(result.ok, true);
+});
+
+test("score patch [C]: patching only displayPrefix leaves unit/direction/min/max exactly as B2 had them", () => {
+  const existing = { unit: "seconds", direction: "asc" as const, min: 0.5, max: 100 };
+  const result = computeCreatorCanonicalScorePatch(existing, { scoreDisplayPrefix: "New:" });
+  assert.deepEqual(result, {
+    ok: true,
+    score: { unit: "seconds", direction: "asc", min: 0.5, max: 100, displayPrefix: "New:" },
+  });
+});
+
+test("score patch [D]: score:null activation never lets a D1 stale displayPrefix/displaySuffix leak into the new ScoreConfig", () => {
+  // The request itself supplies the required four but no display fields — nothing here is a D1
+  // row, so there is nothing for a stale value to come from except the request itself, which
+  // this test confirms doesn't happen implicitly.
+  const input: SandboxGameMetadataInput = {
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 100,
+  };
+  const result = computeCreatorCanonicalScorePatch(null, input);
+  assert.equal(result.ok, true);
+  assert.ok(result.ok && result.score && !("displayPrefix" in result.score));
+  assert.ok(result.ok && result.score && !("displaySuffix" in result.score));
+});
+
+test("score patch [E]: score:null activation with an explicit displayPrefix in the request includes only that value", () => {
+  const input: SandboxGameMetadataInput = {
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 100,
+    scoreDisplayPrefix: "Lvl ",
+  };
+  const result = computeCreatorCanonicalScorePatch(null, input);
+  assert.deepEqual(result, {
+    ok: true,
+    score: { unit: "pts", direction: "desc", min: 0, max: 100, displayPrefix: "Lvl " },
+  });
+});
+
+test("score patch [F]: an explicit null on a required field is still rejected before any write, base-from-B2 or not", () => {
+  const existing = { unit: "seconds", direction: "asc" as const, min: 0.5, max: 100 };
+  const result = computeCreatorCanonicalScorePatch(existing, { scoreUnit: null });
+  assert.deepEqual(result, { ok: false, reason: "SCORE_POLICY_WOULD_BECOME_INCOMPLETE" });
 });
 
 // ── patchCreatorCanonicalDocument ────────────────────────────────────────────
@@ -269,4 +325,39 @@ test("document patch: an empty input produces a document identical to the existi
   const row = updatedRow({ updatedAt: existing.updatedAt }); // D1 no-op update, updatedAt unchanged
   const result = patchCreatorCanonicalDocument(existing, row, {});
   assert.deepEqual(result, { ok: true, document: existing });
+});
+
+test("document patch: D1/B2 divergence on score fields the patch doesn't name never bleeds into the saved document", () => {
+  // existing B2 canonical's score has its own values; updatedRow (D1's post-mutation state)
+  // deliberately carries different score_* values for the fields NOT named in `input` — proving
+  // patchCreatorCanonicalDocument's score computation reads only from `existing`+`input`, never
+  // from `updatedRow`'s score_* columns at all.
+  const existing = canonicalDoc({
+    policy: {
+      score: { unit: "seconds", direction: "asc", min: 0.5, max: 100, displayPrefix: "T:" },
+      leaderboard: true,
+      xpPerCompletion: 10,
+      requiresAuth: false,
+    },
+  });
+  const row = updatedRow({
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 999,
+    scoreDisplayPrefix: "OLD",
+  });
+  const input: SandboxGameMetadataInput = { scoreMax: 200 };
+
+  const result = patchCreatorCanonicalDocument(existing, row, input);
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.deepEqual(result.document.policy.score, {
+      unit: "seconds",
+      direction: "asc",
+      min: 0.5,
+      max: 200,
+      displayPrefix: "T:",
+    });
+  }
 });

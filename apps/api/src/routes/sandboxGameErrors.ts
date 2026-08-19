@@ -46,8 +46,10 @@ export const SANDBOX_GAME_FAILURE_STATUS: Record<
   // Stage C-2 (B2 canonical write-through): a rejected metadata mutation, not a server fault.
   SCORE_POLICY_WOULD_BECOME_INCOMPLETE: 400,
   AMBIGUOUS_SCORE_POLICY_ACTIVATION: 400,
-  // The request itself was valid; keeping B2 in sync with an already-committed D1 change failed —
-  // a dependency failure, safely retryable, not the client's fault.
+  // The request itself was valid; keeping B2 in sync with D1 failed — this can happen before D1
+  // is ever touched (a pre-read failure) or after (a save/parity failure), so the message must
+  // stay neutral about what, if anything, was actually saved. A dependency failure either way,
+  // safely retryable, not the client's fault.
   CANONICAL_SYNC_FAILED: 503,
 };
 
@@ -92,5 +94,5 @@ export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["cod
   AMBIGUOUS_SCORE_POLICY_ACTIVATION:
     "점수 미설정 게임에 점수를 설정하려면 단위/방향/최소/최대값을 이번 요청에서 모두 함께 입력해야 합니다.",
   CANONICAL_SYNC_FAILED:
-    "게임 정보가 저장은 되었지만 게임 정보 동기화(B2)에 실패했습니다. 잠시 후 같은 요청을 다시 시도해주세요.",
+    "게임 정보 동기화(B2)에 실패해 변경을 완료하지 못했습니다. 잠시 후 같은 요청을 다시 시도해주세요.",
 };

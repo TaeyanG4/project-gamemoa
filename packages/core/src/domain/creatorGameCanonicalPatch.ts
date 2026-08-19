@@ -17,26 +17,21 @@
  * column for `presentation` or `requiresAuth` at all). {@link patchCreatorCanonicalDocument} only
  * ever changes the fields `input` actually named; everything else — including the *entire*
  * document, when `input` names nothing this file reads — carries over from `existing` untouched.
+ *
+ * This same rule applies field-by-field to `policy.score`, not just to the document as a whole:
+ * {@link computeCreatorCanonicalScorePatch} never reads D1 at all (no `SandboxGameRecord` — the
+ * function only takes `existingScore` and `input`). D1 and B2 can genuinely diverge for
+ * `score_*` columns the metadata API doesn't touch every time (D1 is a migration-period
+ * compatibility mirror, not a re-derivation source for an already-canonical field) — a PATCH that
+ * only names `scoreMax` must leave B2's own `unit`/`direction`/`min`/`displayPrefix`/
+ * `displaySuffix` exactly as they were, never "helpfully" refreshed from whatever D1 currently
+ * happens to hold for those columns.
  */
 
 import type { ScoreConfig } from "@owogg/game-sdk/contracts";
 import type { CreatorGameCanonicalDocument } from "./creatorGameCanonicalDocument.js";
 import { isCreatorScorePolicyConfigured } from "./creatorScorePolicy.js";
 import type { SandboxGameMetadataInput, SandboxGameRecord } from "../ports/sandboxGames.js";
-
-/** The score_* fields a patch decision reads — from either a real `SandboxGameRecord` (the D1 row
- * already reflects `input` once `SandboxGameRepository.updateMetadata` has run) or a simulated
- * pre-mutation merge (see `mergeEffectiveScoreFields` in sandboxGameUseCases.ts, used to validate
- * BEFORE the D1 write actually happens). */
-export type EffectiveScoreFields = Pick<
-  SandboxGameRecord,
-  | "scoreUnit"
-  | "scoreDirection"
-  | "scoreMin"
-  | "scoreMax"
-  | "scoreDisplayPrefix"
-  | "scoreDisplaySuffix"
->;
 
 export const CREATOR_CANONICAL_SCORE_PATCH_REJECTIONS = [
   "SCORE_POLICY_WOULD_BECOME_INCOMPLETE",
@@ -60,17 +55,21 @@ function touchesAnyScoreField(input: SandboxGameMetadataInput): boolean {
   );
 }
 
-function buildScoreConfig(effective: EffectiveScoreFields): ScoreConfig {
-  // Only reachable once the caller has already confirmed (via isCreatorScorePolicyConfigured)
-  // that the four required fields are non-null — the `as` casts below just spell that out for
-  // TypeScript at the one call site that needs it, not a new, unchecked assumption.
+function buildScoreConfig(fields: {
+  unit: string;
+  direction: "asc" | "desc";
+  min: number;
+  max: number;
+  displayPrefix: string | null;
+  displaySuffix: string | null;
+}): ScoreConfig {
   return {
-    unit: effective.scoreUnit as string,
-    direction: effective.scoreDirection as "asc" | "desc",
-    min: effective.scoreMin as number,
-    max: effective.scoreMax as number,
-    ...(effective.scoreDisplayPrefix ? { displayPrefix: effective.scoreDisplayPrefix } : {}),
-    ...(effective.scoreDisplaySuffix ? { displaySuffix: effective.scoreDisplaySuffix } : {}),
+    unit: fields.unit,
+    direction: fields.direction,
+    min: fields.min,
+    max: fields.max,
+    ...(fields.displayPrefix ? { displayPrefix: fields.displayPrefix } : {}),
+    ...(fields.displaySuffix ? { displaySuffix: fields.displaySuffix } : {}),
   };
 }
 
@@ -78,26 +77,31 @@ function buildScoreConfig(effective: EffectiveScoreFields): ScoreConfig {
  * Decides what an existing canonical document's `policy.score` becomes after a metadata PATCH —
  * `score: null` (deliberately unscored) and an incomplete/not-yet-configured score policy are
  * never conflated (see domain/creatorScorePolicy.ts's own doc comment on why that distinction
- * matters). Three cases:
+ * matters). Deliberately takes no D1 row at all — see this file's own top doc comment on why B2
+ * must stay the sole source of truth for every field this function doesn't explicitly patch.
  *
- *   1. `existingScore` is a real `ScoreConfig`, and the patch doesn't touch any score field at
- *      all → unchanged, still that same `ScoreConfig`.
- *   2. `existingScore` is a real `ScoreConfig`, and the patch DOES touch a score field, but the
- *      resulting `effective` fields (this request's patch merged onto the current row — see
- *      `EffectiveScoreFields`'s own doc comment) leave any of the four required fields null →
- *      rejected (`SCORE_POLICY_WOULD_BECOME_INCOMPLETE`). This function never interprets that as
- *      "switch to score: null" — Stage C-2 does not support a ScoreConfig -> null transition (no
- *      "make this deliberately unscored" intent exists anywhere in the current metadata API).
- *   3. `existingScore` is `null` (deliberately unscored): a patch that touches no score field
+ * Two cases:
+ *
+ *   1. `existingScore` is a real `ScoreConfig` — the BASE is always `existingScore` itself, never
+ *      anything derived from D1. Only the fields `input` explicitly names are overridden (using
+ *      `input`'s own value, which is exactly the row's post-update value too, since D1 applies
+ *      score_* columns verbatim with no normalization — see D1SandboxGameRepository's own
+ *      `buildMetadataAssignments`). If the patch doesn't touch any score field at all, the result
+ *      is `existingScore` unchanged. If overriding leaves any of the four required fields null,
+ *      the whole patch is rejected (`SCORE_POLICY_WOULD_BECOME_INCOMPLETE`) — never reinterpreted
+ *      as "switch to score: null" (Stage C-2 does not support a ScoreConfig -> null transition;
+ *      no such intent exists anywhere in the current metadata API).
+ *   2. `existingScore` is `null` (deliberately unscored): a patch that touches no score field
  *      leaves it `null`. A patch that touches ANY score field must supply all four required
- *      fields as explicit, non-null values IN THIS REQUEST ITSELF (never inferred from
- *      `effective`/D1's own possibly-stale leftover score_* columns) — anything less is rejected
- *      as `AMBIGUOUS_SCORE_POLICY_ACTIVATION`, not silently treated as "still unscored" or
- *      "partially scored".
+ *      fields as explicit, non-null values IN THIS REQUEST ITSELF — never inferred from D1's own
+ *      possibly-stale leftover score_* columns (there is nothing to fall back to here at all;
+ *      this branch never reads anything but `input`) — anything less is rejected as
+ *      `AMBIGUOUS_SCORE_POLICY_ACTIVATION`. The optional `scoreDisplayPrefix`/`scoreDisplaySuffix`
+ *      are included ONLY when `input` itself names them — a stale D1 display value left over from
+ *      before the game went unscored must never leak into the newly-activated `ScoreConfig`.
  */
 export function computeCreatorCanonicalScorePatch(
   existingScore: ScoreConfig | null,
-  effective: EffectiveScoreFields,
   input: SandboxGameMetadataInput,
 ): CreatorCanonicalScorePatchResult {
   const touched = touchesAnyScoreField(input);
@@ -106,10 +110,38 @@ export function computeCreatorCanonicalScorePatch(
     if (!touched) {
       return { ok: true, score: existingScore };
     }
-    if (!isCreatorScorePolicyConfigured(effective)) {
+
+    const merged = {
+      scoreUnit: input.scoreUnit !== undefined ? input.scoreUnit : existingScore.unit,
+      scoreDirection:
+        input.scoreDirection !== undefined ? input.scoreDirection : existingScore.direction,
+      scoreMin: input.scoreMin !== undefined ? input.scoreMin : existingScore.min,
+      scoreMax: input.scoreMax !== undefined ? input.scoreMax : existingScore.max,
+    };
+    if (!isCreatorScorePolicyConfigured(merged)) {
       return { ok: false, reason: "SCORE_POLICY_WOULD_BECOME_INCOMPLETE" };
     }
-    return { ok: true, score: buildScoreConfig(effective) };
+
+    const displayPrefix =
+      input.scoreDisplayPrefix !== undefined
+        ? input.scoreDisplayPrefix
+        : (existingScore.displayPrefix ?? null);
+    const displaySuffix =
+      input.scoreDisplaySuffix !== undefined
+        ? input.scoreDisplaySuffix
+        : (existingScore.displaySuffix ?? null);
+
+    return {
+      ok: true,
+      score: buildScoreConfig({
+        unit: merged.scoreUnit,
+        direction: merged.scoreDirection,
+        min: merged.scoreMin,
+        max: merged.scoreMax,
+        displayPrefix,
+        displaySuffix,
+      }),
+    };
   }
 
   if (!touched) {
@@ -125,7 +157,18 @@ export function computeCreatorCanonicalScorePatch(
   if (!isCreatorScorePolicyConfigured(explicitlyProvided)) {
     return { ok: false, reason: "AMBIGUOUS_SCORE_POLICY_ACTIVATION" };
   }
-  return { ok: true, score: buildScoreConfig(effective) };
+
+  return {
+    ok: true,
+    score: buildScoreConfig({
+      unit: explicitlyProvided.scoreUnit,
+      direction: explicitlyProvided.scoreDirection,
+      min: explicitlyProvided.scoreMin,
+      max: explicitlyProvided.scoreMax,
+      displayPrefix: input.scoreDisplayPrefix ?? null,
+      displaySuffix: input.scoreDisplaySuffix ?? null,
+    }),
+  };
 }
 
 export type CreatorCanonicalPatchResult =
@@ -137,10 +180,13 @@ export type CreatorCanonicalPatchResult =
  * doc comment for why this never rebuilds the document from `mapSandboxGameRecordToCanonical`.
  *
  * `updatedRow` must be the D1 row AFTER `SandboxGameRepository.updateMetadata` has already applied
- * `input` — its score_* columns are therefore already the real "effective" (patch-merged) values,
- * and its `updatedAt` is the single timestamp this document's own `updatedAt` reuses verbatim
- * (never a second, independently-generated one — see sandboxGameUseCases.ts's own doc comment on
- * why `new Date()` is only ever called once per mutation).
+ * `input` — used here only for `title`/`shortDescription`/`description`/`genre`/`xpPerCompletion`/
+ * `updatedAt` (D1's own compatibility-mirror fields); `policy.score` is computed by
+ * {@link computeCreatorCanonicalScorePatch} from `input` alone, which never reads `updatedRow` at
+ * all (see that function's own doc comment on why B2 — never D1 — is `policy.score`'s base).
+ * `updatedAt` is the single timestamp this document's own `updatedAt` reuses verbatim (never a
+ * second, independently-generated one — see sandboxGameUseCases.ts's own doc comment on why
+ * `new Date()` is only ever called once per mutation).
  *
  * Always preserved from `existing`, regardless of what `input` contains: `schemaVersion`, `slug`,
  * `mode` (the metadata API has no field to change it), `presentation`, `policy.requiresAuth`,
@@ -153,22 +199,11 @@ export function patchCreatorCanonicalDocument(
   existing: CreatorGameCanonicalDocument,
   updatedRow: Pick<
     SandboxGameRecord,
-    | "title"
-    | "shortDescription"
-    | "description"
-    | "genre"
-    | "xpPerCompletion"
-    | "scoreUnit"
-    | "scoreDirection"
-    | "scoreMin"
-    | "scoreMax"
-    | "scoreDisplayPrefix"
-    | "scoreDisplaySuffix"
-    | "updatedAt"
+    "title" | "shortDescription" | "description" | "genre" | "xpPerCompletion" | "updatedAt"
   >,
   input: SandboxGameMetadataInput,
 ): CreatorCanonicalPatchResult {
-  const scoreResult = computeCreatorCanonicalScorePatch(existing.policy.score, updatedRow, input);
+  const scoreResult = computeCreatorCanonicalScorePatch(existing.policy.score, input);
   if (!scoreResult.ok) {
     return scoreResult;
   }
