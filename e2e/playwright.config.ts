@@ -16,6 +16,14 @@ const WEB_BUILD_ROOT = path.join(REPO_ROOT, "apps", "web", "build", "client");
  * tear it down after") rather than in e2e/run.ts — run.ts's job ends at "produce a built
  * apps/web/build/client and a populated e2e/.local-game-origin/", both of which must already
  * exist on disk before either server here has anything to serve.
+ *
+ * `channel: "chrome"` on the one project below runs against the OS-installed Google Chrome
+ * (GitHub's ubuntu-24.04 runner image ships it preinstalled; a local dev machine needs a system
+ * Chrome install too) instead of Playwright's own managed Chromium build. That's what lets CI
+ * skip `playwright install` entirely — the actual bottleneck was never the test run, it was that
+ * install step stalling on the runner's apt mirror while downloading Chromium's OS-level deps.
+ * Same "one engine, DOM invariants only" reasoning as above still applies; this only changes
+ * which Chrome binary runs the same test.
  */
 export default defineConfig({
   testDir: "./tests",
@@ -35,7 +43,7 @@ export default defineConfig({
     baseURL: WEB_BASE_URL,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], channel: "chrome" } }],
   webServer: [
     {
       command: "tsx e2e/serveStaticCli.ts",
