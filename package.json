@@ -25,6 +25,7 @@
     "i18n:sync-check": "tsx scripts/check-i18n-sync.ts",
     "publish:official-games": "tsx scripts/publish-official-game-bundles.ts",
     "backfill:creator-canonical": "tsx scripts/run-creator-canonical-backfill.ts",
+    "migrate:game-canonical": "tsx scripts/run-game-canonical-migration.ts",
     "e2e": "tsx e2e/run.ts",
     "verify": "pnpm install --frozen-lockfile && pnpm format:check && pnpm architecture:check && pnpm registry:check && pnpm lint && pnpm typecheck && pnpm typecheck:scripts && pnpm test && pnpm test:scripts && pnpm build",
     "deploy": "pnpm --filter @owogg/api deploy && pnpm --filter @owogg/web deploy",
