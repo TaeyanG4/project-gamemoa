@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 import { zipSync, unzipSync } from "fflate";
 import { SystemGameBundlePublisher, sha256Hex } from "@owogg/core";
 import type { BundleArchiveReader } from "@owogg/core";
+import type { PreparedBundle } from "@owogg/core";
 import { BackblazeB2GameBundleRepository } from "@owogg/db";
 import type { BackblazeB2Config } from "@owogg/db";
 
@@ -30,6 +31,19 @@ export interface MigratedGame {
 export interface ReleaseMapEntry {
   version: string;
   entry: string;
+}
+
+/** Optional B-1 observer. It receives the exact deterministic ZIP/hash and validated file set the
+ * legacy publisher just used, so generic shadow publication cannot drift to a separately-built
+ * artifact. Throwing aborts this deploy step before the release map/Web deployment proceeds. */
+export interface OfficialBundlePreparedObserver {
+  onBundlePrepared(input: {
+    slug: string;
+    zipBytes: Uint8Array;
+    contentHash: string;
+    prepared: PreparedBundle;
+    publishedAt: string;
+  }): Promise<void>;
 }
 
 /** Every SYSTEM game that has been migrated onto the standalone-bundle + Game Bridge + IframeRuntime
@@ -242,6 +256,7 @@ export function writeReleaseMap(repoRoot: string, releases: Record<string, Relea
 export async function publishAllMigratedGames(
   repoRoot: string,
   b2Config: BackblazeB2Config,
+  observer?: OfficialBundlePreparedObserver,
 ): Promise<Record<string, ReleaseMapEntry>> {
   const storage = new BackblazeB2GameBundleRepository(b2Config);
   const publisher = new SystemGameBundlePublisher(storage, new FflateArchiveReader());
@@ -252,18 +267,32 @@ export async function publishAllMigratedGames(
   for (const game of migratedGames(repoRoot)) {
     const zipBytes = buildAndZip(game, repoRoot);
     const version = await sha256Hex(toArrayBuffer(zipBytes));
+    // B-1 reuses this exact validation result for the generic B2 layout, whether the legacy
+    // official path was newly published or already present from an earlier deploy.
+    const prepared = observer ? publisher.prepare(toArrayBuffer(zipBytes)) : null;
 
     console.log(`🔎 ${game.slug}: checking whether ${version} is already published...`);
     const existing = await publisher.readManifest(game.slug, version);
     if (existing) {
       console.log(`✅ ${game.slug}@${version} already published — reusing it, no upload needed.`);
     } else {
-      const prepared = publisher.prepare(toArrayBuffer(zipBytes));
+      const bundle = prepared ?? publisher.prepare(toArrayBuffer(zipBytes));
       console.log(
-        `⬆️  Publishing ${game.slug}@${version} (${prepared.files.length} files, ${prepared.totalSize} bytes)...`,
+        `⬆️  Publishing ${game.slug}@${version} (${bundle.files.length} files, ${bundle.totalSize} bytes)...`,
       );
-      await publisher.publish({ slug: game.slug, version, prepared, publishedAt });
+      await publisher.publish({ slug: game.slug, version, prepared: bundle, publishedAt });
       console.log(`✅ Published official-games/${game.slug}/${version}/`);
+    }
+
+    if (observer) {
+      await observer.onBundlePrepared({
+        slug: game.slug,
+        zipBytes,
+        contentHash: version,
+        // observer exists iff this was prepared above
+        prepared: prepared as PreparedBundle,
+        publishedAt,
+      });
     }
 
     releases[game.slug] = { version, entry: "index.html" };

@@ -81,6 +81,7 @@ export * from "./application/creatorCanonicalBackfill.js";
 // stays unwired in production by this Stage" list.
 export * from "./application/genericCanonicalMigration.js";
 export * from "./application/systemGameBundlePublisher.js";
+export * from "./application/officialGameShadowBootstrap.js";
 export * from "./application/gameAttemptUseCases.js";
 export * from "./application/creatorScoreAcceptanceUseCases.js";
 export * from "./application/creatorLeaderboardUseCases.js";

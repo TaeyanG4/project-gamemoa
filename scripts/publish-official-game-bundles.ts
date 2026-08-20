@@ -6,6 +6,7 @@ import {
   publishAllMigratedGames,
   writeReleaseMap,
 } from "./official-game-bundle-publisher.js";
+import { createOfficialShadowBundleObserver } from "./official-game-shadow-bootstrap.js";
 
 /**
  * Builds + publishes every migrated SYSTEM game's standalone iframe bundle to
@@ -39,7 +40,11 @@ async function main(): Promise<void> {
     );
   }
 
-  const releases = await publishAllMigratedGames(REPO_ROOT, b2Config);
+  const releases = await publishAllMigratedGames(
+    REPO_ROOT,
+    b2Config,
+    createOfficialShadowBundleObserver({ repoRoot: REPO_ROOT, b2Config }),
+  );
   writeReleaseMap(REPO_ROOT, releases);
 
   const mapPath = path.join(
