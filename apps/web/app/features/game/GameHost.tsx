@@ -1,13 +1,8 @@
-import { useEffect, useState, useMemo, useCallback, useRef, type ComponentType } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router";
-import { loadGame, gameManifests } from "../catalog/registry";
+import { gameManifests } from "../catalog/registry";
 import { useIsGameDisabled } from "../catalog/gameAvailability";
-import {
-  formatScore,
-  type GameRuntimeContext,
-  type GameResult,
-  type GameProps,
-} from "@owogg/game-sdk";
+import { formatScore, type GameRuntimeContext, type GameResult } from "@owogg/game-sdk";
 import {
   saveLocalBestScore,
   submitScoreApi,
@@ -22,7 +17,6 @@ import { getLocalizedGameContent } from "../catalog/localizedGameContent";
 import { localizedDifficultyLabel } from "../catalog/difficultyLabels";
 import { GameThumbnail } from "../../components/ui/GameThumbnail";
 import { XIcon } from "../../components/ui/XIcon";
-import { LegacyReactRuntime } from "./runtime/LegacyReactRuntime";
 import { IframeRuntime } from "./runtime/IframeRuntime";
 import { resolvePresentationLayout } from "./presentationLayoutResolver";
 import {
@@ -30,11 +24,7 @@ import {
   resolveMobileAdvisory,
   resolveOrientationAdvisory,
 } from "./presentationAdvisory";
-import {
-  SYSTEM_GAME_RELEASES,
-  type SystemGameRelease,
-} from "./runtime/systemGameReleaseMap.generated";
-import { officialGameEntryUrl } from "../../lib/api/config";
+import { gamePlayUrl } from "../../lib/api/config";
 import type { Dictionary } from "../i18n/dictionary";
 import type { LeaderRecord } from "@owogg/contracts";
 import {
@@ -85,27 +75,12 @@ export function formatMetadataValue(key: string, value: unknown): string {
 }
 
 /**
- * Which runtime a SYSTEM game's slug plays through — the ONE place that decision is made. Driven
- * entirely by the release map's own presence, not a hardcoded per-slug switch: the map (built at
- * deploy time by scripts/publish-official-game-bundles.ts, see systemGameReleaseMap.generated.ts's
- * own doc comment) already encodes exactly which SYSTEM games have been migrated to a standalone
- * iframe bundle, so re-deriving that list here would just be a second copy that could drift.
- * Deliberately NOT read off GameDefinition/GameManifest — the release map is deployment/runtime
- * state (which published bundle version is currently live), not catalog metadata a game's own
- * manifest should ever carry.
- *
- * A slug absent from the map — because it was never migrated (aim-test/memory-test/typing-test
- * today), or because a deploy's publish step failed and left the previous map in place — always
- * resolves to "legacy", never a broken iframe URL. That fallback is what makes "publish
- * failed/missing hash → the new iframe URL is never deployed" hold structurally, not just by
- * convention: GameHost has no code path that renders IframeRuntime without a release map entry to
- * point it at.
+ * C-1's primary official runtime URL. The API's generic resolver owns the numeric live version;
+ * the deploy-generated release map remains available as rollback infrastructure but is not a
+ * primary runtime input anymore.
  */
-export function resolveGameRuntimeKind(
-  slug: string,
-  releases: Readonly<Record<string, SystemGameRelease>>,
-): "iframe" | "legacy" {
-  return releases[slug] ? "iframe" : "legacy";
+export function resolveOfficialRuntimeUrl(slug: string): string {
+  return gamePlayUrl(slug);
 }
 
 /**
@@ -386,7 +361,6 @@ export function GameHost({ slug }: GameHostProps) {
   const { user, isAuthenticated, openLoginModal } = useAuth();
   const { dict } = useI18n();
 
-  const [GameComponent, setGameComponent] = useState<ComponentType<GameProps> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<GameResult | null>(null);
@@ -411,10 +385,7 @@ export function GameHost({ slug }: GameHostProps) {
   const localizedTitle = manifest ? getLocalizedGameContent(dict, manifest).title : undefined;
   const isDisabled = useIsGameDisabled(manifest?.id ?? slug);
 
-  // See resolveGameRuntimeKind's own doc comment — the release map's presence is the only signal
-  // that decides IframeRuntime vs. LegacyReactRuntime for this slug.
-  const release = SYSTEM_GAME_RELEASES[slug];
-  const runtimeKind = resolveGameRuntimeKind(slug, SYSTEM_GAME_RELEASES);
+  const runtimeKind = "iframe" as const;
 
   // Presentation layout — see presentationLayoutResolver.ts's own doc comment for the math, and
   // useElementSize's/useViewportHeight's for why width and height each come from the source they
@@ -549,54 +520,13 @@ export function GameHost({ slug }: GameHostProps) {
     iframeAttemptDifficultyRef.current = undefined;
   }, [manifest]);
 
-  // Load Game Module — skipped entirely for a slug the release map resolves to "iframe": the
-  // game's React component never enters this host's own JS bundle at all in that case (it runs
-  // standalone, inside the iframe's own bundle instead), so there is no module for loadGame() to
-  // fetch. GameComponent simply stays null and the iframe branch below never reads it.
+  // Official games now always load through the generic /play resolver. The legacy React modules
+  // stay in the repository as rollback infrastructure, but are no longer a primary runtime input.
   useEffect(() => {
-    if (runtimeKind === "iframe") {
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    let isMounted = true;
     extractPlayTokenFromLocation();
-
-    async function init() {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const module = await loadGame(slug);
-
-        if (!isMounted) return;
-
-        if (!module) {
-          setError(dict.gamePlay.errorGameNotFound);
-        } else {
-          setGameComponent(() => module.Game);
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error("Failed to load game:", err);
-          setError(dict.gamePlay.errorLoadFailed);
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void init();
-
-    return () => {
-      isMounted = false;
-    };
-    // loadGame() dynamic-imports the module, which the bundler caches per specifier — re-running
-    // this on a locale switch is just a cache hit, not a real re-fetch, so it's safe to depend on
-    // these two dict strings the same way exhaustive-deps wants.
-  }, [slug, runtimeKind, dict.gamePlay.errorGameNotFound, dict.gamePlay.errorLoadFailed]);
+    setError(null);
+    setIsLoading(false);
+  }, [slug]);
 
   // Handle Score Submission (Authenticated Attempts Only)
   const handleScoreSubmission = useCallback(
@@ -1265,49 +1195,26 @@ export function GameHost({ slug }: GameHostProps) {
               {dict.gamePlay.authRequiredCta}
             </button>
           </div>
-        ) : runtimeKind === "iframe" ? (
-          release ? (
-            <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
-              {resultOverlay}
-              <div className="p-6" ref={iframeAreaRef}>
-                <IframeRuntime
-                  src={officialGameEntryUrl(slug, release)}
-                  title={localizedTitle ?? slug}
-                  attemptKey={attemptKey}
-                  // IframeRuntime/GameFrame render the iframe at `h-full w-full` of whatever this
-                  // wraps — with no sizing at all that collapses to a near-zero height, since
-                  // nothing here otherwise constrains it. LegacyReactRuntime's games never hit
-                  // this because each sizes its own arena internally (e.g. aim-test's own
-                  // `aspect-[16/10] min-h-[380px]` on its play area) — GameHost has no visibility
-                  // into what an iframe-runtime game renders internally, so absent a presentation
-                  // preference this falls back to a shared, generously-sized responsive viewport
-                  // instead (LEGACY_IFRAME_FRAME_CLASS_NAME, restored in #44): roughly 70% of
-                  // viewport height, never below a legacy-game-sized 480px, never beyond 720px on
-                  // very tall screens. See presentationLayoutResolver.ts for the general case.
-                  frameClassName={iframeFrameClassName}
-                  frameStyle={iframeFrameStyle}
-                  iframeStyle={iframeElementStyle}
-                  {...(manifest?.difficulty ? { difficultyId: selectedDifficultyId } : {})}
-                  onStarted={handleIframeStarted}
-                  onComplete={handleIframeComplete}
-                  onCancel={runtime.cancel}
-                  onError={handleIframeError}
-                />
-              </div>
-            </div>
-          ) : null
-        ) : GameComponent ? (
+        ) : (
           <div className="w-full max-w-6xl bg-surface-raised rounded-xl shadow-2xl overflow-hidden relative border border-border/50">
             {resultOverlay}
-            <div className="p-6">
-              <LegacyReactRuntime
-                GameComponent={GameComponent}
-                runtime={runtime}
+            <div className="p-6" ref={iframeAreaRef}>
+              <IframeRuntime
+                src={resolveOfficialRuntimeUrl(slug)}
+                title={localizedTitle ?? slug}
                 attemptKey={attemptKey}
+                frameClassName={iframeFrameClassName}
+                frameStyle={iframeFrameStyle}
+                iframeStyle={iframeElementStyle}
+                {...(manifest?.difficulty ? { difficultyId: selectedDifficultyId } : {})}
+                onStarted={handleIframeStarted}
+                onComplete={handleIframeComplete}
+                onCancel={runtime.cancel}
+                onError={handleIframeError}
               />
             </div>
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   );

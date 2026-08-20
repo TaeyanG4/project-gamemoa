@@ -6,6 +6,7 @@ import {
 } from "../components/games/SandboxGameFrame";
 import {
   getGameOrigin,
+  gamePlayUrl,
   sandboxGamePlayUrl,
   officialGameEntryUrl,
   API_URL,
@@ -50,6 +51,11 @@ test("the game origin is resolved from configuration, not hardcoded to one hostn
 test("sandboxGamePlayUrl points at the live-version resolver and escapes the slug", () => {
   assert.equal(sandboxGamePlayUrl("my-game"), `${API_URL}/play/my-game`);
   assert.equal(sandboxGamePlayUrl("a b"), `${API_URL}/play/a%20b`);
+});
+
+test("the provider-neutral runtime URL is shared by official and Creator hosts", () => {
+  assert.equal(gamePlayUrl("reaction-time"), `${API_URL}/play/reaction-time`);
+  assert.equal(gamePlayUrl("creator game"), sandboxGamePlayUrl("creator game"));
 });
 
 test("officialGameEntryUrl points at the exact published SYSTEM bundle version, never a live resolver", () => {

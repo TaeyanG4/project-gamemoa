@@ -5,7 +5,7 @@ import { formatScore } from "@owogg/game-sdk";
 import { useAuth } from "../auth";
 import { useI18n } from "../i18n/I18nContext";
 import { IframeRuntime } from "./runtime/IframeRuntime";
-import { sandboxGamePlayUrl } from "../../lib/api/config";
+import { gamePlayUrl } from "../../lib/api/config";
 import { fetchGameSession } from "./gameSessionApi";
 import { acceptCreatorScore } from "./creatorScoreAcceptApi";
 import { createCreatorScoreFlow, type CreatorScoreSubmissionState } from "./creatorScoreFlow";
@@ -328,7 +328,7 @@ export function CreatorGameHost({ slug, game }: CreatorGameHostProps) {
 
             <div className="p-6">
               <IframeRuntime
-                src={sandboxGamePlayUrl(slug)}
+                src={gamePlayUrl(slug)}
                 title={game.title}
                 attemptKey={attemptKey}
                 onComplete={handleComplete}

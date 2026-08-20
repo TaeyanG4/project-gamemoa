@@ -1,0 +1,60 @@
+import {
+  parseGameCanonicalDocument,
+  serializeGameCanonicalDocument,
+} from "../domain/gameCanonicalDocument.js";
+import type { RuntimeGame } from "../domain/runtimeGame.js";
+import type { GameCanonicalRepository } from "../ports/gameCanonicalRepository.js";
+import type { GameIdentityRepository } from "../ports/gameIdentityRepository.js";
+import type { RuntimeGameRegistry } from "../ports/runtimeGameRegistry.js";
+import type { GameVersionRepository } from "../ports/gameVersionRepository.js";
+
+/**
+ * Joins generic D1 identity/live-version state with the generic canonical document. There is no
+ * publisher branch: OWOGG and USER games pass through exactly the same invariants.
+ */
+export class ComposedRuntimeGameRegistry implements RuntimeGameRegistry {
+  constructor(
+    private readonly identities: GameIdentityRepository,
+    private readonly versions: GameVersionRepository,
+    private readonly canonicals: GameCanonicalRepository,
+  ) {}
+
+  async findBySlug(slug: string): Promise<RuntimeGame | null> {
+    try {
+      const identity = await this.identities.findBySlug(slug);
+      if (
+        identity === null ||
+        identity.deletedAt !== null ||
+        identity.visibility !== "PUBLIC" ||
+        identity.liveVersionId === null
+      ) {
+        return null;
+      }
+
+      const liveVersion = await this.versions.findById(identity.liveVersionId);
+      if (
+        liveVersion === null ||
+        liveVersion.gameId !== identity.id ||
+        liveVersion.publishStatus !== "READY"
+      ) {
+        return null;
+      }
+
+      const storedCanonical = await this.canonicals.findBySlug(identity.slug);
+      if (storedCanonical === null) return null;
+
+      // The production adapter already parses strictly. Re-parse at this boundary as defense in
+      // depth so a malformed alternate adapter or test double cannot bypass runtime validation.
+      const canonical = parseGameCanonicalDocument(
+        serializeGameCanonicalDocument(storedCanonical),
+        identity.slug,
+      );
+
+      return { identity, liveVersion, canonical };
+    } catch {
+      // Storage failures and malformed rows/documents are all unavailable runtime state. The
+      // public resolver deliberately exposes the same null result as an unknown slug.
+      return null;
+    }
+  }
+}
