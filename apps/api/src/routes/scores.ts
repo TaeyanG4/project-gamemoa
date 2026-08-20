@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { createContainer, evaluateAchievementsForUser } from "../container.js";
+import { createReadContainer } from "../readReplica.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { readB2Config } from "./devGames.js";
@@ -329,7 +330,10 @@ scoresRouter.get("/:gameId", edgeCache({ ttlSeconds: 30 }), async (c) => {
       );
     }
 
-    const rows = await container.scoreRepo.getLeaderboard(
+    // Runtime identity/version/canonical and availability above deliberately stay on the primary.
+    // Only this staleness-tolerant public score-row read opts into D1's read-replica session.
+    const readContainer = createReadContainer(c.env.DB);
+    const rows = await readContainer.scoreRepo.getLeaderboard(
       gameId,
       20,
       runtime.canonical.policy.score.direction,

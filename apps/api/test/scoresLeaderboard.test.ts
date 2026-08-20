@@ -23,7 +23,7 @@ interface FakeScoreRow {
   created_at: string;
 }
 
-function createDb(rows: FakeScoreRow[]) {
+function createDb(rows: FakeScoreRow[], queryLog: string[] = []) {
   const ids: Record<string, { gameId: number; versionId: number }> = {
     "reaction-time": { gameId: 9, versionId: 5 },
     "memory-test": { gameId: 11, versionId: 7 },
@@ -93,6 +93,7 @@ function createDb(rows: FakeScoreRow[]) {
 
   return {
     prepare(query: string) {
+      queryLog.push(query);
       return statement(query);
     },
     async batch(statements: Array<ReturnType<typeof statement>>) {
@@ -195,4 +196,55 @@ test("GET /api/scores/:gameId gameTitle is consistent across multiple rows of th
 
   assert.equal(body.leaderboard.length, 2);
   assert.ok(body.leaderboard.every((row) => row.gameTitle === "순서 기억력 테스트"));
+});
+
+test("generic leaderboard keeps runtime validation on primary and reads score rows through replica session", async () => {
+  const primaryQueries: string[] = [];
+  const replicaQueries: string[] = [];
+  const replica = createDb(
+    [
+      {
+        id: 2,
+        user_id: 2,
+        nickname: "Replica",
+        avatar_url: null,
+        game_id: "reaction-time",
+        score: 222,
+        difficulty: "normal",
+        created_at: new Date().toISOString(),
+      },
+    ],
+    replicaQueries,
+  );
+  const primary = createDb(
+    [
+      {
+        id: 1,
+        user_id: 1,
+        nickname: "Primary",
+        avatar_url: null,
+        game_id: "reaction-time",
+        score: 111,
+        difficulty: "normal",
+        created_at: new Date().toISOString(),
+      },
+    ],
+    primaryQueries,
+  ) as typeof replica & { withSession: (constraint?: unknown) => typeof replica };
+  primary.withSession = (constraint) => {
+    assert.equal(constraint, "first-unconstrained");
+    return replica;
+  };
+
+  const res = await requestLeaderboard(primary, "/api/scores/reaction-time");
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { leaderboard: Array<Record<string, unknown>> };
+  assert.equal(body.leaderboard[0]?.score, 222);
+  assert.ok(primaryQueries.some((query) => query.includes("FROM games")));
+  assert.ok(primaryQueries.some((query) => query.includes("FROM game_versions")));
+  assert.equal(
+    primaryQueries.some((query) => query.includes("FROM scores")),
+    false,
+  );
+  assert.ok(replicaQueries.some((query) => query.includes("FROM scores")));
 });
