@@ -1,7 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { D1GameIdentityRepository, mapSandboxGameIdentityRow } from "../src/index.js";
-import { createSqliteD1, SANDBOX_GAMES_TEST_SCHEMA } from "./helpers/sqliteD1.js";
+import fs from "node:fs";
+import {
+  D1GameIdentityRepository,
+  mapGameIdentityRow,
+  mapSandboxGameIdentityRow,
+} from "../src/index.js";
+import {
+  createSqliteD1,
+  GAMES_TEST_SCHEMA,
+  SANDBOX_GAMES_TEST_SCHEMA,
+} from "./helpers/sqliteD1.js";
 
 function seedUser(raw: import("node:sqlite").DatabaseSync, id: number, nickname: string) {
   raw
@@ -9,7 +18,7 @@ function seedUser(raw: import("node:sqlite").DatabaseSync, id: number, nickname:
     .run(id, nickname, `${nickname}@example.com`, new Date().toISOString());
 }
 
-function insertRawGame(
+function insertRawSandboxGame(
   raw: import("node:sqlite").DatabaseSync,
   row: {
     id?: number;
@@ -59,44 +68,364 @@ function insertRawGame(
   return Number(info.lastInsertRowid);
 }
 
-test("public surface export: D1GameIdentityRepository and mapSandboxGameIdentityRow exported from index", () => {
+function insertRawGenericGame(
+  raw: import("node:sqlite").DatabaseSync,
+  row: {
+    id?: number;
+    slug: string;
+    publisherType: "OWOGG" | "USER";
+    publisherUserId?: number | null;
+    visibility?: string;
+    liveVersionId?: number | null;
+    deletedAt?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+  },
+): number {
+  const info = raw
+    .prepare(
+      `INSERT INTO games (
+        id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      row.id ?? null,
+      row.slug,
+      row.publisherType,
+      row.publisherUserId ?? null,
+      row.visibility ?? "PRIVATE",
+      row.liveVersionId ?? null,
+      row.deletedAt ?? null,
+      row.createdAt ?? "2026-08-19T10:00:00.000Z",
+      row.updatedAt ?? "2026-08-19T10:00:00.000Z",
+    );
+  return Number(info.lastInsertRowid);
+}
+
+test("public surface export: D1GameIdentityRepository and mappers exported from index", () => {
   assert.equal(typeof D1GameIdentityRepository, "function");
+  assert.equal(typeof mapGameIdentityRow, "function");
   assert.equal(typeof mapSandboxGameIdentityRow, "function");
 });
 
-test("findById returns active game identity with mapped publisher and runtime fields", async () => {
+test("0029 migration actual-file: cleanly applies to existing DB and backfills USER rows preserving IDs and parity", () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 42, "Dev42");
-  const gameId = insertRawGame(raw, {
+  seedUser(raw, 1, "Alice");
+  seedUser(raw, 2, "Bob");
+
+  const id1 = insertRawSandboxGame(raw, {
+    id: 101,
     slug: "ball-dodge",
-    developerUserId: 42,
+    developerUserId: 1,
     visibility: "PRIVATE",
     liveVersionId: null,
     createdAt: "2026-08-19T12:00:00.000Z",
     updatedAt: "2026-08-19T12:30:00.000Z",
   });
 
-  const repo = new D1GameIdentityRepository(db);
-  const identity = await repo.findById(gameId);
+  const id2 = insertRawSandboxGame(raw, {
+    id: 202,
+    slug: "featured-runner",
+    developerUserId: 2,
+    visibility: "PUBLIC",
+    liveVersionId: 77,
+    createdAt: "2026-08-19T14:00:00.000Z",
+    updatedAt: "2026-08-19T14:30:00.000Z",
+  });
 
-  assert.ok(identity);
-  assert.equal(identity.id, gameId);
-  assert.equal(identity.slug, "ball-dodge");
-  assert.deepEqual(identity.publisher, { type: "USER", userId: 42 });
-  assert.equal(identity.visibility, "PRIVATE");
-  assert.equal(identity.liveVersionId, null);
-  assert.equal(identity.deletedAt, null);
-  assert.equal(identity.createdAt, "2026-08-19T12:00:00.000Z");
-  assert.equal(identity.updatedAt, "2026-08-19T12:30:00.000Z");
+  const id3 = insertRawSandboxGame(raw, {
+    id: 303,
+    slug: "archived-puzzle",
+    developerUserId: 1,
+    visibility: "PRIVATE",
+    liveVersionId: null,
+    deletedAt: "2026-08-20T08:00:00.123Z",
+    createdAt: "2026-08-19T16:00:00.000Z",
+    updatedAt: "2026-08-20T08:00:00.123Z",
+  });
+
+  // Read and apply the actual 0029 migration file
+  const migrationSql = fs.readFileSync(
+    new URL("../migrations/0029_unified_game_identity.sql", import.meta.url),
+    "utf-8",
+  );
+  raw.exec(migrationSql);
+
+  const repo = new D1GameIdentityRepository(db);
+
+  // Verify backfilled rows in games table
+  const gamesRows = raw.prepare("SELECT * FROM games ORDER BY id ASC").all() as Record<
+    string,
+    unknown
+  >[];
+  assert.equal(gamesRows.length, 3);
+
+  // Exact ID preservation
+  assert.equal(gamesRows[0].id, id1);
+  assert.equal(gamesRows[1].id, id2);
+  assert.equal(gamesRows[2].id, id3);
+
+  // Exact parity between mapSandboxGameIdentityRow and D1GameIdentityRepository.findById
+  const sandboxRows = raw.prepare("SELECT * FROM sandbox_games ORDER BY id ASC").all() as Record<
+    string,
+    unknown
+  >[];
+
+  for (let i = 0; i < 3; i++) {
+    const sandboxProjection = mapSandboxGameIdentityRow(sandboxRows[i]);
+    const genericProjection = mapGameIdentityRow(gamesRows[i]);
+    assert.deepEqual(sandboxProjection, genericProjection);
+  }
+
+  // Repository lookup matches
+  const identity1 = repo.findById(id1);
+  const identity2 = repo.findById(id2);
+  const identity3 = repo.findById(id3);
+
+  return Promise.all([identity1, identity2, identity3]).then(([g1, g2, g3]) => {
+    assert.ok(g1);
+    assert.equal(g1.slug, "ball-dodge");
+    assert.deepEqual(g1.publisher, { type: "USER", userId: 1 });
+    assert.equal(g1.visibility, "PRIVATE");
+    assert.equal(g1.liveVersionId, null);
+
+    assert.ok(g2);
+    assert.equal(g2.slug, "featured-runner");
+    assert.deepEqual(g2.publisher, { type: "USER", userId: 2 });
+    assert.equal(g2.visibility, "PUBLIC");
+    assert.equal(g2.liveVersionId, 77);
+
+    assert.ok(g3);
+    assert.equal(g3.slug, "archived-puzzle");
+    assert.deepEqual(g3.publisher, { type: "USER", userId: 1 });
+    assert.equal(g3.deletedAt, "2026-08-20T08:00:00.123Z");
+  });
 });
 
-test("findById returns soft-deleted game identity with deletedAt preserved exact as-is", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+test("physical SQLite constraints: publisher, visibility, slug, and liveVersion invariants", () => {
+  const { raw } = createSqliteD1(GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev1");
+
+  // 1. Valid USER row succeeds
+  raw
+    .prepare(
+      `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+       VALUES ('valid-user', 'USER', 1, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+    )
+    .run();
+
+  // 2. USER with NULL publisher_user_id rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('user-null', 'USER', NULL, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 3. USER with non-positive publisher_user_id rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('user-zero', 'USER', 0, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 4. Valid OWOGG row with NULL publisher_user_id succeeds
+  raw
+    .prepare(
+      `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+       VALUES ('reaction-time', 'OWOGG', NULL, 'PUBLIC', 1, '2026-08-19', '2026-08-19')`,
+    )
+    .run();
+
+  // 5. OWOGG with non-NULL publisher_user_id rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('owogg-with-user', 'OWOGG', 1, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 6. Unknown publisher_type rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('unknown-pub', 'CREATOR', 1, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 7. PUBLIC visibility with NULL live_version_id rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('public-no-ver', 'USER', 1, 'PUBLIC', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 8. Non-positive live_version_id rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('neg-ver', 'USER', 1, 'PRIVATE', 0, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 9. Invalid visibility rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('inv-vis', 'USER', 1, 'UNLISTED', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 10. Padded slug or empty slug rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES (' padded ', 'USER', 1, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('', 'USER', 1, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /CHECK constraint failed/,
+  );
+
+  // 11. Duplicate slug rejected
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('valid-user', 'USER', 1, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /UNIQUE constraint failed/,
+  );
+});
+
+test("findById and findBySlug return active USER and OWOGG game identities", async () => {
+  const { db, raw } = createSqliteD1(GAMES_TEST_SCHEMA);
+  seedUser(raw, 42, "Dev42");
+
+  const userGameId = insertRawGenericGame(raw, {
+    slug: "ball-dodge",
+    publisherType: "USER",
+    publisherUserId: 42,
+    visibility: "PRIVATE",
+    liveVersionId: null,
+    createdAt: "2026-08-19T12:00:00.000Z",
+    updatedAt: "2026-08-19T12:30:00.000Z",
+  });
+
+  const owoggGameId = insertRawGenericGame(raw, {
+    slug: "reaction-time",
+    publisherType: "OWOGG",
+    publisherUserId: null,
+    visibility: "PUBLIC",
+    liveVersionId: 1,
+    createdAt: "2026-08-19T10:00:00.000Z",
+    updatedAt: "2026-08-19T10:30:00.000Z",
+  });
+
+  const repo = new D1GameIdentityRepository(db);
+
+  // USER lookup
+  const userById = await repo.findById(userGameId);
+  assert.ok(userById);
+  assert.equal(userById.id, userGameId);
+  assert.equal(userById.slug, "ball-dodge");
+  assert.deepEqual(userById.publisher, { type: "USER", userId: 42 });
+  assert.equal(userById.visibility, "PRIVATE");
+  assert.equal(userById.liveVersionId, null);
+
+  const userBySlug = await repo.findBySlug("ball-dodge");
+  assert.ok(userBySlug);
+  assert.equal(userBySlug.id, userGameId);
+  assert.deepEqual(userBySlug.publisher, { type: "USER", userId: 42 });
+
+  // OWOGG lookup
+  const owoggById = await repo.findById(owoggGameId);
+  assert.ok(owoggById);
+  assert.equal(owoggById.id, owoggGameId);
+  assert.equal(owoggById.slug, "reaction-time");
+  assert.deepEqual(owoggById.publisher, { type: "OWOGG" });
+  assert.equal(owoggById.visibility, "PUBLIC");
+  assert.equal(owoggById.liveVersionId, 1);
+
+  const owoggBySlug = await repo.findBySlug("reaction-time");
+  assert.ok(owoggBySlug);
+  assert.equal(owoggBySlug.id, owoggGameId);
+  assert.deepEqual(owoggBySlug.publisher, { type: "OWOGG" });
+});
+
+test("publisher userId matches developer_user_id exactly without displayName derivation", async () => {
+  const { db, raw } = createSqliteD1(GAMES_TEST_SCHEMA);
+  // Even if user's nickname is "owogg", publisher must remain USER with developerUserId
+  seedUser(raw, 123, "owogg");
+
+  insertRawGenericGame(raw, {
+    slug: "user-game-by-owogg-named-user",
+    publisherType: "USER",
+    publisherUserId: 123,
+    visibility: "PRIVATE",
+  });
+
+  const repo = new D1GameIdentityRepository(db);
+  const identity = await repo.findBySlug("user-game-by-owogg-named-user");
+
+  assert.ok(identity);
+  assert.deepEqual(identity.publisher, { type: "USER", userId: 123 });
+  assert.notEqual(identity.publisher.type, "OWOGG");
+});
+
+test("findById returns soft-deleted game identity with exact deletedAt preserved", async () => {
+  const { db, raw } = createSqliteD1(GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev1");
   const exactDeletedTimestamp = "2026-08-20T08:00:00.123Z";
-  const gameId = insertRawGame(raw, {
+  const gameId = insertRawGenericGame(raw, {
     slug: "archived-game",
-    developerUserId: 1,
+    publisherType: "USER",
+    publisherUserId: 1,
     deletedAt: exactDeletedTimestamp,
   });
 
@@ -109,73 +438,57 @@ test("findById returns soft-deleted game identity with deletedAt preserved exact
   assert.equal(identity.deletedAt, exactDeletedTimestamp);
 });
 
+test("findBySlug returns null for soft-deleted game and non-existent slug", async () => {
+  const { db, raw } = createSqliteD1(GAMES_TEST_SCHEMA);
+  seedUser(raw, 5, "Dev5");
+  insertRawGenericGame(raw, {
+    slug: "deleted-runner",
+    publisherType: "USER",
+    publisherUserId: 5,
+    deletedAt: "2026-08-20T09:00:00.000Z",
+  });
+
+  const repo = new D1GameIdentityRepository(db);
+  const deleted = await repo.findBySlug("deleted-runner");
+  assert.equal(deleted, null);
+
+  const missing = await repo.findBySlug("non-existent");
+  assert.equal(missing, null);
+});
+
 test("findById returns null for non-existent game id", async () => {
-  const { db } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  const { db } = createSqliteD1(GAMES_TEST_SCHEMA);
   const repo = new D1GameIdentityRepository(db);
 
   const identity = await repo.findById(99999);
   assert.equal(identity, null);
 });
 
-test("findBySlug returns active game identity", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 5, "Dev5");
-  insertRawGame(raw, {
-    slug: "active-runner",
-    developerUserId: 5,
-    visibility: "PRIVATE",
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identity = await repo.findBySlug("active-runner");
-
-  assert.ok(identity);
-  assert.equal(identity.slug, "active-runner");
-  assert.deepEqual(identity.publisher, { type: "USER", userId: 5 });
-  assert.equal(identity.deletedAt, null);
-});
-
-test("findBySlug returns null for soft-deleted game", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 5, "Dev5");
-  insertRawGame(raw, {
-    slug: "deleted-runner",
-    developerUserId: 5,
-    deletedAt: "2026-08-20T09:00:00.000Z",
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identity = await repo.findBySlug("deleted-runner");
-
-  assert.equal(identity, null);
-});
-
-test("findBySlug returns null for non-existent slug", async () => {
-  const { db } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  const repo = new D1GameIdentityRepository(db);
-
-  const identity = await repo.findBySlug("does-not-exist");
-  assert.equal(identity, null);
-});
-
-test("listAll returns only active games and excludes soft-deleted rows", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+test("listAll returns active games ordered by created_at DESC and excludes soft-deleted rows", async () => {
+  const { db, raw } = createSqliteD1(GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev1");
 
-  insertRawGame(raw, {
+  insertRawGenericGame(raw, {
     slug: "game-1",
-    developerUserId: 1,
+    publisherType: "USER",
+    publisherUserId: 1,
+    visibility: "PRIVATE",
     createdAt: "2026-08-19T01:00:00.000Z",
   });
-  insertRawGame(raw, {
+  insertRawGenericGame(raw, {
     slug: "game-2-deleted",
-    developerUserId: 1,
+    publisherType: "USER",
+    publisherUserId: 1,
+    visibility: "PRIVATE",
     deletedAt: "2026-08-20T00:00:00.000Z",
     createdAt: "2026-08-19T02:00:00.000Z",
   });
-  insertRawGame(raw, {
-    slug: "game-3",
-    developerUserId: 1,
+  insertRawGenericGame(raw, {
+    slug: "game-3-owogg",
+    publisherType: "OWOGG",
+    publisherUserId: null,
+    visibility: "PUBLIC",
+    liveVersionId: 1,
     createdAt: "2026-08-19T03:00:00.000Z",
   });
 
@@ -183,145 +496,23 @@ test("listAll returns only active games and excludes soft-deleted rows", async (
   const identities = await repo.listAll();
 
   assert.equal(identities.length, 2);
-  const slugs = identities.map((i) => i.slug);
-  assert.deepEqual(slugs, ["game-3", "game-1"]); // ordered created_at DESC
+  assert.deepEqual(
+    identities.map((i) => i.slug),
+    ["game-3-owogg", "game-1"],
+  );
+  assert.equal(identities[0].visibility, "PUBLIC");
+  assert.equal(identities[1].visibility, "PRIVATE");
 });
 
-test("listAll includes PRIVATE rows as well as PUBLIC rows", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 1, "Dev1");
-
-  insertRawGame(raw, {
-    slug: "private-game",
-    developerUserId: 1,
-    visibility: "PRIVATE",
-    createdAt: "2026-08-19T01:00:00.000Z",
-  });
-  insertRawGame(raw, {
-    slug: "public-game",
-    developerUserId: 1,
-    visibility: "PUBLIC",
-    liveVersionId: 10,
-    createdAt: "2026-08-19T02:00:00.000Z",
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identities = await repo.listAll();
-
-  assert.equal(identities.length, 2);
-  const visibilityBySlug = Object.fromEntries(identities.map((i) => [i.slug, i.visibility]));
-  assert.equal(visibilityBySlug["private-game"], "PRIVATE");
-  assert.equal(visibilityBySlug["public-game"], "PUBLIC");
-});
-
-test("PUBLIC game with liveVersionId preserves both fields accurately", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 10, "Dev10");
-
-  insertRawGame(raw, {
-    slug: "featured-game",
-    developerUserId: 10,
-    visibility: "PUBLIC",
-    liveVersionId: 77,
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identity = await repo.findBySlug("featured-game");
-
-  assert.ok(identity);
-  assert.equal(identity.visibility, "PUBLIC");
-  assert.equal(identity.liveVersionId, 77);
-});
-
-test("Game with liveVersionId = null preserves null for PRIVATE game", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 10, "Dev10");
-
-  insertRawGame(raw, {
-    slug: "draft-game",
-    developerUserId: 10,
-    visibility: "PRIVATE",
-    liveVersionId: null,
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identity = await repo.findBySlug("draft-game");
-
-  assert.ok(identity);
-  assert.equal(identity.liveVersionId, null);
-  assert.equal(identity.visibility, "PRIVATE");
-});
-
-test("publisher userId matches developer_user_id exactly without displayName derivation", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  // Even if user's nickname is "owogg", publisher must remain USER with developerUserId
-  seedUser(raw, 123, "owogg");
-
-  insertRawGame(raw, {
-    slug: "user-game-by-owogg-named-user",
-    developerUserId: 123,
-    visibility: "PRIVATE",
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identity = await repo.findBySlug("user-game-by-owogg-named-user");
-
-  assert.ok(identity);
-  assert.deepEqual(identity.publisher, { type: "USER", userId: 123 });
-  assert.notEqual(identity.publisher.type, "OWOGG");
-});
-
-test("canonical metadata modifications do not alter GameIdentity projection", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 1, "Dev1");
-
-  const gameId = insertRawGame(raw, {
-    slug: "metadata-test",
-    developerUserId: 1,
-    title: "Original Title",
-    shortDescription: "Original Short",
-    description: "Original Long",
-    genre: "action",
-    mode: "single",
-    xpPerCompletion: 50,
-    scoreMin: 10,
-    scoreMax: 999,
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identityBefore = await repo.findById(gameId);
-
-  // Update canonical metadata in D1 table
-  raw
-    .prepare(
-      `UPDATE sandbox_games SET
-        title = 'Changed Title',
-        short_description = 'Changed Short',
-        description = 'Changed Long',
-        genre = 'rpg',
-        mode = 'multi',
-        xp_per_completion = 500,
-        score_min = 0,
-        score_max = 50000
-       WHERE id = ?`,
-    )
-    .run(gameId);
-
-  const identityAfter = await repo.findById(gameId);
-
-  assert.ok(identityBefore);
-  assert.ok(identityAfter);
-  assert.deepEqual(identityBefore, identityAfter);
-});
-
-test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
+test("mapGameIdentityRow: fail-closed on malformed row data", () => {
   // Invalid id
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: "not-a-number",
         slug: "game",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
@@ -331,10 +522,11 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
 
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: -1,
         slug: "game",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
@@ -345,10 +537,11 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
   // Padded / whitespace slug rejected without normalization
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "   ",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
@@ -358,10 +551,11 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
 
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: " padded-slug ",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
@@ -369,66 +563,73 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
     /Invalid or malformed game slug/,
   );
 
+  // Invalid publisher_type
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
-        id: 1,
-        slug: " leading-space",
-        developer_user_id: 1,
-        visibility: "PRIVATE",
-        created_at: "2026-08-19",
-        updated_at: "2026-08-19",
-      }),
-    /Invalid or malformed game slug/,
-  );
-
-  assert.throws(
-    () =>
-      mapSandboxGameIdentityRow({
-        id: 1,
-        slug: "trailing-space ",
-        developer_user_id: 1,
-        visibility: "PRIVATE",
-        created_at: "2026-08-19",
-        updated_at: "2026-08-19",
-      }),
-    /Invalid or malformed game slug/,
-  );
-
-  // Invalid developer_user_id
-  assert.throws(
-    () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "game",
-        developer_user_id: 0,
+        publisher_type: "UNKNOWN",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
       }),
-    /Invalid developer_user_id/,
+    /Invalid publisher_type/,
+  );
+
+  // OWOGG with publisher_user_id
+  assert.throws(
+    () =>
+      mapGameIdentityRow({
+        id: 1,
+        slug: "game",
+        publisher_type: "OWOGG",
+        publisher_user_id: 123,
+        visibility: "PRIVATE",
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /OWOGG publisher must not have publisher_user_id/,
+  );
+
+  // USER without positive publisher_user_id
+  assert.throws(
+    () =>
+      mapGameIdentityRow({
+        id: 1,
+        slug: "game",
+        publisher_type: "USER",
+        publisher_user_id: null,
+        visibility: "PRIVATE",
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /USER publisher must have a positive integer publisher_user_id/,
   );
 
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "game",
-        developer_user_id: -1,
+        publisher_type: "USER",
+        publisher_user_id: 0,
         visibility: "PRIVATE",
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
       }),
-    /Invalid developer_user_id/,
+    /USER publisher must have a positive integer publisher_user_id/,
   );
 
   // Invalid visibility
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "game",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "UNKNOWN",
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
@@ -436,28 +637,14 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
     /Invalid visibility/,
   );
 
-  // Invalid live_version_id
-  assert.throws(
-    () =>
-      mapSandboxGameIdentityRow({
-        id: 1,
-        slug: "game",
-        developer_user_id: 1,
-        visibility: "PRIVATE",
-        live_version_id: 0,
-        created_at: "2026-08-19",
-        updated_at: "2026-08-19",
-      }),
-    /Invalid live_version_id/,
-  );
-
   // PUBLIC game without live_version_id rejected
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "public-without-version",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PUBLIC",
         live_version_id: null,
         created_at: "2026-08-19",
@@ -469,10 +656,11 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
   // Malformed deleted_at (number, object, empty string)
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "game",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         deleted_at: 123456789,
         created_at: "2026-08-19",
@@ -483,10 +671,11 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
 
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "game",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         deleted_at: {},
         created_at: "2026-08-19",
@@ -497,10 +686,11 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
 
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "game",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         deleted_at: "",
         created_at: "2026-08-19",
@@ -512,45 +702,15 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
   // Missing timestamps
   assert.throws(
     () =>
-      mapSandboxGameIdentityRow({
+      mapGameIdentityRow({
         id: 1,
         slug: "game",
-        developer_user_id: 1,
+        publisher_type: "USER",
+        publisher_user_id: 1,
         visibility: "PRIVATE",
         created_at: "",
         updated_at: "2026-08-19",
       }),
     /Missing timestamp/,
-  );
-});
-
-test("listAll maintains query ordering created_at DESC without alphabetic sort", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 1, "Dev1");
-
-  // Insert games with slugs zzz, aaa, mmm at increasing createdAt timestamps
-  insertRawGame(raw, {
-    slug: "zzz-game",
-    developerUserId: 1,
-    createdAt: "2026-08-19T01:00:00.000Z",
-  });
-  insertRawGame(raw, {
-    slug: "aaa-game",
-    developerUserId: 1,
-    createdAt: "2026-08-19T02:00:00.000Z",
-  });
-  insertRawGame(raw, {
-    slug: "mmm-game",
-    developerUserId: 1,
-    createdAt: "2026-08-19T03:00:00.000Z",
-  });
-
-  const repo = new D1GameIdentityRepository(db);
-  const identities = await repo.listAll();
-
-  // Newest first
-  assert.deepEqual(
-    identities.map((i) => i.slug),
-    ["mmm-game", "aaa-game", "zzz-game"],
   );
 });
