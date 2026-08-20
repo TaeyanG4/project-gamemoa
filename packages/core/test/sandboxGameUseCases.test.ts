@@ -21,6 +21,13 @@ import { SANDBOX_GAME_POLICY } from "../src/domain/sandboxGames.js";
 import type { SandboxGameBundleManifest } from "../src/domain/sandboxGameBundle.js";
 import { GAME_REGISTRATION_MANIFEST_FILENAME } from "../src/domain/sandboxGameBundle.js";
 import { GAME_DEFINITIONS, StaticGameRegistry, type GameRegistry } from "../src/index.js";
+import type { GameCanonicalRepository } from "../src/modules/game/ports/gameCanonicalRepository.js";
+import {
+  parseGameCanonicalDocument,
+  serializeGameCanonicalDocument,
+  type GameCanonicalDocument,
+} from "../src/modules/game/domain/gameCanonicalDocument.js";
+import { creatorCanonicalDocumentToGameCanonicalDocument } from "../src/modules/game/domain/gameCanonicalMigration.js";
 
 // The zip container format itself is an infrastructure detail behind the BundleArchiveReader port,
 // so these tests inject archive *contents* directly. Real zip bytes (and therefore fflate) are
@@ -377,6 +384,43 @@ function createFakeCanonicalRepo(): CreatorGameDefinitionRepository & {
   };
 }
 
+// Stage U-3: the generic canonical shadow repository — same fake shape/conventions as
+// createFakeCanonicalRepo above, applied to GameCanonicalRepository/GameCanonicalDocument instead.
+// `save` re-validates through parseGameCanonicalDocument before storing, exactly mirroring
+// B2GameCanonicalRepository's own real validate-before-write contract (see that class's own doc
+// comment) — so a document a Creator canonical's looser schema allowed but the generic schema
+// doesn't is rejected here too, not just in production.
+function createFakeGameCanonicalRepo(): GameCanonicalRepository & {
+  documents: Map<string, GameCanonicalDocument>;
+  saveCalls: GameCanonicalDocument[];
+  throwOnFindFor?: string;
+  throwOnSaveFor?: string;
+} {
+  return {
+    documents: new Map(),
+    saveCalls: [],
+    async findBySlug(slug) {
+      if (this.throwOnFindFor === slug) {
+        throw new Error(`simulated malformed/unreadable generic document at ${slug}`);
+      }
+      return this.documents.get(slug) ?? null;
+    },
+    async save(document) {
+      if (this.throwOnSaveFor === document.slug) {
+        throw new Error(`simulated storage failure saving generic ${document.slug}`);
+      }
+      // Throws (INVALID_DOCUMENT etc.) for a semantically-invalid document, before it's ever
+      // stored — same as the real adapter.
+      parseGameCanonicalDocument(serializeGameCanonicalDocument(document), document.slug);
+      this.saveCalls.push(document);
+      this.documents.set(document.slug, document);
+    },
+    async delete(slug) {
+      this.documents.delete(slug);
+    },
+  };
+}
+
 // Empty by default: none of the arbitrary slugs these tests invent (`my-game`, `ball-dodge`, ...)
 // collide with a real SYSTEM game, so the default keeps every existing test's behaviour exactly
 // as it was before SandboxGameUseCases took a GameRegistry at all. Tests exercising the P-03
@@ -387,13 +431,30 @@ function createUseCases(
   entries?: Record<string, Uint8Array>,
   registry: GameRegistry = new StaticGameRegistry([]),
   canonicalRepo: ReturnType<typeof createFakeCanonicalRepo> = createFakeCanonicalRepo(),
+  gameCanonicalRepo: ReturnType<typeof createFakeGameCanonicalRepo> = createFakeGameCanonicalRepo(),
 ) {
   const repo = createFakeRepo();
   const storage = createFakeStorage();
   const archives = createFakeArchiveReader(entries);
   const publisher = new GameBundlePublisher(repo, storage, archives);
-  const useCases = new SandboxGameUseCases(repo, storage, publisher, registry, canonicalRepo);
-  return { useCases, repo, storage, archives, publisher, registry, canonicalRepo };
+  const useCases = new SandboxGameUseCases(
+    repo,
+    storage,
+    publisher,
+    registry,
+    canonicalRepo,
+    gameCanonicalRepo,
+  );
+  return {
+    useCases,
+    repo,
+    storage,
+    archives,
+    publisher,
+    registry,
+    canonicalRepo,
+    gameCanonicalRepo,
+  };
 }
 
 async function createGameWithLiveVersion(entries?: Record<string, Uint8Array>) {
@@ -1063,6 +1124,7 @@ test("updateMetadata: a D1 update failure never reaches B2 at all", async () => 
     publisher,
     new StaticGameRegistry([]),
     canonicalRepo,
+    createFakeGameCanonicalRepo(),
   );
   const game = await useCases.createGame({
     slug: "my-game",
@@ -1229,8 +1291,14 @@ test("updateMetadata: a canonical document created by a concurrent writer betwee
 test("updateMetadata: B2-only presentation survives an unrelated metadata patch end to end", async () => {
   const { useCases, canonicalRepo } = createUseCases();
   const game = await createBareGame(useCases);
+  // "responsive" is the only GamePresentation viewport mode with min*/max* bounds (see
+  // @owogg/game-sdk's presentation.ts) — a pre-existing "scale-to-fit" value here was never a
+  // real GamePresentation mode; it went unnoticed only because packages/core's typecheck config
+  // excludes test/ and this fake never round-tripped the value through a real parser. Stage U-3's
+  // generic shadow sync is the first thing that actually validates it (see gameCanonicalDocument
+  // .ts's own doc comment on why the generic schema is stricter than the Creator schema).
   const presentation = {
-    viewport: { mode: "scale-to-fit" as const, minWidth: 320, minHeight: 240 },
+    viewport: { mode: "responsive" as const, minWidth: 320, minHeight: 240 },
     fullscreen: { supported: false, recommended: false },
     mobile: { support: "supported" as const, orientation: "any" as const },
   };
@@ -1263,6 +1331,312 @@ test("updateMetadata: existing requiresAuth/leaderboard are preserved verbatim b
   assert.equal(doc?.policy.requiresAuth, false);
 });
 
+// ── updateMetadata: Stage U-3 generic canonical shadow write convergence ─────
+
+test("updateMetadata: existing Creator canonical + generic missing -> generic CREATED with exact converted parity (A)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      presentation: {
+        viewport: { mode: "fixed" as const, preferredWidth: 640, preferredHeight: 360 },
+        fullscreen: { supported: true, recommended: false },
+        mobile: { support: "unsupported" as const },
+      },
+    }),
+  );
+
+  await useCases.updateMetadata(game.id, 99, { title: "Renamed" });
+
+  const creatorDoc = canonicalRepo.documents.get(game.slug);
+  const genericDoc = gameCanonicalRepo.documents.get(game.slug);
+  assert.ok(creatorDoc);
+  assert.ok(genericDoc);
+  assert.deepEqual(genericDoc, creatorCanonicalDocumentToGameCanonicalDocument(creatorDoc));
+  assert.equal(gameCanonicalRepo.saveCalls.length, 1);
+});
+
+test("updateMetadata: Creator+generic already MATCH -> a new patch updates both to the latest value (B)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  const existing = fixtureCanonicalDoc(game.slug);
+  canonicalRepo.documents.set(game.slug, existing);
+  gameCanonicalRepo.documents.set(
+    game.slug,
+    creatorCanonicalDocumentToGameCanonicalDocument(existing),
+  );
+
+  await useCases.updateMetadata(game.id, 99, { title: "Second Title" });
+
+  const creatorDoc = canonicalRepo.documents.get(game.slug);
+  const genericDoc = gameCanonicalRepo.documents.get(game.slug);
+  assert.equal(creatorDoc?.title, "Second Title");
+  assert.equal(genericDoc?.title, "Second Title");
+  assert.deepEqual(genericDoc, creatorCanonicalDocumentToGameCanonicalDocument(creatorDoc!));
+});
+
+test("updateMetadata: a stale-but-valid generic shadow is repaired to match the latest Creator canonical, not treated as a conflict (C)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  // Stale: reflects an older title. This must never block the update as a conflict — the generic
+  // canonical is a shadow, not authoritative, in this Stage.
+  gameCanonicalRepo.documents.set(
+    game.slug,
+    creatorCanonicalDocumentToGameCanonicalDocument(
+      fixtureCanonicalDoc(game.slug, { title: "Old Stale Title" }),
+    ),
+  );
+
+  await useCases.updateMetadata(game.id, 99, { title: "Repaired Title" });
+
+  const genericDoc = gameCanonicalRepo.documents.get(game.slug);
+  assert.equal(genericDoc?.title, "Repaired Title");
+});
+
+test("updateMetadata: a generic canonical pre-read storage failure leaves D1 and Creator canonical untouched (D)", async () => {
+  const { useCases, repo, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  gameCanonicalRepo.throwOnFindFor = game.slug;
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  assert.equal(repo.games.get(game.id)?.title, "Original Title");
+  assert.equal(canonicalRepo.documents.get(game.slug)?.title, "Canonical Title");
+  assert.equal(canonicalRepo.saveCalls.length, 0);
+});
+
+test("updateMetadata: a malformed generic canonical document on pre-read leaves D1 and Creator canonical untouched (E)", async () => {
+  const { useCases, repo, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  gameCanonicalRepo.findBySlug = async () => {
+    throw new Error("simulated MALFORMED_JSON generic document");
+  };
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  assert.equal(repo.games.get(game.id)?.title, "Original Title");
+  assert.equal(canonicalRepo.documents.get(game.slug)?.title, "Canonical Title");
+});
+
+test("updateMetadata: an orphan generic shadow (Creator canonical missing, generic exists) fails closed before any write or delete (F)", async () => {
+  const { useCases, repo, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  const orphanGeneric = creatorCanonicalDocumentToGameCanonicalDocument(
+    fixtureCanonicalDoc(game.slug),
+  );
+  gameCanonicalRepo.documents.set(game.slug, orphanGeneric);
+  // Creator canonical is deliberately never set for this slug.
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  assert.equal(repo.games.get(game.id)?.title, "Original Title");
+  assert.equal(
+    canonicalRepo.documents.has(game.slug),
+    false,
+    "Creator canonical must not be created",
+  );
+  assert.deepEqual(
+    gameCanonicalRepo.documents.get(game.slug),
+    orphanGeneric,
+    "the orphan generic document must not be deleted or overwritten",
+  );
+  assert.equal(gameCanonicalRepo.saveCalls.length, 0);
+});
+
+test("updateMetadata: pre-canonical row + still-incomplete patch -> zero generic writes either (G)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+
+  await useCases.updateMetadata(game.id, 99, { title: "New Title" });
+
+  assert.equal(canonicalRepo.saveCalls.length, 0);
+  assert.equal(gameCanonicalRepo.saveCalls.length, 0);
+  assert.equal(gameCanonicalRepo.documents.size, 0);
+});
+
+test("updateMetadata: pre-canonical row + a patch that completes the score policy creates the first Creator AND first generic canonical, in parity (H)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+
+  await useCases.updateMetadata(game.id, 99, {
+    scoreUnit: "pts",
+    scoreDirection: "desc",
+    scoreMin: 0,
+    scoreMax: 100,
+  });
+
+  const creatorDoc = canonicalRepo.documents.get(game.slug);
+  const genericDoc = gameCanonicalRepo.documents.get(game.slug);
+  assert.ok(creatorDoc);
+  assert.ok(genericDoc);
+  assert.deepEqual(genericDoc, creatorCanonicalDocumentToGameCanonicalDocument(creatorDoc));
+});
+
+test("updateMetadata: a generic canonical save failure after D1+Creator canonical success never returns success (I)", async () => {
+  const { useCases, repo, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  gameCanonicalRepo.throwOnSaveFor = game.slug;
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  // D1 and the Creator canonical were already committed — the failure is isolated to the generic
+  // shadow sync, and is never hidden as a success.
+  assert.equal(repo.games.get(game.id)?.title, "New Title");
+  assert.equal(canonicalRepo.documents.get(game.slug)?.title, "New Title");
+  assert.equal(gameCanonicalRepo.documents.has(game.slug), false);
+});
+
+test("updateMetadata: a generic save failure followed by a retry converges (J)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  gameCanonicalRepo.throwOnSaveFor = game.slug;
+
+  await assert.rejects(() => useCases.updateMetadata(game.id, 99, { title: "New Title" }));
+  assert.equal(gameCanonicalRepo.documents.has(game.slug), false);
+
+  gameCanonicalRepo.throwOnSaveFor = undefined;
+  await useCases.updateMetadata(game.id, 99, { title: "New Title" });
+
+  const creatorDoc = canonicalRepo.documents.get(game.slug);
+  const genericDoc = gameCanonicalRepo.documents.get(game.slug);
+  assert.equal(genericDoc?.title, "New Title");
+  assert.deepEqual(genericDoc, creatorCanonicalDocumentToGameCanonicalDocument(creatorDoc!));
+});
+
+test("updateMetadata: a generic read-back parity mismatch after save is surfaced as a sync failure (K)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+  const realSave = gameCanonicalRepo.save.bind(gameCanonicalRepo);
+  gameCanonicalRepo.save = async (document) => {
+    await realSave(document);
+    gameCanonicalRepo.documents.set(document.slug, { ...document, title: "corrupted-in-storage" });
+  };
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+});
+
+test("updateMetadata: a Creator canonical change detected during generic shadow sync never returns success (L)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(game.slug, fixtureCanonicalDoc(game.slug));
+
+  let findCalls = 0;
+  const originalFindBySlug = canonicalRepo.findBySlug.bind(canonicalRepo);
+  canonicalRepo.findBySlug = async (slug: string) => {
+    findCalls++;
+    // Call #4 on this slug is syncGenericCanonicalShadow's own post-save recheck — simulate a
+    // concurrent writer changing the Creator canonical exactly then, between the generic save and
+    // this recheck.
+    if (slug === game.slug && findCalls === 4) {
+      const current = await originalFindBySlug(slug);
+      if (current) {
+        canonicalRepo.documents.set(slug, { ...current, title: "Changed By Concurrent Writer" });
+      }
+    }
+    return originalFindBySlug(slug);
+  };
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  assert.equal(gameCanonicalRepo.saveCalls.length, 1, "the generic save itself must still happen");
+});
+
+test("updateMetadata: presentation/requiresAuth/leaderboard/score:null all survive into the generic shadow (M)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  const presentation = {
+    viewport: { mode: "fixed" as const, preferredWidth: 640, preferredHeight: 360 },
+    fullscreen: { supported: true, recommended: false },
+    mobile: { support: "unsupported" as const },
+  };
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      presentation,
+      policy: { score: null, leaderboard: false, xpPerCompletion: 0, requiresAuth: true },
+    }),
+  );
+
+  await useCases.updateMetadata(game.id, 99, { description: "unrelated change" });
+
+  const genericDoc = gameCanonicalRepo.documents.get(game.slug);
+  assert.deepEqual(genericDoc?.presentation, presentation);
+  assert.equal(genericDoc?.policy.requiresAuth, true);
+  assert.equal(genericDoc?.policy.leaderboard, false);
+  assert.equal(genericDoc?.policy.score, null);
+});
+
+test("updateMetadata: decimal score bounds survive into the generic shadow without truncation (M)", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: {
+        score: { unit: "s", direction: "asc", min: 0.25, max: 359.75 },
+        leaderboard: true,
+        xpPerCompletion: 10,
+        requiresAuth: false,
+      },
+    }),
+  );
+
+  await useCases.updateMetadata(game.id, 99, { title: "Renamed" });
+
+  const genericDoc = gameCanonicalRepo.documents.get(game.slug);
+  assert.equal(genericDoc?.policy.score?.min, 0.25);
+  assert.equal(genericDoc?.policy.score?.max, 359.75);
+});
+
+test("updateMetadata: a Creator canonical that converts to a semantically-invalid generic document (looser Creator schema) fails as CANONICAL_SYNC_FAILED, bonus", async () => {
+  const { useCases, canonicalRepo, gameCanonicalRepo } = createUseCases();
+  const game = await createBareGame(useCases);
+  // Valid per the looser Creator canonical schema (no leaderboard<->score coupling there), but
+  // fails the stricter generic parser's own invariant (score:null + leaderboard:true) — see
+  // gameCanonicalDocument.ts's own doc comment.
+  canonicalRepo.documents.set(
+    game.slug,
+    fixtureCanonicalDoc(game.slug, {
+      policy: { score: null, leaderboard: true, xpPerCompletion: 0, requiresAuth: false },
+    }),
+  );
+
+  await assert.rejects(
+    () => useCases.updateMetadata(game.id, 99, { title: "New Title" }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANONICAL_SYNC_FAILED",
+  );
+  // D1 and Creator canonical are still committed — only the generic shadow write is refused.
+  assert.equal(canonicalRepo.documents.get(game.slug)?.title, "New Title");
+  assert.equal(gameCanonicalRepo.documents.has(game.slug), false);
+});
+
 test("uploadVersion cleans up the orphaned storage object when the D1 write fails after a successful put, and surfaces PUBLISH_FAILED rather than the raw D1 error", async () => {
   const repo = createFakeRepo();
   const storage = createFakeStorage();
@@ -1279,6 +1653,7 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
     publisher,
     new StaticGameRegistry([]),
     createFakeCanonicalRepo(),
+    createFakeGameCanonicalRepo(),
   );
 
   const game = await useCases.createGame({

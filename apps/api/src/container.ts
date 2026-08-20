@@ -22,6 +22,7 @@ import {
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
   B2CreatorGameDefinitionRepository,
+  B2GameCanonicalRepository,
   type BackblazeB2Config,
 } from "@owogg/db";
 import {
@@ -74,6 +75,7 @@ import {
   type GameAttemptConsumptionRepository,
   type CreatorScoreAcceptanceRepository,
   type CreatorGameDefinitionRepository,
+  type GameCanonicalRepository,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
@@ -136,6 +138,14 @@ export interface AppContainer {
    * clean 503 before doing so — same convention as `gameBundleStorageRepo`, never a silent
    * D1-only fallback (see adminSandboxGames.ts's metadata PATCH route). */
   creatorGameDefinitionRepo: CreatorGameDefinitionRepository;
+  /** Stage U-3's generic canonical SHADOW write target — composed from the SAME
+   * `gameBundleStorageRepo` above as `creatorGameDefinitionRepo` (no second B2 client; see
+   * B2GameCanonicalRepository's own doc comment), so it too is only really backed by B2 when
+   * `gameBundlesConfigured` is true. `creatorGameDefinitionRepo` (Creator canonical) remains
+   * AUTHORITATIVE this Stage — `sandboxGameUseCases.updateMetadata` only ever writes here as a
+   * projection of what that repository already holds (see that method's own doc comment); nothing
+   * else in this container reads or writes this repository yet. */
+  gameCanonicalRepo: GameCanonicalRepository;
   /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
    * game is not "missing" from here so much as out of scope, see StaticGameRegistry's doc
    * comment. Exposed on the container, not just threaded privately into ScoreUseCases/
@@ -210,6 +220,12 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   // sandboxGameUseCases.updateMetadata, same as every other B2-dependent route already does.
   const creatorGameDefinitionRepo: CreatorGameDefinitionRepository =
     new B2CreatorGameDefinitionRepository(gameBundleStorageRepo);
+  // Stage U-3: also composed from the same gameBundleStorageRepo above — see this container's own
+  // doc comment on gameCanonicalRepo. Creator canonical (above) stays authoritative; this is a
+  // shadow write target only.
+  const gameCanonicalRepo: GameCanonicalRepository = new B2GameCanonicalRepository(
+    gameBundleStorageRepo,
+  );
 
   const scoreUseCases = new ScoreUseCases(scoreRepo, gameRegistry);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
@@ -248,6 +264,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameBundlePublisher,
     gameRegistry,
     creatorGameDefinitionRepo,
+    gameCanonicalRepo,
   );
   const gameAttemptUseCases = new GameAttemptUseCases(gameAttemptRepo);
   const creatorScoreAcceptanceUseCases = new CreatorScoreAcceptanceUseCases(
@@ -280,6 +297,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
     creatorGameDefinitionRepo,
+    gameCanonicalRepo,
     gameRegistry,
 
     scoreUseCases,
