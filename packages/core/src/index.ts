@@ -39,7 +39,13 @@ export * from "./modules/game/domain/gameOwner.js";
 export * from "./modules/game/domain/gameDefinition.js";
 export * from "./modules/game/domain/creatorGameStatus.js";
 export * from "./modules/game/domain/publicGame.js";
+// Unified Game Platform, Stage U-1 (foundation only — see each file's own top doc comment for the
+// exhaustive list of what stays unwired in production by this Stage).
+export * from "./modules/game/domain/gamePublisher.js";
+export * from "./modules/game/domain/gameCanonicalDocument.js";
+export * from "./modules/game/domain/gameCanonicalMigration.js";
 export * from "./modules/game/ports/gameRegistry.js";
+export * from "./modules/game/ports/gameCanonicalRepository.js";
 export * from "./modules/game/registry/staticGameRegistry.js";
 export * from "./modules/game/registry/creatorGameRegistry.js";
 
