@@ -157,14 +157,23 @@ BEGIN
     WHERE id = OLD.id AND publisher_type = 'OWOGG'
   );
 
-  -- Authority Guard: Refuse update if new slug is already claimed by an OWOGG game
+  -- Authority Guard: Refuse update if new slug is already claimed by a different OWOGG game
   SELECT RAISE(ABORT, 'Authority conflict: slug is reserved by OWOGG game')
   WHERE EXISTS (
     SELECT 1 FROM games
     WHERE slug = NEW.slug AND id <> OLD.id AND publisher_type = 'OWOGG'
   );
 
-  UPDATE games SET
+  -- Convergent upsert: if the USER generic row was somehow lost (deployment gap, manual repair,
+  -- etc.) the trigger re-creates it with exact parity rather than silently doing nothing.
+  -- ON CONFLICT(id) fires only when a row with that id already exists; the WHERE clause prevents
+  -- accidentally overwriting an OWOGG row that somehow escaped the guard above (defense-in-depth).
+  INSERT INTO games (
+    id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at, created_at, updated_at
+  ) VALUES (
+    OLD.id, NEW.slug, 'USER', NEW.developer_user_id, NEW.visibility, NEW.live_version_id, NEW.deleted_at, NEW.created_at, NEW.updated_at
+  )
+  ON CONFLICT(id) DO UPDATE SET
     slug = NEW.slug,
     publisher_type = 'USER',
     publisher_user_id = NEW.developer_user_id,
@@ -173,7 +182,7 @@ BEGIN
     deleted_at = NEW.deleted_at,
     created_at = NEW.created_at,
     updated_at = NEW.updated_at
-  WHERE id = OLD.id AND publisher_type = 'USER';
+  WHERE games.publisher_type = 'USER';
 END;
 
 CREATE TRIGGER trg_sandbox_games_after_delete

@@ -625,7 +625,14 @@ BEGIN
     WHERE slug = NEW.slug AND id <> OLD.id AND publisher_type = 'OWOGG'
   );
 
-  UPDATE games SET
+  -- Convergent upsert: re-creates a missing USER generic row so that sandbox_games remains the
+  -- single write authority even when the games projection was lost (deployment gap, etc.).
+  INSERT INTO games (
+    id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at, created_at, updated_at
+  ) VALUES (
+    OLD.id, NEW.slug, 'USER', NEW.developer_user_id, NEW.visibility, NEW.live_version_id, NEW.deleted_at, NEW.created_at, NEW.updated_at
+  )
+  ON CONFLICT(id) DO UPDATE SET
     slug = NEW.slug,
     publisher_type = 'USER',
     publisher_user_id = NEW.developer_user_id,
@@ -634,7 +641,7 @@ BEGIN
     deleted_at = NEW.deleted_at,
     created_at = NEW.created_at,
     updated_at = NEW.updated_at
-  WHERE id = OLD.id AND publisher_type = 'USER';
+  WHERE games.publisher_type = 'USER';
 END;
 
 CREATE TRIGGER trg_sandbox_games_after_delete
@@ -866,7 +873,14 @@ BEGIN
     WHERE slug = NEW.slug AND id <> OLD.id AND publisher_type = 'OWOGG'
   );
 
-  UPDATE games SET
+  -- Convergent upsert: re-creates a missing USER generic row so that sandbox_games remains the
+  -- single write authority even when the games projection was lost (deployment gap, etc.).
+  INSERT INTO games (
+    id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at, created_at, updated_at
+  ) VALUES (
+    OLD.id, NEW.slug, 'USER', NEW.developer_user_id, NEW.visibility, NEW.live_version_id, NEW.deleted_at, NEW.created_at, NEW.updated_at
+  )
+  ON CONFLICT(id) DO UPDATE SET
     slug = NEW.slug,
     publisher_type = 'USER',
     publisher_user_id = NEW.developer_user_id,
@@ -875,7 +889,7 @@ BEGIN
     deleted_at = NEW.deleted_at,
     created_at = NEW.created_at,
     updated_at = NEW.updated_at
-  WHERE id = OLD.id AND publisher_type = 'USER';
+  WHERE games.publisher_type = 'USER';
 END;
 
 CREATE TRIGGER trg_sandbox_games_after_delete

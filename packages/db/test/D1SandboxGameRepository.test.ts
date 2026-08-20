@@ -1082,13 +1082,89 @@ test("Stage A-3: all write paths maintain exact parity in games identity table",
   assert.equal(deletedGeneric, undefined);
 });
 
-test("Stage A-3: partial batch failure rolls back all statements leaving zero orphan rows", async () => {
+test("Stage A-3: true second-statement rollback — games INSERT succeeds then sandbox INSERT fails, leaving zero orphan rows", async () => {
+  // This test proves the *correct* partial-batch-failure scenario:
+  //   Statement 1 (games INSERT) succeeds and writes a row.
+  //   Statement 2 (sandbox_games INSERT) is then forcibly aborted by a test-only
+  //   BEFORE INSERT trigger that fires for the exact slug under test.
+  //   The db.batch() helper wraps both statements in BEGIN/COMMIT/ROLLBACK, so
+  //   the abort in Statement 2 causes the entire transaction — including the
+  //   already-committed Statement 1 row — to roll back.
+  //   Final assertion: both games and sandbox_games have 0 rows for that slug.
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   raw.exec("PRAGMA foreign_keys = ON;");
-  // Do NOT seed user with id 999999
+  // Seed a real, valid user so Statement 1 (games) does NOT fail on FK.
+  seedUser(raw, 1, "Dev");
+
+  // Install a test-only BEFORE INSERT trigger that aborts sandbox_games writes for
+  // the specific slug. This guarantees Statement 1 (games) always succeeds first.
+  raw.exec(`
+      CREATE TRIGGER trg_test_only_sandbox_abort_for_slug
+      BEFORE INSERT ON sandbox_games
+      FOR EACH ROW
+      WHEN NEW.slug = 'second-stmt-fail-game'
+      BEGIN
+        SELECT RAISE(ABORT, 'test-only: forced sandbox_games INSERT failure for rollback proof');
+      END;
+    `);
+
   const repo = new D1SandboxGameRepository(db);
 
-  // Attempting create for a non-existent user id triggers FK failure on games statement
+  // Verify no rows exist before the attempt.
+  const gamesBefore = Number(
+    (
+      raw.prepare("SELECT COUNT(*) as c FROM games WHERE slug = 'second-stmt-fail-game'").get() as {
+        c: number;
+      }
+    ).c,
+  );
+  assert.equal(gamesBefore, 0, "precondition: games is empty before attempt");
+
+  // Statement 2 (sandbox_games) must fail; db.batch() must reject.
+  await assert.rejects(
+    () =>
+      repo.create({
+        slug: "second-stmt-fail-game",
+        developerUserId: 1,
+        title: "Rollback Test",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+        nowIso: new Date().toISOString(),
+      }),
+    /forced sandbox_games INSERT failure/,
+  );
+
+  // After rejection both tables must be clean — the games row written by Statement 1
+  // must have been rolled back together with the failed Statement 2.
+  const gamesCount = Number(
+    (
+      raw.prepare("SELECT COUNT(*) as c FROM games WHERE slug = 'second-stmt-fail-game'").get() as {
+        c: number;
+      }
+    ).c,
+  );
+  const sandboxCount = Number(
+    (
+      raw
+        .prepare("SELECT COUNT(*) as c FROM sandbox_games WHERE slug = 'second-stmt-fail-game'")
+        .get() as { c: number }
+    ).c,
+  );
+  assert.equal(gamesCount, 0, "Statement 1 games row must be rolled back — no orphan in games");
+  assert.equal(sandboxCount, 0, "Statement 2 never inserted — no orphan in sandbox_games either");
+});
+
+test("Stage A-3: FK failure on games INSERT (Statement 1) also leaves zero rows — documented as first-statement, not second-statement, rollback", async () => {
+  // Separate from the second-statement proof above: this exercises the case where the
+  // games INSERT itself fails (bad FK).  The label clarifies it is *first-statement*
+  // failure, not second-statement rollback.
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  raw.exec("PRAGMA foreign_keys = ON;");
+  // Do NOT seed user 999999 — FK on games.publisher_user_id must fire.
+  const repo = new D1SandboxGameRepository(db);
+
   await assert.rejects(
     () =>
       repo.create({
@@ -1112,6 +1188,51 @@ test("Stage A-3: partial batch failure rolls back all statements leaving zero or
   );
   assert.equal(gamesCount, 0, "no orphan rows in games");
   assert.equal(sandboxCount, 0, "no orphan rows in sandbox_games");
+});
+
+test("Stage A-3: UPDATE trigger recovers a missing USER generic row in games (convergent upsert)", async () => {
+  // Proves the missing-destination hardening: if the games projection row for a
+  // sandbox USER game is somehow absent (deployment gap, direct deletion, etc.),
+  // the AFTER UPDATE trigger on sandbox_games must re-create it with exact parity
+  // rather than silently doing nothing and leaving the tables out of sync.
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+
+  // Create a game normally so both tables are in sync.
+  const game = await seedGame(repo, "recovery-game", 1);
+
+  // Simulate the deployment-gap scenario: manually delete the games row while
+  // keeping sandbox_games intact (as if 0029 migration landed but 0030 triggers
+  // hadn't been installed yet when the row was created).
+  raw.prepare("DELETE FROM games WHERE id = ?").run(game.id);
+  const missingCheck = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id);
+  assert.equal(missingCheck, undefined, "precondition: games row is missing");
+
+  // Trigger an UPDATE on sandbox_games (any field change will do).
+  const repairTime = "2026-08-21T10:00:00.000Z";
+  await repo.updateMetadata(game.id, { title: "Recovered Title" }, repairTime);
+
+  // The AFTER UPDATE trigger must have re-created the games row with exact parity.
+  const recovered = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<
+    string,
+    unknown
+  >;
+  assert.ok(recovered, "games row must be restored by the UPDATE trigger");
+  assert.equal(recovered.slug, game.slug, "slug must match sandbox_games authority");
+  assert.equal(recovered.publisher_type, "USER");
+  assert.equal(Number(recovered.publisher_user_id), 1);
+  assert.equal(recovered.updated_at, repairTime, "updated_at must be the repair timestamp");
+
+  // Subsequent sandbox writes must continue to maintain parity normally.
+  const visTime = "2026-08-21T10:10:00.000Z";
+  await repo.setLiveVersion(game.id, 55, visTime);
+  const afterLV = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<
+    string,
+    unknown
+  >;
+  assert.equal(Number(afterLV.live_version_id), 55);
+  assert.equal(afterLV.updated_at, visTime);
 });
 
 test("Stage A-3: concurrent create by different developers allocates distinct IDs without collision", async () => {
