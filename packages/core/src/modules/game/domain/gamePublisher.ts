@@ -53,3 +53,27 @@ export function isValidGamePublisherType(value: unknown): value is GamePublisher
 export function isUserPublished(publisher: GamePublisher): publisher is UserGamePublisher {
   return publisher.type === "USER";
 }
+
+/**
+ * Validates whether a value satisfies the structural and domain invariants of a `GamePublisher`.
+ * Fail-closed:
+ * - `{ type: "OWOGG" }`: strictly authority without extra relational fields (e.g. `userId` must not be present).
+ * - `{ type: "USER", userId }`: `userId` must be a finite positive integer.
+ */
+export function isValidGamePublisher(value: unknown): value is GamePublisher {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Record<string, unknown>;
+  if (candidate.type === "OWOGG") {
+    return !("userId" in candidate) || candidate.userId === undefined;
+  }
+  if (candidate.type === "USER") {
+    return (
+      typeof candidate.userId === "number" &&
+      Number.isInteger(candidate.userId) &&
+      candidate.userId > 0
+    );
+  }
+  return false;
+}

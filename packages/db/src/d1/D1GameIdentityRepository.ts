@@ -6,11 +6,12 @@ import type { D1Database } from "./D1UserRepository.js";
  *
  * Invariants enforced (fail-closed):
  * - `id` is a positive finite integer.
- * - `slug` is a non-empty trimmed string.
+ * - `slug` is a non-empty string matching its exact representation (no whitespace padding).
  * - `developer_user_id` is a positive finite integer, mapped directly to `{ type: "USER", userId }`.
  * - `visibility` is strictly "PRIVATE" | "PUBLIC".
  * - `live_version_id` is null or a positive finite integer.
- * - `deleted_at` is null or string.
+ * - PUBLIC visibility requires a non-null `live_version_id`.
+ * - `deleted_at` is null/undefined or a non-empty string preserved exact as-is (throws on malformed types).
  * - `created_at` and `updated_at` are non-empty strings.
  *
  * Deliberately excludes all canonical metadata (title, genre, mode, score*, xp*) and
@@ -22,10 +23,10 @@ export function mapSandboxGameIdentityRow(row: Record<string, unknown>): GameIde
     throw new Error(`Invalid or missing game id in D1 row: ${String(row.id)}`);
   }
 
-  const slug = typeof row.slug === "string" ? row.slug.trim() : "";
-  if (!slug) {
-    throw new Error(`Invalid or missing game slug in D1 row: ${String(row.slug)}`);
+  if (typeof row.slug !== "string" || row.slug.length === 0 || row.slug !== row.slug.trim()) {
+    throw new Error(`Invalid or malformed game slug in D1 row: ${String(row.slug)}`);
   }
+  const slug = row.slug;
 
   const developerUserId = Number(row.developer_user_id);
   if (!Number.isInteger(developerUserId) || developerUserId <= 0) {
@@ -50,7 +51,20 @@ export function mapSandboxGameIdentityRow(row: Record<string, unknown>): GameIde
     liveVersionId = parsed;
   }
 
-  const deletedAt = row.deleted_at ? String(row.deleted_at) : null;
+  if (visibility === "PUBLIC" && liveVersionId === null) {
+    throw new Error(
+      `Invalid runtime state: PUBLIC game "${slug}" must have a non-null live_version_id`,
+    );
+  }
+
+  let deletedAt: string | null = null;
+  if (row.deleted_at !== null && row.deleted_at !== undefined) {
+    if (typeof row.deleted_at !== "string" || row.deleted_at.length === 0) {
+      throw new Error(`Invalid deleted_at in D1 row for game "${slug}": ${String(row.deleted_at)}`);
+    }
+    deletedAt = row.deleted_at;
+  }
+
   const createdAt =
     typeof row.created_at === "string" && row.created_at.length > 0 ? row.created_at : "";
   const updatedAt =

@@ -1,9 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  D1GameIdentityRepository,
-  mapSandboxGameIdentityRow,
-} from "../src/d1/D1GameIdentityRepository.js";
+import { D1GameIdentityRepository, mapSandboxGameIdentityRow } from "../src/index.js";
 import { createSqliteD1, SANDBOX_GAMES_TEST_SCHEMA } from "./helpers/sqliteD1.js";
 
 function seedUser(raw: import("node:sqlite").DatabaseSync, id: number, nickname: string) {
@@ -62,6 +59,11 @@ function insertRawGame(
   return Number(info.lastInsertRowid);
 }
 
+test("public surface export: D1GameIdentityRepository and mapSandboxGameIdentityRow exported from index", () => {
+  assert.equal(typeof D1GameIdentityRepository, "function");
+  assert.equal(typeof mapSandboxGameIdentityRow, "function");
+});
+
 test("findById returns active game identity with mapped publisher and runtime fields", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 42, "Dev42");
@@ -88,13 +90,14 @@ test("findById returns active game identity with mapped publisher and runtime fi
   assert.equal(identity.updatedAt, "2026-08-19T12:30:00.000Z");
 });
 
-test("findById returns soft-deleted game identity with deletedAt set", async () => {
+test("findById returns soft-deleted game identity with deletedAt preserved exact as-is", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev1");
+  const exactDeletedTimestamp = "2026-08-20T08:00:00.123Z";
   const gameId = insertRawGame(raw, {
     slug: "archived-game",
     developerUserId: 1,
-    deletedAt: "2026-08-20T08:00:00.000Z",
+    deletedAt: exactDeletedTimestamp,
   });
 
   const repo = new D1GameIdentityRepository(db);
@@ -103,7 +106,7 @@ test("findById returns soft-deleted game identity with deletedAt set", async () 
   assert.ok(identity);
   assert.equal(identity.id, gameId);
   assert.equal(identity.slug, "archived-game");
-  assert.equal(identity.deletedAt, "2026-08-20T08:00:00.000Z");
+  assert.equal(identity.deletedAt, exactDeletedTimestamp);
 });
 
 test("findById returns null for non-existent game id", async () => {
@@ -230,7 +233,7 @@ test("PUBLIC game with liveVersionId preserves both fields accurately", async ()
   assert.equal(identity.liveVersionId, 77);
 });
 
-test("Game with liveVersionId = null preserves null", async () => {
+test("Game with liveVersionId = null preserves null for PRIVATE game", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 10, "Dev10");
 
@@ -246,6 +249,7 @@ test("Game with liveVersionId = null preserves null", async () => {
 
   assert.ok(identity);
   assert.equal(identity.liveVersionId, null);
+  assert.equal(identity.visibility, "PRIVATE");
 });
 
 test("publisher userId matches developer_user_id exactly without displayName derivation", async () => {
@@ -338,7 +342,7 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
     /Invalid or missing game id/,
   );
 
-  // Invalid slug
+  // Padded / whitespace slug rejected without normalization
   assert.throws(
     () =>
       mapSandboxGameIdentityRow({
@@ -349,8 +353,48 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
         created_at: "2026-08-19",
         updated_at: "2026-08-19",
       }),
-    /Invalid or missing game slug/,
+    /Invalid or malformed game slug/,
   );
+
+  assert.throws(
+    () =>
+      mapSandboxGameIdentityRow({
+        id: 1,
+        slug: " padded-slug ",
+        developer_user_id: 1,
+        visibility: "PRIVATE",
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /Invalid or malformed game slug/,
+  );
+
+  assert.throws(
+    () =>
+      mapSandboxGameIdentityRow({
+        id: 1,
+        slug: " leading-space",
+        developer_user_id: 1,
+        visibility: "PRIVATE",
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /Invalid or malformed game slug/,
+  );
+
+  assert.throws(
+    () =>
+      mapSandboxGameIdentityRow({
+        id: 1,
+        slug: "trailing-space ",
+        developer_user_id: 1,
+        visibility: "PRIVATE",
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /Invalid or malformed game slug/,
+  );
+
 
   // Invalid developer_user_id
   assert.throws(
@@ -406,6 +450,64 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
         updated_at: "2026-08-19",
       }),
     /Invalid live_version_id/,
+  );
+
+  // PUBLIC game without live_version_id rejected
+  assert.throws(
+    () =>
+      mapSandboxGameIdentityRow({
+        id: 1,
+        slug: "public-without-version",
+        developer_user_id: 1,
+        visibility: "PUBLIC",
+        live_version_id: null,
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /Invalid runtime state: PUBLIC game "public-without-version" must have a non-null live_version_id/,
+  );
+
+  // Malformed deleted_at (number, object, empty string)
+  assert.throws(
+    () =>
+      mapSandboxGameIdentityRow({
+        id: 1,
+        slug: "game",
+        developer_user_id: 1,
+        visibility: "PRIVATE",
+        deleted_at: 123456789,
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /Invalid deleted_at/,
+  );
+
+  assert.throws(
+    () =>
+      mapSandboxGameIdentityRow({
+        id: 1,
+        slug: "game",
+        developer_user_id: 1,
+        visibility: "PRIVATE",
+        deleted_at: {},
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /Invalid deleted_at/,
+  );
+
+  assert.throws(
+    () =>
+      mapSandboxGameIdentityRow({
+        id: 1,
+        slug: "game",
+        developer_user_id: 1,
+        visibility: "PRIVATE",
+        deleted_at: "",
+        created_at: "2026-08-19",
+        updated_at: "2026-08-19",
+      }),
+    /Invalid deleted_at/,
   );
 
   // Missing timestamps

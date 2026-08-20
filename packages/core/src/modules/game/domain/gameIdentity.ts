@@ -15,7 +15,7 @@
  *   rejectReason, deletedByAdminId, logoKey).
  */
 
-import type { GamePublisher } from "./gamePublisher.js";
+import { isValidGamePublisher, type GamePublisher } from "./gamePublisher.js";
 
 export interface GameIdentity {
   readonly id: number;
@@ -34,7 +34,7 @@ export interface GameIdentity {
 /**
  * Validates whether a value satisfies the structural and domain invariants of a `GameIdentity`.
  * Fail-closed: returns false for any missing/malformed field, non-positive integer id/userId,
- * or unexpected visibility value.
+ * padded/whitespace slug, unexpected visibility value, or PUBLIC visibility without liveVersionId.
  */
 export function isValidGameIdentity(value: unknown): value is GameIdentity {
   if (!value || typeof value !== "object") {
@@ -46,22 +46,15 @@ export function isValidGameIdentity(value: unknown): value is GameIdentity {
     return false;
   }
 
-  if (typeof candidate.slug !== "string" || candidate.slug.trim().length === 0) {
+  if (
+    typeof candidate.slug !== "string" ||
+    candidate.slug.length === 0 ||
+    candidate.slug !== candidate.slug.trim()
+  ) {
     return false;
   }
 
-  if (!candidate.publisher || typeof candidate.publisher !== "object") {
-    return false;
-  }
-
-  if (candidate.publisher.type === "OWOGG") {
-    // OWOGG publisher has no extra relational fields.
-  } else if (candidate.publisher.type === "USER") {
-    const userId = candidate.publisher.userId;
-    if (typeof userId !== "number" || !Number.isInteger(userId) || userId <= 0) {
-      return false;
-    }
-  } else {
+  if (!isValidGamePublisher(candidate.publisher)) {
     return false;
   }
 
@@ -75,6 +68,11 @@ export function isValidGameIdentity(value: unknown): value is GameIdentity {
       !Number.isInteger(candidate.liveVersionId) ||
       candidate.liveVersionId <= 0)
   ) {
+    return false;
+  }
+
+  // PUBLIC game runtime invariant: must have an approved live version
+  if (candidate.visibility === "PUBLIC" && candidate.liveVersionId === null) {
     return false;
   }
 
