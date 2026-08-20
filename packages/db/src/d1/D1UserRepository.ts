@@ -2,7 +2,13 @@ import type { OAuthAccount, User, UserRepository } from "@owogg/core";
 
 export interface D1Database {
   prepare(query: string): D1PreparedStatement;
-  batch(statements: D1PreparedStatement[]): Promise<unknown[]>;
+  batch(statements: D1PreparedStatement[]): Promise<D1Result[]>;
+}
+
+export interface D1Result<T = unknown> {
+  success: boolean;
+  results?: T[];
+  meta?: { changes?: number; rows_written?: number; last_row_id?: number };
 }
 
 export interface D1PreparedStatement {
@@ -13,7 +19,7 @@ export interface D1PreparedStatement {
    * used to detect whether an `ON CONFLICT DO NOTHING` insert was a no-op. `meta.rows_written` is
    * the same signal under Cloudflare D1's own field name (see D1CreatorScoreAcceptanceRepository,
    * which reads that field specifically rather than `changes`). */
-  run(): Promise<{ success: boolean; meta?: { changes?: number; rows_written?: number } }>;
+  run(): Promise<D1Result>;
 }
 
 export class D1UserRepository implements UserRepository {

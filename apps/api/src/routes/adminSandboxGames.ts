@@ -363,11 +363,9 @@ adminSandboxGamesRouter.delete("/:id", async (c) => {
   }
 });
 
-// DELETE /api/admin/sandbox-games/:id/purge — permanently erases an already soft-deleted game
-// (row, versions, review-audit log all gone) and frees its `slug` for reuse. Same permission as
-// the soft delete above — this is the separate, rarer "actually forget this" step an admin only
-// reaches for after deciding the audit trail is no longer worth keeping (e.g. test data, or a
-// creator asking to reuse a name). See SandboxGameUseCases.purgeGame's doc comment.
+// DELETE /api/admin/sandbox-games/:id/purge — permanently erases already-soft-deleted draft/test
+// data only. Any durable D1 slug reservation returns 409 even if review/audit rows were removed;
+// prevents historical score/XP/favorite records from attaching to unrelated content.
 adminSandboxGamesRouter.delete("/:id/purge", async (c) => {
   const admin = await requireElevatedAdmin(c);
   if (isElevatedAdminResponse(admin)) return admin;

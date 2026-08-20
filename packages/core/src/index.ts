@@ -51,6 +51,8 @@ export * from "./modules/game/registry/creatorGameRegistry.js";
 // Unified Game Platform, Stage A-1 — game identity domain foundation
 export * from "./modules/game/domain/gameIdentity.js";
 export * from "./modules/game/ports/gameIdentityRepository.js";
+export * from "./modules/game/domain/gameVersion.js";
+export * from "./modules/game/ports/gameVersionRepository.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";

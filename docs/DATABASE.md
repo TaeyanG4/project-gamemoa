@@ -31,19 +31,20 @@
   `packages/db/src/d1/D1*Repository.ts`(실제 SQL) 순서로만 접근합니다
   (`docs/ARCHITECTURE.md` 참고). 게임 카탈로그 정책(`GAME_MANIFEST_MAP`)은 D1 레이어와 100%
   분리되어 있습니다.
-- **현재 26개 마이그레이션**(`0000`~`0025`)이 아래 9개 도메인 영역, 총 35개 테이블을 구성합니다.
+- **현재 32개 마이그레이션**(`0000`~`0031`)이 아래 도메인 영역을 구성합니다.
 
-| 영역                         | 마이그레이션                   | 테이블                                                                                                                                                                               |
-| :--------------------------- | :----------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 계정/인증                    | `0000`, `0003`, `0004`         | `users`, `oauth_accounts`, `sessions`, `account_merge_challenges`                                                                                                                    |
-| 점수/진행도(XP)              | `0000`, `0002`, `0005`, `0020` | `scores`, `xp_events`, `user_progress`, `user_achievements`                                                                                                                          |
-| 개인화                       | `0001`                         | `user_favorites`, `user_recent_plays`                                                                                                                                                |
-| Discord                      | `0006`~`0009`                  | `discord_link_challenges`, `discord_guilds`, `discord_guild_managers`, `discord_server_registration_challenges`, `discord_play_contexts`, `discord_guild_xp_events`                  |
-| Creator (STREAMER)           | `0010`~`0014`                  | `creator_profiles`, `creator_platform_accounts`, `creator_review_jobs`, `creator_review_audit_log`                                                                                   |
-| 관리자 인증 & Staff Role     | `0015`, `0016`, `0025`         | `admin_step_up_challenges`, `admin_sessions`, `admin_login_attempts`, `admin_accounts`, `admin_account_audit_log`, `admin_permission_grants`                                         |
-| 게임 운영                    | `0019`                         | `game_settings`                                                                                                                                                                      |
-| 유저 제재                    | `0023`                         | `user_moderation`, `user_moderation_audit_log`                                                                                                                                       |
-| 샌드박스 게임 (GAME_CREATOR) | `0024`, `0025`                 | `sandbox_games`, `sandbox_game_versions`, `sandbox_game_review_audit_log`, `game_creator_access`(구 `game_developers`), `game_creator_access_audit_log`, `game_creator_applications` |
+| 영역                         | 마이그레이션                   | 테이블                                                                                                                                                                                                            |
+| :--------------------------- | :----------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 계정/인증                    | `0000`, `0003`, `0004`         | `users`, `oauth_accounts`, `sessions`, `account_merge_challenges`                                                                                                                                                 |
+| 점수/진행도(XP)              | `0000`, `0002`, `0005`, `0020` | `scores`, `xp_events`, `user_progress`, `user_achievements`                                                                                                                                                       |
+| 개인화                       | `0001`                         | `user_favorites`, `user_recent_plays`                                                                                                                                                                             |
+| Discord                      | `0006`~`0009`                  | `discord_link_challenges`, `discord_guilds`, `discord_guild_managers`, `discord_server_registration_challenges`, `discord_play_contexts`, `discord_guild_xp_events`                                               |
+| Creator (STREAMER)           | `0010`~`0014`                  | `creator_profiles`, `creator_platform_accounts`, `creator_review_jobs`, `creator_review_audit_log`                                                                                                                |
+| 관리자 인증 & Staff Role     | `0015`, `0016`, `0025`         | `admin_step_up_challenges`, `admin_sessions`, `admin_login_attempts`, `admin_accounts`, `admin_account_audit_log`, `admin_permission_grants`                                                                      |
+| 게임 운영                    | `0019`                         | `game_settings`                                                                                                                                                                                                   |
+| 유저 제재                    | `0023`                         | `user_moderation`, `user_moderation_audit_log`                                                                                                                                                                    |
+| 샌드박스 게임 (GAME_CREATOR) | `0024`~`0028`                  | `sandbox_games`, `sandbox_game_versions`, `sandbox_game_review_audit_log`, `game_creator_access`(구 `game_developers`), `game_creator_access_audit_log`, `game_creator_applications`, `game_attempt_consumptions` |
+| 통합 게임 Identity/Version   | `0029`~`0031`                  | `games`, `game_versions` (`0030`은 USER identity, `0031`은 USER version write convergence trigger 포함)                                                                                                           |
 
 각 행이 나타내는 실제 축(Staff Role / Program / 인증)의 개념적 구분은
 [`docs/AUTHORIZATION.md`](AUTHORIZATION.md)를 참고하세요 — 이 문서는 스키마만 다룹니다.
@@ -321,6 +322,11 @@ erDiagram
     game_creator_access ||--o{ game_creator_access_audit_log : ""
     users ||--o{ game_creator_applications : ""
     users ||--o{ sandbox_games : "developer_user_id"
+    users ||--o{ games : "publisher_user_id(USER만)"
+    games ||--o{ game_versions : "공통 버전"
+    games ||--o| sandbox_games : "USER shared id"
+    game_versions ||--o| sandbox_game_versions : "USER shared id"
+    games ||--o| game_slug_reservations : "최초 승인 identity, 비-FK 기록"
     sandbox_games ||--o{ sandbox_game_versions : "불변 버전"
     sandbox_games ||--o{ sandbox_game_review_audit_log : ""
     sandbox_game_versions ||--o{ sandbox_game_review_audit_log : ""
@@ -354,6 +360,30 @@ erDiagram
         text status "PENDING_REVIEW/APPROVED/REJECTED"
         text publish_status "UPLOADED/PUBLISHING/READY/FAILED"
     }
+    games {
+        int id PK
+        text slug UK
+        text publisher_type "OWOGG/USER"
+        int publisher_user_id "USER만"
+        text visibility "PRIVATE/PUBLIC"
+        int live_version_id "같은 game의 game_versions.id"
+        text deleted_at
+    }
+    game_versions {
+        int id PK
+        int game_id FK
+        text object_key
+        text content_hash
+        int bundle_bytes
+        text publish_status "UPLOADED/PUBLISHING/READY/FAILED"
+        text manifest_key
+        text uploaded_at
+    }
+    game_slug_reservations {
+        text slug PK "영구 예약"
+        int source_game_id "의도적으로 FK 없음"
+        text reserved_at
+    }
     sandbox_game_review_audit_log {
         int id PK
         int game_id FK
@@ -362,6 +392,14 @@ erDiagram
         text action "APPROVED/REJECTED/DISABLED/METADATA_CHANGED"
     }
 ```
+
+`games`/`game_versions`는 publisher-neutral runtime identity/version 저장소입니다. USER row는
+`sandbox_games`/`sandbox_game_versions`와 정확한 숫자 ID를 공유하며 trigger로 쓰기가 수렴합니다.
+`sandbox_game_versions.status`, `reviewed_*`, `reject_reason`은 USER 전용 심사 lifecycle이므로 generic
+`game_versions`에 복제하지 않습니다. `game_slug_reservations`는 승인 상태 전이와 같은 D1 statement의
+trigger에서 생성되며 `games`/심사/감사 row의 hard-delete cascade에 참여하지 않습니다. `slugExists`는
+generic identity와 이 영구 예약을 함께 조회합니다. `0031` 시점에는 production registry/read 경로를
+바꾸지 않습니다.
 
 `game_creator_access`/`game_creator_access_audit_log`는 마이그레이션 `0024`가 만든
 `game_developers`/`game_developer_audit_log`를 `0025`가 **이름만** 바꾼 테이블입니다(행 데이터

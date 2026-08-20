@@ -145,12 +145,18 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return row ? mapGameRow(row) : null;
   }
 
-  // Deliberately NOT filtered by deleted_at — see the port doc comment. Checks global existence
-  // in `games` identity table (SELECT 1), not the full row, so slug availability is platform-wide.
+  // Deliberately NOT filtered by deleted_at — see the port doc comment. A slug stays taken while
+  // any generic identity row exists, and remains taken after hard deletion when approval created a
+  // permanent reservation. The UNION keeps this a single fail-closed database read.
   async slugExists(slug: string): Promise<boolean> {
     const row = await this.db
-      .prepare(`SELECT 1 FROM games WHERE slug = ?`)
-      .bind(slug)
+      .prepare(
+        `SELECT 1 FROM games WHERE slug = ?
+         UNION ALL
+         SELECT 1 FROM game_slug_reservations WHERE slug = ?
+         LIMIT 1`,
+      )
+      .bind(slug, slug)
       .first<{ 1: number }>();
     return row !== null;
   }
@@ -208,7 +214,8 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     // ON DELETE CASCADE actually being enforced (SQLite/D1 foreign-key enforcement is a per-
     // connection PRAGMA; being explicit here doesn't depend on it). One batch() call for
     // atomicity across the statements. The trg_sandbox_games_after_delete trigger automatically
-    // removes the corresponding USER row from `games`.
+    // removes the corresponding USER row from `games`; game_slug_reservations is deliberately not
+    // part of this batch or any FK cascade.
     await this.db.batch([
       this.db.prepare(`DELETE FROM sandbox_game_review_audit_log WHERE game_id = ?`).bind(id),
       this.db.prepare(`DELETE FROM sandbox_game_versions WHERE game_id = ?`).bind(id),
@@ -281,10 +288,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
         ),
     ]);
 
-    const [gamesResult, sandboxResult] = res as [
-      { meta?: { changes?: number } } | undefined,
-      { meta?: { changes?: number } } | undefined,
-    ];
+    const [gamesResult, sandboxResult] = res;
     if (!gamesResult?.meta?.changes || !sandboxResult?.meta?.changes) {
       return null; // no review slot available
     }
@@ -395,21 +399,32 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     bundleBytes: number;
     nowIso: string;
   }): Promise<SandboxGameVersionRecord> {
-    // `RETURNING *` rather than a separate `SELECT ... WHERE rowid = last_insert_rowid()`:
-    // `last_insert_rowid()` is connection-global, not scoped to this call, so under concurrent
-    // uploads another request's INSERT landing between this one and its own read-back could make
-    // this method return a *different* upload's version data to the caller (found exactly this
-    // way while hardening SandboxGameRepository.create for the review-slot quota — see its
-    // comment). `RETURNING` makes the insert and the read one atomic statement with no window for
-    // that to happen. Requires SQLite 3.35+ / a D1 version with RETURNING support (both do).
-    const row = await this.db
-      .prepare(
-        `INSERT INTO sandbox_game_versions (game_id, object_key, content_hash, bundle_bytes, uploaded_at)
-         VALUES (?, ?, ?, ?, ?)
-         RETURNING *`,
-      )
-      .bind(input.gameId, input.objectKey, input.contentHash, input.bundleBytes, input.nowIso)
-      .first<Record<string, unknown>>();
+    // A-4 shared numeric namespace:
+    // 1. Generic game_versions allocates the ID.
+    // 2. The legacy USER review row consumes that exact ID via last_insert_rowid() inside the same
+    //    atomic D1 batch. Unlike a separate statement/call, no concurrent writer can interleave in
+    //    a batch; a failure in either statement rolls both back.
+    // 3. RETURNING on statement 2 gives this call its own row without a racy post-batch MAX query.
+    const results = await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT INTO game_versions (
+             game_id, object_key, content_hash, bundle_bytes, publish_status, publish_error,
+             published_at, manifest_key, published_size_bytes, file_count, uploaded_at
+           ) VALUES (?, ?, ?, ?, 'UPLOADED', NULL, NULL, NULL, NULL, NULL, ?)`,
+        )
+        .bind(input.gameId, input.objectKey, input.contentHash, input.bundleBytes, input.nowIso),
+      this.db
+        .prepare(
+          `INSERT INTO sandbox_game_versions (
+             id, game_id, object_key, content_hash, bundle_bytes, uploaded_at
+           ) VALUES (last_insert_rowid(), ?, ?, ?, ?, ?)
+           RETURNING *`,
+        )
+        .bind(input.gameId, input.objectKey, input.contentHash, input.bundleBytes, input.nowIso),
+    ]);
+
+    const row = results[1]?.results?.[0] as Record<string, unknown> | undefined;
     if (!row) throw new Error("sandbox_game_versions row vanished immediately after insert");
     return mapVersionRow(row);
   }
@@ -566,5 +581,13 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
       .bind(gameId, limit)
       .all<Record<string, unknown>>();
     return (res.results || []).map(mapAuditRow);
+  }
+
+  async isSlugPermanentlyReserved(slug: string): Promise<boolean> {
+    const row = await this.db
+      .prepare(`SELECT 1 FROM game_slug_reservations WHERE slug = ?`)
+      .bind(slug)
+      .first<{ 1: number }>();
+    return row !== null;
   }
 }

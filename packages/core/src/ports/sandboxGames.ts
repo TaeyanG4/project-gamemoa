@@ -117,11 +117,10 @@ export interface SandboxGamePendingVersionsPage {
 export interface SandboxGameRepository {
   findById(id: number): Promise<SandboxGameRecord | null>;
   findBySlug(slug: string): Promise<SandboxGameRecord | null>;
-  /** Whether `slug` is taken at the DB level — includes soft-deleted rows, unlike findBySlug.
-   * `slug` carries a raw SQL UNIQUE constraint (migration 0024) that a soft delete does not lift
-   * (the row survives for audit — see SandboxGameUseCases.deleteGame), so createGame's
-   * pre-insert check has to agree with that constraint or the INSERT crashes with a raw,
-   * unhandled uniqueness violation instead of a clean SLUG_TAKEN. */
+  /** Whether `slug` is taken at the DB level — includes generic identity rows (including
+   * soft-deleted rows) and permanent slug reservations, unlike findBySlug. The pre-insert check
+   * must agree with both DB authorities or registration can crash with a raw uniqueness/trigger
+   * failure instead of returning a clean SLUG_TAKEN. */
   slugExists(slug: string): Promise<boolean>;
   listByDeveloper(developerUserId: number): Promise<SandboxGameRecord[]>;
   /** Public catalog surface — visibility = 'PUBLIC' only (implies an approved live version, by
@@ -166,13 +165,11 @@ export interface SandboxGameRepository {
    * takes effect). The row and its versions are kept, not removed. */
   softDelete(id: number, deletedByAdminId: number, nowIso: string): Promise<SandboxGameRecord>;
 
-  /** Hard delete — removes the game row and its versions/review-audit rows entirely. Used only for
-   * a creator's own self-service removal of a game that has never been approved (see
-   * SandboxGameUseCases.deleteOwnGame): nothing worth auditing exists yet, so unlike softDelete
-   * there is no row left behind — and that is what actually frees `slug` for reuse, since `slug`
-   * carries a plain (non-partial) UNIQUE constraint that a soft-deleted row would keep occupying
-   * forever. Implementations must remove all three tables (game, versions, review audit) in one
-   * atomic operation regardless of whether FK ON DELETE CASCADE is relied upon. */
+  /** Hard delete — removes the game row and its versions/review-audit rows entirely. Application
+   * callers use it only for never-approved drafts; the database intentionally does not delete any
+   * permanent slug reservation, so even an old-worker/racing hard delete cannot free an approved
+   * public identity. Implementations must remove the three workflow tables atomically regardless
+   * of whether FK ON DELETE CASCADE is relied upon. */
   hardDelete(id: number): Promise<void>;
 
   updateMetadata(
@@ -261,6 +258,11 @@ export interface SandboxGameRepository {
   }): Promise<void>;
 
   listReviewAudit(gameId: number, limit: number): Promise<SandboxGameReviewAuditEntry[]>;
+
+  /** True when D1's durable reservation authority owns this slug. Approval creates the
+   * reservation atomically at the database boundary; review rows and audit entries may later be
+   * removed without making the public identity reusable. */
+  isSlugPermanentlyReserved(slug: string): Promise<boolean>;
 }
 
 /**

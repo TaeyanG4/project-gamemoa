@@ -87,10 +87,12 @@ function createFakeRepo(): SandboxGameRepository & {
   games: Map<number, SandboxGameRecord>;
   versions: Map<number, SandboxGameVersionRecord>;
   auditActions: string[];
+  reservedSlugs: Set<string>;
 } {
   const games = new Map<number, SandboxGameRecord>();
   const versions = new Map<number, SandboxGameVersionRecord>();
   const auditActions: string[] = [];
+  const reservedSlugs = new Set<string>();
   let nextGameId = 1;
   let nextVersionId = 1;
 
@@ -98,6 +100,7 @@ function createFakeRepo(): SandboxGameRepository & {
     games,
     versions,
     auditActions,
+    reservedSlugs,
     async findById(id) {
       return games.get(id) ?? null;
     },
@@ -105,7 +108,7 @@ function createFakeRepo(): SandboxGameRepository & {
       return [...games.values()].find((g) => g.slug === slug) ?? null;
     },
     async slugExists(slug) {
-      return [...games.values()].some((g) => g.slug === slug);
+      return reservedSlugs.has(slug) || [...games.values()].some((g) => g.slug === slug);
     },
     async listByDeveloper(developerUserId) {
       return [...games.values()].filter((g) => g.developerUserId === developerUserId);
@@ -277,6 +280,11 @@ function createFakeRepo(): SandboxGameRepository & {
         rejectReason: reason,
       };
       versions.set(id, updated);
+      if (status === "APPROVED") {
+        const game = games.get(existing.gameId);
+        if (!game) throw new Error("not found");
+        reservedSlugs.add(game.slug);
+      }
       return updated;
     },
     async revokeVersionApproval(id) {
@@ -305,6 +313,9 @@ function createFakeRepo(): SandboxGameRepository & {
     },
     async listReviewAudit() {
       return [];
+    },
+    async isSlugPermanentlyReserved(slug) {
+      return reservedSlugs.has(slug);
     },
   };
 }
@@ -3343,6 +3354,28 @@ test("purgeGame refuses a game that hasn't been soft-deleted yet, with NOT_YET_D
   );
 });
 
+test("purgeGame permanently reserves the slug after any approval, even when approval was revoked", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "published-game",
+    developerUserId: 1,
+    title: "Published",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+  repo.reservedSlugs.add(game.slug);
+  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  await assert.rejects(
+    () => useCases.purgeGame({ gameId: game.id, actorAdminId: 9 }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANNOT_PURGE_APPROVED_GAME",
+  );
+  assert.equal(await repo.slugExists("published-game"), true);
+});
+
 test("purgeGame on an unknown game id is GAME_NOT_FOUND", async () => {
   const { useCases } = createUseCases();
   await assert.rejects(
@@ -3460,4 +3493,36 @@ test("deleteOwnGame refuses a game with an approved version, even a not-currentl
   );
   // Still there — the refusal must not have half-deleted anything.
   assert.notEqual(await useCases.getById(game.id), null);
+});
+
+test("approve -> revoke -> creator delete stays blocked and the slug cannot be registered again", async () => {
+  const { useCases, repo, game, version } = await createGameWithLiveVersion();
+
+  const revoked = await useCases.revokeApproval({
+    versionId: version.id,
+    adminId: 99,
+    reason: "re-review",
+  });
+  assert.equal(revoked.status, "PENDING_REVIEW");
+
+  await assert.rejects(
+    () => useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANNOT_DELETE_APPROVED_GAME",
+  );
+  assert.equal(await repo.isSlugPermanentlyReserved(game.slug), true);
+
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: game.slug,
+        developerUserId: 2,
+        title: "Different Game",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
 });

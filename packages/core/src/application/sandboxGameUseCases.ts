@@ -92,6 +92,10 @@ export type SandboxGameUseCaseError =
    * version — self-delete is only for a game that has never been reviewed/approved; past that
    * point only ADMIN/OPERATOR (sandbox_games.delete) may remove it. */
   | "CANNOT_DELETE_APPROVED_GAME"
+  /** purgeGame may only erase never-approved draft/test data. Once a version has ever been
+   * approved, a non-cascading D1 reservation becomes the permanent slug tombstone so historical
+   * score/XP/favorite data can never attach to a different game under the same slug. */
+  | "CANNOT_PURGE_APPROVED_GAME"
   /** revokeApproval was called on a version that isn't currently APPROVED — there is no approval
    * decision left to undo (it's still pending, was rejected, or was already revoked). */
   | "REVOKE_REQUIRES_APPROVED"
@@ -611,28 +615,18 @@ export class SandboxGameUseCases {
     return deleted;
   }
 
-  /**
-   * Permanently erases an already-admin-deleted game — ADMIN/OPERATOR only (same
-   * `sandbox_games.delete` permission as deleteGame), and only reachable on a game deleteGame has
-   * already soft-deleted (NOT_YET_DELETED otherwise). This two-step shape is deliberate: soft
-   * delete is the routine "take this down" action and always keeps the audit trail; purge is the
-   * separate, rarer "actually forget this and free the slug" action an admin reaches for only when
-   * they've decided the audit trail (and the slug reservation deliberately built on top of it — see
-   * SandboxGameRepository.slugExists) is no longer worth keeping — e.g. test data, or a creator
-   * asking to reuse a name after 관리자에게 문의. Unlike deleteOwnGame, this has no
-   * CANNOT_DELETE_APPROVED_GAME guard: by the time a game is even eligible here it was already
-   * soft-deleted specifically *because* it had an approved/live version, so refusing to purge one
-   * would make the action pointless.
-   *
-   * A genuine hard delete (SandboxGameRepository.hardDelete): the row, its versions, and its
-   * review-audit log all go, and `slug` becomes free for a new registration — same effect as
-   * deleteOwnGame's hard delete, just reached from the other side (admin, on an already-deleted
-   * game) instead of the creator's own never-approved one.
-   */
+  /** Permanently erases already-soft-deleted draft/test data that has never been approved.
+   * Approval permanently reserves the slug: scores, XP events, favorites, and recent-play records
+   * still identify games by slug, so reusing a published identity could attach history to unrelated
+   * content. Revoking approval does not make the slug reusable; D1's permanent reservation row is
+   * authoritative even if workflow/audit rows are later removed. */
   async purgeGame(input: { gameId: number; actorAdminId: number }): Promise<void> {
     const game = await this.repo.findById(input.gameId);
     if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
     if (game.deletedAt === null) throw new SandboxGameUseCaseFailure("NOT_YET_DELETED");
+    if (await this.repo.isSlugPermanentlyReserved(game.slug)) {
+      throw new SandboxGameUseCaseFailure("CANNOT_PURGE_APPROVED_GAME");
+    }
 
     await this.repo.hardDelete(game.id);
   }
@@ -655,8 +649,7 @@ export class SandboxGameUseCases {
       throw new SandboxGameUseCaseFailure("NOT_OWNER");
     }
 
-    const versions = await this.repo.listVersionsByGame(game.id);
-    if (versions.some((v) => v.status === "APPROVED")) {
+    if (await this.repo.isSlugPermanentlyReserved(game.slug)) {
       throw new SandboxGameUseCaseFailure("CANNOT_DELETE_APPROVED_GAME");
     }
 

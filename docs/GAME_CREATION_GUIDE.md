@@ -399,20 +399,19 @@ hardDelete`). 소프트 삭제와 달리 이래야만 `slug`의 UNIQUE 제약이
   반환 로직 재사용).
 
 - **관리자 완전 삭제(purge)** (`DELETE /api/admin/sandbox-games/:id/purge`,
-  `SandboxGameUseCases.purgeGame`, 2026-08-18) — 위 소프트 삭제의 후속 단계로만 존재하는 별도
-  작업입니다. **이미 소프트 삭제된 게임에만** 실행할 수 있고(`NOT_YET_DELETED`로 그 외엔 거부),
-  실행하면 `hardDelete`와 동일하게 row/버전/심사 로그가 전부 사라지며 `slug`가 즉시 재사용
-  가능해집니다. 감사 기록을 실제로 포기하겠다는 관리자의 명시적 두 번째 결정이 필요하도록 일부러
-  소프트 삭제와 분리했습니다 — 실수로 감사 기록까지 한 번에 날아가는 걸 막기 위함입니다. 관리자
-  심사 페이지에서 이미 삭제된 게임에만 "완전 삭제(슬러그 해제)" 버튼이 나타납니다.
-  `deleteOwnGame`과 달리 `CANNOT_DELETE_APPROVED_GAME` 가드가 없습니다 — 여기까지 온 게임은
-  애초에 승인 이력이 있었기 때문에 소프트 삭제된 것이므로, 그 조건을 다시 걸면 이 기능 자체가
-  무의미해집니다.
+  `SandboxGameUseCases.purgeGame`) — 위 소프트 삭제의 후속 단계이며, **승인 이력이 전혀 없는 초안·
+  테스트 데이터**에만 허용됩니다. 먼저 소프트 삭제되지 않았으면 `NOT_YET_DELETED`, D1의 영구
+  `game_slug_reservations`에 slug가 있으면 `CANNOT_PURGE_APPROVED_GAME`으로 거부됩니다. 예약은 승인
+  상태 전이와 같은 DB statement의 trigger에서 생성되므로 감사 로그 append 성공에 의존하지 않습니다.
+  허용된 경우에만 row/버전/심사 로그가 사라지고 `slug`가 재사용 가능해집니다. 한 번이라도 승인된
+  게임은 승인 철회·비공개·hard-delete 후에도 reservation row가 남아 slug를 예약합니다.
+  scores/XP/favorites/recent plays가 문자열 slug를 사용하므로 새 게임에 과거 기록이 붙는 것을 막기
+  위한 불변식입니다.
 
 두 경로가 다른 삭제 방식을 쓰는 이유: 셀프서비스로 지울 수 있는 게임은 애초에 아무도 심사한 적이
 없으므로 감사 기록으로 남길 가치가 없고, 하드 삭제라야 슬러그가 실제로 풀립니다. 반면 관리자가
-지우는 게임은 이미 공개됐거나 심사를 거쳤을 수 있으므로 무엇이 왜 내려갔는지 기록이 남아야
-합니다 — 단, 그 기록을 영구히 포기하고 슬러그를 돌려주고 싶다면 위 purge로 넘어갈 수 있습니다.
+지우는 게임이 이미 승인됐다면 무엇이 왜 내려갔는지 기록과 별도 slug reservation이 영구히 남아야
+합니다. 관리자가 purge할 수 있는 범위도 승인 전 초안·테스트 데이터로 제한됩니다.
 
 `sandbox_games.delete`가 `sandbox_games.review`(승인/반려)와 별개 권한인 이유: MODERATOR는
 콘텐츠 심사는 하되, 게임을 완전히 내리는 더 강한 조치까지는 할 수 없어야 한다는 2026-08-18 제품
