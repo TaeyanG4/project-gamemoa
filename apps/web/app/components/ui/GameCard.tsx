@@ -3,26 +3,14 @@ import { Play, Sparkles, Bookmark } from "lucide-react";
 import { usePersonalization } from "../../features/personalization";
 import { useI18n } from "../../features/i18n/I18nContext";
 import { GameThumbnail } from "./GameThumbnail";
+import type { PublicGameCard } from "../../features/catalog/publicGameAdapter";
 
-interface GameCardProps {
-  slug: string;
-  title: string;
-  shortDescription: string;
-  modes: readonly string[];
-  thumbnail: string;
-  accent?: string | undefined;
-  estimatedRoundSeconds?: number | undefined;
-}
+export type GameCardProps = Pick<
+  PublicGameCard,
+  "slug" | "title" | "shortDescription" | "modes" | "thumbnail" | "accent"
+>;
 
-/**
- * Every game card, SYSTEM or Creator, now routes here — /games/:slug's own transitional resolver
- * (features/game/transitionalCreatorGameResolver.ts, added alongside GameHost's IframeRuntime
- * counterpart) is what tells the two apart today, not the card. Before that resolver existed,
- * /games/:slug only ever looked a slug up in the built-in registry, so a sandbox game's card had
- * to route elsewhere (/sandbox-games/:slug) or 404 — see this function's git history for that
- * branch. /sandbox-games/:slug (sandboxGamePlay.tsx) is unchanged and still reachable directly;
- * this only changes where a catalog *card* points.
- */
+/** Every provider-neutral public game card enters the same generic GameHost route. */
 export function gameCardHref(slug: string): string {
   return `/games/${slug}`;
 }
@@ -39,9 +27,7 @@ export function GameCard({
   const { dict } = useI18n();
   const isFav = isFavorite(slug);
 
-  // GameManifest text is Korean-only (shared with apps/api, which has no i18n dictionary) — the
-  // localized display text for the web UI lives in dict.gameContent, falling back to the
-  // manifest's own Korean text if a slug has no entry yet.
+  // API canonical text is the fallback; the web dictionary overlays known official translations.
   const content = dict.gameContent[slug];
   const title = content?.title ?? koTitle;
   const shortDescription = content?.shortDescription ?? koShortDescription;

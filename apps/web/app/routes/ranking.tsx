@@ -20,7 +20,8 @@ import type { LeaderRecord, XpLeaderboardEntry, CreatorRankEntryDto } from "@owo
 
 import { levelForTotalXp } from "@owogg/core";
 
-import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
+import { usePublicGames } from "../features/publicGamesApi";
+import { publicGameToCard } from "../features/catalog/publicGameAdapter";
 import { useI18n } from "../features/i18n/I18nContext";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
 
@@ -36,7 +37,11 @@ type LeaderboardState = "loading" | "success" | "error";
 
 export default function Ranking() {
   const { dict } = useI18n();
-  const gameManifests = useEnabledGameManifests();
+  const { games: publicGames } = usePublicGames();
+  const gameManifests = useMemo(
+    () => publicGames.map((game) => publicGameToCard(game, dict)),
+    [publicGames, dict],
+  );
   const [mainTab, setMainTab] = useState<MainTab>("game");
 
   // Game Score Ranking state

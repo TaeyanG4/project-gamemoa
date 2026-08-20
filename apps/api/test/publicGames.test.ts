@@ -1,108 +1,119 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "../src/index.js";
+import {
+  GAME_DEFINITIONS,
+  systemGameDefinitionToGameCanonicalDocument,
+  type GameCanonicalDocument,
+} from "@owogg/core";
+import type { ApiEnv } from "../src/routes/auth.js";
 
-/**
- * The unified public Game read model: GET /api/games and GET /api/games/:slug. Compatibility
- * (GET /api/games/sandbox*) is already covered by sandboxGamesPublic.test.ts — this file is only
- * the new surface plus the route-ordering guarantee that a catch-all `/:slug` doesn't break the
- * more specific literal routes it now sits behind.
- */
+const B2_ENV = {
+  B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
+  B2_REGION: "us-west-004",
+  B2_BUCKET_NAME: "test",
+  B2_KEY_ID: "test",
+  B2_APPLICATION_KEY: "test",
+};
 
 interface FakeGame {
   id: number;
   slug: string;
-  title: string;
+  publisher_type: "OWOGG" | "USER";
+  publisher_user_id: number | null;
   visibility: "PRIVATE" | "PUBLIC";
   live_version_id: number | null;
-  mode?: "single" | "multi";
-  logo_key?: string | null;
+  canonical: GameCanonicalDocument;
+  assetKey?: string;
+  disabled?: boolean;
 }
 
-function gameRow(game: FakeGame) {
+interface PublicGameJson {
+  slug: string;
+  publisherType: string;
+  catalog: { type: string };
+  mediaUrl: string | null;
+  [key: string]: unknown;
+}
+
+function rowFor(game: FakeGame) {
   return {
     id: game.id,
     slug: game.slug,
-    developer_user_id: 1,
-    title: game.title,
-    short_description: `${game.title} short`,
-    description: null,
-    genre: "arcade",
-    mode: game.mode ?? "single",
-    logo_key: game.logo_key ?? null,
-    xp_per_completion: 0,
-    score_unit: null,
-    score_direction: null,
-    score_min: null,
-    score_max: null,
-    score_display_prefix: null,
-    score_display_suffix: null,
+    publisher_type: game.publisher_type,
+    publisher_user_id: game.publisher_user_id,
     visibility: game.visibility,
     live_version_id: game.live_version_id,
-    review_slot: null,
     deleted_at: null,
-    deleted_by_admin_id: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
+    created_at: "2026-08-01T00:00:00.000Z",
+    updated_at: "2026-08-01T00:00:00.000Z",
   };
 }
 
-function versionRow(gameId: number, versionId: number) {
+function versionFor(game: FakeGame) {
+  if (game.live_version_id === null) return null;
   return {
-    id: versionId,
-    game_id: gameId,
-    object_key: `uploads/${gameId}/abc.zip`,
-    content_hash: "abc",
+    id: game.live_version_id,
+    game_id: game.id,
+    object_key: `games/${game.id}/${game.live_version_id}/index.html`,
+    content_hash: `hash-${game.slug}`,
     bundle_bytes: 100,
-    status: "APPROVED",
-    reviewed_by_admin_id: 9,
-    reviewed_at: new Date().toISOString(),
-    reject_reason: null,
-    uploaded_at: new Date().toISOString(),
     publish_status: "READY",
     publish_error: null,
-    published_at: new Date().toISOString(),
-    manifest_key: `games/${gameId}/${versionId}/.owogg-manifest.json`,
+    published_at: "2026-08-01T00:00:00.000Z",
+    manifest_key: `games/${game.id}/${game.live_version_id}/.owogg-manifest.json`,
     published_size_bytes: 100,
     file_count: 1,
+    uploaded_at: "2026-08-01T00:00:00.000Z",
   };
 }
 
-/** Every PUBLIC game gets a matching APPROVED/READY version at id = game.id * 100, so
- * resolveLiveVersion (which GET /api/games/:slug and /api/games/sandbox/:slug both go through)
- * fully resolves — unlike sandboxGamesPublic.test.ts's minimal fake DB, which deliberately can't
- * exercise a successful detail response. */
-function createDb(games: FakeGame[]) {
-  const versionByGameId = new Map(
-    games.filter((g) => g.live_version_id !== null).map((g) => [g.id, g.live_version_id as number]),
-  );
-
+function createDb(games: readonly FakeGame[]) {
   function statement(query: string) {
-    let values: unknown[] = [];
+    let values: readonly unknown[] = [];
     return {
       bind(...bound: unknown[]) {
         values = bound;
         return this;
       },
       async first<T>() {
-        if (query.includes("FROM sandbox_games WHERE slug")) {
-          const game = games.find((g) => g.slug === values[0]);
-          return (game ? gameRow(game) : null) as T | null;
+        if (query.includes("FROM games WHERE slug")) {
+          const game = games.find((candidate) => candidate.slug === values[0]);
+          return (game ? rowFor(game) : null) as T | null;
         }
-        if (query.includes("FROM sandbox_game_versions WHERE id")) {
-          const versionId = Number(values[0]);
-          const game = games.find((g) => versionByGameId.get(g.id) === versionId);
-          return (game ? versionRow(game.id, versionId) : null) as T | null;
+        if (query.includes("FROM games WHERE id")) {
+          const game = games.find((candidate) => candidate.id === Number(values[0]));
+          return (game ? rowFor(game) : null) as T | null;
+        }
+        if (query.includes("FROM game_versions WHERE id")) {
+          const game = games.find((candidate) => candidate.live_version_id === Number(values[0]));
+          return (game ? versionFor(game) : null) as T | null;
+        }
+        if (query.includes("FROM game_assets")) {
+          const game = games.find((candidate) => candidate.id === Number(values[0]));
+          return game?.assetKey
+            ? ({
+                game_id: game.id,
+                kind: "LOGO",
+                object_key: game.assetKey,
+                updated_at: "2026-08-01T00:00:00.000Z",
+              } as T)
+            : null;
         }
         return null;
       },
       async all<T>() {
-        if (query.includes("FROM sandbox_games WHERE visibility = 'PUBLIC'")) {
-          return { results: games.filter((g) => g.visibility === "PUBLIC").map(gameRow) } as {
+        if (query.includes("FROM games WHERE deleted_at IS NULL")) {
+          return { results: games.filter((game) => game.visibility !== "PRIVATE").map(rowFor) } as {
             results: T[];
           };
         }
-        return { results: [] } as { results: T[] };
+        if (query.includes("FROM game_settings WHERE enabled = 0")) {
+          return {
+            results: games.filter((game) => game.disabled).map((game) => ({ game_id: game.slug })),
+          } as { results: T[] };
+        }
+        return { results: [] as T[] };
       },
       async run() {
         return { success: true, meta: { changes: 0 } };
@@ -111,190 +122,146 @@ function createDb(games: FakeGame[]) {
   }
 
   return {
-    db: {
-      prepare(query: string) {
-        return statement(query);
-      },
-      async batch(statements: Array<ReturnType<typeof statement>>) {
-        return statements.map(() => ({ success: true, meta: { changes: 0 } }));
-      },
+    prepare(query: string) {
+      return statement(query);
+    },
+    async batch(statements: Array<ReturnType<typeof statement>>) {
+      return statements.map(() => ({ success: true, meta: { changes: 0 } }));
     },
   };
 }
 
-// ── GET /api/games/:slug ──────────────────────────────────────────────────────
+function request(path: string, db: unknown, games: readonly FakeGame[], init: RequestInit = {}) {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const canonicalGame = games.find((game) => url.includes(`game-definitions/${game.slug}/`));
+    if (canonicalGame) {
+      return new Response(JSON.stringify(canonicalGame.canonical), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const assetGame = games.find((game) => game.assetKey && url.endsWith(`/${game.assetKey}`));
+    if (assetGame) return new Response(new Uint8Array([1, 2, 3]), { status: 200 });
+    return new Response("Not Found", { status: 404 });
+  }) as typeof fetch;
 
-test("GET /api/games/:slug resolves a SYSTEM game with the SYSTEM shape", async () => {
-  const { db } = createDb([]);
-  const res = await app.request("/api/games/reaction-time", {}, { DB: db } as any);
+  return app
+    .request(path, { ...init }, { DB: db, ...B2_ENV } as unknown as ApiEnv["Bindings"])
+    .finally(() => {
+      globalThis.fetch = originalFetch;
+    });
+}
 
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as Record<string, unknown>;
-  assert.equal(body.ownerType, "SYSTEM");
-  assert.equal(body.slug, "reaction-time");
-  assert.ok(Array.isArray(body.categories));
-  assert.equal(typeof body.thumbnail, "string");
-});
+const reactionDefinition = GAME_DEFINITIONS.find((game) => game.slug === "reaction-time");
+assert.ok(reactionDefinition, "fixture assumption: reaction-time exists");
 
-test("GET /api/games/:slug resolves a PUBLIC creator game with the CREATOR shape", async () => {
-  const { db } = createDb([
-    {
-      id: 1,
-      slug: "ball-dodge",
-      title: "공 피하기",
-      visibility: "PUBLIC",
-      live_version_id: 100,
-      mode: "single",
-      logo_key: "games/1/logo.svg",
+const OFFICIAL: FakeGame = {
+  id: 9,
+  slug: "reaction-time",
+  publisher_type: "OWOGG",
+  publisher_user_id: null,
+  visibility: "PUBLIC",
+  live_version_id: 901,
+  canonical: systemGameDefinitionToGameCanonicalDocument(
+    reactionDefinition,
+    "2026-08-01T00:00:00.000Z",
+  ),
+};
+
+const USER: FakeGame = {
+  id: 8,
+  slug: "ball-dodge",
+  publisher_type: "USER",
+  publisher_user_id: 42,
+  visibility: "PUBLIC",
+  live_version_id: 801,
+  assetKey: "uploads/8/logo.svg",
+  canonical: {
+    schemaVersion: 1,
+    slug: "ball-dodge",
+    title: "공 피하기",
+    shortDescription: "공을 피하세요",
+    description: "공을 피하세요.",
+    policy: {
+      score: { unit: "seconds", direction: "desc", min: 0, max: 3600 },
+      leaderboard: true,
+      xpPerCompletion: 0,
+      requiresAuth: false,
     },
-  ]);
-  const res = await app.request("/api/games/ball-dodge", {}, { DB: db } as any);
+    supportsReplay: false,
+    catalog: { type: "GENRE_MODE", genre: "arcade", mode: "single" },
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  },
+};
 
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as Record<string, unknown>;
-  assert.equal(body.ownerType, "CREATOR");
-  assert.equal(body.slug, "ball-dodge");
-  assert.equal(body.genre, "arcade");
-  assert.equal(body.hasLogo, true);
-  assert.equal("logoKey" in body, false);
+const PRIVATE: FakeGame = {
+  ...USER,
+  id: 10,
+  slug: "private-game",
+  publisher_user_id: 43,
+  visibility: "PRIVATE",
+  live_version_id: null,
+  canonical: { ...USER.canonical, slug: "private-game" },
+};
+
+test("GET /api/games lists generic OWOGG and USER projections and preserves catalog shapes", async () => {
+  const games = [OFFICIAL, USER, PRIVATE];
+  const db = createDb(games);
+  const response = await request("https://api.example.test/api/games", db, games);
+  assert.equal(response.status, 200);
+  const body = (await response.json()) as { games: PublicGameJson[] };
+  assert.deepEqual(body.games.map((game) => game.slug).sort(), ["ball-dodge", "reaction-time"]);
+  const official = body.games.find((game) => game.slug === OFFICIAL.slug);
+  const user = body.games.find((game) => game.slug === USER.slug);
+  assert.equal(official?.publisherType, "OWOGG");
+  assert.equal(user?.publisherType, "USER");
+  assert.equal(official?.catalog.type, "TAXONOMY");
+  assert.equal(user?.catalog.type, "GENRE_MODE");
+  assert.equal(user?.mediaUrl, "https://api.example.test/api/games/ball-dodge/media/logo");
+  assert.equal("publisher_user_id" in (user ?? {}), false);
+  assert.equal("developerUserId" in (user ?? {}), false);
 });
 
-test("GET /api/games/:slug 404s the same way for an unknown slug and a PRIVATE creator game", async () => {
-  const { db } = createDb([
-    { id: 1, slug: "private-game", title: "Private", visibility: "PRIVATE", live_version_id: null },
-  ]);
+test("GET /api/games/:slug resolves the same generic projection and denies private games", async () => {
+  const games = [OFFICIAL, USER, PRIVATE];
+  const db = createDb(games);
+  const officialResponse = await request(
+    "https://api.example.test/api/games/reaction-time",
+    db,
+    games,
+  );
+  const official = (await officialResponse.json()) as PublicGameJson;
+  assert.equal(officialResponse.status, 200);
+  assert.equal(official.publisherType, "OWOGG");
+  assert.equal(official.title, OFFICIAL.canonical.title);
 
-  const unknown = await app.request("/api/games/no-such-game", {}, { DB: db } as any);
-  const privateGame = await app.request("/api/games/private-game", {}, { DB: db } as any);
-  assert.equal(unknown.status, 404);
-  assert.equal(privateGame.status, 404);
+  const privateResponse = await request(
+    "https://api.example.test/api/games/private-game",
+    db,
+    games,
+  );
+  assert.equal(privateResponse.status, 404);
 });
 
-test("GET /api/games/:slug: SYSTEM wins when a creator game claims an official slug", async () => {
-  // P-03 is guarded at registration time too now (SandboxGameUseCases.createGame rejects a
-  // SYSTEM-slug collision with SLUG_TAKEN — see packages/core/test/sandboxGameUseCases.test.ts).
-  // This is the read-path guarantee resolvePublicGame provides as a second layer: a row that
-  // predates that guard, or reaches sandbox_games some other way, must still never be served
-  // under the SYSTEM slug.
-  const { db } = createDb([
-    {
-      id: 1,
-      slug: "reaction-time",
-      title: "가짜 반응속도 게임",
-      visibility: "PUBLIC",
-      live_version_id: 100,
-    },
-  ]);
-  const res = await app.request("/api/games/reaction-time", {}, { DB: db } as any);
-  const body = (await res.json()) as Record<string, unknown>;
+test("generic media route serves a D1 asset without exposing its object key and denies disabled games", async () => {
+  const games = [USER, { ...OFFICIAL, slug: "typing-test", disabled: true }];
+  const db = createDb(games);
+  const mediaResponse = await request("/api/games/ball-dodge/media/logo", db, games);
+  assert.equal(mediaResponse.status, 200);
+  assert.equal(mediaResponse.headers.get("Content-Type"), "image/svg+xml");
+  assert.deepEqual(new Uint8Array(await mediaResponse.arrayBuffer()), new Uint8Array([1, 2, 3]));
 
-  assert.equal(res.status, 200);
-  assert.equal(body.ownerType, "SYSTEM");
-  assert.notEqual(body.title, "가짜 반응속도 게임");
+  const disabledResponse = await request("/api/games/typing-test/media/logo", db, games);
+  assert.equal(disabledResponse.status, 404);
 });
 
-test("GET /api/games/:slug fails safe (404, not 500) when no DB is bound", async () => {
-  const res = await app.request("/api/games/reaction-time", {}, {} as any);
-  assert.equal(res.status, 404);
-});
-
-// ── GET /api/games ─────────────────────────────────────────────────────────────
-
-test("GET /api/games lists every SYSTEM game before any PUBLIC creator game, excluding PRIVATE ones", async () => {
-  const { db } = createDb([
-    { id: 1, slug: "ball-dodge", title: "공 피하기", visibility: "PUBLIC", live_version_id: 100 },
-    { id: 2, slug: "hidden-game", title: "Hidden", visibility: "PRIVATE", live_version_id: null },
-  ]);
-  const res = await app.request("/api/games", {}, { DB: db } as any);
-
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as { games: Array<Record<string, unknown>> };
-  const ownerTypes = body.games.map((g) => g.ownerType);
-
-  assert.ok(ownerTypes.includes("SYSTEM"));
-  assert.ok(!body.games.some((g) => g.slug === "hidden-game"));
-  const ballDodge = body.games.find((g) => g.slug === "ball-dodge");
-  assert.equal(ballDodge?.ownerType, "CREATOR");
-  // Every SYSTEM entry precedes every CREATOR entry.
-  const lastSystemIndex = ownerTypes.lastIndexOf("SYSTEM");
-  const firstCreatorIndex = ownerTypes.indexOf("CREATOR");
-  assert.ok(lastSystemIndex < firstCreatorIndex);
-});
-
-test("GET /api/games never lists the same slug twice — a creator game colliding with a SYSTEM slug is dropped", async () => {
-  // Same policy as GET /api/games/:slug's SYSTEM-wins collision test above, at the list level:
-  // the impostor must not appear as a second "reaction-time" entry, and the one entry that does
-  // appear must be the real SYSTEM game.
-  const { db } = createDb([
-    {
-      id: 1,
-      slug: "reaction-time",
-      title: "가짜 반응속도 게임",
-      visibility: "PUBLIC",
-      live_version_id: 100,
-    },
-    { id: 2, slug: "ball-dodge", title: "공 피하기", visibility: "PUBLIC", live_version_id: 200 },
-  ]);
-  const res = await app.request("/api/games", {}, { DB: db } as any);
-
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as { games: Array<Record<string, unknown>> };
-  const reactionTimeEntries = body.games.filter((g) => g.slug === "reaction-time");
-
-  assert.equal(reactionTimeEntries.length, 1);
-  assert.equal(reactionTimeEntries[0]?.ownerType, "SYSTEM");
-  // The non-colliding creator game still appears normally.
-  assert.ok(body.games.some((g) => g.slug === "ball-dodge" && g.ownerType === "CREATOR"));
-});
-
-test("GET /api/games returns only SYSTEM games (not an error) when no DB is bound", async () => {
-  const res = await app.request("/api/games", {}, {} as any);
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as { games: Array<Record<string, unknown>> };
-  assert.ok(body.games.length === 0 || body.games.every((g) => g.ownerType === "SYSTEM"));
-});
-
-// ── Route-ordering safety: the catch-all must never shadow a literal route ───
-
-test("adding GET /api/games/:slug does not break GET /api/games/availability", async () => {
-  const res = await app.request("/api/games/availability", {}, {} as any);
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as { disabledGameIds: unknown };
-  assert.ok(Array.isArray(body.disabledGameIds));
-});
-
-test("adding GET /api/games/:slug does not break GET /api/games/sandbox (list)", async () => {
-  const { db } = createDb([
-    { id: 1, slug: "ball-dodge", title: "공 피하기", visibility: "PUBLIC", live_version_id: 100 },
-  ]);
-  const res = await app.request("/api/games/sandbox", {}, { DB: db } as any);
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as { games: Array<Record<string, unknown>> };
-  // The sandbox-specific list route's own shape (no ownerType field) — confirms this hit
-  // SandboxGamePublicListResponseSchema's route, not the unified list route re-purposed.
-  assert.ok(body.games.every((g) => !("ownerType" in g)));
-  assert.equal(body.games[0]?.slug, "ball-dodge");
-});
-
-test("adding GET /api/games/:slug does not break GET /api/games/sandbox/:slug (detail)", async () => {
-  const { db } = createDb([
-    { id: 1, slug: "ball-dodge", title: "공 피하기", visibility: "PUBLIC", live_version_id: 100 },
-  ]);
-  const res = await app.request("/api/games/sandbox/ball-dodge", {}, { DB: db } as any);
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as Record<string, unknown>;
-  assert.equal(body.slug, "ball-dodge");
-  assert.equal("ownerType" in body, false);
-});
-
-test("adding GET /api/games/:slug does not break GET /api/games/sandbox/:slug/logo", async () => {
-  const { db } = createDb([
-    { id: 1, slug: "no-logo-game", title: "No Logo", visibility: "PUBLIC", live_version_id: 100 },
-  ]);
-  const res = await app.request("/api/games/sandbox/no-logo-game/logo", {}, { DB: db } as any);
-  // 404 either way (this fake DB has no B2 config to actually serve bytes), but the important
-  // thing is it reaches the logo route's own not-found path, not a JSON 404 from a slug lookup
-  // that misparsed "no-logo-game/logo" — a text body distinguishes the two.
-  assert.equal(res.status, 404);
-  assert.equal(res.headers.get("Content-Type")?.includes("text/plain"), true);
+test("generic public routes fail closed without a D1 binding", async () => {
+  const emptyEnv = {} as unknown as ApiEnv["Bindings"];
+  const list = await app.request("/api/games", {}, emptyEnv);
+  const detail = await app.request("/api/games/reaction-time", {}, emptyEnv);
+  assert.equal(list.status, 200);
+  assert.deepEqual(await list.json(), { games: [] });
+  assert.equal(detail.status, 404);
 });

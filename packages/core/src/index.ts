@@ -54,6 +54,8 @@ export * from "./modules/game/domain/gameIdentity.js";
 export * from "./modules/game/ports/gameIdentityRepository.js";
 export * from "./modules/game/domain/gameVersion.js";
 export * from "./modules/game/ports/gameVersionRepository.js";
+export * from "./modules/game/domain/gameAsset.js";
+export * from "./modules/game/ports/gameAssetRepository.js";
 export * from "./modules/game/domain/runtimeGame.js";
 export * from "./modules/game/ports/runtimeGameRegistry.js";
 export * from "./modules/game/registry/composedRuntimeGameRegistry.js";

@@ -1,5 +1,6 @@
-import type { GameManifest } from "@owogg/game-sdk";
 import type { Dictionary } from "../i18n/dictionary";
+import type { GameManifest } from "@owogg/game-sdk";
+import type { PublicGameCard } from "./publicGameAdapter";
 
 /** GameManifest.title/shortDescription/description/tags stay Korean-only in the manifest itself
  * on purpose — that type is shared with apps/api (Discord bot embeds, score validation), which
@@ -9,7 +10,12 @@ import type { Dictionary } from "../i18n/dictionary";
  * Falls back to the manifest's own (Korean) text when a slug has no dict entry yet — e.g. a new
  * game added before its translation lands — so missing translations degrade gracefully instead
  * of crashing or rendering blank. */
-export function getLocalizedGameContent(dict: Dictionary, game: GameManifest) {
+export function getLocalizedGameContent(
+  dict: Dictionary,
+  game:
+    | PublicGameCard
+    | Pick<GameManifest, "slug" | "title" | "shortDescription" | "description" | "tags">,
+) {
   const content = dict.gameContent[game.slug];
   return {
     title: content?.title ?? game.title,

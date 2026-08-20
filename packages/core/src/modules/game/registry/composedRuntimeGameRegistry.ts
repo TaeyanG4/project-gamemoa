@@ -3,6 +3,7 @@ import {
   serializeGameCanonicalDocument,
 } from "../domain/gameCanonicalDocument.js";
 import type { RuntimeGame } from "../domain/runtimeGame.js";
+import type { GameIdentity } from "../domain/gameIdentity.js";
 import type { GameCanonicalRepository } from "../ports/gameCanonicalRepository.js";
 import type { GameIdentityRepository } from "../ports/gameIdentityRepository.js";
 import type { RuntimeGameRegistry } from "../ports/runtimeGameRegistry.js";
@@ -56,5 +57,51 @@ export class ComposedRuntimeGameRegistry implements RuntimeGameRegistry {
       // public resolver deliberately exposes the same null result as an unknown slug.
       return null;
     }
+  }
+
+  async listPublic(): Promise<readonly RuntimeGame[]> {
+    let identities: readonly GameIdentity[];
+    try {
+      identities = await this.identities.listAll();
+    } catch {
+      // A failed or malformed identity enumeration cannot produce a trustworthy partial public
+      // catalog. Return no candidates rather than falling back to a legacy registry.
+      return [];
+    }
+    const runtimes: RuntimeGame[] = [];
+
+    for (const identity of identities) {
+      if (
+        identity.deletedAt !== null ||
+        identity.visibility !== "PUBLIC" ||
+        identity.liveVersionId === null
+      ) {
+        continue;
+      }
+
+      try {
+        const liveVersion = await this.versions.findById(identity.liveVersionId);
+        if (
+          liveVersion === null ||
+          liveVersion.gameId !== identity.id ||
+          liveVersion.publishStatus !== "READY"
+        ) {
+          continue;
+        }
+
+        const storedCanonical = await this.canonicals.findBySlug(identity.slug);
+        if (storedCanonical === null) continue;
+        const canonical = parseGameCanonicalDocument(
+          serializeGameCanonicalDocument(storedCanonical),
+          identity.slug,
+        );
+        runtimes.push({ identity, liveVersion, canonical });
+      } catch {
+        // A malformed/incomplete entry must not make the rest of the public catalog appear
+        // available, and must never fall back to legacy publisher-specific metadata.
+      }
+    }
+
+    return runtimes;
   }
 }

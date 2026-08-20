@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router";
 import { ArrowLeft, Trophy, Medal, AlertCircle, RefreshCw } from "lucide-react";
 import { fetchLeaderboardApi } from "../features/scores/api";
-import { gameManifests } from "../features/catalog/registry";
 import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import { publicGameToCard } from "../features/catalog/publicGameAdapter";
+import { fetchPublicGame } from "../features/publicGamesApi";
 import { localizedDifficultyLabel } from "../features/catalog/difficultyLabels";
 import { useI18n } from "../features/i18n/I18nContext";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
-import type { LeaderRecord } from "@owogg/contracts";
+import type { LeaderRecord, PublicGame } from "@owogg/contracts";
 
 export function meta() {
   return [
@@ -56,25 +57,50 @@ function PlayerCell({ record }: { record: LeaderRecord }) {
 }
 
 /** Per-game ranking page — osu!-style: ranking recorded per game (like per-beatmap leaderboards)
- * rather than only living inside the single combined /ranking page's game filter. Games with
- * manifest.supportsLeaderboard === false skip this entirely (casual games where rank isn't
- * meaningful). */
+ * rather than only living inside the single combined /ranking page's game filter. The generic
+ * public game contract supplies leaderboard policy, difficulty, and presentation for both
+ * publishers. */
 export default function GameRankingRoute() {
   const params = useParams();
   const slug = params.slug ?? "";
   const { dict } = useI18n();
 
-  const manifest = gameManifests.find((m) => m.slug === slug);
-  const content = manifest ? getLocalizedGameContent(dict, manifest) : null;
+  const [game, setGame] = useState<PublicGame | null>(null);
+  const [gameLoading, setGameLoading] = useState(true);
+  const card = useMemo(() => (game ? publicGameToCard(game, dict) : null), [game, dict]);
+  const content = card ? getLocalizedGameContent(dict, card) : null;
 
   const [records, setRecords] = useState<LeaderRecord[]>([]);
   const [status, setStatus] = useState<LeaderboardState>("loading");
   const [selectedDifficultyId, setSelectedDifficultyId] = useState<string>(
-    () => manifest?.difficulty?.defaultLevelId ?? "normal",
+    () => game?.difficulty?.defaultLevelId ?? "normal",
   );
 
+  useEffect(() => {
+    let cancelled = false;
+    setGameLoading(true);
+    setGame(null);
+    fetchPublicGame(slug)
+      .then((resolved) => {
+        if (!cancelled) setGame(resolved);
+      })
+      .catch(() => {
+        if (!cancelled) setGame(null);
+      })
+      .finally(() => {
+        if (!cancelled) setGameLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  useEffect(() => {
+    setSelectedDifficultyId(game?.difficulty?.defaultLevelId ?? "normal");
+  }, [game]);
+
   const loadData = useCallback(async () => {
-    if (!manifest) return;
+    if (!game || !game.policy.leaderboard) return;
     setStatus("loading");
     try {
       const data = await fetchLeaderboardApi(slug, selectedDifficultyId);
@@ -84,13 +110,21 @@ export default function GameRankingRoute() {
       console.error("Failed to load game leaderboard:", err);
       setStatus("error");
     }
-  }, [slug, manifest, selectedDifficultyId]);
+  }, [slug, game, selectedDifficultyId]);
 
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
-  if (!manifest) {
+  if (gameLoading) {
+    return (
+      <div className="mx-auto w-full max-w-3xl px-4 py-20 text-center text-text-muted">
+        {dict.common.loading}
+      </div>
+    );
+  }
+
+  if (!game || !card) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-20 text-center">
         <p className="text-text-muted">{dict.gamePlay.errorGameNotFound}</p>
@@ -98,7 +132,7 @@ export default function GameRankingRoute() {
     );
   }
 
-  if (!manifest.supportsLeaderboard) {
+  if (!game.policy.leaderboard) {
     return (
       <div className="mx-auto w-full max-w-3xl px-4 py-20 text-center">
         <Trophy className="mx-auto mb-4 h-10 w-10 text-text-muted" />
@@ -128,9 +162,9 @@ export default function GameRankingRoute() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <GameThumbnail
-            thumbnail={manifest.thumbnail}
-            title={content?.title ?? manifest.title}
-            accent={manifest.accent}
+            thumbnail={card.thumbnail}
+            title={content?.title ?? card.title}
+            accent={card.accent}
             className="h-12 w-12 shrink-0"
           />
           <div>
@@ -144,9 +178,9 @@ export default function GameRankingRoute() {
         {/* Scores across difficulty tiers are never comparable (see
             docs/GAME_CREATION_GUIDE.md §4) — the leaderboard below is always scoped to exactly
             one tier, switched here rather than mixed into one table. */}
-        {manifest.difficulty && (
+        {game.difficulty && (
           <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
-            {manifest.difficulty.levels.map((level) => {
+            {game.difficulty.levels.map((level) => {
               const isSelected = level.id === selectedDifficultyId;
               return (
                 <button

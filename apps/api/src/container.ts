@@ -22,6 +22,7 @@ import {
   D1GameScoreAcceptanceRepository,
   D1GameIdentityRepository,
   D1GameVersionRepository,
+  D1GameAssetRepository,
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
   B2CreatorGameDefinitionRepository,
@@ -85,6 +86,7 @@ import {
   type GameCanonicalRepository,
   type GameIdentityRepository,
   type GameVersionRepository,
+  type GameAssetRepository,
   type RuntimeGameRegistry,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
@@ -161,6 +163,7 @@ export interface AppContainer {
   gameCanonicalRepo: GameCanonicalRepository;
   gameIdentityRepo: GameIdentityRepository;
   gameVersionRepo: GameVersionRepository;
+  gameAssetRepo: GameAssetRepository;
   runtimeGameRegistry: RuntimeGameRegistry;
   runtimeGameAvailability: RuntimeGameAvailability;
   /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
@@ -232,6 +235,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const gameScoreAcceptanceRepo = new D1GameScoreAcceptanceRepository(db);
   const gameIdentityRepo = new D1GameIdentityRepository(db);
   const gameVersionRepo = new D1GameVersionRepository(db);
+  const gameAssetRepo = new D1GameAssetRepository(db);
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
     ? new BackblazeB2GameBundleRepository(b2Config)
     : new UnconfiguredGameBundleRepository();
@@ -338,6 +342,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameScoreAcceptanceRepo,
     gameIdentityRepo,
     gameVersionRepo,
+    gameAssetRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
     creatorGameDefinitionRepo,

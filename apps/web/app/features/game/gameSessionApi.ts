@@ -7,10 +7,10 @@ import { apiFetch } from "../../lib/api/client";
  * already be authenticated — the existing owogg_session cookie, sent automatically by apiFetch's
  * credentials: "include", same as every other authenticated client call in this app.
  *
- * This is deliberately just the fetch — a Web Host (GameHost/CreatorGameHost) CAN call this and
+ * This is deliberately just the fetch — the provider-neutral Web GameHost can call this and
  * hold the resulting token in its own state, but nothing does yet, and nothing here decides what
  * to do with it: connecting a held token to GAME_COMPLETE/score submission is a later PR's scope.
- * The token itself must never reach the sandboxed game iframe — see CreatorGameHost.tsx and
+ * The token itself must never reach the sandboxed game iframe — see GameHost.tsx and
  * IframeRuntime for why nothing crosses that boundary except the five Game Bridge messages.
  */
 export function fetchGameSession(slug: string, difficulty?: string) {
