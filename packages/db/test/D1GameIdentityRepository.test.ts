@@ -395,7 +395,6 @@ test("mapSandboxGameIdentityRow: fail-closed on malformed row data", () => {
     /Invalid or malformed game slug/,
   );
 
-
   // Invalid developer_user_id
   assert.throws(
     () =>

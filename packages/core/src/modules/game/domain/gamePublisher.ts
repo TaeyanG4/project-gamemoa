@@ -66,7 +66,7 @@ export function isValidGamePublisher(value: unknown): value is GamePublisher {
   }
   const candidate = value as Record<string, unknown>;
   if (candidate.type === "OWOGG") {
-    return !("userId" in candidate) || candidate.userId === undefined;
+    return !("userId" in candidate);
   }
   if (candidate.type === "USER") {
     return (

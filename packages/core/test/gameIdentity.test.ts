@@ -167,6 +167,7 @@ test("isValidGameIdentity: fail-closed on padded or whitespace-only slug", () =>
 test("isValidGamePublisher: rejects OWOGG publisher carrying userId", () => {
   assert.equal(isValidGamePublisher({ type: "OWOGG" }), true);
   assert.equal(isValidGamePublisher({ type: "OWOGG", userId: 123 }), false);
+  assert.equal(isValidGamePublisher({ type: "OWOGG", userId: undefined }), false);
   assert.equal(isValidGamePublisher({ type: "USER", userId: 123 }), true);
   assert.equal(isValidGamePublisher({ type: "USER", userId: 0 }), false);
   assert.equal(isValidGamePublisher({ type: "USER", userId: -1 }), false);
@@ -181,6 +182,20 @@ test("isValidGameIdentity: fail-closed on invalid publisher shape including OWOG
       id: 1,
       slug: "game",
       publisher: { type: "OWOGG", userId: 123 } as unknown as GamePublisher,
+      visibility: "PRIVATE",
+      liveVersionId: null,
+      deletedAt: null,
+      createdAt: "2026-08-19T00:00:00.000Z",
+      updatedAt: "2026-08-19T00:00:00.000Z",
+    }),
+    false,
+  );
+
+  assert.equal(
+    isValidGameIdentity({
+      id: 1,
+      slug: "game",
+      publisher: { type: "OWOGG", userId: undefined } as unknown as GamePublisher,
       visibility: "PRIVATE",
       liveVersionId: null,
       deletedAt: null,
