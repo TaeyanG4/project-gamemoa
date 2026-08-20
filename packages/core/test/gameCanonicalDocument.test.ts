@@ -121,6 +121,109 @@ test("decimal score bounds are preserved without truncation", () => {
   assert.equal(parsed.policy.score?.max, 99.9);
 });
 
+// ── policy invariants ────────────────────────────────────────────────────────
+
+test("a scored policy with decimal min < max parses normally", () => {
+  const doc = genreModeDoc({
+    policy: {
+      score: { unit: "s", direction: "asc", min: 0.25, max: 10.75 },
+      leaderboard: true,
+      xpPerCompletion: 1,
+      requiresAuth: false,
+    },
+  });
+  const parsed = roundTrip(doc);
+  assert.equal(parsed.policy.score?.min, 0.25);
+  assert.equal(parsed.policy.score?.max, 10.75);
+});
+
+test("score.min === score.max is rejected — no rankable range", () => {
+  const raw = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  raw.policy.score.min = 100;
+  raw.policy.score.max = 100;
+  assert.throws(
+    () => parseGameCanonicalDocument(JSON.stringify(raw), "my-game"),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+});
+
+test("score.min > score.max is rejected", () => {
+  const raw = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  raw.policy.score.min = 100;
+  raw.policy.score.max = 0;
+  assert.throws(
+    () => parseGameCanonicalDocument(JSON.stringify(raw), "my-game"),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+});
+
+test("score:null combined with leaderboard:true is rejected — nothing to rank", () => {
+  const doc = genreModeDoc({
+    policy: { score: null, leaderboard: true, xpPerCompletion: 0, requiresAuth: false },
+  });
+  assert.throws(
+    () => parseGameCanonicalDocument(serializeGameCanonicalDocument(doc), doc.slug),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+});
+
+test("score:null combined with leaderboard:false parses normally — still explicitly unscored", () => {
+  const doc = genreModeDoc({
+    policy: { score: null, leaderboard: false, xpPerCompletion: 0, requiresAuth: false },
+  });
+  const parsed = roundTrip(doc);
+  assert.equal(parsed.policy.score, null);
+  assert.equal(parsed.policy.leaderboard, false);
+});
+
+test("a negative xpPerCompletion is rejected", () => {
+  const raw = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  raw.policy.xpPerCompletion = -1;
+  assert.throws(
+    () => parseGameCanonicalDocument(JSON.stringify(raw), "my-game"),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+});
+
+test("a decimal xpPerCompletion is rejected — must be an integer", () => {
+  const raw = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  raw.policy.xpPerCompletion = 10.5;
+  assert.throws(
+    () => parseGameCanonicalDocument(JSON.stringify(raw), "my-game"),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+});
+
+test("an xpPerCompletion over 100000 is rejected", () => {
+  const raw = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  raw.policy.xpPerCompletion = 100_001;
+  assert.throws(
+    () => parseGameCanonicalDocument(JSON.stringify(raw), "my-game"),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+});
+
+test("xpPerCompletion of exactly 0 and exactly 100000 both parse normally (inclusive bounds)", () => {
+  const zero = genreModeDoc({
+    policy: {
+      score: { unit: "pts", direction: "desc", min: 0, max: 100 },
+      leaderboard: false,
+      xpPerCompletion: 0,
+      requiresAuth: false,
+    },
+  });
+  const max = genreModeDoc({
+    policy: {
+      score: { unit: "pts", direction: "desc", min: 0, max: 100 },
+      leaderboard: true,
+      xpPerCompletion: 100_000,
+      requiresAuth: false,
+    },
+  });
+  assert.equal(roundTrip(zero).policy.xpPerCompletion, 0);
+  assert.equal(roundTrip(max).policy.xpPerCompletion, 100_000);
+});
+
 // ── presentation / difficulty / supportsReplay ────────────────────────────────
 
 test("presentation is preserved through round-trip", () => {

@@ -73,7 +73,16 @@ import type { SandboxGameMode } from "../../../domain/sandboxGames.js";
 export const GAME_CANONICAL_SCHEMA_VERSION = 1 as const;
 
 /** Same shape as `CreatorGameCanonicalPolicy`/`GameDefinition.policy` — see this file's own top
- * doc comment for the field-by-field meaning. */
+ * doc comment for the field-by-field meaning. `parseGameCanonicalDocument` enforces, as
+ * domain-invalid-state rejections (never silently coerced), the same invariants every existing
+ * policy source already guarantees: `score.min < score.max` when scored (decimals allowed, no
+ * integer restriction — scripts/game-registry-schema.ts's SYSTEM parser and Creator's own decimal
+ * score bounds agree on the former, this schema does not add the latter); `leaderboard: true`
+ * requires `score !== null` (nothing to rank otherwise — scripts/game-registry-schema.ts's own
+ * wording); `xpPerCompletion` is a non-negative integer capped at 100_000 (the same bound
+ * scripts/game-registry-schema.ts and packages/contracts's Creator admin `xpPerCompletion` schema
+ * already enforce). `requiresAuth` is unaffected by any of this — it is still purely "must a
+ * player sign in to PLAY at all", independent of score submission auth. */
 export interface GameCanonicalPolicy {
   readonly score: ScoreConfig | null;
   readonly leaderboard: boolean;
@@ -294,6 +303,11 @@ const TOP_LEVEL_KEYS = [
 const POLICY_KEYS = ["score", "leaderboard", "xpPerCompletion", "requiresAuth"] as const;
 const SCORE_KEYS = ["unit", "direction", "min", "max", "displayPrefix", "displaySuffix"] as const;
 const SCORE_DIRECTIONS = ["asc", "desc"] as const;
+// Same bound scripts/game-registry-schema.ts's own SYSTEM parser and packages/contracts's Creator
+// admin contract (sandboxGames.ts's `xpPerCompletion: z.number().int().min(0).max(100_000)`) both
+// already enforce — restated here, not invented, so this canonical schema fails closed on the same
+// domain-invalid state every other source already rejects.
+const MAX_XP_PER_COMPLETION = 100_000;
 
 function parseScoreConfig(value: unknown): ScoreConfig {
   const raw = asRecord(value, "policy.score");
@@ -306,8 +320,20 @@ function parseScoreConfig(value: unknown): ScoreConfig {
       `policy.score.direction must be one of ${SCORE_DIRECTIONS.join(", ")}`,
     );
   }
+  // Finite decimal bounds, no integer restriction — Creator's own decimal score bounds (e.g. a
+  // 0.5s-precision timer game) must stay representable, matching parseScoreConfig's sibling in
+  // domain/creatorGameCanonicalDocument.ts.
   const min = requireNumber(raw, "min");
   const max = requireNumber(raw, "max");
+  // Same strict inequality scripts/game-registry-schema.ts's own score parser already enforces
+  // ("min (${min}) must be less than max (${max})") — a min === max range can never produce a
+  // rankable outcome any more than min > max can.
+  if (min >= max) {
+    fail(
+      "INVALID_DOCUMENT",
+      `policy.score.min (${min}) must be less than policy.score.max (${max})`,
+    );
+  }
   const displayPrefix = optionalString(raw, "displayPrefix");
   const displaySuffix = optionalString(raw, "displaySuffix");
 
@@ -327,10 +353,25 @@ function parsePolicy(value: unknown): GameCanonicalPolicy {
   if (!("score" in raw))
     fail("INVALID_DOCUMENT", "policy.score is required (use null if unscored)");
   const score = raw.score === null ? null : parseScoreConfig(raw.score);
+  const leaderboard = requireBoolean(raw, "leaderboard");
+  // Same invariant scripts/game-registry-schema.ts's own SYSTEM policy parser already enforces
+  // ("leaderboard is true but score is null — there would be nothing to rank"). `score: null` stays
+  // a legitimate, explicit "no score" state (see this file's own D1-vs-canonical boundary doc
+  // comment) — it just can never be paired with `leaderboard: true`.
+  if (leaderboard && score === null) {
+    fail("INVALID_DOCUMENT", "policy.leaderboard is true but policy.score is null");
+  }
+  const xpPerCompletion = requireInteger(raw, "xpPerCompletion");
+  if (xpPerCompletion < 0 || xpPerCompletion > MAX_XP_PER_COMPLETION) {
+    fail(
+      "INVALID_DOCUMENT",
+      `policy.xpPerCompletion must be between 0 and ${MAX_XP_PER_COMPLETION}`,
+    );
+  }
   return {
     score,
-    leaderboard: requireBoolean(raw, "leaderboard"),
-    xpPerCompletion: requireNumber(raw, "xpPerCompletion"),
+    leaderboard,
+    xpPerCompletion,
     requiresAuth: requireBoolean(raw, "requiresAuth"),
   };
 }
