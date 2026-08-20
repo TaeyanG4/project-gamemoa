@@ -1,5 +1,6 @@
 // eslint-disable-next-line import/no-unresolved -- Node 22 built-in, requires --experimental-sqlite
 import { DatabaseSync } from "node:sqlite";
+import fs from "node:fs";
 import type { D1Database, D1PreparedStatement } from "../../src/d1/D1UserRepository.js";
 
 /**
@@ -28,10 +29,30 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
         // gets a real, correctly-populated value rather than undefined.
         return {
           success: true,
-          meta: { changes: Number(info.changes), rows_written: Number(info.changes) },
+          meta: {
+            changes: Number(info.changes),
+            rows_written: Number(info.changes),
+            last_row_id: Number(info.lastInsertRowid),
+          },
         };
       };
-      const wrapper: D1PreparedStatement & { __runSync: typeof runSync } = {
+      const batchSync = () => {
+        if (/\bRETURNING\b/i.test(query)) {
+          const rows = stmt.all(...(bound as never[])) as Record<string, unknown>[];
+          const lastRow = rows.at(-1);
+          return {
+            success: true,
+            results: rows,
+            meta: {
+              changes: rows.length,
+              rows_written: rows.length,
+              last_row_id: typeof lastRow?.id === "number" ? Number(lastRow.id) : undefined,
+            },
+          };
+        }
+        return runSync();
+      };
+      const wrapper: D1PreparedStatement & { __batchSync: typeof batchSync } = {
         bind(...values: unknown[]) {
           bound = values;
           return wrapper;
@@ -48,7 +69,7 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
           return runSync();
         },
         // Batch-only escape hatch — see batch() below for why this exists.
-        __runSync: runSync,
+        __batchSync: batchSync,
       };
       return wrapper;
     },
@@ -58,7 +79,7 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
       raw.exec("BEGIN TRANSACTION;");
       try {
         const results = statements.map((s) =>
-          (s as D1PreparedStatement & { __runSync: () => unknown }).__runSync(),
+          (s as D1PreparedStatement & { __batchSync: () => unknown }).__batchSync(),
         );
         raw.exec("COMMIT;");
         return results;
@@ -438,7 +459,8 @@ CREATE TABLE sandbox_game_review_audit_log (
 `;
 
 /** Schema for D1GameCreatorRepository / D1SandboxGameRepository tests (migration 0024-0030) */
-export const SANDBOX_GAMES_TEST_SCHEMA = `
+export const SANDBOX_GAMES_TEST_SCHEMA =
+  `
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   nickname TEXT NOT NULL,
@@ -657,7 +679,11 @@ BEGIN
   DELETE FROM games
   WHERE id = OLD.id AND publisher_type = 'USER';
 END;
-`;
+` +
+  fs.readFileSync(
+    new URL("../../migrations/0031_game_version_write_convergence.sql", import.meta.url),
+    "utf8",
+  );
 
 /** Schema for D1GameAttemptConsumptionRepository tests (migration 0028) — the minimal slice of
  * SANDBOX_GAMES_TEST_SCHEMA the FK columns need (users, sandbox_games, sandbox_game_versions)

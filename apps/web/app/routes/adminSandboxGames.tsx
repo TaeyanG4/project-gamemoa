@@ -354,7 +354,7 @@ export default function AdminSandboxGamesRoute() {
                     onClick={() => void handleToggleGameVisibility(g)}
                     title={
                       g.deletedAt !== null
-                        ? "삭제된 게임입니다. 관리 화면에서 완전 삭제할 수 있습니다."
+                        ? "삭제된 게임입니다. 승인 이력이 없는 초안만 완전 삭제할 수 있습니다."
                         : g.liveVersionId === null
                           ? "승인된 버전이 있어야 활성화할 수 있습니다."
                           : undefined
@@ -438,6 +438,9 @@ function GameDetailPanel({
   onError: (message: string) => void;
 }) {
   const { game } = detail;
+  const slugPermanentlyReserved =
+    detail.versions.some((version) => version.status === "APPROVED") ||
+    detail.auditLog.some((entry) => entry.action === "VERSION_APPROVED");
   const [title, setTitle] = useState(game.title);
   const [shortDescription, setShortDescription] = useState(game.shortDescription ?? "");
   const [description, setDescription] = useState(game.description ?? "");
@@ -619,9 +622,13 @@ function GameDetailPanel({
           {game.deletedAt !== null && (
             <button
               type="button"
-              disabled={purging}
+              disabled={purging || slugPermanentlyReserved}
               onClick={() => void handlePurge()}
-              title="행을 포함해 완전히 지우고 슬러그를 재사용 가능하게 합니다. 감사 기록도 함께 사라집니다."
+              title={
+                slugPermanentlyReserved
+                  ? "승인 이력이 있는 게임의 슬러그는 과거 기록 보호를 위해 영구 예약됩니다."
+                  : "승인 이력이 없는 초안의 행·버전·감사 기록을 완전히 지우고 슬러그를 해제합니다."
+              }
               className="flex items-center gap-1.5 rounded-xl border border-accent-red/60 bg-accent-red px-4 py-2.5 text-xs font-bold text-white hover:bg-accent-red/80 disabled:opacity-40"
             >
               {purging ? (
@@ -629,7 +636,7 @@ function GameDetailPanel({
               ) : (
                 <X className="h-3.5 w-3.5" />
               )}
-              완전 삭제 (슬러그 해제)
+              {slugPermanentlyReserved ? "승인 이력 보존" : "완전 삭제 (슬러그 해제)"}
             </button>
           )}
         </div>

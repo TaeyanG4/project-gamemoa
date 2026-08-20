@@ -68,6 +68,20 @@ API Composition Root (apps/api/src/container.ts)
 @owogg/db (D1 Repository 어댑터 - 게임 카탈로그 매니페스트와 완전 분리)
 ```
 
+### 2.1 통합 게임 Identity/Version 경계
+
+- D1 `games`는 OWOGG/USER 공통 identity, publisher authority, visibility, live version 포인터를
+  저장합니다.
+- D1 `game_versions`는 공통 bundle identity와 publish 상태만 저장합니다. USER 심사 상태·심사자·
+  반려 사유는 계속 `sandbox_game_versions`에 남습니다.
+- A-4 동안 USER의 `sandbox_game_versions` 쓰기는 migration trigger로 `game_versions`에 수렴하지만,
+  production runtime read authority는 아직 기존 SYSTEM/Creator 경로에서 전환하지 않습니다.
+- `games.live_version_id`는 같은 `games.id`에 속한 `game_versions.id`만 가리킬 수 있습니다.
+- 신규 USER version ID는 `game_versions` 공통 숫자 namespace에서 먼저 할당한 뒤 동일한 ID로 USER
+  심사 row를 원자적으로 생성합니다.
+- 제목·설명·점수·presentation 등 canonical 의미는 B2
+  `game-definitions/<slug>/definition.json`에 유지하며 D1 identity/version과 분리합니다.
+
 ---
 
 ## 3. 🛡️ 아키텍처 가드 규칙 (Architecture Guard Rules)
@@ -97,7 +111,7 @@ API Composition Root (apps/api/src/container.ts)
 
 ## 5. ⚡ 인프라 및 프로덕션 스택
 
-- **Hosting / Compute**: Cloudflare Pages (Web SPA) + Cloudflare Workers (API Serverless)
+- **Hosting / Compute**: Cloudflare Workers Static Assets (Web SPA) + Cloudflare Workers (API)
 - **Database**: Cloudflare D1 (Serverless SQLite with atomic batch transactions)
 - **Security / Crypto**: Web Crypto API (Ed25519 서명 검증, PBKDF2-HMAC-SHA256, Google RS256 JWKS)
 - **Assets**: 결정론적 무의존성 래스터라이저(`scripts/generate-favicon.ts`) 기반 파비콘/PWA 아이콘 세트 생성

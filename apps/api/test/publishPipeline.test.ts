@@ -51,6 +51,7 @@ function createDb() {
   function statement(query: string) {
     let values: unknown[] = [];
     return {
+      query,
       bind(...bound: unknown[]) {
         values = bound;
         return this;
@@ -137,7 +138,19 @@ function createDb() {
         return statement(query);
       },
       async batch(statements: Array<ReturnType<typeof statement>>) {
-        return statements.map(() => ({ success: true, meta: { changes: 1 } }));
+        return Promise.all(
+          statements.map(async (prepared) => {
+            if (/\bRETURNING\b/i.test(prepared.query)) {
+              const row = await prepared.first<Record<string, unknown>>();
+              return {
+                success: true,
+                results: row ? [row] : [],
+                meta: { changes: row ? 1 : 0 },
+              };
+            }
+            return prepared.run();
+          }),
+        );
       },
     },
     versionRow,

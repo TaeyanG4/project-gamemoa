@@ -38,6 +38,7 @@ export const SANDBOX_GAME_FAILURE_STATUS: Record<
   INVALID_GENRE: 400,
   ALREADY_DELETED: 409,
   CANNOT_DELETE_APPROVED_GAME: 409,
+  CANNOT_PURGE_APPROVED_GAME: 409,
   REVOKE_REQUIRES_APPROVED: 409,
   INVALID_MODE: 400,
   LOGO_REQUIRED: 422,
@@ -83,6 +84,8 @@ export const SANDBOX_GAME_FAILURE_MESSAGE: Record<SandboxGameUseCaseFailure["cod
   ALREADY_DELETED: "이미 삭제된 게임입니다.",
   CANNOT_DELETE_APPROVED_GAME:
     "이미 승인된 버전이 있는 게임은 직접 삭제할 수 없습니다. 관리자에게 문의하세요.",
+  CANNOT_PURGE_APPROVED_GAME:
+    "승인 이력이 있는 게임은 과거 기록 보호를 위해 슬러그를 영구 보존해야 하므로 완전 삭제할 수 없습니다.",
   REVOKE_REQUIRES_APPROVED: "승인된 버전만 철회할 수 있습니다.",
   INVALID_MODE: 'owogg.game.json의 mode는 "single" 또는 "multi"여야 합니다.',
   LOGO_REQUIRED:

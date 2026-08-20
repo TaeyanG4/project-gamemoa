@@ -167,8 +167,8 @@ export interface SandboxGameRepository {
   softDelete(id: number, deletedByAdminId: number, nowIso: string): Promise<SandboxGameRecord>;
 
   /** Hard delete — removes the game row and its versions/review-audit rows entirely. Used only for
-   * a creator's own self-service removal of a game that has never been approved (see
-   * SandboxGameUseCases.deleteOwnGame): nothing worth auditing exists yet, so unlike softDelete
+   * a game that has never been approved, either creator self-service or admin purge (see
+   * SandboxGameUseCases.deleteOwnGame/purgeGame): nothing worth auditing exists yet, so unlike softDelete
    * there is no row left behind — and that is what actually frees `slug` for reuse, since `slug`
    * carries a plain (non-partial) UNIQUE constraint that a soft-deleted row would keep occupying
    * forever. Implementations must remove all three tables (game, versions, review audit) in one
@@ -261,6 +261,11 @@ export interface SandboxGameRepository {
   }): Promise<void>;
 
   listReviewAudit(gameId: number, limit: number): Promise<SandboxGameReviewAuditEntry[]>;
+
+  /** True once any version of this game has ever been approved. Approval history permanently
+   * reserves the public slug even when a later admin action revokes approval or soft-deletes the
+   * game, so callers must not infer this from the versions' current status alone. */
+  hasEverApprovedVersion(gameId: number): Promise<boolean>;
 }
 
 /**

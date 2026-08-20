@@ -58,6 +58,7 @@ function fakeSandboxGameRepo(
     withdrawVersion: notImplemented("withdrawVersion"),
     appendReviewAudit: notImplemented("appendReviewAudit"),
     listReviewAudit: notImplemented("listReviewAudit"),
+    hasEverApprovedVersion: notImplemented("hasEverApprovedVersion"),
   };
 }
 

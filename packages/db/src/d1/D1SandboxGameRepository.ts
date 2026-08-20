@@ -281,10 +281,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
         ),
     ]);
 
-    const [gamesResult, sandboxResult] = res as [
-      { meta?: { changes?: number } } | undefined,
-      { meta?: { changes?: number } } | undefined,
-    ];
+    const [gamesResult, sandboxResult] = res;
     if (!gamesResult?.meta?.changes || !sandboxResult?.meta?.changes) {
       return null; // no review slot available
     }
@@ -395,21 +392,32 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     bundleBytes: number;
     nowIso: string;
   }): Promise<SandboxGameVersionRecord> {
-    // `RETURNING *` rather than a separate `SELECT ... WHERE rowid = last_insert_rowid()`:
-    // `last_insert_rowid()` is connection-global, not scoped to this call, so under concurrent
-    // uploads another request's INSERT landing between this one and its own read-back could make
-    // this method return a *different* upload's version data to the caller (found exactly this
-    // way while hardening SandboxGameRepository.create for the review-slot quota — see its
-    // comment). `RETURNING` makes the insert and the read one atomic statement with no window for
-    // that to happen. Requires SQLite 3.35+ / a D1 version with RETURNING support (both do).
-    const row = await this.db
-      .prepare(
-        `INSERT INTO sandbox_game_versions (game_id, object_key, content_hash, bundle_bytes, uploaded_at)
-         VALUES (?, ?, ?, ?, ?)
-         RETURNING *`,
-      )
-      .bind(input.gameId, input.objectKey, input.contentHash, input.bundleBytes, input.nowIso)
-      .first<Record<string, unknown>>();
+    // A-4 shared numeric namespace:
+    // 1. Generic game_versions allocates the ID.
+    // 2. The legacy USER review row consumes that exact ID via last_insert_rowid() inside the same
+    //    atomic D1 batch. Unlike a separate statement/call, no concurrent writer can interleave in
+    //    a batch; a failure in either statement rolls both back.
+    // 3. RETURNING on statement 2 gives this call its own row without a racy post-batch MAX query.
+    const results = await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT INTO game_versions (
+             game_id, object_key, content_hash, bundle_bytes, publish_status, publish_error,
+             published_at, manifest_key, published_size_bytes, file_count, uploaded_at
+           ) VALUES (?, ?, ?, ?, 'UPLOADED', NULL, NULL, NULL, NULL, NULL, ?)`,
+        )
+        .bind(input.gameId, input.objectKey, input.contentHash, input.bundleBytes, input.nowIso),
+      this.db
+        .prepare(
+          `INSERT INTO sandbox_game_versions (
+             id, game_id, object_key, content_hash, bundle_bytes, uploaded_at
+           ) VALUES (last_insert_rowid(), ?, ?, ?, ?, ?)
+           RETURNING *`,
+        )
+        .bind(input.gameId, input.objectKey, input.contentHash, input.bundleBytes, input.nowIso),
+    ]);
+
+    const row = results[1]?.results?.[0] as Record<string, unknown> | undefined;
     if (!row) throw new Error("sandbox_game_versions row vanished immediately after insert");
     return mapVersionRow(row);
   }
@@ -566,5 +574,21 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
       .bind(gameId, limit)
       .all<Record<string, unknown>>();
     return (res.results || []).map(mapAuditRow);
+  }
+
+  async hasEverApprovedVersion(gameId: number): Promise<boolean> {
+    const row = await this.db
+      .prepare(
+        `SELECT EXISTS (
+           SELECT 1 FROM sandbox_game_versions
+           WHERE game_id = ? AND status = 'APPROVED'
+           UNION ALL
+           SELECT 1 FROM sandbox_game_review_audit_log
+           WHERE game_id = ? AND action = 'VERSION_APPROVED'
+         ) AS approved`,
+      )
+      .bind(gameId, gameId)
+      .first<{ approved: number }>();
+    return Number(row?.approved ?? 0) === 1;
   }
 }

@@ -87,10 +87,12 @@ function createFakeRepo(): SandboxGameRepository & {
   games: Map<number, SandboxGameRecord>;
   versions: Map<number, SandboxGameVersionRecord>;
   auditActions: string[];
+  approvedGameIds: Set<number>;
 } {
   const games = new Map<number, SandboxGameRecord>();
   const versions = new Map<number, SandboxGameVersionRecord>();
   const auditActions: string[] = [];
+  const approvedGameIds = new Set<number>();
   let nextGameId = 1;
   let nextVersionId = 1;
 
@@ -98,6 +100,7 @@ function createFakeRepo(): SandboxGameRepository & {
     games,
     versions,
     auditActions,
+    approvedGameIds,
     async findById(id) {
       return games.get(id) ?? null;
     },
@@ -302,9 +305,13 @@ function createFakeRepo(): SandboxGameRepository & {
     },
     async appendReviewAudit(entry) {
       auditActions.push(entry.action);
+      if (entry.action === "VERSION_APPROVED") approvedGameIds.add(entry.gameId);
     },
     async listReviewAudit() {
       return [];
+    },
+    async hasEverApprovedVersion(gameId) {
+      return approvedGameIds.has(gameId);
     },
   };
 }
@@ -3341,6 +3348,28 @@ test("purgeGame refuses a game that hasn't been soft-deleted yet, with NOT_YET_D
     () => useCases.purgeGame({ gameId: game.id, actorAdminId: 9 }),
     (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "NOT_YET_DELETED",
   );
+});
+
+test("purgeGame permanently reserves the slug after any approval, even when approval was revoked", async () => {
+  const { useCases, repo } = createUseCases();
+  const game = await useCases.createGame({
+    slug: "published-game",
+    developerUserId: 1,
+    title: "Published",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+  });
+  repo.approvedGameIds.add(game.id);
+  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
+
+  await assert.rejects(
+    () => useCases.purgeGame({ gameId: game.id, actorAdminId: 9 }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANNOT_PURGE_APPROVED_GAME",
+  );
+  assert.equal(await repo.slugExists("published-game"), true);
 });
 
 test("purgeGame on an unknown game id is GAME_NOT_FOUND", async () => {

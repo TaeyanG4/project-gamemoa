@@ -290,6 +290,35 @@ test("appendReviewAudit + listReviewAudit round-trips metadata JSON and orders m
   assert.deepEqual(audit[1]?.metadata, { xpPerCompletion: 50 });
 });
 
+test("hasEverApprovedVersion remains true after approval is revoked", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo, "approval-history", 1);
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "uploads/approval-history.zip",
+    contentHash: "approval-history-hash",
+    bundleBytes: 10,
+    nowIso: "2026-08-21T00:00:00.000Z",
+  });
+  assert.equal(await repo.hasEverApprovedVersion(game.id), false);
+
+  await repo.decideVersion(version.id, "APPROVED", 9, null, "2026-08-21T00:01:00.000Z");
+  await repo.appendReviewAudit({
+    gameId: game.id,
+    versionId: version.id,
+    actorAdminId: 9,
+    action: "VERSION_APPROVED",
+    reason: null,
+    metadata: null,
+    nowIso: "2026-08-21T00:01:00.000Z",
+  });
+  await repo.revokeVersionApproval(version.id);
+
+  assert.equal(await repo.hasEverApprovedVersion(game.id), true);
+});
+
 test("listByDeveloper and listPublic scope correctly", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "DevA");
@@ -867,7 +896,7 @@ test("withdrawVersion is a no-op on a version that has already been decided", as
   assert.equal(result.status, "APPROVED", "an already-decided version must not be overwritten");
 });
 
-test("concurrent createVersion calls each get back their own row, never another call's (RETURNING, not last_insert_rowid)", async () => {
+test("concurrent createVersion batches each return their own shared-ID USER row", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev");
   const repo = new D1SandboxGameRepository(db);
@@ -902,7 +931,7 @@ test("Stage A-3: shared numeric ID namespace does not collide with existing OWOG
   raw
     .prepare(
       `INSERT INTO games (id, slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
-       VALUES (100, 'reaction-time', 'OWOGG', NULL, 'PUBLIC', 1, '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z')`,
+       VALUES (100, 'reaction-time', 'OWOGG', NULL, 'PRIVATE', NULL, '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z')`,
     )
     .run();
 
@@ -993,7 +1022,7 @@ test("Stage A-3: slugExists checks global games identity namespace including OWO
   raw
     .prepare(
       `INSERT INTO games (id, slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
-       VALUES (99, 'official-memory-test', 'OWOGG', NULL, 'PUBLIC', 1, '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z')`,
+       VALUES (99, 'official-memory-test', 'OWOGG', NULL, 'PRIVATE', NULL, '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z')`,
     )
     .run();
 
@@ -1034,9 +1063,16 @@ test("Stage A-3: all write paths maintain exact parity in games identity table",
 
   // 4. setLiveVersion updates live_version_id in games
   const verTime = "2026-08-20T14:20:00.000Z";
-  await repo.setLiveVersion(game.id, 42, verTime);
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "uploads/parity.zip",
+    contentHash: "parity-hash",
+    bundleBytes: 42,
+    nowIso: "2026-08-20T14:15:00.000Z",
+  });
+  await repo.setLiveVersion(game.id, version.id, verTime);
   gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
-  assert.equal(gRow.live_version_id, 42);
+  assert.equal(gRow.live_version_id, version.id);
   assert.equal(gRow.updated_at, verTime);
 
   // 5. setVisibility updates visibility in games
@@ -1055,12 +1091,16 @@ test("Stage A-3: all write paths maintain exact parity in games identity table",
   // 7. clearLiveVersionIfMatches (with mismatch -> no-op)
   await repo.clearLiveVersionIfMatches(game.id, 999, "2026-08-20T14:50:00.000Z");
   gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
-  assert.equal(gRow.live_version_id, 42, "mismatched version must not clear live_version_id");
+  assert.equal(
+    gRow.live_version_id,
+    version.id,
+    "mismatched version must not clear live_version_id",
+  );
   assert.equal(gRow.visibility, "PUBLIC", "mismatched version must not change visibility");
 
   // 8. clearLiveVersionIfMatches (with match -> clears live_version_id and sets PRIVATE)
   const clearTime = "2026-08-20T15:00:00.000Z";
-  await repo.clearLiveVersionIfMatches(game.id, 42, clearTime);
+  await repo.clearLiveVersionIfMatches(game.id, version.id, clearTime);
   gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
   assert.equal(gRow.live_version_id, null);
   assert.equal(gRow.visibility, "PRIVATE");
@@ -1226,12 +1266,19 @@ test("Stage A-3: UPDATE trigger recovers a missing USER generic row in games (co
 
   // Subsequent sandbox writes must continue to maintain parity normally.
   const visTime = "2026-08-21T10:10:00.000Z";
-  await repo.setLiveVersion(game.id, 55, visTime);
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "uploads/recovery.zip",
+    contentHash: "recovery-hash",
+    bundleBytes: 55,
+    nowIso: "2026-08-21T10:05:00.000Z",
+  });
+  await repo.setLiveVersion(game.id, version.id, visTime);
   const afterLV = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<
     string,
     unknown
   >;
-  assert.equal(Number(afterLV.live_version_id), 55);
+  assert.equal(Number(afterLV.live_version_id), version.id);
   assert.equal(afterLV.updated_at, visTime);
 });
 
