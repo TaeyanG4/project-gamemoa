@@ -1,15 +1,12 @@
 /**
  * Unified Game Platform, Stage U-1 — the provider-neutral "what a game is" document every game
- * (OwOGG official or user-published) is meant to converge on. This PR only builds the domain
- * foundation: the schema, its strict parser/serializer, a deterministic object key, and a
- * persistence port. Nothing here is wired into any production runtime, route, or storage adapter
- * yet — StaticGameRegistry, CreatorGameRegistry, GameHost, CreatorGameHost, /play/:slug, D1, and
- * B2 production data are all untouched by this PR (see this Stage's own task description for the
- * exhaustive "zero change" list). `CreatorGameCanonicalDocument`
+ * (OwOGG official or user-published) converges on. U-1 introduced the schema, strict parser,
+ * deterministic object key, and persistence port; C-1 now consumes it through the provider-neutral
+ * RuntimeGameRegistry for `/play/:slug`. `CreatorGameCanonicalDocument`
  * (domain/creatorGameCanonicalDocument.ts, Stage A) keeps working exactly as it does today —
  * B2CreatorGameDefinitionRepository still reads/writes it, unchanged.
  *
- * ## The eventual architecture direction (not yet true today)
+ * ## Runtime architecture (C-1)
  *
  *   Game Platform → RuntimeGameRegistry → D1 (identity/runtime) + B2 (canonical/bundle)
  *                                              → GameDefinition → /play/:slug → GameHost →

@@ -19,6 +19,8 @@ import {
   D1SandboxGameRepository,
   D1GameAttemptConsumptionRepository,
   D1CreatorScoreAcceptanceRepository,
+  D1GameIdentityRepository,
+  D1GameVersionRepository,
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
   B2CreatorGameDefinitionRepository,
@@ -50,6 +52,8 @@ import {
   CreatorLeaderboardUseCases,
   GameBundlePublisher,
   StaticGameRegistry,
+  ComposedRuntimeGameRegistry,
+  RuntimeGameAvailability,
   GAME_DEFINITIONS,
   type GameRegistry,
   type UserRepository,
@@ -76,6 +80,9 @@ import {
   type CreatorScoreAcceptanceRepository,
   type CreatorGameDefinitionRepository,
   type GameCanonicalRepository,
+  type GameIdentityRepository,
+  type GameVersionRepository,
+  type RuntimeGameRegistry,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
@@ -138,14 +145,19 @@ export interface AppContainer {
    * clean 503 before doing so — same convention as `gameBundleStorageRepo`, never a silent
    * D1-only fallback (see adminSandboxGames.ts's metadata PATCH route). */
   creatorGameDefinitionRepo: CreatorGameDefinitionRepository;
-  /** Stage U-3's generic canonical SHADOW write target — composed from the SAME
+  /** Generic canonical repository — composed from the SAME
    * `gameBundleStorageRepo` above as `creatorGameDefinitionRepo` (no second B2 client; see
    * B2GameCanonicalRepository's own doc comment), so it too is only really backed by B2 when
    * `gameBundlesConfigured` is true. `creatorGameDefinitionRepo` (Creator canonical) remains
    * AUTHORITATIVE this Stage — `sandboxGameUseCases.updateMetadata` only ever writes here as a
    * projection of what that repository already holds (see that method's own doc comment); nothing
-   * else in this container reads or writes this repository yet. */
+   * C-1's runtime registry now reads it for both publishers; Creator write-through continues to
+   * project into the same provider-neutral document without changing its review lifecycle. */
   gameCanonicalRepo: GameCanonicalRepository;
+  gameIdentityRepo: GameIdentityRepository;
+  gameVersionRepo: GameVersionRepository;
+  runtimeGameRegistry: RuntimeGameRegistry;
+  runtimeGameAvailability: RuntimeGameAvailability;
   /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
    * game is not "missing" from here so much as out of scope, see StaticGameRegistry's doc
    * comment. Exposed on the container, not just threaded privately into ScoreUseCases/
@@ -211,6 +223,8 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const sandboxGameRepo = new D1SandboxGameRepository(db);
   const gameAttemptRepo = new D1GameAttemptConsumptionRepository(db);
   const creatorScoreAcceptanceRepo = new D1CreatorScoreAcceptanceRepository(db);
+  const gameIdentityRepo = new D1GameIdentityRepository(db);
+  const gameVersionRepo = new D1GameVersionRepository(db);
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
     ? new BackblazeB2GameBundleRepository(b2Config)
     : new UnconfiguredGameBundleRepository();
@@ -225,6 +239,16 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   // shadow write target only.
   const gameCanonicalRepo: GameCanonicalRepository = new B2GameCanonicalRepository(
     gameBundleStorageRepo,
+  );
+  const runtimeGameRegistry: RuntimeGameRegistry = new ComposedRuntimeGameRegistry(
+    gameIdentityRepo,
+    gameVersionRepo,
+    gameCanonicalRepo,
+  );
+  const runtimeGameAvailability = new RuntimeGameAvailability(
+    gameIdentityRepo,
+    gameVersionRepo,
+    gameSettingsRepo,
   );
 
   const scoreUseCases = new ScoreUseCases(scoreRepo, gameRegistry);
@@ -294,10 +318,14 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     gameAttemptRepo,
     creatorScoreAcceptanceRepo,
+    gameIdentityRepo,
+    gameVersionRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
     creatorGameDefinitionRepo,
     gameCanonicalRepo,
+    runtimeGameRegistry,
+    runtimeGameAvailability,
     gameRegistry,
 
     scoreUseCases,

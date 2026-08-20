@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import {
   BUNDLE_ENTRY_PATH,
   normalizeBundleEntryPath,
+  publishedObjectKey,
   publishedVersionPrefix,
   resolveBundleContentType,
   systemGamePublishedManifestObjectKey,
@@ -54,23 +55,16 @@ const VERSIONED_ASSET_BROWSER_MAX_AGE_SECONDS = 3600;
 const LIVE_RESOLVER_MAX_AGE_SECONDS = 60;
 
 /**
- * Public sandbox-game delivery. Three routers with deliberately different cache semantics:
+ * Public game delivery. Three routers with deliberately different cache semantics:
  *
- *   /play/:slug                          → mutable: resolves a CREATOR game's *current* live
- *                                          version and redirects to that version's entry point.
- *   /games/:gameId/:versionId/*          → immutable: one specific published CREATOR version's
- *                                          files, straight from object storage through
- *                                          Cloudflare's cache. D1-identified (gameId/versionId).
+ *   /play/:slug                          → mutable: resolves either publisher's generic current
+ *                                          live version and redirects to its numeric entry point.
+ *   /games/:gameId/:versionId/*          → immutable bytes: one exact generic live version's
+ *                                          files, straight from object storage through Cloudflare's
+ *                                          cache. D1-identified for OWOGG and USER alike.
  *   /official-games/:slug/:version/*     → immutable: one specific published SYSTEM version's
- *                                          files — the exact-version counterpart to the route
- *                                          above, for bundles SystemGameBundlePublisher wrote
- *                                          (feat/official-game-publisher-foundation). Identified
- *                                          by (slug, version) — version is that bundle's own
- *                                          content hash, never a D1 row (SYSTEM games have none —
- *                                          see modules/game/domain/gameOwner.ts). No mutable
- *                                          "/play"-style live resolver for SYSTEM games exists
- *                                          yet — deliberately out of this PR's scope
- *                                          (feat/official-game-serving-foundation).
+ *                                          legacy files, retained as a rollback path while the
+ *                                          primary runtime uses the two generic routes above.
  *
  * All three are meant to live on their own hostname (`GAME_ORIGIN`, e.g. play.owogg.com) rather
  * than the main site's, which is what makes the iframe a real origin boundary. Neither the
@@ -90,13 +84,13 @@ export const officialGameAssetsRouter = new Hono<ApiEnv>();
 /**
  * Origin boundary enforcement (2026-08-17 beta hardening) — registered first on both routers, so
  * it runs before any cache lookup or DB read. This Worker also answers `api.owogg.com`, and
- * sandbox UGC must never be reachable there: the whole point of a separate GAME_ORIGIN host (e.g.
- * `play.owogg.com`) is that the browser treats an uploaded game as cross-origin from the real
- * site, which only holds if the game is actually *served from* that other host.
+ * game code must never be reachable there: the whole point of a separate GAME_ORIGIN host (e.g.
+ * `play.owogg.com`) is that the browser treats every game as cross-origin from the real site,
+ * which only holds if the game is actually *served from* that other host.
  *
  * `GAME_ORIGIN` unset means "no game-hosting domain connected yet" — fails CLOSED for everything
  * except localhost (local dev / `wrangler dev` has no reason to set it). This is deliberate: it
- * is not acceptable for sandbox UGC to be reachable through the production API host just because
+ * is not acceptable for game code to be reachable through the production API host just because
  * the dedicated domain hasn't been wired up, so shipping this Worker with GAME_ORIGIN unset must
  * mean "sandbox game serving is off," not "sandbox game serving falls back to api.owogg.com."
  */
@@ -153,7 +147,7 @@ gameServingRouter.use(
  */
 function availabilityCacheKey(gameId: number, versionId: number): Request {
   return new Request(
-    `https://owogg-internal.invalid/sandbox-game-availability/${gameId}/${versionId}`,
+    `https://owogg-internal.invalid/runtime-game-availability/${gameId}/${versionId}`,
   );
 }
 
@@ -166,8 +160,14 @@ const publishedAssetAvailabilityGate: MiddlewareHandler<ApiEnv> = async (c, next
 
   if (typeof caches === "undefined") {
     // Plain-Node test runner — no Cache API available, so just check the DB directly every time.
-    const { sandboxGameUseCases } = createContainer(c.env.DB, readB2Config(c.env));
-    if (!(await sandboxGameUseCases.isVersionServable(gameId, versionId))) return notFound(c);
+    const { runtimeGameAvailability } = createContainer(c.env.DB, readB2Config(c.env));
+    try {
+      if (!(await runtimeGameAvailability.isVersionServable(gameId, versionId))) {
+        return notFound(c);
+      }
+    } catch {
+      return notFound(c);
+    }
     await next();
     return;
   }
@@ -182,8 +182,13 @@ const publishedAssetAvailabilityGate: MiddlewareHandler<ApiEnv> = async (c, next
     return;
   }
 
-  const { sandboxGameUseCases } = createContainer(c.env.DB, readB2Config(c.env));
-  const servable = await sandboxGameUseCases.isVersionServable(gameId, versionId);
+  const { runtimeGameAvailability } = createContainer(c.env.DB, readB2Config(c.env));
+  let servable = false;
+  try {
+    servable = await runtimeGameAvailability.isVersionServable(gameId, versionId);
+  } catch {
+    servable = false;
+  }
   const toStore = new Response(null, {
     status: servable ? 200 : 404,
     headers: { "Cache-Control": `public, max-age=${LIVE_RESOLVER_MAX_AGE_SECONDS}` },
@@ -457,11 +462,26 @@ function notFound(c: Context<ApiEnv>): Response {
  */
 gameServingRouter.get("/:slug", async (c) => {
   if (!c.env?.DB) return notFound(c);
-  const { sandboxGameUseCases } = createContainer(c.env.DB, readB2Config(c.env));
-  const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
+  const { runtimeGameRegistry, runtimeGameAvailability } = createContainer(
+    c.env.DB,
+    readB2Config(c.env),
+  );
+  const resolved = await runtimeGameRegistry.findBySlug(c.req.param("slug"));
   if (!resolved) return notFound(c);
+  try {
+    if (
+      !(await runtimeGameAvailability.isVersionServable(
+        resolved.identity.id,
+        resolved.liveVersion.id,
+      ))
+    ) {
+      return notFound(c);
+    }
+  } catch {
+    return notFound(c);
+  }
 
-  const target = `/${publishedVersionPrefix(resolved.game.id, resolved.version.id)}${BUNDLE_ENTRY_PATH}`;
+  const target = `/${publishedVersionPrefix(resolved.identity.id, resolved.liveVersion.id)}${BUNDLE_ENTRY_PATH}`;
   // Explicit and short. Without a header, a 302 is subject to heuristic browser caching, which
   // could pin a player to a version an admin has already rolled back. The edge cache above only
   // stores 200s, so this redirect always re-resolves at the origin once the browser's minute is up —
@@ -480,31 +500,45 @@ gameServingRouter.get("/:slug/:rest{.+}", async (c) => {
   const path = normalizeBundleEntryPath(decodeURIComponent(c.req.param("rest")));
   if (path === null) return notFound(c);
 
-  const { sandboxGameUseCases } = createContainer(c.env.DB, readB2Config(c.env));
-  const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
-  if (!resolved) return notFound(c);
-
-  const file = await sandboxGameUseCases.resolvePublishedFile({
-    gameId: resolved.game.id,
-    versionId: resolved.version.id,
-    path,
-  });
-  if (!file) return notFound(c);
-
-  return fileResponse(
-    file,
-    path,
-    legacyAssetCachePolicy(), // this URL's contents change when the live version does
-    c.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
+  const { runtimeGameRegistry, runtimeGameAvailability, gameBundleStorageRepo } = createContainer(
+    c.env.DB,
+    readB2Config(c.env),
   );
+  const resolved = await runtimeGameRegistry.findBySlug(c.req.param("slug"));
+  if (!resolved) return notFound(c);
+  try {
+    if (
+      !(await runtimeGameAvailability.isVersionServable(
+        resolved.identity.id,
+        resolved.liveVersion.id,
+      ))
+    ) {
+      return notFound(c);
+    }
+    const bytes = await gameBundleStorageRepo.getObject(
+      publishedObjectKey(resolved.identity.id, resolved.liveVersion.id, path),
+    );
+    if (!bytes) return notFound(c);
+    const { contentType, contentEncoding } = resolveBundleContentType(path);
+    const file: ServableBundleFile = { bytes, contentType, contentEncoding, published: true };
+
+    return fileResponse(
+      file,
+      path,
+      legacyAssetCachePolicy(), // this URL's contents change when the live version does
+      c.env.FRONTEND_URL || DEFAULT_FRONTEND_URL,
+    );
+  } catch {
+    return notFound(c);
+  }
 });
 
 // ── /games/:gameId/:versionId/* — immutable published assets ─────────────────
 
 /**
- * The path a running game actually fetches from, and the only one that should carry meaningful
- * traffic. Nothing is decompressed here: publishing already wrote each file as its own object, so
- * a request is a single object read that Cloudflare can cache indefinitely.
+ * The path a running game actually fetches from for both publishers. Nothing is decompressed or
+ * recovered from a source archive here: READY is established only after manifest-last publishing,
+ * and a request is one generic object read that Cloudflare can cache by exact numeric version.
  */
 publishedGameAssetsRouter.get("/:gameId/:versionId/:rest{.+}", async (c) => {
   if (!c.env?.DB) return notFound(c);
@@ -516,9 +550,16 @@ publishedGameAssetsRouter.get("/:gameId/:versionId/:rest{.+}", async (c) => {
   const path = normalizeBundleEntryPath(decodeURIComponent(c.req.param("rest")));
   if (path === null) return notFound(c);
 
-  const { sandboxGameUseCases } = createContainer(c.env.DB, readB2Config(c.env));
-  const file = await sandboxGameUseCases.resolvePublishedFile({ gameId, versionId, path });
-  if (!file) return notFound(c);
+  const { gameBundleStorageRepo } = createContainer(c.env.DB, readB2Config(c.env));
+  let bytes: ArrayBuffer | null;
+  try {
+    bytes = await gameBundleStorageRepo.getObject(publishedObjectKey(gameId, versionId, path));
+  } catch {
+    return notFound(c);
+  }
+  if (!bytes) return notFound(c);
+  const { contentType, contentEncoding } = resolveBundleContentType(path);
+  const file: ServableBundleFile = { bytes, contentType, contentEncoding, published: true };
 
   return fileResponse(
     file,

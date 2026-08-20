@@ -19,18 +19,20 @@ const B2_ENV = {
 interface FakeGame {
   id: number;
   slug: string;
+  publisher_type?: "OWOGG" | "USER";
+  publisher_user_id?: number | null;
   visibility: "PRIVATE" | "PUBLIC";
   live_version_id: number | null;
+  deleted_at?: string | null;
 }
 interface FakeVersion {
   id: number;
   game_id: number;
   object_key: string;
-  status?: "PENDING_REVIEW" | "APPROVED" | "REJECTED";
   publish_status?: "UPLOADED" | "PUBLISHING" | "READY" | "FAILED";
 }
 
-function createDb(options: { game?: FakeGame; version?: FakeVersion }) {
+function createDb(options: { game?: FakeGame; version?: FakeVersion; disabledSlugs?: string[] }) {
   const { game, version } = options;
   function statement(query: string) {
     let values: unknown[] = [];
@@ -40,33 +42,25 @@ function createDb(options: { game?: FakeGame; version?: FakeVersion }) {
         return this;
       },
       async first<T>() {
-        const wantsGameBySlug = query.includes("FROM sandbox_games WHERE slug");
-        const wantsGameById = query.includes("FROM sandbox_games WHERE id");
+        const wantsGameBySlug = query.includes("FROM games WHERE slug");
+        const wantsGameById = query.includes("FROM games WHERE id");
         if (wantsGameBySlug || wantsGameById) {
           const matches = wantsGameBySlug ? game?.slug === values[0] : game?.id === values[0];
           if (!game || !matches) return null;
           return {
             id: game.id,
             slug: game.slug,
-            developer_user_id: 1,
-            title: "Test Game",
-            short_description: null,
-            description: null,
-            genre: "puzzle",
-            xp_per_completion: 0,
-            score_unit: null,
-            score_direction: null,
-            score_min: null,
-            score_max: null,
-            score_display_prefix: null,
-            score_display_suffix: null,
+            publisher_type: game.publisher_type ?? "USER",
+            publisher_user_id:
+              game.publisher_type === "OWOGG" ? null : (game.publisher_user_id ?? 1),
             visibility: game.visibility,
             live_version_id: game.live_version_id,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            deleted_at: game.deleted_at ?? null,
+            created_at: "2026-08-21T00:00:00.000Z",
+            updated_at: "2026-08-21T00:00:00.000Z",
           } as T;
         }
-        if (query.includes("FROM sandbox_game_versions WHERE id")) {
+        if (query.includes("FROM game_versions WHERE id")) {
           if (!version || version.id !== values[0]) return null;
           return {
             id: version.id,
@@ -74,22 +68,23 @@ function createDb(options: { game?: FakeGame; version?: FakeVersion }) {
             object_key: version.object_key,
             content_hash: "fakehash",
             bundle_bytes: 123,
-            status: version.status ?? "APPROVED",
-            reviewed_by_admin_id: 1,
-            reviewed_at: new Date().toISOString(),
-            reject_reason: null,
-            uploaded_at: new Date().toISOString(),
             publish_status: version.publish_status ?? "READY",
             publish_error: null,
-            published_at: new Date().toISOString(),
+            published_at: "2026-08-21T00:00:00.000Z",
             manifest_key: `games/${version.game_id}/${version.id}/.owogg-manifest.json`,
             published_size_bytes: 456,
             file_count: 2,
+            uploaded_at: "2026-08-21T00:00:00.000Z",
           } as T;
         }
         return null;
       },
       async all<T>() {
+        if (query.includes("FROM game_settings WHERE enabled = 0")) {
+          return {
+            results: (options.disabledSlugs ?? []).map((game_id) => ({ game_id })) as T[],
+          };
+        }
         return { results: [] } as { results: T[] };
       },
       async run() {
@@ -163,11 +158,43 @@ function createStorageStub(options: { stored?: Record<string, Uint8Array>; archi
 }
 
 /** Published objects as the publish pipeline would have written them for game 1 / version 17. */
-function publishedObjects(): Record<string, Uint8Array> {
+function canonicalDocument(slug: string): Uint8Array {
+  return strToU8(
+    JSON.stringify({
+      schemaVersion: 1,
+      slug,
+      title: "Test Game",
+      shortDescription: "Test game short",
+      description: "Test game description",
+      policy: { score: null, leaderboard: false, xpPerCompletion: 0, requiresAuth: false },
+      supportsReplay: false,
+      catalog: { type: "GENRE_MODE", genre: "puzzle", mode: "single" },
+      updatedAt: "2026-08-21T00:00:00.000Z",
+    }),
+  );
+}
+
+function publishedObjects(
+  game: FakeGame = LIVE_GAME,
+  version: FakeVersion = LIVE_VERSION,
+): Record<string, Uint8Array> {
   return {
-    "games/1/17/index.html": BUNDLE["index.html"],
-    "games/1/17/Build/game.wasm": BUNDLE["Build/game.wasm"],
-    "games/1/17/assets/logo.png": BUNDLE["assets/logo.png"],
+    [`game-definitions/${game.slug}/definition.json`]: canonicalDocument(game.slug),
+    [`games/${game.id}/${version.id}/.owogg-manifest.json`]: strToU8(
+      JSON.stringify({
+        gameId: game.id,
+        versionId: version.id,
+        contentHash: "fakehash",
+        entry: "index.html",
+        fileCount: 3,
+        totalSize: 20,
+        publishedAt: "2026-08-21T00:00:00.000Z",
+        files: [],
+      }),
+    ),
+    [`games/${game.id}/${version.id}/index.html`]: BUNDLE["index.html"],
+    [`games/${game.id}/${version.id}/Build/game.wasm`]: BUNDLE["Build/game.wasm"],
+    [`games/${game.id}/${version.id}/assets/logo.png`]: BUNDLE["assets/logo.png"],
   };
 }
 
@@ -187,7 +214,9 @@ async function withStorage<T>(
 
 test("GET /play/:slug redirects to the live version's immutable versioned entry point", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
-  const res = await app.request("/play/live-game", {}, { DB: db, ...B2_ENV } as any);
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/play/live-game", {}, { DB: db, ...B2_ENV } as any),
+  );
 
   assert.equal(res.status, 302);
   assert.equal(res.headers.get("Location"), "/games/1/17/index.html");
@@ -195,7 +224,9 @@ test("GET /play/:slug redirects to the live version's immutable versioned entry 
 
 test("the /play/:slug redirect is only briefly cacheable, so a rollback can't stay pinned", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
-  const res = await app.request("/play/live-game", {}, { DB: db, ...B2_ENV } as any);
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("/play/live-game", {}, { DB: db, ...B2_ENV } as any),
+  );
 
   const cacheControl = res.headers.get("Cache-Control") ?? "";
   assert.equal(cacheControl, "public, max-age=60");
@@ -226,6 +257,29 @@ test("GET /play/:slug returns 404 for a PUBLIC game with no live version", async
   });
   const res = await app.request("/play/live-game", {}, { DB: db, ...B2_ENV } as any);
   assert.equal(res.status, 404);
+});
+
+test("GET /play resolves an OWOGG game through the same generic numeric path as USER", async () => {
+  const official: FakeGame = {
+    id: 9,
+    slug: "reaction-time",
+    publisher_type: "OWOGG",
+    publisher_user_id: null,
+    visibility: "PUBLIC",
+    live_version_id: 5,
+  };
+  const officialVersion: FakeVersion = {
+    id: 5,
+    game_id: 9,
+    object_key: "uploads/9/hash.zip",
+  };
+  const { db } = createDb({ game: official, version: officialVersion });
+  const res = await withStorage({ stored: publishedObjects(official, officialVersion) }, () =>
+    app.request("/play/reaction-time", {}, { DB: db, ...B2_ENV } as any),
+  );
+
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get("Location"), "/games/9/5/index.html");
 });
 
 // ── /games/:gameId/:versionId/* — immutable published assets ─────────────────
@@ -426,7 +480,7 @@ test("serving a published asset reads exactly one object and never the source ar
   }
 });
 
-test("a published object that is missing falls back to the source archive, flagged in the response", async () => {
+test("a missing generic published object fails closed without a source-archive fallback", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
   const archive = zipSync(BUNDLE);
   const stored = publishedObjects();
@@ -436,23 +490,19 @@ test("a published object that is missing falls back to the source archive, flagg
     app.request("/games/1/17/index.html", {}, { DB: db, ...B2_ENV } as any),
   );
 
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("X-Owogg-Bundle-Source"), "archive-fallback");
-  assert.equal(await res.text(), "<h1>hi</h1>");
+  assert.equal(res.status, 404);
 });
 
-test("a version that is not fully published is served only from the archive, never from published objects", async () => {
+test("a version that is not READY is denied even when partial published objects exist", async () => {
   const { db } = createDb({
     game: LIVE_GAME,
     version: { ...LIVE_VERSION, publish_status: "PUBLISHING" },
   });
-  const archive = zipSync(BUNDLE);
   // Publish-time objects exist (a half-finished publish wrote them) but must be ignored.
-  const stub = createStorageStub({ stored: publishedObjects(), archive });
+  const stub = createStorageStub({ stored: publishedObjects() });
   try {
     const res = await app.request("/games/1/17/index.html", {}, { DB: db, ...B2_ENV } as any);
-    assert.equal(res.status, 200);
-    assert.equal(res.headers.get("X-Owogg-Bundle-Source"), "archive-fallback");
+    assert.equal(res.status, 404);
     assert.ok(
       !stub.requestedKeys.some((k) => k.startsWith("games/")),
       "a PUBLISHING version's published objects must not be trusted",
@@ -473,10 +523,56 @@ test("GET a published asset of a PRIVATE game returns 404", async () => {
   assert.equal(res.status, 404);
 });
 
-test("GET a published asset of a version that was never approved returns 404", async () => {
+test("the exact generic asset path serves OWOGG publisher bytes from the numeric layout", async () => {
+  const official: FakeGame = {
+    id: 9,
+    slug: "reaction-time",
+    publisher_type: "OWOGG",
+    publisher_user_id: null,
+    visibility: "PUBLIC",
+    live_version_id: 5,
+  };
+  const officialVersion: FakeVersion = {
+    id: 5,
+    game_id: 9,
+    object_key: "uploads/9/hash.zip",
+  };
+  const { db } = createDb({ game: official, version: officialVersion });
+  const res = await withStorage({ stored: publishedObjects(official, officialVersion) }, () =>
+    app.request("/games/9/5/index.html", {}, { DB: db, ...B2_ENV } as any),
+  );
+
+  assert.equal(res.status, 200);
+  assert.equal(await res.text(), "<h1>hi</h1>");
+});
+
+test("non-live, wrong-owner, and kill-switch-disabled exact versions are denied", async () => {
+  const nonLiveDb = createDb({
+    game: { ...LIVE_GAME, live_version_id: 18 },
+    version: LIVE_VERSION,
+  }).db;
+  const wrongOwnerDb = createDb({
+    game: LIVE_GAME,
+    version: { ...LIVE_VERSION, game_id: 2 },
+  }).db;
+  const disabledDb = createDb({
+    game: LIVE_GAME,
+    version: LIVE_VERSION,
+    disabledSlugs: [LIVE_GAME.slug],
+  }).db;
+
+  for (const db of [nonLiveDb, wrongOwnerDb, disabledDb]) {
+    const res = await withStorage({ stored: publishedObjects() }, () =>
+      app.request("/games/1/17/index.html", {}, { DB: db, ...B2_ENV } as any),
+    );
+    assert.equal(res.status, 404);
+  }
+});
+
+test("GET a published asset of a generic version that is not READY returns 404", async () => {
   const { db } = createDb({
     game: LIVE_GAME,
-    version: { ...LIVE_VERSION, status: "PENDING_REVIEW" },
+    version: { ...LIVE_VERSION, publish_status: "UPLOADED" },
   });
   const res = await withStorage({ stored: publishedObjects() }, () =>
     app.request("/games/1/17/index.html", {}, { DB: db, ...B2_ENV } as any),
@@ -527,16 +623,10 @@ test("published-asset serving fails safe to 404 when B2 is not configured", asyn
 
 test("/play/:slug also fails safe to 404 when B2 is not configured", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
-  // The resolver itself only needs D1, so it still redirects; the asset request behind it is what
-  // fails safe. Asserting both keeps the "no distinct misconfiguration signal" property explicit.
-  const redirect = await app.request("/play/live-game", {}, { DB: db } as any);
-  assert.equal(redirect.status, 302);
-  const asset = await app.request(
-    redirect.headers.get("Location") ?? "/games/1/17/index.html",
-    {},
-    { DB: db } as any,
-  );
-  assert.equal(asset.status, 404);
+  // Runtime resolution includes the strict generic canonical read. Missing B2 configuration must
+  // therefore look exactly like any other unavailable runtime state, with no metadata fallback.
+  const res = await app.request("/play/live-game", {}, { DB: db } as any);
+  assert.equal(res.status, 404);
 });
 
 // ── legacy slug-relative asset path ─────────────────────────────────────────
@@ -624,7 +714,7 @@ test("a PUBLIC→PRIVATE takedown is enforced even though the byte cache would o
       }
     ).default;
     for (const url of [...cache.store.keys()]) {
-      if (url.includes("sandbox-game-availability")) cache.store.delete(url);
+      if (url.includes("runtime-game-availability")) cache.store.delete(url);
     }
 
     const second = await withStorage({ stored: publishedObjects() }, () =>
@@ -650,7 +740,7 @@ test("within the availability window, a second request to the same URL is served
   const db = {
     ...rawDb,
     prepare(query: string) {
-      if (query.includes("FROM sandbox_games") || query.includes("FROM sandbox_game_versions")) {
+      if (query.includes("FROM games") || query.includes("FROM game_versions")) {
         dbReads++;
       }
       return rawDb.prepare(query);
@@ -881,11 +971,13 @@ test("the configured GAME_ORIGIN host is allowed to serve published assets", asy
 
 test("the configured GAME_ORIGIN host is allowed on the /play resolver too", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
-  const res = await app.request("https://play.owogg.com/play/live-game", {}, {
-    DB: db,
-    ...B2_ENV,
-    GAME_ORIGIN: "https://play.owogg.com",
-  } as any);
+  const res = await withStorage({ stored: publishedObjects() }, () =>
+    app.request("https://play.owogg.com/play/live-game", {}, {
+      DB: db,
+      ...B2_ENV,
+      GAME_ORIGIN: "https://play.owogg.com",
+    } as any),
+  );
   assert.equal(res.status, 302);
 });
 

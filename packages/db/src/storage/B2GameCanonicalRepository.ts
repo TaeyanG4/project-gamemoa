@@ -12,9 +12,8 @@ import {
 /**
  * B2-backed {@link GameCanonicalRepository} — Unified Game Platform Stage U-2's storage half of the
  * generic canonical (`GameCanonicalDocument`, modules/game/domain/gameCanonicalDocument.ts, Stage
- * U-1). Not wired into any container/route/production runtime by this Stage — see
- * application/genericCanonicalMigration.ts's own top doc comment for what this class is for so far
- * (a non-destructive migration/parity tool's destination port).
+ * U-1). C-1 composes this adapter into the production RuntimeGameRegistry while the existing
+ * migration/parity tooling continues to use the same provider-neutral destination.
  *
  * Deliberately composes an existing {@link GameBundleStorageRepository} (the exact same
  * `BackblazeB2GameBundleRepository` bundle storage and `B2CreatorGameDefinitionRepository` already

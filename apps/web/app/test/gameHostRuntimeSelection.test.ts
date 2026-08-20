@@ -1,49 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  resolveGameRuntimeKind,
+  resolveOfficialRuntimeUrl,
   buildGameResultFromBridgeComplete,
   shouldRemountIframeOnDifficultyChange,
 } from "../features/game/GameHost";
-import type { SystemGameRelease } from "../features/game/runtime/systemGameReleaseMap.generated";
+import { API_URL } from "../lib/api/config";
 
 /**
- * The pure decisions the SYSTEM-games iframe migration adds to GameHost: which runtime a slug
- * plays through, how a Game Bridge GAME_COMPLETE payload becomes the GameResult runtime.complete
- * already knows how to handle, and when a difficulty-selector change must force an iframe-runtime
- * game to remount (see aim-test's own difficulty tiers). Extracted the same way
+ * The pure decisions around GameHost's generic official iframe runtime: which provider-neutral
+ * URL a slug uses, how a Game Bridge GAME_COMPLETE payload becomes the GameResult runtime.complete
+ * already knows how to handle, and when a difficulty-selector change must force the iframe game
+ * to remount (see aim-test's own difficulty tiers). Extracted the same way
  * formatMetadataKey/Value were (see gameHostMetadata.test.ts) — this suite has no DOM renderer, so
  * this is the part of the new runtime-selection logic that's actually testable without one.
  */
 
-const RELEASES: Readonly<Record<string, SystemGameRelease>> = {
-  "reaction-time": { version: "abc123", entry: "index.html" },
-};
-
-const ALL_FOUR_MIGRATED: Readonly<Record<string, SystemGameRelease>> = {
-  "reaction-time": { version: "aaa", entry: "index.html" },
-  "aim-test": { version: "bbb", entry: "index.html" },
-  "memory-test": { version: "ccc", entry: "index.html" },
-  "typing-test": { version: "ddd", entry: "index.html" },
-};
-
-test("resolveGameRuntimeKind: a slug present in the release map plays through the iframe", () => {
-  assert.equal(resolveGameRuntimeKind("reaction-time", RELEASES), "iframe");
-});
-
-test("resolveGameRuntimeKind: every other SYSTEM game stays on LegacyReactRuntime", () => {
-  for (const slug of ["aim-test", "memory-test", "typing-test"]) {
-    assert.equal(resolveGameRuntimeKind(slug, RELEASES), "legacy");
-  }
-});
-
-test("resolveGameRuntimeKind: an empty release map (local dev, or a failed publish) falls back to legacy for every slug — never a broken iframe URL", () => {
-  assert.equal(resolveGameRuntimeKind("reaction-time", {}), "legacy");
-});
-
-test("resolveGameRuntimeKind: with all four SYSTEM games in the release map, all four resolve to iframe", () => {
+test("official primary runtime URLs use the generic /play resolver, independent of the release map", () => {
   for (const slug of ["reaction-time", "aim-test", "memory-test", "typing-test"]) {
-    assert.equal(resolveGameRuntimeKind(slug, ALL_FOUR_MIGRATED), "iframe", slug);
+    assert.equal(resolveOfficialRuntimeUrl(slug), `${API_URL}/play/${slug}`, slug);
   }
 });
 

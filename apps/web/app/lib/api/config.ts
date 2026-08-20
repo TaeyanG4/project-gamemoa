@@ -35,19 +35,19 @@ export function getGameOrigin(): string {
 
 export const GAME_ORIGIN = getGameOrigin();
 
-/** URL a sandbox game is played from. Resolves the game's current live version server-side, so the
- * caller never needs to know version ids. */
-export function sandboxGamePlayUrl(slug: string): string {
+/** Provider-neutral live runtime URL. D1/B2 resolution happens server-side, so neither OWOGG nor
+ * USER hosts need to know the numeric live version. */
+export function gamePlayUrl(slug: string): string {
   return `${GAME_ORIGIN.replace(/\/+$/, "")}/play/${encodeURIComponent(slug)}`;
 }
 
+/** Compatibility name retained for existing sandbox and Creator call sites. */
+export const sandboxGamePlayUrl = gamePlayUrl;
+
 /**
- * URL a migrated SYSTEM game's standalone iframe bundle is played from — the exact-version
- * counterpart to {@link sandboxGamePlayUrl} above. Unlike a Creator game, a SYSTEM game has no
- * D1-backed "current live version" to resolve server-side, so the caller must already know which
- * published version to point at — see systemGameReleaseMap.generated.ts (built by
- * scripts/publish-official-game-bundles.ts) and gameServing.ts's
- * `/official-games/:slug/:version/*` route.
+ * Legacy rollback URL for an official content-hash bundle. C-1's primary official runtime uses
+ * {@link gamePlayUrl} and generic numeric D1 versions; this helper and the deploy-generated release
+ * map remain available until a later production-verified cleanup removes the legacy route.
  */
 export function officialGameEntryUrl(
   slug: string,

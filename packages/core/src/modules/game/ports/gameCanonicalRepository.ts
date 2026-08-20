@@ -4,13 +4,12 @@
  * document happens to live in Backblaze B2 — same separation `CreatorGameDefinitionRepository`,
  * ports/creatorGameDefinition.ts, already establishes for the Creator-only predecessor of this
  * port). Deliberately minimal: no listing, no B2 prefix/index operation — same reasoning as
- * `CreatorGameDefinitionRepository`'s own doc comment (a future `RuntimeGameRegistry` can
+ * `CreatorGameDefinitionRepository`'s own doc comment (`RuntimeGameRegistry` can
  * enumerate identities from D1, which already has to track every game row regardless, and resolve
  * each one's canonical definition through {@link findBySlug} here).
  *
- * NOT wired to any adapter, container, or route in this PR — see gameCanonicalDocument.ts's own
- * top doc comment for the full list of what stays unchanged. A future Stage builds a
- * `B2GameCanonicalRepository` (or similarly named) adapter, reusing the exact same
+ * C-1 composes this port into RuntimeGameRegistry through `B2GameCanonicalRepository`, reusing the
+ * exact same
  * `GameBundleStorageRepository`/`BackblazeB2GameBundleRepository` composition
  * `B2CreatorGameDefinitionRepository` already established — no new B2 client is expected to be
  * needed for that either.

@@ -53,6 +53,9 @@ export * from "./modules/game/domain/gameIdentity.js";
 export * from "./modules/game/ports/gameIdentityRepository.js";
 export * from "./modules/game/domain/gameVersion.js";
 export * from "./modules/game/ports/gameVersionRepository.js";
+export * from "./modules/game/domain/runtimeGame.js";
+export * from "./modules/game/ports/runtimeGameRegistry.js";
+export * from "./modules/game/registry/composedRuntimeGameRegistry.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";
@@ -82,6 +85,7 @@ export * from "./application/creatorCanonicalBackfill.js";
 export * from "./application/genericCanonicalMigration.js";
 export * from "./application/systemGameBundlePublisher.js";
 export * from "./application/officialGameShadowBootstrap.js";
+export * from "./application/runtimeGameAvailability.js";
 export * from "./application/gameAttemptUseCases.js";
 export * from "./application/creatorScoreAcceptanceUseCases.js";
 export * from "./application/creatorLeaderboardUseCases.js";
