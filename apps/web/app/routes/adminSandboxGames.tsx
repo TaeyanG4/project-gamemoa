@@ -526,7 +526,7 @@ function GameDetailPanel({
     if (purging) return;
     if (
       !window.confirm(
-        `"${game.title}" 게임을 완전히 삭제할까요? 되돌릴 수 없고 감사 기록도 함께 사라집니다 — 대신 슬러그 "${game.slug}"는 즉시 재사용 가능해집니다.`,
+        `"${game.title}" 게임을 완전히 삭제할까요? 되돌릴 수 없고 감사 기록도 함께 사라집니다. 서버가 영구 슬러그 예약을 다시 확인하며, 승인 이력이 없는 경우에만 "${game.slug}"를 재사용할 수 있습니다.`,
       )
     ) {
       return;

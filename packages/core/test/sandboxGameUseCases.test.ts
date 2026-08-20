@@ -87,12 +87,12 @@ function createFakeRepo(): SandboxGameRepository & {
   games: Map<number, SandboxGameRecord>;
   versions: Map<number, SandboxGameVersionRecord>;
   auditActions: string[];
-  approvedGameIds: Set<number>;
+  reservedSlugs: Set<string>;
 } {
   const games = new Map<number, SandboxGameRecord>();
   const versions = new Map<number, SandboxGameVersionRecord>();
   const auditActions: string[] = [];
-  const approvedGameIds = new Set<number>();
+  const reservedSlugs = new Set<string>();
   let nextGameId = 1;
   let nextVersionId = 1;
 
@@ -100,7 +100,7 @@ function createFakeRepo(): SandboxGameRepository & {
     games,
     versions,
     auditActions,
-    approvedGameIds,
+    reservedSlugs,
     async findById(id) {
       return games.get(id) ?? null;
     },
@@ -108,7 +108,7 @@ function createFakeRepo(): SandboxGameRepository & {
       return [...games.values()].find((g) => g.slug === slug) ?? null;
     },
     async slugExists(slug) {
-      return [...games.values()].some((g) => g.slug === slug);
+      return reservedSlugs.has(slug) || [...games.values()].some((g) => g.slug === slug);
     },
     async listByDeveloper(developerUserId) {
       return [...games.values()].filter((g) => g.developerUserId === developerUserId);
@@ -280,6 +280,11 @@ function createFakeRepo(): SandboxGameRepository & {
         rejectReason: reason,
       };
       versions.set(id, updated);
+      if (status === "APPROVED") {
+        const game = games.get(existing.gameId);
+        if (!game) throw new Error("not found");
+        reservedSlugs.add(game.slug);
+      }
       return updated;
     },
     async revokeVersionApproval(id) {
@@ -305,13 +310,12 @@ function createFakeRepo(): SandboxGameRepository & {
     },
     async appendReviewAudit(entry) {
       auditActions.push(entry.action);
-      if (entry.action === "VERSION_APPROVED") approvedGameIds.add(entry.gameId);
     },
     async listReviewAudit() {
       return [];
     },
-    async hasEverApprovedVersion(gameId) {
-      return approvedGameIds.has(gameId);
+    async isSlugPermanentlyReserved(slug) {
+      return reservedSlugs.has(slug);
     },
   };
 }
@@ -3361,7 +3365,7 @@ test("purgeGame permanently reserves the slug after any approval, even when appr
     genre: "puzzle",
     mode: "single",
   });
-  repo.approvedGameIds.add(game.id);
+  repo.reservedSlugs.add(game.slug);
   await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
 
   await assert.rejects(
@@ -3489,4 +3493,36 @@ test("deleteOwnGame refuses a game with an approved version, even a not-currentl
   );
   // Still there — the refusal must not have half-deleted anything.
   assert.notEqual(await useCases.getById(game.id), null);
+});
+
+test("approve -> revoke -> creator delete stays blocked and the slug cannot be registered again", async () => {
+  const { useCases, repo, game, version } = await createGameWithLiveVersion();
+
+  const revoked = await useCases.revokeApproval({
+    versionId: version.id,
+    adminId: 99,
+    reason: "re-review",
+  });
+  assert.equal(revoked.status, "PENDING_REVIEW");
+
+  await assert.rejects(
+    () => useCases.deleteOwnGame({ gameId: game.id, developerUserId: 1 }),
+    (err: unknown) =>
+      err instanceof SandboxGameUseCaseFailure && err.code === "CANNOT_DELETE_APPROVED_GAME",
+  );
+  assert.equal(await repo.isSlugPermanentlyReserved(game.slug), true);
+
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: game.slug,
+        developerUserId: 2,
+        title: "Different Game",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
 });

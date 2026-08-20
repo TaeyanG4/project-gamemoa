@@ -93,8 +93,8 @@ export type SandboxGameUseCaseError =
    * point only ADMIN/OPERATOR (sandbox_games.delete) may remove it. */
   | "CANNOT_DELETE_APPROVED_GAME"
   /** purgeGame may only erase never-approved draft/test data. Once a version has ever been
-   * approved, the game row becomes the permanent slug tombstone so historical score/XP/favorite
-   * data can never attach to a different game registered under the same slug. */
+   * approved, a non-cascading D1 reservation becomes the permanent slug tombstone so historical
+   * score/XP/favorite data can never attach to a different game under the same slug. */
   | "CANNOT_PURGE_APPROVED_GAME"
   /** revokeApproval was called on a version that isn't currently APPROVED — there is no approval
    * decision left to undo (it's still pending, was rejected, or was already revoked). */
@@ -618,12 +618,13 @@ export class SandboxGameUseCases {
   /** Permanently erases already-soft-deleted draft/test data that has never been approved.
    * Approval permanently reserves the slug: scores, XP events, favorites, and recent-play records
    * still identify games by slug, so reusing a published identity could attach history to unrelated
-   * content. Revoking approval does not make the slug reusable; the audit history is authoritative. */
+   * content. Revoking approval does not make the slug reusable; D1's permanent reservation row is
+   * authoritative even if workflow/audit rows are later removed. */
   async purgeGame(input: { gameId: number; actorAdminId: number }): Promise<void> {
     const game = await this.repo.findById(input.gameId);
     if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
     if (game.deletedAt === null) throw new SandboxGameUseCaseFailure("NOT_YET_DELETED");
-    if (await this.repo.hasEverApprovedVersion(game.id)) {
+    if (await this.repo.isSlugPermanentlyReserved(game.slug)) {
       throw new SandboxGameUseCaseFailure("CANNOT_PURGE_APPROVED_GAME");
     }
 
@@ -648,8 +649,7 @@ export class SandboxGameUseCases {
       throw new SandboxGameUseCaseFailure("NOT_OWNER");
     }
 
-    const versions = await this.repo.listVersionsByGame(game.id);
-    if (versions.some((v) => v.status === "APPROVED")) {
+    if (await this.repo.isSlugPermanentlyReserved(game.slug)) {
       throw new SandboxGameUseCaseFailure("CANNOT_DELETE_APPROVED_GAME");
     }
 

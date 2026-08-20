@@ -290,7 +290,7 @@ test("appendReviewAudit + listReviewAudit round-trips metadata JSON and orders m
   assert.deepEqual(audit[1]?.metadata, { xpPerCompletion: 50 });
 });
 
-test("hasEverApprovedVersion remains true after approval is revoked", async () => {
+test("approval atomically reserves the slug and reservation survives revoke + hard delete", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Dev");
   const repo = new D1SandboxGameRepository(db);
@@ -302,21 +302,41 @@ test("hasEverApprovedVersion remains true after approval is revoked", async () =
     bundleBytes: 10,
     nowIso: "2026-08-21T00:00:00.000Z",
   });
-  assert.equal(await repo.hasEverApprovedVersion(game.id), false);
+  assert.equal(await repo.isSlugPermanentlyReserved(game.slug), false);
 
   await repo.decideVersion(version.id, "APPROVED", 9, null, "2026-08-21T00:01:00.000Z");
-  await repo.appendReviewAudit({
-    gameId: game.id,
-    versionId: version.id,
-    actorAdminId: 9,
-    action: "VERSION_APPROVED",
-    reason: null,
-    metadata: null,
-    nowIso: "2026-08-21T00:01:00.000Z",
-  });
+  assert.equal(await repo.isSlugPermanentlyReserved(game.slug), true);
   await repo.revokeVersionApproval(version.id);
+  await repo.hardDelete(game.id);
 
-  assert.equal(await repo.hasEverApprovedVersion(game.id), true);
+  assert.equal(await repo.isSlugPermanentlyReserved(game.slug), true);
+  assert.equal(await repo.slugExists(game.slug), true);
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (
+             id, slug, publisher_type, publisher_user_id, visibility, live_version_id,
+             deleted_at, created_at, updated_at
+           ) VALUES (?, 'renamed-identity', 'USER', 1, 'PRIVATE', NULL, NULL, ?, ?)`,
+        )
+        .run(game.id, "2026-08-21T00:02:00.000Z", "2026-08-21T00:02:00.000Z"),
+    /reserved identity cannot change slug/,
+  );
+  await assert.rejects(
+    () =>
+      repo.create({
+        slug: game.slug,
+        developerUserId: 1,
+        title: "Replacement",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+        nowIso: "2026-08-21T00:02:00.000Z",
+      }),
+    /slug is permanently reserved/,
+  );
 });
 
 test("listByDeveloper and listPublic scope correctly", async () => {

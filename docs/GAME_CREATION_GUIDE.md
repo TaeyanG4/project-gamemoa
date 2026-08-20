@@ -400,16 +400,17 @@ hardDelete`). 소프트 삭제와 달리 이래야만 `slug`의 UNIQUE 제약이
 
 - **관리자 완전 삭제(purge)** (`DELETE /api/admin/sandbox-games/:id/purge`,
   `SandboxGameUseCases.purgeGame`) — 위 소프트 삭제의 후속 단계이며, **승인 이력이 전혀 없는 초안·
-  테스트 데이터**에만 허용됩니다. 먼저 소프트 삭제되지 않았으면 `NOT_YET_DELETED`, 현재 승인 상태
-  또는 과거 `VERSION_APPROVED` 감사 이력이 있으면 `CANNOT_PURGE_APPROVED_GAME`으로 거부됩니다.
+  테스트 데이터**에만 허용됩니다. 먼저 소프트 삭제되지 않았으면 `NOT_YET_DELETED`, D1의 영구
+  `game_slug_reservations`에 slug가 있으면 `CANNOT_PURGE_APPROVED_GAME`으로 거부됩니다. 예약은 승인
+  상태 전이와 같은 DB statement의 trigger에서 생성되므로 감사 로그 append 성공에 의존하지 않습니다.
   허용된 경우에만 row/버전/심사 로그가 사라지고 `slug`가 재사용 가능해집니다. 한 번이라도 승인된
-  게임은 승인 철회·비공개·소프트 삭제 후에도 row가 영구 tombstone으로 남아 slug를 예약합니다.
+  게임은 승인 철회·비공개·hard-delete 후에도 reservation row가 남아 slug를 예약합니다.
   scores/XP/favorites/recent plays가 문자열 slug를 사용하므로 새 게임에 과거 기록이 붙는 것을 막기
   위한 불변식입니다.
 
 두 경로가 다른 삭제 방식을 쓰는 이유: 셀프서비스로 지울 수 있는 게임은 애초에 아무도 심사한 적이
 없으므로 감사 기록으로 남길 가치가 없고, 하드 삭제라야 슬러그가 실제로 풀립니다. 반면 관리자가
-지우는 게임이 이미 승인됐다면 무엇이 왜 내려갔는지 기록과 slug tombstone이 영구히 남아야
+지우는 게임이 이미 승인됐다면 무엇이 왜 내려갔는지 기록과 별도 slug reservation이 영구히 남아야
 합니다. 관리자가 purge할 수 있는 범위도 승인 전 초안·테스트 데이터로 제한됩니다.
 
 `sandbox_games.delete`가 `sandbox_games.review`(승인/반려)와 별개 권한인 이유: MODERATOR는

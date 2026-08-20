@@ -145,12 +145,18 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return row ? mapGameRow(row) : null;
   }
 
-  // Deliberately NOT filtered by deleted_at — see the port doc comment. Checks global existence
-  // in `games` identity table (SELECT 1), not the full row, so slug availability is platform-wide.
+  // Deliberately NOT filtered by deleted_at — see the port doc comment. A slug stays taken while
+  // any generic identity row exists, and remains taken after hard deletion when approval created a
+  // permanent reservation. The UNION keeps this a single fail-closed database read.
   async slugExists(slug: string): Promise<boolean> {
     const row = await this.db
-      .prepare(`SELECT 1 FROM games WHERE slug = ?`)
-      .bind(slug)
+      .prepare(
+        `SELECT 1 FROM games WHERE slug = ?
+         UNION ALL
+         SELECT 1 FROM game_slug_reservations WHERE slug = ?
+         LIMIT 1`,
+      )
+      .bind(slug, slug)
       .first<{ 1: number }>();
     return row !== null;
   }
@@ -208,7 +214,8 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     // ON DELETE CASCADE actually being enforced (SQLite/D1 foreign-key enforcement is a per-
     // connection PRAGMA; being explicit here doesn't depend on it). One batch() call for
     // atomicity across the statements. The trg_sandbox_games_after_delete trigger automatically
-    // removes the corresponding USER row from `games`.
+    // removes the corresponding USER row from `games`; game_slug_reservations is deliberately not
+    // part of this batch or any FK cascade.
     await this.db.batch([
       this.db.prepare(`DELETE FROM sandbox_game_review_audit_log WHERE game_id = ?`).bind(id),
       this.db.prepare(`DELETE FROM sandbox_game_versions WHERE game_id = ?`).bind(id),
@@ -576,19 +583,11 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return (res.results || []).map(mapAuditRow);
   }
 
-  async hasEverApprovedVersion(gameId: number): Promise<boolean> {
+  async isSlugPermanentlyReserved(slug: string): Promise<boolean> {
     const row = await this.db
-      .prepare(
-        `SELECT EXISTS (
-           SELECT 1 FROM sandbox_game_versions
-           WHERE game_id = ? AND status = 'APPROVED'
-           UNION ALL
-           SELECT 1 FROM sandbox_game_review_audit_log
-           WHERE game_id = ? AND action = 'VERSION_APPROVED'
-         ) AS approved`,
-      )
-      .bind(gameId, gameId)
-      .first<{ approved: number }>();
-    return Number(row?.approved ?? 0) === 1;
+      .prepare(`SELECT 1 FROM game_slug_reservations WHERE slug = ?`)
+      .bind(slug)
+      .first<{ 1: number }>();
+    return row !== null;
   }
 }

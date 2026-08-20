@@ -5,6 +5,19 @@
 -- fields remain authoritative in `sandbox_game_versions`. Existing USER numeric version IDs are
 -- preserved exactly so games.live_version_id already points into the generic namespace.
 
+-- Permanent public identity reservation. Deliberately has no FK/cascade to games or sandbox_games:
+-- approval makes a slug non-reusable even if every workflow/identity row is later hard-deleted.
+-- source_game_id records which numeric identity first claimed it and lets triggers reject a
+-- conflicting future identity without overwriting history.
+CREATE TABLE game_slug_reservations (
+  slug TEXT PRIMARY KEY,
+  source_game_id INTEGER NOT NULL,
+  reserved_at TEXT NOT NULL,
+  CHECK (length(slug) > 0 AND slug = trim(slug)),
+  CHECK (source_game_id > 0),
+  CHECK (length(reserved_at) > 0)
+);
+
 CREATE TABLE game_versions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -62,6 +75,33 @@ SELECT
 FROM sandbox_game_versions sv
 JOIN games g ON g.id = sv.game_id AND g.publisher_type = 'USER';
 
+-- Non-destructive reservation backfill. Current approval catches rows whose audit append failed;
+-- historical audit catches approvals later revoked to PENDING_REVIEW. Both sources may name the
+-- same slug, so INSERT OR IGNORE is intentional and the parity guard below verifies that any
+-- ignored row agrees on source_game_id rather than silently accepting conflicting authority.
+INSERT OR IGNORE INTO game_slug_reservations (slug, source_game_id, reserved_at)
+SELECT approval_history.slug, approval_history.game_id, MIN(approval_history.approved_at)
+FROM (
+  SELECT
+    sg.slug AS slug,
+    sg.id AS game_id,
+    COALESCE(sv.reviewed_at, sv.uploaded_at) AS approved_at
+  FROM sandbox_game_versions sv
+  JOIN sandbox_games sg ON sg.id = sv.game_id
+  WHERE sv.status = 'APPROVED'
+
+  UNION ALL
+
+  SELECT
+    sg.slug AS slug,
+    sg.id AS game_id,
+    audit.created_at AS approved_at
+  FROM sandbox_game_review_audit_log audit
+  JOIN sandbox_games sg ON sg.id = audit.game_id
+  WHERE audit.action = 'VERSION_APPROVED'
+) approval_history
+GROUP BY approval_history.slug, approval_history.game_id;
+
 -- Fail closed unless every legacy USER version has exact provider-neutral parity and every live
 -- version pointer resolves to a version owned by that same game.
 CREATE TEMP TABLE _migration_0031_parity_guard (
@@ -96,6 +136,25 @@ WHERE g.live_version_id IS NOT NULL
     SELECT 1 FROM game_versions gv
     WHERE gv.id = g.live_version_id AND gv.game_id = g.id
   );
+
+INSERT INTO _migration_0031_parity_guard (must_be_zero)
+SELECT COUNT(*)
+FROM (
+  SELECT sg.slug, sg.id AS game_id
+  FROM sandbox_game_versions sv
+  JOIN sandbox_games sg ON sg.id = sv.game_id
+  WHERE sv.status = 'APPROVED'
+
+  UNION
+
+  SELECT sg.slug, sg.id AS game_id
+  FROM sandbox_game_review_audit_log audit
+  JOIN sandbox_games sg ON sg.id = audit.game_id
+  WHERE audit.action = 'VERSION_APPROVED'
+) approval_history
+LEFT JOIN game_slug_reservations reservation ON reservation.slug = approval_history.slug
+WHERE reservation.slug IS NULL
+   OR reservation.source_game_id <> approval_history.game_id;
 
 DROP TABLE _migration_0031_parity_guard;
 
@@ -187,6 +246,103 @@ BEGIN
   );
 
   DELETE FROM game_versions WHERE id = OLD.id AND game_id = OLD.game_id;
+END;
+
+-- Approval and reservation are one SQLite statement boundary. If reservation authority conflicts,
+-- the approval INSERT/UPDATE itself aborts and rolls back; audit append success is not required for
+-- identity durability. The INSERT case is defense-in-depth for direct/old-worker writes that create
+-- an already-approved version, while normal approval uses the UPDATE trigger.
+CREATE TRIGGER trg_sandbox_game_versions_reserve_slug_after_insert
+AFTER INSERT ON sandbox_game_versions
+FOR EACH ROW
+WHEN NEW.status = 'APPROVED'
+BEGIN
+  SELECT RAISE(ABORT, 'Slug reservation conflict: approved slug belongs to another game identity')
+  WHERE EXISTS (
+    SELECT 1
+    FROM sandbox_games sg
+    JOIN game_slug_reservations reservation ON reservation.slug = sg.slug
+    WHERE sg.id = NEW.game_id AND reservation.source_game_id <> NEW.game_id
+  );
+
+  INSERT OR IGNORE INTO game_slug_reservations (slug, source_game_id, reserved_at)
+  SELECT slug, NEW.game_id, COALESCE(NEW.reviewed_at, NEW.uploaded_at)
+  FROM sandbox_games
+  WHERE id = NEW.game_id;
+
+  SELECT RAISE(ABORT, 'Slug reservation failed: approved game identity is missing or malformed')
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM sandbox_games sg
+    JOIN game_slug_reservations reservation
+      ON reservation.slug = sg.slug AND reservation.source_game_id = NEW.game_id
+    WHERE sg.id = NEW.game_id
+  );
+END;
+
+CREATE TRIGGER trg_sandbox_game_versions_reserve_slug_after_update
+AFTER UPDATE OF status ON sandbox_game_versions
+FOR EACH ROW
+WHEN NEW.status = 'APPROVED' AND OLD.status IS NOT 'APPROVED'
+BEGIN
+  SELECT RAISE(ABORT, 'Slug reservation conflict: approved slug belongs to another game identity')
+  WHERE EXISTS (
+    SELECT 1
+    FROM sandbox_games sg
+    JOIN game_slug_reservations reservation ON reservation.slug = sg.slug
+    WHERE sg.id = NEW.game_id AND reservation.source_game_id <> NEW.game_id
+  );
+
+  INSERT OR IGNORE INTO game_slug_reservations (slug, source_game_id, reserved_at)
+  SELECT slug, NEW.game_id, COALESCE(NEW.reviewed_at, NEW.uploaded_at)
+  FROM sandbox_games
+  WHERE id = NEW.game_id;
+
+  SELECT RAISE(ABORT, 'Slug reservation failed: approved game identity is missing or malformed')
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM sandbox_games sg
+    JOIN game_slug_reservations reservation
+      ON reservation.slug = sg.slug AND reservation.source_game_id = NEW.game_id
+    WHERE sg.id = NEW.game_id
+  );
+END;
+
+-- Database-level reservation enforcement closes the migration -> Worker deployment gap. Old code
+-- can still hard-delete workflow rows, but it cannot allocate a different generic identity for a
+-- reserved slug. Re-inserting the same source_game_id is allowed only as identity restoration.
+CREATE TRIGGER trg_games_reserved_slug_before_insert
+BEFORE INSERT ON games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Slug reservation conflict: reserved identity cannot change slug')
+  WHERE EXISTS (
+    SELECT 1 FROM game_slug_reservations
+    WHERE source_game_id = NEW.id AND slug <> NEW.slug
+  );
+
+  SELECT RAISE(ABORT, 'Slug reservation conflict: slug is permanently reserved')
+  WHERE EXISTS (
+    SELECT 1 FROM game_slug_reservations
+    WHERE slug = NEW.slug AND source_game_id <> NEW.id
+  );
+END;
+
+CREATE TRIGGER trg_games_reserved_slug_before_update
+BEFORE UPDATE OF slug, id ON games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Slug reservation conflict: reserved identity cannot change slug')
+  WHERE EXISTS (
+    SELECT 1 FROM game_slug_reservations
+    WHERE source_game_id = NEW.id AND slug <> NEW.slug
+  );
+
+  SELECT RAISE(ABORT, 'Slug reservation conflict: slug is permanently reserved')
+  WHERE EXISTS (
+    SELECT 1 FROM game_slug_reservations
+    WHERE slug = NEW.slug AND source_game_id <> NEW.id
+  );
 END;
 
 -- Runtime identity can only point at a generic version belonging to that exact game. This guard is

@@ -364,7 +364,7 @@ adminSandboxGamesRouter.delete("/:id", async (c) => {
 });
 
 // DELETE /api/admin/sandbox-games/:id/purge — permanently erases already-soft-deleted draft/test
-// data only. Any VERSION_APPROVED history permanently reserves the slug and returns 409; this
+// data only. Any durable D1 slug reservation returns 409 even if review/audit rows were removed;
 // prevents historical score/XP/favorite records from attaching to unrelated content.
 adminSandboxGamesRouter.delete("/:id/purge", async (c) => {
   const admin = await requireElevatedAdmin(c);

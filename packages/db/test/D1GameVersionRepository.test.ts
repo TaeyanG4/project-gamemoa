@@ -59,15 +59,17 @@ function seedSandboxVersion(
     gameId: number;
     publishStatus?: "UPLOADED" | "PUBLISHING" | "READY" | "FAILED";
     publishError?: string | null;
+    reviewStatus?: "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+    reviewedAt?: string | null;
   },
 ): void {
   const ready = input.publishStatus === "READY";
   raw
     .prepare(
       `INSERT INTO sandbox_game_versions (
-         id, game_id, object_key, content_hash, bundle_bytes, status, uploaded_at,
+         id, game_id, object_key, content_hash, bundle_bytes, status, reviewed_at, uploaded_at,
          publish_status, publish_error, published_at, manifest_key, published_size_bytes, file_count
-       ) VALUES (?, ?, ?, ?, ?, 'PENDING_REVIEW', ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       input.id,
@@ -75,6 +77,8 @@ function seedSandboxVersion(
       `uploads/${input.gameId}/${input.id}.zip`,
       `hash-${input.id}`,
       input.id * 10,
+      input.reviewStatus ?? "PENDING_REVIEW",
+      input.reviewedAt ?? null,
       `2026-08-20T00:00:${String(input.id).padStart(2, "0")}.000Z`,
       input.publishStatus ?? "UPLOADED",
       input.publishError ?? null,
@@ -143,6 +147,55 @@ test("0031 actual migration preserves USER version IDs and publish facts without
   ]) {
     assert.equal(names.has(forbidden), false, `${forbidden} must remain USER-workflow-only`);
   }
+});
+
+test("0031 backfills permanent slug reservations from current approval and historical audit", () => {
+  const { raw } = createSqliteD1(LEGACY_SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1);
+  seedSandboxGame(raw, { id: 1, slug: "currently-approved", userId: 1 });
+  seedSandboxGame(raw, { id: 2, slug: "historically-approved", userId: 1 });
+  seedSandboxGame(raw, { id: 3, slug: "never-approved", userId: 1 });
+  seedSandboxVersion(raw, {
+    id: 1,
+    gameId: 1,
+    reviewStatus: "APPROVED",
+    reviewedAt: "2026-08-20T02:00:00.000Z",
+  });
+  seedSandboxVersion(raw, { id: 2, gameId: 2, reviewStatus: "PENDING_REVIEW" });
+  seedSandboxVersion(raw, { id: 3, gameId: 3, reviewStatus: "PENDING_REVIEW" });
+  raw
+    .prepare(
+      `INSERT INTO sandbox_game_review_audit_log
+         (game_id, version_id, actor_admin_id, action, reason, metadata_json, created_at)
+       VALUES (2, 2, 9, 'VERSION_APPROVED', NULL, NULL, '2026-08-20T01:00:00.000Z'),
+              (1, 1, 9, 'VERSION_APPROVED', NULL, NULL, '2026-08-20T03:00:00.000Z')`,
+    )
+    .run();
+
+  applyIdentityFoundation(raw);
+  raw.exec(migration0031);
+
+  const reservations = raw
+    .prepare(
+      `SELECT slug, source_game_id, reserved_at
+       FROM game_slug_reservations ORDER BY source_game_id`,
+    )
+    .all() as Array<{ slug: string; source_game_id: number; reserved_at: string }>;
+  assert.deepEqual(
+    reservations.map((reservation) => ({ ...reservation })),
+    [
+      {
+        slug: "currently-approved",
+        source_game_id: 1,
+        reserved_at: "2026-08-20T02:00:00.000Z",
+      },
+      {
+        slug: "historically-approved",
+        source_game_id: 2,
+        reserved_at: "2026-08-20T01:00:00.000Z",
+      },
+    ],
+  );
 });
 
 test("0031 triggers converge old-worker INSERT/UPDATE/DELETE and preserve soft-deleted history", async () => {
@@ -351,4 +404,19 @@ test("mapGameVersionRow fails closed on malformed generic data", () => {
     /Invalid publish_status/,
   );
   assert.throws(() => mapGameVersionRow({ ...valid, bundle_bytes: -1 }), /Invalid bundle_bytes/);
+  for (const field of [
+    "publish_error",
+    "published_at",
+    "manifest_key",
+    "published_size_bytes",
+    "file_count",
+  ]) {
+    const missing: Record<string, unknown> = { ...valid };
+    delete missing[field];
+    assert.throws(
+      () => mapGameVersionRow(missing),
+      new RegExp(`Invalid ${field}`),
+      `${field}: missing must not normalize to SQL NULL`,
+    );
+  }
 });

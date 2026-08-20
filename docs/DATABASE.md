@@ -326,6 +326,7 @@ erDiagram
     games ||--o{ game_versions : "공통 버전"
     games ||--o| sandbox_games : "USER shared id"
     game_versions ||--o| sandbox_game_versions : "USER shared id"
+    games ||--o| game_slug_reservations : "최초 승인 identity, 비-FK 기록"
     sandbox_games ||--o{ sandbox_game_versions : "불변 버전"
     sandbox_games ||--o{ sandbox_game_review_audit_log : ""
     sandbox_game_versions ||--o{ sandbox_game_review_audit_log : ""
@@ -378,6 +379,11 @@ erDiagram
         text manifest_key
         text uploaded_at
     }
+    game_slug_reservations {
+        text slug PK "영구 예약"
+        int source_game_id "의도적으로 FK 없음"
+        text reserved_at
+    }
     sandbox_game_review_audit_log {
         int id PK
         int game_id FK
@@ -390,7 +396,10 @@ erDiagram
 `games`/`game_versions`는 publisher-neutral runtime identity/version 저장소입니다. USER row는
 `sandbox_games`/`sandbox_game_versions`와 정확한 숫자 ID를 공유하며 trigger로 쓰기가 수렴합니다.
 `sandbox_game_versions.status`, `reviewed_*`, `reject_reason`은 USER 전용 심사 lifecycle이므로 generic
-`game_versions`에 복제하지 않습니다. `0031` 시점에는 production registry/read 경로를 바꾸지 않습니다.
+`game_versions`에 복제하지 않습니다. `game_slug_reservations`는 승인 상태 전이와 같은 D1 statement의
+trigger에서 생성되며 `games`/심사/감사 row의 hard-delete cascade에 참여하지 않습니다. `slugExists`는
+generic identity와 이 영구 예약을 함께 조회합니다. `0031` 시점에는 production registry/read 경로를
+바꾸지 않습니다.
 
 `game_creator_access`/`game_creator_access_audit_log`는 마이그레이션 `0024`가 만든
 `game_developers`/`game_developer_audit_log`를 `0025`가 **이름만** 바꾼 테이블입니다(행 데이터

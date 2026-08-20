@@ -31,12 +31,12 @@ function requiredString(value: unknown, field: string): string {
 }
 
 function nullableString(value: unknown, field: string): string | null {
-  if (value === null || value === undefined) return null;
+  if (value === null) return null;
   return requiredString(value, field);
 }
 
 function nullableNonNegativeInteger(value: unknown, field: string): number | null {
-  if (value === null || value === undefined) return null;
+  if (value === null) return null;
   return requiredNonNegativeInteger(value, field);
 }
 
