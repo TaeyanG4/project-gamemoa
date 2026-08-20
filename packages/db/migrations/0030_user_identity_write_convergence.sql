@@ -68,10 +68,12 @@ WHERE games.publisher_type = 'USER'
 -- 2. Authority & Parity Guard (Fail-Closed Migration Check)
 -- -------------------------------------------------------------------------------------------------
 
--- Create a temporary check table to ensure zero delta/conflict exists.
+-- Create a migration-local scratch check table to ensure zero delta/conflict exists.
+-- This intentionally uses normal DDL rather than TEMP: Cloudflare's remote D1 authorizer
+-- rejects TEMP table DDL during migrations. The table is dropped before successful completion.
 -- If any sandbox_games row is missing or mismatched in games (e.g. collision with OWOGG row),
 -- the CHECK constraint will immediately abort the migration.
-CREATE TEMP TABLE _migration_0030_parity_guard (
+CREATE TABLE _migration_0030_parity_guard (
   must_be_zero INTEGER CHECK (must_be_zero = 0)
 );
 
