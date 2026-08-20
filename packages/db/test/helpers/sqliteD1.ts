@@ -37,7 +37,7 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
         };
       };
       const batchSync = () => {
-        if (/\bRETURNING\b/i.test(query)) {
+        if (/\bRETURNING\b/i.test(query) || /^\s*SELECT\b/i.test(query)) {
           const rows = stmt.all(...(bound as never[])) as Record<string, unknown>[];
           const lastRow = rows.at(-1);
           return {

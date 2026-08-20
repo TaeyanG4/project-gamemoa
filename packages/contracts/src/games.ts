@@ -90,18 +90,34 @@ export const GameSessionResponseSchema = z.object({
 export type GameSessionResponse = z.infer<typeof GameSessionResponseSchema>;
 
 /**
- * POST /api/games/:slug/score — the server-side acceptance request for a Creator game's score.
- * `token` is the Game Session token from GameSessionResponseSchema, spent exactly once by this
- * call (see packages/core/src/application/creatorScoreAcceptanceUseCases.ts). No difficulty field
- * — Creator games have no difficulty tiers today.
+ * POST /api/games/:slug/score — provider-neutral server-side score acceptance. `token` is the Game
+ * Session token from GameSessionResponseSchema, spent exactly once by this call. Difficulty is
+ * optional on the wire because the signed token is authoritative; when supplied it must match.
  */
-export const CreatorScoreAcceptRequestSchema = z.object({
+export const GameScoreAcceptRequestSchema = z.object({
   token: z.string(),
   score: z.number(),
+  difficulty: z.string().optional(),
+  /** Separate Discord guild play context; never reaches the iframe or replaces the game token. */
+  playToken: z.string().optional(),
 });
-export type CreatorScoreAcceptRequest = z.infer<typeof CreatorScoreAcceptRequestSchema>;
+export type GameScoreAcceptRequest = z.infer<typeof GameScoreAcceptRequestSchema>;
 
-export const CreatorScoreAcceptResponseSchema = z.object({
+export const GameScoreAcceptResponseSchema = z.object({
   success: z.literal(true),
+  score_id: z.number().int().positive().optional(),
+  game_id: z.string().optional(),
+  score: z.number().optional(),
+  nickname: z.string().optional(),
+  xpAwarded: z.number().int().min(0).optional(),
+  guildXpAwarded: z.number().int().min(0).optional(),
+  guildId: z.string().optional(),
+  newlyUnlockedAchievements: z.array(z.string()).optional(),
 });
-export type CreatorScoreAcceptResponse = z.infer<typeof CreatorScoreAcceptResponseSchema>;
+export type GameScoreAcceptResponse = z.infer<typeof GameScoreAcceptResponseSchema>;
+
+/** Transitional names retained for CreatorGameHost callers; the endpoint is now generic. */
+export const CreatorScoreAcceptRequestSchema = GameScoreAcceptRequestSchema;
+export type CreatorScoreAcceptRequest = GameScoreAcceptRequest;
+export const CreatorScoreAcceptResponseSchema = GameScoreAcceptResponseSchema;
+export type CreatorScoreAcceptResponse = GameScoreAcceptResponse;

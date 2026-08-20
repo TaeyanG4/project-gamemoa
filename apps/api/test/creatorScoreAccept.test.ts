@@ -40,7 +40,7 @@ function tamperSignedToken(token: string): string {
   return prefix + tamperedSegment;
 }
 
-// POST /api/games/:slug/score — route-layer wiring only. The atomic accept-or-reject write is
+// POST /api/games/:slug/score — route-layer wiring only. The generic D1/B2 runtime acceptance path is
 // proven against real SQLite in packages/db/test/D1CreatorScoreAcceptanceRepository.test.ts, and
 // every pre-write check (availability, token validity, context match, score policy) is proven
 // against a fake repository in packages/core/test/creatorScoreAcceptanceUseCases.test.ts. This
@@ -118,26 +118,16 @@ function createDb(options: {
           } as T;
         }
 
-        const wantsGameBySlug = query.includes("FROM sandbox_games WHERE slug");
-        const wantsGameById = query.includes("FROM sandbox_games WHERE id");
+        const wantsGameBySlug = query.includes("FROM games WHERE slug");
+        const wantsGameById = query.includes("FROM games WHERE id");
         if (wantsGameBySlug || wantsGameById) {
           const matches = wantsGameBySlug ? game?.slug === values[0] : game?.id === values[0];
           if (!game || !matches) return null;
           return {
             id: game.id,
             slug: game.slug,
-            developer_user_id: 1,
-            title: "Test Game",
-            short_description: null,
-            description: null,
-            genre: "puzzle",
-            xp_per_completion: 0,
-            score_unit: game.score_unit ?? null,
-            score_direction: game.score_direction ?? null,
-            score_min: game.score_min ?? null,
-            score_max: game.score_max ?? null,
-            score_display_prefix: null,
-            score_display_suffix: null,
+            publisher_type: "USER",
+            publisher_user_id: 1,
             visibility: game.visibility,
             live_version_id: game.live_version_id,
             created_at: new Date().toISOString(),
@@ -145,18 +135,14 @@ function createDb(options: {
           } as T;
         }
 
-        if (query.includes("FROM sandbox_game_versions WHERE id")) {
+        if (query.includes("FROM game_versions WHERE id")) {
           if (!version || version.id !== values[0]) return null;
           return {
             id: version.id,
             game_id: version.game_id,
-            object_key: "uploads/1/abc.zip",
+            object_key: "games/1/17/index.html",
             content_hash: "fakehash",
             bundle_bytes: 123,
-            status: "APPROVED",
-            reviewed_by_admin_id: 1,
-            reviewed_at: new Date().toISOString(),
-            reject_reason: null,
             uploaded_at: new Date().toISOString(),
             publish_status: "READY",
             publish_error: null,
@@ -181,6 +167,7 @@ function createDb(options: {
   return {
     scores,
     db: {
+      __game: game,
       prepare(query: string) {
         return statement(query);
       },
@@ -216,7 +203,11 @@ function createDb(options: {
           // rows_written is the field D1CreatorScoreAcceptanceRepository actually reads to decide
           // `accepted` — populated here (not left undefined) so this fake models a real D1 batch
           // result, not just changes, which the repository deliberately no longer trusts.
-          { success: true, meta: { changes: scoreChanges, rows_written: scoreChanges } },
+          {
+            success: true,
+            meta: { changes: scoreChanges, rows_written: scoreChanges, last_row_id: 1 },
+          },
+          { success: true, results: scoreChanges === 1 ? [{ id: 1 }] : [] },
         ];
       },
     },
@@ -244,6 +235,7 @@ function samplePayload(overrides: Partial<GameSessionPayload> = {}): GameSession
     versionId: LIVE_VERSION.id,
     attemptId: crypto.randomUUID(),
     exp: Math.floor(Date.now() / 1000) + 300,
+    difficulty: "normal",
     ...overrides,
   };
 }
@@ -253,11 +245,55 @@ async function postScore(
   body: unknown,
   env: Record<string, unknown> = { GAME_SESSION_SECRET: SESSION_SECRET },
 ) {
-  return app.request(
-    "/api/games/ball-dodge/score",
-    { method: "POST", headers: AUTH_HEADERS, body: JSON.stringify(body) },
-    { DB: db, ...env } as any,
-  );
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    const canonicalGame = (db as { __game?: FakeGame }).__game ?? LIVE_GAME;
+    const canonical = {
+      schemaVersion: 1,
+      slug: "ball-dodge",
+      title: "Test Game",
+      shortDescription: "",
+      description: "",
+      policy: {
+        score:
+          canonicalGame.score_unit &&
+          canonicalGame.score_direction &&
+          canonicalGame.score_min !== null &&
+          canonicalGame.score_max !== null
+            ? {
+                unit: canonicalGame.score_unit,
+                direction: canonicalGame.score_direction,
+                min: canonicalGame.score_min,
+                max: canonicalGame.score_max,
+              }
+            : null,
+        leaderboard: false,
+        xpPerCompletion: 0,
+        requiresAuth: true,
+      },
+      catalog: { type: "GENRE_MODE", genre: "puzzle", mode: "single" },
+      supportsReplay: false,
+      updatedAt: new Date().toISOString(),
+    };
+    return new Response(JSON.stringify(canonical), { status: 200 });
+  }) as typeof fetch;
+  try {
+    return await app.request(
+      "/api/games/ball-dodge/score",
+      { method: "POST", headers: AUTH_HEADERS, body: JSON.stringify(body) },
+      {
+        DB: db,
+        B2_ENDPOINT: "https://s3.us-west-004.backblazeb2.com",
+        B2_REGION: "us-west-004",
+        B2_BUCKET_NAME: "test",
+        B2_KEY_ID: "test",
+        B2_APPLICATION_KEY: "test",
+        ...env,
+      } as any,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 }
 
 test("requires authentication — no session cookie means 401, before anything else runs", async () => {
@@ -353,7 +389,7 @@ test("a valid token, matching context, and in-policy score is accepted and reach
 
   assert.equal(res.status, 200);
   const responseBody = (await res.json()) as { success: true };
-  assert.deepEqual(responseBody, { success: true });
+  assert.equal(responseBody.success, true);
 
   assert.equal(scores.length, 1);
   assert.equal(scores[0]?.gameSlug, "ball-dodge");
@@ -390,7 +426,7 @@ test("the same token presented twice is accepted once, then 409 ALREADY_CONSUMED
   assert.equal(scores[0]?.score, 120);
 });
 
-test("is rate limited under the 'creator-score-accept' name when RATE_LIMITER is bound and rejects", async () => {
+test("is rate limited under the generic game-score-accept name when RATE_LIMITER is bound and rejects", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
   const keys: string[] = [];
   const res = await postScore(
@@ -407,10 +443,7 @@ test("is rate limited under the 'creator-score-accept' name when RATE_LIMITER is
     },
   );
   assert.equal(res.status, 429);
-  assert.ok(
-    keys[0]?.startsWith("creator-score-accept:"),
-    "keyed under this route's own name prefix",
-  );
+  assert.ok(keys[0]?.startsWith("game-score-accept:"), "keyed under this route's own name prefix");
 });
 
 test("passes through when RATE_LIMITER is bound and allows the request", async () => {

@@ -13,8 +13,9 @@ import { apiFetch } from "../../lib/api/client";
  * The token itself must never reach the sandboxed game iframe — see CreatorGameHost.tsx and
  * IframeRuntime for why nothing crosses that boundary except the five Game Bridge messages.
  */
-export function fetchGameSession(slug: string) {
+export function fetchGameSession(slug: string, difficulty?: string) {
   return apiFetch(`/api/games/${encodeURIComponent(slug)}/session`, GameSessionResponseSchema, {
     method: "POST",
+    ...(difficulty ? { body: JSON.stringify({ difficulty }) } : {}),
   });
 }

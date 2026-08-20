@@ -6,6 +6,8 @@ export const scoreSubmissionSchema = z.object({
   grade: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
   playToken: z.string().optional(),
+  /** Signed generic Game Session token. Legacy POST /api/scores requires this field now. */
+  gameSessionToken: z.string().optional(),
   timestamp: z.number().default(() => Date.now()),
   /** Omitted = the game's default difficulty (or "normal" for games without difficulty tiers).
    * Validated server-side against the game's manifest — see scoreValidation.ts. */

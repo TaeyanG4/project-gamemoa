@@ -1,14 +1,50 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { createContainer, evaluateAchievementsForUser, gameRegistry } from "../container.js";
-import { createReadContainer } from "../readReplica.js";
+import { createContainer, evaluateAchievementsForUser } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { rateLimit } from "../middleware/rateLimit.js";
+import { readB2Config } from "./devGames.js";
 import { scoreSubmissionSchema } from "@owogg/contracts";
-import type { FormattedScoreRecord } from "@owogg/core";
+import { formatScore } from "@owogg/game-sdk/contracts";
+import { validateDifficultyAgainstDefinition, type GameScoreAcceptError } from "@owogg/core";
 import type { ApiEnv } from "./auth.js";
 
 export const scoresRouter = new Hono<ApiEnv>();
+
+function scoreAcceptErrorStatus(error: GameScoreAcceptError): 400 | 401 | 404 | 409 {
+  switch (error) {
+    case "GAME_NOT_AVAILABLE":
+      return 404;
+    case "INVALID_TOKEN":
+    case "CONTEXT_MISMATCH":
+      return 401;
+    case "ALREADY_CONSUMED":
+      return 409;
+    default:
+      return 400;
+  }
+}
+
+function scoreAcceptErrorMessage(error: GameScoreAcceptError, reason?: string): string {
+  switch (error) {
+    case "GAME_NOT_AVAILABLE":
+      return "게임을 찾을 수 없습니다.";
+    case "GAME_DISABLED":
+      return "현재 비활성화된 게임입니다.";
+    case "INVALID_TOKEN":
+      return "게임 세션이 유효하지 않거나 만료되었습니다.";
+    case "CONTEXT_MISMATCH":
+      return "게임 세션이 이 요청과 일치하지 않습니다. 다시 시작해 주세요.";
+    case "SCORE_POLICY_NOT_CONFIGURED":
+      return "이 게임은 아직 점수 제출을 지원하지 않습니다.";
+    case "INVALID_DIFFICULTY":
+      return reason ?? "유효하지 않은 난이도입니다.";
+    case "INVALID_SCORE":
+      return reason ?? "유효하지 않은 점수입니다.";
+    case "ALREADY_CONSUMED":
+      return "이미 처리된 플레이입니다.";
+  }
+}
 
 // POST /api/scores — the most D1-expensive endpoint in the app (~10-15 serialized queries per
 // submission), so it is rate limited ahead of any DB work. The configured ceiling is far above
@@ -21,8 +57,8 @@ scoresRouter.post("/", rateLimit({ name: "score-submit" }), async (c) => {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const container = createContainer(c.env.DB);
-    const { sessionRepo, scoreUseCases } = container;
+    const container = createContainer(c.env.DB, readB2Config(c.env));
+    const { sessionRepo, gameScoreAcceptanceUseCases } = container;
 
     let authData;
     try {
@@ -58,6 +94,7 @@ scoresRouter.post("/", rateLimit({ name: "score-submit" }), async (c) => {
       grade: rawBody.grade,
       metadata: rawBody.metadata,
       playToken: rawBody.playToken ?? rawBody.play_token,
+      gameSessionToken: rawBody.gameSessionToken ?? rawBody.game_session_token ?? rawBody.token,
       timestamp: rawBody.timestamp,
       difficulty: rawBody.difficulty,
     });
@@ -67,15 +104,11 @@ scoresRouter.post("/", rateLimit({ name: "score-submit" }), async (c) => {
     }
 
     const { gameId, score } = parseResult.data;
-
-    // Admin kill switch (see adminGames.ts) — checked here, not just filtered from the catalog,
-    // so a disabled game can't be scored via a direct API call even if a client still has the
-    // gameplay screen open from before it was disabled.
-    const disabledGameIds = await container.gameSettingsUseCases.getDisabledGameIds();
-    if (disabledGameIds.includes(gameId)) {
+    const gameSessionToken = parseResult.data.gameSessionToken;
+    if (!gameSessionToken) {
       return c.json(
-        { error: { code: "GAME_DISABLED", message: "현재 비활성화된 게임입니다." } },
-        400,
+        { error: { code: "SIGNED_GAME_SESSION_REQUIRED", message: "게임 세션이 필요합니다." } },
+        401,
       );
     }
 
@@ -84,17 +117,37 @@ scoresRouter.post("/", rateLimit({ name: "score-submit" }), async (c) => {
     const nickname = authData.user.nickname;
     const avatarUrl = authData.user.avatar_url;
 
-    const result = await scoreUseCases.submitScore({
+    const secret = c.env.GAME_SESSION_SECRET;
+    if (!secret) {
+      return c.json(
+        {
+          error: { code: "GAME_SESSION_NOT_CONFIGURED", message: "게임 세션 서명 키가 없습니다." },
+        },
+        503,
+      );
+    }
+
+    const result = await gameScoreAcceptanceUseCases.accept({
+      slug: gameId,
       userId,
       nickname,
       avatarUrl,
-      gameId,
+      token: gameSessionToken,
+      secret,
       score,
       difficulty: parseResult.data.difficulty,
     });
-
-    if (!result.valid || !result.saved) {
-      return c.json({ error: result.reason || "Invalid score" }, 400);
+    if (!result.ok) {
+      const status = scoreAcceptErrorStatus(result.error);
+      return c.json(
+        {
+          error: {
+            code: result.error,
+            message: scoreAcceptErrorMessage(result.error, result.reason),
+          },
+        },
+        status,
+      );
     }
 
     // Progression side-effects: server-authoritative XP for this accepted, authenticated
@@ -107,15 +160,16 @@ scoresRouter.post("/", rateLimit({ name: "score-submit" }), async (c) => {
     try {
       const completion = await container.progressionUseCases.recordAcceptedGameCompletion({
         userId,
-        gameId: result.saved.game_id,
-        sourceId: String(result.saved.id),
+        gameId: result.slug,
+        sourceId: String(result.scoreId),
+        xpPerCompletion: result.xpPerCompletion,
       });
       xpAwarded = completion.xpAwarded;
 
       if (parseResult.data.playToken && completion.xpEventId) {
         const guildAttr = await container.discordGuildXpUseCases.attributeCompletionToGuild({
           userId,
-          gameId: result.saved.game_id,
+          gameId: result.slug,
           sourceXpEventId: completion.xpEventId,
           xpAmount: xpAwarded,
           playToken: parseResult.data.playToken,
@@ -153,10 +207,10 @@ scoresRouter.post("/", rateLimit({ name: "score-submit" }), async (c) => {
 
     return c.json({
       success: true,
-      score_id: result.saved.id,
-      game_id: result.saved.game_id,
-      score: result.saved.score,
-      nickname: result.saved.nickname,
+      score_id: result.scoreId,
+      game_id: result.slug,
+      score,
+      nickname,
       xpAwarded,
       ...(guildXpAwarded > 0 || guildId ? { guildXpAwarded, guildId } : {}),
       newlyUnlockedAchievements,
@@ -195,91 +249,104 @@ scoresRouter.get("/user/me", async (c) => {
   }
 });
 
-/** Shared row shape for both the SYSTEM and Creator branches below — one game's worth of already
- * PB-deduped, already-formatted rows plus the resolved title (resolved once per request, not
- * re-looked-up per row — lets the web client drop its own GAME_MANIFEST_MAP-based title lookup,
- * see apps/web/app/features/scores/api.ts). */
-function formatLeaderboardEntry(item: FormattedScoreRecord, gameTitle: string) {
+/** Shared public row shape. Resolution and policy formatting both come from the generic runtime
+ * object, never from a publisher-specific registry. */
+function formatLeaderboardEntry(
+  item: {
+    id: number;
+    user_id: number | null;
+    nickname: string;
+    avatar_url: string | null;
+    game_id: string;
+    score: number;
+    difficulty: string;
+    created_at: string;
+  },
+  gameTitle: string,
+  formattedScore: string,
+) {
   return {
     id: item.id,
     user_id: item.user_id,
     nickname: item.nickname,
-    playerName: item.playerName,
+    playerName: item.nickname,
     avatar_url: item.avatar_url,
     avatarUrl: item.avatar_url,
     gameId: item.game_id,
     gameTitle,
     score: item.score,
-    formattedScore: item.formattedScore,
+    formattedScore,
     difficulty: item.difficulty,
     createdAt: item.created_at?.split("T")[0] ?? item.created_at,
     created_at: item.created_at,
   };
 }
 
-// GET /api/scores/:gameId — public leaderboard. Edge-cached: the response depends only on
-// gameId + the ?difficulty query (both in the URL), never on who is asking, so one cached entry
-// per URL correctly serves every visitor. This is the single hottest read path in the app.
-//
-// SYSTEM games resolve through the shared GameRegistry singleton (see container.ts) exactly as
-// before this generalization — same lookup, same difficulty handling, same response shape, same
-// cache. A slug that ISN'T a SYSTEM game now gets a second chance through the Creator path
-// (CreatorLeaderboardUseCases: PUBLIC + live + score policy configured) before this falls back to
-// INVALID_GAME_ID — the same "can't distinguish unknown from private/unconfigured" posture used
-// everywhere else a Creator game is read publicly. No new endpoint, no new `scores` table, no new
-// ranking SQL: both branches call the exact same D1ScoreRepository.getLeaderboard PB-dedup query,
-// just resolved against a different registry.
+// GET /api/scores/:gameId — one generic leaderboard path for OWOGG and USER. The D1 identity/live
+// guard and canonical policy are both required; incomplete B2/D1 state fails closed.
 scoresRouter.get("/:gameId", edgeCache({ ttlSeconds: 30 }), async (c) => {
   const gameId = c.req.param("gameId");
+  if (!c.env?.DB) {
+    return c.json(
+      { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
+      400,
+    );
+  }
 
-  const definition = await gameRegistry.findBySlug(gameId);
+  try {
+    const container = createContainer(c.env.DB, readB2Config(c.env));
+    const runtime = await container.runtimeGameRegistry.findBySlug(gameId);
+    if (
+      !runtime ||
+      !(await container.runtimeGameAvailability.isVersionServable(
+        runtime.identity.id,
+        runtime.liveVersion.id,
+      ))
+    ) {
+      return c.json(
+        { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
+        400,
+      );
+    }
 
-  if (definition) {
-    if (!c.env?.DB) {
+    if (!runtime.canonical.policy.leaderboard || runtime.canonical.policy.score === null) {
       return c.json({ game_id: gameId, leaderboard: [] });
     }
 
-    try {
-      // Read-replica eligible: this is a public leaderboard already served with a 30s edge cache,
-      // so it is explicitly allowed to lag — a replica cannot make it staler than the cache TTL
-      // already does. See readReplica.ts for why auth/session reads deliberately stay on primary.
-      const { scoreUseCases } = createReadContainer(c.env.DB);
-      const difficulty = c.req.query("difficulty");
-      const leaderboard = await scoreUseCases.getLeaderboard(gameId, 20, difficulty);
-
-      return c.json({
-        game_id: gameId,
-        leaderboard: leaderboard.map((item) => formatLeaderboardEntry(item, definition.title)),
-      });
-    } catch (err) {
-      console.error("Get Leaderboard Error:", err);
-      return c.json({ game_id: gameId, leaderboard: [] });
+    const difficulty = validateDifficultyAgainstDefinition(
+      runtime.canonical.difficulty,
+      c.req.query("difficulty"),
+    );
+    if (!difficulty.valid) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_DIFFICULTY",
+            message: difficulty.reason ?? "유효하지 않은 난이도입니다.",
+          },
+        },
+        400,
+      );
     }
-  }
 
-  // Not a SYSTEM game — try the Creator path before giving up.
-  if (c.env?.DB) {
-    try {
-      const { creatorLeaderboardUseCases } = createReadContainer(c.env.DB);
-      const creatorLeaderboard = await creatorLeaderboardUseCases.getLeaderboard(gameId, 20);
-      if (creatorLeaderboard) {
-        return c.json({
-          game_id: gameId,
-          leaderboard: creatorLeaderboard.rows.map((item) =>
-            formatLeaderboardEntry(item, creatorLeaderboard.gameTitle),
-          ),
-        });
-      }
-    } catch (err) {
-      console.error("Get Creator Leaderboard Error:", err);
-      // Falls through to INVALID_GAME_ID below — same as any other unexpected failure resolving
-      // this slug, never a 200 with an empty/partial leaderboard for a request that never actually
-      // resolved a real game.
-    }
+    const rows = await container.scoreRepo.getLeaderboard(
+      gameId,
+      20,
+      runtime.canonical.policy.score.direction,
+      difficulty.normalizedDifficultyId,
+    );
+    return c.json({
+      game_id: gameId,
+      leaderboard: rows.map((item) =>
+        formatLeaderboardEntry(
+          item,
+          runtime.canonical.title,
+          formatScore(item.score, runtime.canonical.policy.score ?? undefined),
+        ),
+      ),
+    });
+  } catch (err) {
+    console.error("Get Leaderboard Error:", err);
+    return c.json({ game_id: gameId, leaderboard: [] });
   }
-
-  return c.json(
-    { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
-    400,
-  );
 });

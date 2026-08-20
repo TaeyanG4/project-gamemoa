@@ -19,6 +19,7 @@ import {
   D1SandboxGameRepository,
   D1GameAttemptConsumptionRepository,
   D1CreatorScoreAcceptanceRepository,
+  D1GameScoreAcceptanceRepository,
   D1GameIdentityRepository,
   D1GameVersionRepository,
   BackblazeB2GameBundleRepository,
@@ -49,6 +50,7 @@ import {
   SandboxGameUseCases,
   GameAttemptUseCases,
   CreatorScoreAcceptanceUseCases,
+  GameScoreAcceptanceUseCases,
   CreatorLeaderboardUseCases,
   GameBundlePublisher,
   StaticGameRegistry,
@@ -78,6 +80,7 @@ import {
   type GameBundleStorageRepository,
   type GameAttemptConsumptionRepository,
   type CreatorScoreAcceptanceRepository,
+  type GameScoreAcceptanceRepository,
   type CreatorGameDefinitionRepository,
   type GameCanonicalRepository,
   type GameIdentityRepository,
@@ -133,6 +136,8 @@ export interface AppContainer {
    * `scores`) — see CreatorScoreAcceptanceRepository's own doc comment for why this is a
    * separate port from gameAttemptRepo above rather than an extension of it. */
   creatorScoreAcceptanceRepo: CreatorScoreAcceptanceRepository;
+  /** Provider-neutral atomic attempt consume + score insert (migration 0032). */
+  gameScoreAcceptanceRepo: GameScoreAcceptanceRepository;
   gameBundleStorageRepo: GameBundleStorageRepository;
   /** True only when a complete Backblaze B2 config was passed to createContainer — routes should
    * check this (rather than try/catch-ing putBundle) to return a clean 503 before touching the
@@ -186,6 +191,7 @@ export interface AppContainer {
   sandboxGameUseCases: SandboxGameUseCases;
   gameAttemptUseCases: GameAttemptUseCases;
   creatorScoreAcceptanceUseCases: CreatorScoreAcceptanceUseCases;
+  gameScoreAcceptanceUseCases: GameScoreAcceptanceUseCases;
   creatorLeaderboardUseCases: CreatorLeaderboardUseCases;
   gameBundlePublisher: GameBundlePublisher;
 }
@@ -223,6 +229,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const sandboxGameRepo = new D1SandboxGameRepository(db);
   const gameAttemptRepo = new D1GameAttemptConsumptionRepository(db);
   const creatorScoreAcceptanceRepo = new D1CreatorScoreAcceptanceRepository(db);
+  const gameScoreAcceptanceRepo = new D1GameScoreAcceptanceRepository(db);
   const gameIdentityRepo = new D1GameIdentityRepository(db);
   const gameVersionRepo = new D1GameVersionRepository(db);
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
@@ -270,7 +277,11 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const creatorUseCases = new CreatorUseCases(creatorRepo, creatorReviewRepo);
   const adminAuthUseCases = new AdminAuthUseCases(adminAuthRepo);
   const adminAccountUseCases = new AdminAccountUseCases(adminAccountRepo, adminAuthRepo);
-  const gameSettingsUseCases = new GameSettingsUseCases(gameSettingsRepo, gameRegistry);
+  const gameSettingsUseCases = new GameSettingsUseCases(
+    gameSettingsRepo,
+    gameIdentityRepo,
+    gameCanonicalRepo,
+  );
   const userModerationUseCases = new UserModerationUseCases(
     userModerationRepo,
     sessionRepo,
@@ -295,6 +306,12 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     creatorScoreAcceptanceRepo,
   );
+  const gameScoreAcceptanceUseCases = new GameScoreAcceptanceUseCases(
+    runtimeGameRegistry,
+    runtimeGameAvailability,
+    gameSettingsRepo,
+    gameScoreAcceptanceRepo,
+  );
   const creatorLeaderboardUseCases = new CreatorLeaderboardUseCases(sandboxGameRepo, scoreRepo);
 
   return {
@@ -318,6 +335,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     gameAttemptRepo,
     creatorScoreAcceptanceRepo,
+    gameScoreAcceptanceRepo,
     gameIdentityRepo,
     gameVersionRepo,
     gameBundleStorageRepo,
@@ -349,6 +367,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameUseCases,
     gameAttemptUseCases,
     creatorScoreAcceptanceUseCases,
+    gameScoreAcceptanceUseCases,
     creatorLeaderboardUseCases,
     gameBundlePublisher,
   };

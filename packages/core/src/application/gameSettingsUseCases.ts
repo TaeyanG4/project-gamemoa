@@ -1,5 +1,6 @@
 import type { GameSettingsRepository, GameSettingRecord } from "../ports/repositories.js";
-import type { GameRegistry } from "../modules/game/ports/gameRegistry.js";
+import type { GameCanonicalRepository } from "../modules/game/ports/gameCanonicalRepository.js";
+import type { GameIdentityRepository } from "../modules/game/ports/gameIdentityRepository.js";
 
 export interface GameAvailability {
   gameId: string;
@@ -17,33 +18,44 @@ export type SetGameEnabledResult =
   { ok: true; record: GameSettingRecord } | { ok: false; code: "GAME_NOT_FOUND" };
 
 /**
- * Resolves the set of known games through the injected {@link GameRegistry} rather than the
- * build-time `GAME_MANIFESTS` this class used to import directly — see ScoreUseCases's doc
- * comment for the same reasoning. The registry holds SYSTEM games only today (creator games are
- * not resolved through it yet), so the admin kill switch's reach is unchanged: it still only ever
- * covers the four built-in games, just no longer by hardcoding that source in this file.
+ * Resolves identities from generic D1. Canonical metadata is an optional enrichment only: a B2
+ * outage must never prevent the operator from listing a game or applying the D1-only kill switch.
  */
 export class GameSettingsUseCases {
   constructor(
     private repo: GameSettingsRepository,
-    private registry: GameRegistry,
+    private identities: GameIdentityRepository,
+    private canonicals?: GameCanonicalRepository,
   ) {}
 
   /** Every known game (from the registry) merged with its live override, if any — used by the
    * admin games panel. */
   async listAll(): Promise<GameAvailability[]> {
-    const [definitions, overrides] = await Promise.all([
-      this.registry.listAll(),
+    const [identities, overrides] = await Promise.all([
+      this.identities.listAll(),
       this.repo.getAllOverrides(),
     ]);
     const overrideByGameId = new Map(overrides.map((o) => [o.gameId, o]));
 
-    return definitions.map((definition) => {
-      const override = overrideByGameId.get(definition.slug);
+    const canonicalResults = await Promise.all(
+      identities.map(async (identity) => {
+        if (!this.canonicals) return [identity.slug, null] as const;
+        try {
+          return [identity.slug, await this.canonicals.findBySlug(identity.slug)] as const;
+        } catch {
+          return [identity.slug, null] as const;
+        }
+      }),
+    );
+    const canonicalBySlug = new Map(canonicalResults);
+
+    return identities.map((identity) => {
+      const override = overrideByGameId.get(identity.slug);
+      const canonical = canonicalBySlug.get(identity.slug);
       return {
-        gameId: definition.slug,
-        title: definition.title,
-        status: definition.status,
+        gameId: identity.slug,
+        title: canonical?.title ?? identity.slug,
+        status: identity.visibility === "PUBLIC" ? "published" : "draft",
         enabled: override ? override.enabled : true,
         disabledReason: override?.disabledReason ?? null,
         updatedByAdminId: override?.updatedByAdminId ?? null,
@@ -64,7 +76,7 @@ export class GameSettingsUseCases {
     reason: string | null,
     adminId: number,
   ): Promise<SetGameEnabledResult> {
-    if (!(await this.registry.findBySlug(gameId))) {
+    if (!(await this.identities.findBySlug(gameId))) {
       return { ok: false, code: "GAME_NOT_FOUND" };
     }
     const record = await this.repo.setEnabled(gameId, enabled, reason, adminId);

@@ -65,6 +65,8 @@ export async function submitScoreApi(payload: {
   gameId: string;
   score: number;
   nickname?: string;
+  /** Required compatibility token — POST /api/scores no longer accepts unsigned writes. */
+  gameSessionToken: string;
   playToken?: string | null;
   /** Omitted = the game's default difficulty (or "normal" for games without difficulty tiers). */
   difficulty?: string;
@@ -76,6 +78,7 @@ export async function submitScoreApi(payload: {
       game_id: payload.gameId,
       score: payload.score,
       nickname: payload.nickname,
+      gameSessionToken: payload.gameSessionToken,
       ...(tokenToUse ? { play_token: tokenToUse } : {}),
       ...(payload.difficulty ? { difficulty: payload.difficulty } : {}),
     }),

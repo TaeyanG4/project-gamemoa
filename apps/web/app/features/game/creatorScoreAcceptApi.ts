@@ -17,7 +17,7 @@ import { apiFetch } from "../../lib/api/client";
  */
 export function acceptCreatorScore(
   slug: string,
-  input: { token: string; score: number },
+  input: { token: string; score: number; difficulty?: string; playToken?: string | null },
 ): Promise<CreatorScoreAcceptResponse> {
   return apiFetch(
     `/api/games/${encodeURIComponent(slug)}/score`,

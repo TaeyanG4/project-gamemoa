@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "../src/index.js";
-import {
-  AuthMeResponseSchema,
-  PersonalBestResponseSchema,
-  LeaderboardResponseSchema,
-} from "@owogg/contracts";
+import { AuthMeResponseSchema, PersonalBestResponseSchema } from "@owogg/contracts";
 
 test("GET / returns 200 OK with service info", async () => {
   const res = await app.request("http://localhost/");
@@ -89,13 +85,13 @@ test("GET /api/scores/user/me matches PersonalBestResponseSchema without session
   assert.deepEqual(parsed.data.bests, {});
 });
 
-test("GET /api/scores/:gameId matches LeaderboardResponseSchema", async () => {
+test("GET /api/scores/:gameId fails closed without generic D1 runtime state", async () => {
   const res = await app.request("http://localhost/api/scores/reaction-time");
-  assert.equal(res.status, 200);
+  // Generic leaderboard resolution requires the D1 identity/version projection; without a DB
+  // binding it fails closed instead of falling back to the static registry.
+  assert.equal(res.status, 400);
   const json = await res.json();
-  const parsed = LeaderboardResponseSchema.safeParse(json);
-  assert.ok(parsed.success, "Response matches LeaderboardResponseSchema");
-  assert.equal(parsed.data.game_id || parsed.data.gameId, "reaction-time");
+  assert.equal((json as { error: { code: string } }).error.code, "INVALID_GAME_ID");
 });
 
 test("GET /api/personalization returns 401 unauthenticated without session cookie", async () => {
