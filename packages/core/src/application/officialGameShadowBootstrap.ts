@@ -76,7 +76,7 @@ export class OfficialGameShadowBootstrap {
     }
 
     let version = await this.repository.findVersionByContentHash(identity.id, contentHash);
-    let reusedReadyVersion = version?.publishStatus === "READY";
+    const reusedReadyVersion = version?.publishStatus === "READY";
     if (version?.publishStatus === "READY") {
       await this.assertReadyManifest(version, contentHash);
     } else {
