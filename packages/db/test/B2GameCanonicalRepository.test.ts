@@ -2,7 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { GameBundleStorageRepository, GameCanonicalDocument } from "@owogg/core";
 import { GAME_CANONICAL_SCHEMA_VERSION, gameCanonicalObjectKey } from "@owogg/core";
-import { B2GameCanonicalRepository } from "../src/storage/B2GameCanonicalRepository.js";
+// Imported through this package's own public entrypoint (../src/index.js — exactly what
+// packages/db/package.json's "." export points to), not by direct path to
+// storage/B2GameCanonicalRepository.js. This is deliberate: it's what actually proves
+// `import { B2GameCanonicalRepository } from "@owogg/db"` works for a real external consumer (a
+// future Stage's container wiring) — a direct-path import would still compile even if this class
+// were missing from src/index.ts entirely, which is exactly the gap that let that omission ship
+// unnoticed once already.
+import { B2GameCanonicalRepository } from "../src/index.js";
 
 /**
  * No real B2 network anywhere here — a fake, in-memory GameBundleStorageRepository stands in for
