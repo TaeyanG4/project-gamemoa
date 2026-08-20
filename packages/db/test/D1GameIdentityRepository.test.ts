@@ -205,6 +205,7 @@ test("0029 migration actual-file: cleanly applies to existing DB and backfills U
 
 test("physical SQLite constraints: publisher, visibility, slug, and liveVersion invariants", () => {
   const { raw } = createSqliteD1(GAMES_TEST_SCHEMA);
+  raw.exec("PRAGMA foreign_keys = ON;");
   seedUser(raw, 1, "Dev1");
 
   // 1. Valid USER row succeeds
@@ -340,6 +341,18 @@ test("physical SQLite constraints: publisher, visibility, slug, and liveVersion 
         )
         .run(),
     /UNIQUE constraint failed/,
+  );
+
+  // 12. Non-existent user id rejected by foreign key constraint
+  assert.throws(
+    () =>
+      raw
+        .prepare(
+          `INSERT INTO games (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           VALUES ('orphan-user', 'USER', 999999, 'PRIVATE', NULL, '2026-08-19', '2026-08-19')`,
+        )
+        .run(),
+    /FOREIGN KEY constraint failed/,
   );
 });
 
