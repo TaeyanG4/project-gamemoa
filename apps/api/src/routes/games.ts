@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { getCookie } from "hono/cookie";
 import {
-  CreatorScoreAcceptRequestSchema,
-  CreatorScoreAcceptResponseSchema,
+  GameScoreAcceptRequestSchema,
+  GameScoreAcceptResponseSchema,
   GameSessionResponseSchema,
   PublicGameAvailabilityResponseSchema,
   PublicGameListResponseSchema,
@@ -13,14 +13,15 @@ import {
 } from "@owogg/contracts";
 import {
   GAME_SESSION_POLICY,
+  validateDifficultyAgainstDefinition,
   mergePublicGames,
   resolvePublicGame,
   signGameSession,
   toPublicCreatorGame,
-  type CreatorScoreAcceptError,
+  type GameScoreAcceptError,
   type GameSessionPayload,
 } from "@owogg/core";
-import { createContainer } from "../container.js";
+import { createContainer, evaluateAchievementsForUser } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { readB2Config } from "./devGames.js";
@@ -167,19 +168,10 @@ gamesRouter.get("/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
   return c.json(PublicGameSchema.parse(game), 200);
 });
 
-// ── Game Session (Creator score-submission prerequisite) ─────────────────────
+// ── Generic Game Session ─────────────────────────────────────────────────────
 //
-// POST /api/games/:slug/session — issues a short-lived, HMAC-signed Game Session token (see
-// packages/core/src/domain/gameSession.ts). Deliberately NOT connected to anything past signing
-// and returning it: no score/leaderboard/XP route reads this token yet, and nothing here writes
-// to D1 — that wiring is a later PR's scope. This exists so a Web Host can start acquiring and
-// holding a token now, ready for whenever that connection is made.
-//
-// Login required (the existing owogg_session cookie — same requireAuth as creators.ts/
-// discordGuilds.ts). Deliberately reuses resolveLiveVersion, the exact same "PUBLIC + has a live
-// version" gate every other public Creator-game read in this file already uses — a SYSTEM slug
-// (not in sandbox_games at all) or a private/unpublished/unknown Creator game all 404 identically,
-// the same can't-distinguish-unknown-from-private posture as everywhere else in this file.
+// The session is issued only for the exact generic D1 identity/live READY version and its
+// canonical difficulty. The token is held by the parent Web host and is never sent to the iframe.
 
 gamesRouter.post("/:slug/session", rateLimit({ name: "game-session" }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
@@ -203,17 +195,48 @@ gamesRouter.post("/:slug/session", rateLimit({ name: "game-session" }), async (c
   if (!auth)
     return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
 
-  const { sandboxGameUseCases } = createContainer(c.env.DB);
-  const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
-  if (!resolved) return c.text("Not Found", 404);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  const runtime = await container.runtimeGameRegistry.findBySlug(c.req.param("slug"));
+  if (!runtime) return c.text("Not Found", 404);
+
+  if (
+    (await container.gameSettingsUseCases.getDisabledGameIds()).includes(runtime.identity.slug) ||
+    !(await container.runtimeGameAvailability.isVersionServable(
+      runtime.identity.id,
+      runtime.liveVersion.id,
+    ))
+  ) {
+    return c.json(
+      { error: { code: "GAME_DISABLED", message: "현재 비활성화된 게임입니다." } },
+      400,
+    );
+  }
+
+  const rawBody = await c.req.json().catch(() => ({}));
+  const difficulty = validateDifficultyAgainstDefinition(
+    runtime.canonical.difficulty,
+    typeof rawBody?.difficulty === "string" ? rawBody.difficulty : undefined,
+  );
+  if (!difficulty.valid) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_DIFFICULTY",
+          message: difficulty.reason ?? "유효하지 않은 난이도입니다.",
+        },
+      },
+      400,
+    );
+  }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   const payload: GameSessionPayload = {
     userId: auth.userId,
-    gameId: resolved.game.id,
-    versionId: resolved.version.id,
+    gameId: runtime.identity.id,
+    versionId: runtime.liveVersion.id,
     attemptId: crypto.randomUUID(),
     exp: nowSeconds + GAME_SESSION_POLICY.EXPIRY_SECONDS,
+    difficulty: difficulty.normalizedDifficultyId,
   };
   const token = await signGameSession(payload, secret);
 
@@ -226,30 +249,19 @@ gamesRouter.post("/:slug/session", rateLimit({ name: "game-session" }), async (c
   );
 });
 
-// ── Creator score acceptance ──────────────────────────────────────────────────
-//
-// POST /api/games/:slug/score — the actual write a Game Session token exists for. Every check
-// (game availability, token validity, token-vs-context match, score policy) runs in
-// CreatorScoreAcceptanceUseCases.accept() before the one atomic D1 write — consuming the
-// attemptId and saving the score together, so there is no possible outcome where the token gets
-// spent but no score is recorded. See that class's own doc comment for the full reasoning.
-//
-// Called from CreatorGameHost (apps/web/app/features/game/creatorScoreFlow.ts) whenever
-// GAME_COMPLETE carries a score and the player is logged in. Still deliberately not connected to
-// anything past accepting the row: no leaderboard read, no XP/achievement/guild XP award (those
-// stay on the existing SYSTEM-game path, apps/api/src/routes/scores.ts), no Bridge protocol
-// change, no HOST_INIT payload change — the token this endpoint spends never reaches the iframe.
+// ── Generic score acceptance ─────────────────────────────────────────────────
 
-/** HTTP status per failure reason — mirrors the shape POST /api/scores already uses (a JSON
- * {error:{code,message}} body), just with this route's own error codes. */
-function creatorScoreAcceptErrorStatus(error: CreatorScoreAcceptError): 400 | 401 | 404 | 409 {
+function gameScoreAcceptErrorStatus(error: GameScoreAcceptError): 400 | 401 | 404 | 409 {
   switch (error) {
     case "GAME_NOT_AVAILABLE":
       return 404;
+    case "GAME_DISABLED":
+      return 400;
     case "INVALID_TOKEN":
     case "CONTEXT_MISMATCH":
       return 401;
     case "SCORE_POLICY_NOT_CONFIGURED":
+    case "INVALID_DIFFICULTY":
     case "INVALID_SCORE":
       return 400;
     case "ALREADY_CONSUMED":
@@ -257,7 +269,7 @@ function creatorScoreAcceptErrorStatus(error: CreatorScoreAcceptError): 400 | 40
   }
 }
 
-function creatorScoreAcceptErrorMessage(error: CreatorScoreAcceptError, reason?: string): string {
+function gameScoreAcceptErrorMessage(error: GameScoreAcceptError, reason?: string): string {
   switch (error) {
     case "GAME_NOT_AVAILABLE":
       return "게임을 찾을 수 없습니다.";
@@ -267,6 +279,10 @@ function creatorScoreAcceptErrorMessage(error: CreatorScoreAcceptError, reason?:
       return "게임 세션이 이 요청과 일치하지 않습니다. 다시 시작해 주세요.";
     case "SCORE_POLICY_NOT_CONFIGURED":
       return "이 게임은 아직 점수 제출을 지원하지 않습니다.";
+    case "GAME_DISABLED":
+      return "현재 비활성화된 게임입니다.";
+    case "INVALID_DIFFICULTY":
+      return reason || "유효하지 않은 난이도입니다.";
     case "INVALID_SCORE":
       return reason || "유효하지 않은 점수입니다.";
     case "ALREADY_CONSUMED":
@@ -274,7 +290,7 @@ function creatorScoreAcceptErrorMessage(error: CreatorScoreAcceptError, reason?:
   }
 }
 
-gamesRouter.post("/:slug/score", rateLimit({ name: "creator-score-accept" }), async (c) => {
+gamesRouter.post("/:slug/score", rateLimit({ name: "game-score-accept" }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
 
   const secret = c.env.GAME_SESSION_SECRET;
@@ -296,7 +312,8 @@ gamesRouter.post("/:slug/score", rateLimit({ name: "creator-score-accept" }), as
   if (!sessionId) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
   }
-  const { sessionRepo, creatorScoreAcceptanceUseCases } = createContainer(c.env.DB);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  const { sessionRepo, gameScoreAcceptanceUseCases } = container;
   const authData = await sessionRepo.findSession(sessionId);
   if (!authData) {
     return c.json({ error: { code: "UNAUTHORIZED", message: "Authentication required" } }, 401);
@@ -314,7 +331,7 @@ gamesRouter.post("/:slug/score", rateLimit({ name: "creator-score-accept" }), as
   }
 
   const rawBody = await c.req.json().catch(() => ({}));
-  const parseResult = CreatorScoreAcceptRequestSchema.safeParse(rawBody);
+  const parseResult = GameScoreAcceptRequestSchema.safeParse(rawBody);
   if (!parseResult.success) {
     return c.json(
       { error: { code: "INVALID_PAYLOAD", message: "요청 형식이 올바르지 않습니다." } },
@@ -322,7 +339,7 @@ gamesRouter.post("/:slug/score", rateLimit({ name: "creator-score-accept" }), as
     );
   }
 
-  const result = await creatorScoreAcceptanceUseCases.accept({
+  const result = await gameScoreAcceptanceUseCases.accept({
     slug: c.req.param("slug"),
     userId: authData.user.id,
     nickname: authData.user.nickname,
@@ -330,6 +347,7 @@ gamesRouter.post("/:slug/score", rateLimit({ name: "creator-score-accept" }), as
     token: parseResult.data.token,
     secret,
     score: parseResult.data.score,
+    difficulty: parseResult.data.difficulty,
   });
 
   if (!result.ok) {
@@ -337,12 +355,63 @@ gamesRouter.post("/:slug/score", rateLimit({ name: "creator-score-accept" }), as
       {
         error: {
           code: result.error,
-          message: creatorScoreAcceptErrorMessage(result.error, result.reason),
+          message: gameScoreAcceptErrorMessage(result.error, result.reason),
         },
       },
-      creatorScoreAcceptErrorStatus(result.error),
+      gameScoreAcceptErrorStatus(result.error),
     );
   }
 
-  return c.json(CreatorScoreAcceptResponseSchema.parse({ success: true }), 200);
+  let xpAwarded = 0;
+  let guildXpAwarded = 0;
+  let guildId: string | undefined;
+  let newlyUnlockedAchievements: string[] = [];
+  try {
+    const completion = await container.progressionUseCases.recordAcceptedGameCompletion({
+      userId: authData.user.id,
+      gameId: result.slug,
+      sourceId: String(result.scoreId),
+      xpPerCompletion: result.xpPerCompletion,
+    });
+    xpAwarded = completion.xpAwarded;
+
+    if (parseResult.data.playToken && completion.xpEventId) {
+      const guildAttr = await container.discordGuildXpUseCases.attributeCompletionToGuild({
+        userId: authData.user.id,
+        gameId: result.slug,
+        sourceXpEventId: completion.xpEventId,
+        xpAmount: xpAwarded,
+        playToken: parseResult.data.playToken,
+      });
+      if (guildAttr.attributed) {
+        guildXpAwarded = guildAttr.amount ?? 0;
+        guildId = guildAttr.guildId;
+      }
+    }
+
+    const deferredAchievements = evaluateAchievementsForUser(container, authData.user.id).catch(
+      (achievementErr) => console.error("Deferred Achievement Evaluation Error:", achievementErr),
+    );
+    try {
+      c.executionCtx.waitUntil(deferredAchievements);
+    } catch {
+      newlyUnlockedAchievements = (await deferredAchievements) ?? [];
+    }
+  } catch (progressionErr) {
+    console.error("Progression Update Error:", progressionErr);
+  }
+
+  return c.json(
+    GameScoreAcceptResponseSchema.parse({
+      success: true,
+      score_id: result.scoreId,
+      game_id: result.slug,
+      score: parseResult.data.score,
+      nickname: authData.user.nickname,
+      xpAwarded,
+      ...(guildXpAwarded > 0 || guildId ? { guildXpAwarded, guildId } : {}),
+      newlyUnlockedAchievements,
+    }),
+    200,
+  );
 });

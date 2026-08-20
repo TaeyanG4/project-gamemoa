@@ -51,10 +51,13 @@ export type CreatorScoreSubmissionState = "idle" | "guest" | "submitting" | "suc
 
 export interface CreatorScoreFlowDeps {
   slug: string;
-  fetchGameSession: (slug: string) => Promise<{ token: string; expiresAt: string }>;
+  fetchGameSession: (
+    slug: string,
+    difficulty?: string,
+  ) => Promise<{ token: string; expiresAt: string }>;
   acceptScore: (
     slug: string,
-    input: { token: string; score: number },
+    input: { token: string; score: number; difficulty?: string },
   ) => Promise<{ success: true }>;
 }
 
@@ -63,7 +66,7 @@ export interface CreatorScoreFlowCallbacks {
 }
 
 export interface CreatorScoreFlow {
-  startAttempt(authenticated: boolean): Promise<void>;
+  startAttempt(authenticated: boolean, difficulty?: string): Promise<void>;
   handleComplete(
     authenticated: boolean,
     result: { score?: number; metadata?: Record<string, unknown> },
@@ -75,16 +78,18 @@ export function createCreatorScoreFlow(
   callbacks: CreatorScoreFlowCallbacks,
 ): CreatorScoreFlow {
   let heldToken: string | null = null;
+  let heldDifficulty = "normal";
   let spentForThisAttempt = false;
   // Bumped by every startAttempt() call — see this module's own doc comment ("Attempt
   // generation") for what this guards against and why spentForThisAttempt/heldToken alone can't.
   let generation = 0;
 
-  async function startAttempt(authenticated: boolean): Promise<void> {
+  async function startAttempt(authenticated: boolean, difficulty = "normal"): Promise<void> {
     generation += 1;
     const myGeneration = generation;
 
     heldToken = null;
+    heldDifficulty = difficulty;
     spentForThisAttempt = false;
     callbacks.onStatusChange("idle");
 
@@ -94,7 +99,7 @@ export function createCreatorScoreFlow(
 
     let session: { token: string };
     try {
-      session = await deps.fetchGameSession(deps.slug);
+      session = await deps.fetchGameSession(deps.slug, difficulty);
     } catch {
       // Session issuance failing must not block gameplay — the iframe was never waiting on this.
       // handleComplete() below simply has no token to submit with when this attempt ends, and
@@ -145,7 +150,11 @@ export function createCreatorScoreFlow(
 
     callbacks.onStatusChange("submitting");
     try {
-      await deps.acceptScore(deps.slug, { token, score: result.score });
+      await deps.acceptScore(deps.slug, {
+        token,
+        score: result.score,
+        difficulty: heldDifficulty,
+      });
       // A retry may have started (and possibly already finished) a whole new attempt while this
       // call was in flight — the result screen belongs to that attempt now, not this one.
       if (myGeneration !== generation) return;

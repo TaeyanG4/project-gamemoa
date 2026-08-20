@@ -30,6 +30,7 @@ export * from "./ports/sandboxGames.js";
 export * from "./ports/creatorGameDefinition.js";
 export * from "./ports/gameAttempt.js";
 export * from "./ports/creatorScoreAcceptance.js";
+export * from "./ports/gameScoreAcceptance.js";
 
 // Unified Game Platform foundation (modules/game). ScoreUseCases/GameSettingsUseCases already
 // resolve SYSTEM games through GameRegistry (see application/scoreUseCases.js below); the
@@ -88,6 +89,7 @@ export * from "./application/officialGameShadowBootstrap.js";
 export * from "./application/runtimeGameAvailability.js";
 export * from "./application/gameAttemptUseCases.js";
 export * from "./application/creatorScoreAcceptanceUseCases.js";
+export * from "./application/gameScoreAcceptanceUseCases.js";
 export * from "./application/creatorLeaderboardUseCases.js";
 export * from "./registry/gameRegistry.generated.js";
 // Compiled from game-registry/. The composition root wires StaticGameRegistry(GAME_DEFINITIONS)

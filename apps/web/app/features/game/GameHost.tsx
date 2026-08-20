@@ -5,8 +5,8 @@ import { useIsGameDisabled } from "../catalog/gameAvailability";
 import { formatScore, type GameRuntimeContext, type GameResult } from "@owogg/game-sdk";
 import {
   saveLocalBestScore,
-  submitScoreApi,
   extractPlayTokenFromLocation,
+  consumeActivePlayToken,
   fetchLeaderboardApi,
 } from "../scores/api";
 import { getReactionTierById } from "@owogg/shared";
@@ -18,6 +18,9 @@ import { localizedDifficultyLabel } from "../catalog/difficultyLabels";
 import { GameThumbnail } from "../../components/ui/GameThumbnail";
 import { XIcon } from "../../components/ui/XIcon";
 import { IframeRuntime } from "./runtime/IframeRuntime";
+import { fetchGameSession } from "./gameSessionApi";
+import { acceptCreatorScore } from "./creatorScoreAcceptApi";
+import { createCreatorScoreFlow } from "./creatorScoreFlow";
 import { resolvePresentationLayout } from "./presentationLayoutResolver";
 import {
   shouldShowFullscreenControl,
@@ -358,7 +361,7 @@ export interface GameHostProps {
  */
 export function GameHost({ slug }: GameHostProps) {
   const navigate = useNavigate();
-  const { user, isAuthenticated, openLoginModal } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, openLoginModal } = useAuth();
   const { dict } = useI18n();
 
   const [error, setError] = useState<string | null>(null);
@@ -520,6 +523,35 @@ export function GameHost({ slug }: GameHostProps) {
     iframeAttemptDifficultyRef.current = undefined;
   }, [manifest]);
 
+  // The generic Game Session is acquired before each attempt and held only in this parent-side
+  // controller. It is never included in HOST_INIT or any iframe bridge message.
+  const scoreFlow = useMemo(
+    () =>
+      createCreatorScoreFlow(
+        {
+          slug,
+          fetchGameSession,
+          acceptScore: (gameSlug, input) =>
+            acceptCreatorScore(gameSlug, {
+              ...input,
+              playToken: consumeActivePlayToken(),
+            }),
+        },
+        {
+          onStatusChange: (state, message) => {
+            setSubmissionState(state);
+            setSubmissionError(message ?? null);
+          },
+        },
+      ),
+    [slug],
+  );
+
+  useEffect(() => {
+    if (authLoading) return;
+    void scoreFlow.startAttempt(isAuthenticated, selectedDifficultyId);
+  }, [authLoading, isAuthenticated, scoreFlow, selectedDifficultyId, attemptKey]);
+
   // Official games now always load through the generic /play resolver. The legacy React modules
   // stay in the repository as rollback infrastructure, but are no longer a primary runtime input.
   useEffect(() => {
@@ -531,40 +563,9 @@ export function GameHost({ slug }: GameHostProps) {
   // Handle Score Submission (Authenticated Attempts Only)
   const handleScoreSubmission = useCallback(
     async (scoreToSubmit: number) => {
-      setSubmissionState("submitting");
-      setSubmissionError(null);
-
-      try {
-        const payload: {
-          gameId: string;
-          score: number;
-          nickname?: string;
-          difficulty?: string;
-        } = {
-          gameId: slug,
-          score: scoreToSubmit,
-          difficulty: selectedDifficultyId,
-        };
-
-        const res = await submitScoreApi(payload);
-
-        if (res && res.success) {
-          setSubmissionState("success");
-        } else {
-          setSubmissionState("error");
-          setSubmissionError(dict.gamePlay.errorSubmitFailed);
-        }
-      } catch {
-        setSubmissionState("error");
-        setSubmissionError(dict.gamePlay.errorNetworkSubmitFailed);
-      }
+      await scoreFlow.handleComplete(isAuthenticated, { score: scoreToSubmit });
     },
-    [
-      slug,
-      selectedDifficultyId,
-      dict.gamePlay.errorSubmitFailed,
-      dict.gamePlay.errorNetworkSubmitFailed,
-    ],
+    [isAuthenticated, scoreFlow],
   );
 
   // Reset / Retry Game Attempt

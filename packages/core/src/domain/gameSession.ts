@@ -1,10 +1,8 @@
 /**
- * Short-lived, HMAC-signed Game Session token — the prerequisite this PR builds, one step before a
- * Creator game will eventually be allowed to submit a score. Deliberately NOT wired to that yet:
- * nothing here talks to scores/leaderboard/XP, and nothing consumes a token past verifying it.
+ * Short-lived, HMAC-signed Game Session token used by the provider-neutral score acceptance path.
  *
- * A session ties one authenticated user to one specific Creator game's live version and one play
- * attempt, for a few minutes, entirely statelessly — no DB row, no server-side session store (see
+ * A session ties one authenticated user to one specific game's live version, canonical difficulty,
+ * and one play attempt, for a few minutes, entirely statelessly — no DB row, no server-side session store (see
  * docs/GAME_CREATION_GUIDE.md's non-goals on server-side game-state relay for the same reasoning
  * applied here: a signed, self-verifying token is the whole mechanism). Verifying a token only
  * ever needs the same secret that signed it — the same "Worker secret, no new binding
@@ -28,11 +26,14 @@ export interface GameSessionPayload {
   readonly gameId: number;
   readonly versionId: number;
   /** A random per-attempt identifier (crypto.randomUUID() at issuance) — distinguishes concurrent
-   * or repeated play attempts by the same user on the same game version; not itself checked for
-   * uniqueness anywhere in this PR (no DB, no replay tracking — see the task this shipped under). */
+   * or repeated play attempts by the same user on the same game version; the generic score
+   * acceptance repository consumes it atomically so it cannot be spent twice. */
   readonly attemptId: string;
   /** Unix seconds. */
   readonly exp: number;
+  /** Canonical difficulty tier selected for this attempt. The score acceptance path verifies the
+   * same value against the canonical policy instead of trusting a later request field. */
+  readonly difficulty: string;
 }
 
 /** 5 minutes — well inside the "5~10분" the task called for, and short enough that a leaked token
@@ -85,7 +86,10 @@ function isGameSessionPayload(value: unknown): value is GameSessionPayload {
     typeof v.attemptId === "string" &&
     v.attemptId.length > 0 &&
     typeof v.exp === "number" &&
-    Number.isFinite(v.exp)
+    Number.isFinite(v.exp) &&
+    typeof v.difficulty === "string" &&
+    v.difficulty.length > 0 &&
+    v.difficulty === v.difficulty.trim()
   );
 }
 
@@ -162,11 +166,12 @@ export async function verifyGameSession(
  */
 export function gameSessionMatches(
   payload: GameSessionPayload,
-  expected: { userId: number; gameId: number; versionId: number },
+  expected: { userId: number; gameId: number; versionId: number; difficulty?: string },
 ): boolean {
   return (
     payload.userId === expected.userId &&
     payload.gameId === expected.gameId &&
-    payload.versionId === expected.versionId
+    payload.versionId === expected.versionId &&
+    (expected.difficulty === undefined || payload.difficulty === expected.difficulty)
   );
 }

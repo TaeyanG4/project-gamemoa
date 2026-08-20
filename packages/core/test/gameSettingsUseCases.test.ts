@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { GameSettingsUseCases } from "../src/application/gameSettingsUseCases.js";
-import { StaticGameRegistry } from "../src/modules/game/registry/staticGameRegistry.js";
 import { GAME_DEFINITIONS } from "../src/registry/gameDefinitions.generated.js";
 import type { GameSettingsRepository, GameSettingRecord } from "../src/ports/repositories.js";
+import { systemGameDefinitionToGameCanonicalDocument } from "../src/modules/game/domain/gameCanonicalMigration.js";
+import type { GameIdentityRepository } from "../src/modules/game/ports/gameIdentityRepository.js";
+import type { GameCanonicalRepository } from "../src/modules/game/ports/gameCanonicalRepository.js";
 
 class FakeGameSettingsRepository implements GameSettingsRepository {
   private overrides = new Map<string, GameSettingRecord>();
@@ -37,10 +39,67 @@ class FakeGameSettingsRepository implements GameSettingsRepository {
 /** The real production registry, same reasoning as scoreUseCases.test.ts's `newUseCases` — this
  * is what makes the tests below an equivalence check against the four official games' actual
  * enable/disable behaviour, not just a shape check against synthetic data. */
-function newUseCases(): { useCases: GameSettingsUseCases; repo: FakeGameSettingsRepository } {
+function genericSources(definitions = GAME_DEFINITIONS): {
+  identities: GameIdentityRepository;
+  canonicals: GameCanonicalRepository;
+} {
+  const identities = {
+    async findById(id: number) {
+      const definition = definitions.find((item) => item.slug === `game-${id}`);
+      return definition ? null : null;
+    },
+    async findBySlug(slug: string) {
+      const definition = definitions.find((item) => item.slug === slug);
+      return definition
+        ? {
+            id: definitions.indexOf(definition) + 1,
+            slug,
+            publisher: { type: "OWOGG" as const },
+            visibility: "PUBLIC" as const,
+            liveVersionId: definitions.indexOf(definition) + 1,
+            deletedAt: null,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          }
+        : null;
+    },
+    async listAll() {
+      return Promise.all(
+        definitions.map(async (definition, index) => ({
+          id: index + 1,
+          slug: definition.slug,
+          publisher: { type: "OWOGG" as const },
+          visibility: "PUBLIC" as const,
+          liveVersionId: index + 1,
+          deletedAt: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        })),
+      );
+    },
+  } satisfies GameIdentityRepository;
+  const canonicals = {
+    async findBySlug(slug: string) {
+      const definition = definitions.find((item) => item.slug === slug);
+      return definition
+        ? systemGameDefinitionToGameCanonicalDocument(definition, "2026-01-01T00:00:00.000Z")
+        : null;
+    },
+    async save() {
+      return undefined;
+    },
+  } satisfies GameCanonicalRepository;
+  return { identities, canonicals };
+}
+
+function newUseCases(definitions = GAME_DEFINITIONS): {
+  useCases: GameSettingsUseCases;
+  repo: FakeGameSettingsRepository;
+} {
   const repo = new FakeGameSettingsRepository();
+  const sources = genericSources(definitions);
   return {
-    useCases: new GameSettingsUseCases(repo, new StaticGameRegistry(GAME_DEFINITIONS)),
+    useCases: new GameSettingsUseCases(repo, sources.identities, sources.canonicals),
     repo,
   };
 }
@@ -64,7 +123,7 @@ test("listAll reports title/status from the registry, and gameId from its slug",
   const definition = GAME_DEFINITIONS.find((d) => d.slug === "reaction-time");
   assert.ok(reactionTime && definition);
   assert.equal(reactionTime.title, definition.title);
-  assert.equal(reactionTime.status, definition.status);
+  assert.equal(reactionTime.status, "published");
 });
 
 test("setEnabled(false) disables a known game and getDisabledGameIds reflects it", async () => {
@@ -115,9 +174,10 @@ test("disabling one game never touches another's enabled state", async () => {
 // ── the registry-scoping property this refactor establishes ─────────────────
 
 test("GameSettingsUseCases only ever reaches games the injected registry actually resolves", async () => {
-  const definitions = GAME_DEFINITIONS.slice(0, 1); // pretend only one game is registered
+  const definitions = GAME_DEFINITIONS.slice(0, 1); // pretend only one identity is registered
   const repo = new FakeGameSettingsRepository();
-  const useCases = new GameSettingsUseCases(repo, new StaticGameRegistry(definitions));
+  const sources = genericSources(definitions);
+  const useCases = new GameSettingsUseCases(repo, sources.identities, sources.canonicals);
 
   const all = await useCases.listAll();
   assert.equal(all.length, 1);
@@ -129,4 +189,28 @@ test("GameSettingsUseCases only ever reaches games the injected registry actuall
   assert.ok(otherSlug);
   const result = await useCases.setEnabled(otherSlug, false, null, 1);
   assert.deepEqual(result, { ok: false, code: "GAME_NOT_FOUND" });
+});
+
+test("a broken canonical source cannot block the D1-only kill switch", async () => {
+  const repo = new FakeGameSettingsRepository();
+  const sources = genericSources(GAME_DEFINITIONS.slice(0, 1));
+  const brokenCanonicals: GameCanonicalRepository = {
+    async findBySlug() {
+      throw new Error("B2 unavailable");
+    },
+    async save() {
+      throw new Error("not used");
+    },
+  };
+  const useCases = new GameSettingsUseCases(repo, sources.identities, brokenCanonicals);
+  const knownSlug = GAME_DEFINITIONS[0]?.slug;
+  assert.ok(knownSlug);
+
+  const listed = await useCases.listAll();
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0]?.title, knownSlug);
+
+  const result = await useCases.setEnabled(knownSlug, false, "maintenance", 9);
+  assert.equal(result.ok, true);
+  assert.deepEqual(await useCases.getDisabledGameIds(), [knownSlug]);
 });

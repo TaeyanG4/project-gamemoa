@@ -18,6 +18,7 @@ function samplePayload(overrides: Partial<GameSessionPayload> = {}): GameSession
     versionId: 7,
     attemptId: "11111111-1111-1111-1111-111111111111",
     exp: Math.floor(Date.now() / 1000) + GAME_SESSION_POLICY.EXPIRY_SECONDS,
+    difficulty: "normal",
     ...overrides,
   };
 }
