@@ -534,3 +534,73 @@ CREATE TABLE scores (
   deleted_by_admin_id INTEGER
 );
 `;
+
+/** Schema for generic games table tests (migration 0029) — includes users, sandbox_games, and games. */
+export const GAMES_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE sandbox_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  developer_user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  short_description TEXT,
+  description TEXT,
+  genre TEXT NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'single',
+  logo_key TEXT,
+  xp_per_completion INTEGER NOT NULL DEFAULT 0,
+  score_unit TEXT,
+  score_direction TEXT,
+  score_min INTEGER,
+  score_max INTEGER,
+  score_display_prefix TEXT,
+  score_display_suffix TEXT,
+  visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+  live_version_id INTEGER,
+  review_slot INTEGER,
+  deleted_at TEXT,
+  deleted_by_admin_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT NULL),
+  CHECK (review_slot IS NULL OR review_slot IN (1, 2))
+);
+
+CREATE TABLE games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  publisher_type TEXT NOT NULL,
+  publisher_user_id INTEGER REFERENCES users(id),
+  visibility TEXT NOT NULL,
+  live_version_id INTEGER,
+  deleted_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (publisher_type IN ('OWOGG', 'USER')),
+  CHECK (
+    (
+      publisher_type = 'OWOGG'
+      AND publisher_user_id IS NULL
+    )
+    OR
+    (
+      publisher_type = 'USER'
+      AND publisher_user_id IS NOT NULL
+      AND publisher_user_id > 0
+    )
+  ),
+  CHECK (visibility IN ('PRIVATE', 'PUBLIC')),
+  CHECK (live_version_id IS NULL OR live_version_id > 0),
+  CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT NULL),
+  CHECK (length(slug) > 0 AND slug = trim(slug))
+);
+
+CREATE INDEX idx_games_publisher ON games(publisher_type, publisher_user_id);
+CREATE INDEX idx_games_active_created ON games(created_at DESC) WHERE deleted_at IS NULL;
+`;
