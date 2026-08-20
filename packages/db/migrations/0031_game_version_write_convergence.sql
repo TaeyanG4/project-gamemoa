@@ -103,8 +103,10 @@ FROM (
 GROUP BY approval_history.slug, approval_history.game_id;
 
 -- Fail closed unless every legacy USER version has exact provider-neutral parity and every live
--- version pointer resolves to a version owned by that same game.
-CREATE TEMP TABLE _migration_0031_parity_guard (
+-- version pointer resolves to a version owned by that same game. This uses normal DDL rather than
+-- TEMP because Cloudflare's remote D1 authorizer rejects TEMP table DDL during migrations; the
+-- migration-local scratch table is dropped before successful completion.
+CREATE TABLE _migration_0031_parity_guard (
   must_be_zero INTEGER CHECK (must_be_zero = 0)
 );
 

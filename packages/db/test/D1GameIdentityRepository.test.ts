@@ -250,6 +250,15 @@ test("0030 migration actual-file: closes deployment gap, converges deltas, and e
     "utf-8",
   );
   raw.exec(migration0030);
+  assert.equal(
+    raw
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_migration_0030_parity_guard'",
+      )
+      .get(),
+    undefined,
+    "successful 0030 migration must remove its scratch parity guard",
+  );
 
   const repo = new D1GameIdentityRepository(db);
 

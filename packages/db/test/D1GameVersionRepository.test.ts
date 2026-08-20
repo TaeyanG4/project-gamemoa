@@ -120,6 +120,15 @@ test("0031 actual migration preserves USER version IDs and publish facts without
     .run();
 
   raw.exec(migration0031);
+  assert.equal(
+    raw
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = '_migration_0031_parity_guard'",
+      )
+      .get(),
+    undefined,
+    "successful 0031 migration must remove its scratch parity guard",
+  );
   const repo = new D1GameVersionRepository(db);
   const versions = await repo.listByGameId(10);
 
