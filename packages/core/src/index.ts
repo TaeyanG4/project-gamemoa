@@ -69,7 +69,12 @@ export * from "./application/userModerationUseCases.js";
 export * from "./application/gameCreatorUseCases.js";
 export * from "./application/sandboxGameUseCases.js";
 export * from "./application/gameBundlePublisher.js";
+export * from "./application/jsonDeepEqual.js";
 export * from "./application/creatorCanonicalBackfill.js";
+// Unified Game Platform, Stage U-2 — non-destructive Creator canonical -> generic canonical
+// migration/parity orchestration. See this file's own top doc comment for the exhaustive "what
+// stays unwired in production by this Stage" list.
+export * from "./application/genericCanonicalMigration.js";
 export * from "./application/systemGameBundlePublisher.js";
 export * from "./application/gameAttemptUseCases.js";
 export * from "./application/creatorScoreAcceptanceUseCases.js";

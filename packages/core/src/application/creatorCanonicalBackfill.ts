@@ -37,6 +37,7 @@ import { mapSandboxGameRecordToCanonical } from "../domain/creatorGameCanonicalM
 import type { CreatorCanonicalMappingBlockReason } from "../domain/creatorGameCanonicalMapper.js";
 import type { CreatorGameCanonicalDocument } from "../domain/creatorGameCanonicalDocument.js";
 import type { CreatorGameDefinitionRepository } from "../ports/creatorGameDefinition.js";
+import { jsonDeepEqual } from "./jsonDeepEqual.js";
 
 /**
  * One D1 row's backfill status, relative to what's currently in B2:
@@ -98,33 +99,14 @@ function summarize(statuses: readonly BackfillRowStatus[]): BackfillSummary {
 }
 
 /** Plain structural equality over the JSON-safe values a `CreatorGameCanonicalDocument` is made
- * of — key order never matters (two objects built by different code paths, like a freshly-mapped
- * document and one round-tripped through JSON, are not guaranteed to insert keys in the same
- * order). Deliberately hand-rolled rather than `node:util`'s `isDeepStrictEqual`: `packages/core`
- * has to stay runnable inside a Cloudflare Worker, where Node builtins aren't guaranteed. */
+ * of — see {@link jsonDeepEqual} (application/jsonDeepEqual.ts) for the actual implementation and
+ * why it's hand-rolled rather than `node:util`'s `isDeepStrictEqual`. Kept as a typed wrapper here
+ * so existing call sites don't need to change. */
 export function canonicalDocumentsEqual(
   a: CreatorGameCanonicalDocument,
   b: CreatorGameCanonicalDocument,
 ): boolean {
-  return deepEqualJson(a, b);
-}
-
-function deepEqualJson(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (typeof a !== typeof b || a === null || b === null) return false;
-  if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
-    return a.every((value, index) => deepEqualJson(value, b[index]));
-  }
-  if (typeof a === "object" && typeof b === "object") {
-    const aObj = a as Record<string, unknown>;
-    const bObj = b as Record<string, unknown>;
-    const aKeys = Object.keys(aObj).sort();
-    const bKeys = Object.keys(bObj).sort();
-    if (aKeys.length !== bKeys.length) return false;
-    return aKeys.every((key, index) => key === bKeys[index] && deepEqualJson(aObj[key], bObj[key]));
-  }
-  return false;
+  return jsonDeepEqual(a, b);
 }
 
 /** Classifies exactly one row — the unit both {@link classifyBackfillRows} and
