@@ -53,20 +53,19 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
       return wrapper;
     },
     async batch(statements: D1PreparedStatement[]) {
-      // Real D1 executes an entire batch() call as one uninterruptible unit — no other
-      // concurrent request's statements can land in between. A naive `for (...) { await s.run() }`
-      // does NOT model that: even though the underlying node:sqlite call is itself synchronous,
-      // wrapping it in `async run()` still yields a microtask between each statement, and under
-      // `Promise.all`-driven concurrent calls another call's own batch can interleave its
-      // statements in that gap. That silently breaks any logic (like a `changes()`-gated second
-      // INSERT) that depends on nothing else running on the connection between this batch's own
-      // statements. Fix: run every statement's underlying SQLite call synchronously back-to-back,
-      // via the sync escape hatch above, with no `await` — and therefore no interleaving
-      // opportunity — between them. Only the outer batch() call is async, matching the real
-      // D1Database interface.
-      return statements.map((s) =>
-        (s as D1PreparedStatement & { __runSync: () => unknown }).__runSync(),
-      );
+      // Real D1 executes an entire batch() call as one atomic transaction — no other concurrent
+      // request can interleave, and any statement failure rolls back all statements in the batch.
+      raw.exec("BEGIN TRANSACTION;");
+      try {
+        const results = statements.map((s) =>
+          (s as D1PreparedStatement & { __runSync: () => unknown }).__runSync(),
+        );
+        raw.exec("COMMIT;");
+        return results;
+      } catch (err) {
+        raw.exec("ROLLBACK;");
+        throw err;
+      }
     },
   };
 
@@ -330,8 +329,115 @@ CREATE TABLE user_moderation_audit_log (
 );
 `;
 
-/** Schema for D1GameCreatorRepository / D1SandboxGameRepository tests (migration 0024, renamed +
- * extended by migration 0025 — see that file's comment for why this is a pure table rename). */
+/** Legacy pre-0029 schema (without games table) used for testing 0029 and 0030 migration scripts. */
+export const LEGACY_SANDBOX_GAMES_TEST_SCHEMA = `
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nickname TEXT NOT NULL,
+  email TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE game_creator_access (
+  user_id INTEGER PRIMARY KEY,
+  granted_by_admin_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE game_creator_access_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_user_id INTEGER NOT NULL,
+  actor_admin_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE game_creator_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  message TEXT,
+  reviewed_by_admin_id INTEGER,
+  reviewed_at TEXT,
+  reject_reason TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_game_creator_applications_user
+  ON game_creator_applications(user_id, created_at DESC);
+
+CREATE UNIQUE INDEX idx_game_creator_applications_one_pending_per_user
+  ON game_creator_applications(user_id) WHERE status = 'PENDING';
+
+CREATE TABLE sandbox_games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  developer_user_id INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  short_description TEXT,
+  description TEXT,
+  genre TEXT NOT NULL,
+  mode TEXT NOT NULL DEFAULT 'single',
+  logo_key TEXT,
+  xp_per_completion INTEGER NOT NULL DEFAULT 0,
+  score_unit TEXT,
+  score_direction TEXT,
+  score_min INTEGER,
+  score_max INTEGER,
+  score_display_prefix TEXT,
+  score_display_suffix TEXT,
+  visibility TEXT NOT NULL DEFAULT 'PRIVATE',
+  live_version_id INTEGER,
+  review_slot INTEGER,
+  deleted_at TEXT,
+  deleted_by_admin_id INTEGER,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT NULL),
+  CHECK (review_slot IS NULL OR review_slot IN (1, 2))
+);
+
+CREATE INDEX idx_sandbox_games_deleted_at ON sandbox_games(deleted_at);
+
+CREATE UNIQUE INDEX idx_sandbox_games_review_slot
+  ON sandbox_games(developer_user_id, review_slot)
+  WHERE review_slot IS NOT NULL;
+
+CREATE TABLE sandbox_game_versions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id INTEGER NOT NULL,
+  object_key TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  bundle_bytes INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+  reviewed_by_admin_id INTEGER,
+  reviewed_at TEXT,
+  reject_reason TEXT,
+  uploaded_at TEXT NOT NULL,
+  publish_status TEXT NOT NULL DEFAULT 'UPLOADED',
+  publish_error TEXT,
+  published_at TEXT,
+  manifest_key TEXT,
+  published_size_bytes INTEGER,
+  file_count INTEGER
+);
+
+CREATE TABLE sandbox_game_review_audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id INTEGER NOT NULL,
+  version_id INTEGER,
+  actor_admin_id INTEGER NOT NULL,
+  action TEXT NOT NULL,
+  reason TEXT,
+  metadata_json TEXT,
+  created_at TEXT NOT NULL
+);
+`;
+
+/** Schema for D1GameCreatorRepository / D1SandboxGameRepository tests (migration 0024-0030) */
 export const SANDBOX_GAMES_TEST_SCHEMA = `
 CREATE TABLE users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -437,6 +543,120 @@ CREATE TABLE sandbox_game_review_audit_log (
   metadata_json TEXT,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE games (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  publisher_type TEXT NOT NULL,
+  publisher_user_id INTEGER REFERENCES users(id),
+  visibility TEXT NOT NULL,
+  live_version_id INTEGER,
+  deleted_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  CHECK (publisher_type IN ('OWOGG', 'USER')),
+  CHECK (
+    (
+      publisher_type = 'OWOGG'
+      AND publisher_user_id IS NULL
+    )
+    OR
+    (
+      publisher_type = 'USER'
+      AND publisher_user_id IS NOT NULL
+      AND publisher_user_id > 0
+    )
+  ),
+  CHECK (visibility IN ('PRIVATE', 'PUBLIC')),
+  CHECK (live_version_id IS NULL OR live_version_id > 0),
+  CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT NULL),
+  CHECK (length(slug) > 0 AND slug = trim(slug))
+);
+
+CREATE INDEX idx_games_publisher ON games(publisher_type, publisher_user_id);
+CREATE INDEX idx_games_active_created ON games(created_at DESC) WHERE deleted_at IS NULL;
+
+CREATE TRIGGER trg_sandbox_games_after_insert
+AFTER INSERT ON sandbox_games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Authority conflict: cannot insert USER sandbox game on top of OWOGG identity')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE id = NEW.id AND publisher_type = 'OWOGG'
+  );
+
+  SELECT RAISE(ABORT, 'Authority conflict: slug is reserved by OWOGG game')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE slug = NEW.slug AND id <> NEW.id AND publisher_type = 'OWOGG'
+  );
+
+  INSERT INTO games (
+    id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at, created_at, updated_at
+  ) VALUES (
+    NEW.id, NEW.slug, 'USER', NEW.developer_user_id, NEW.visibility, NEW.live_version_id, NEW.deleted_at, NEW.created_at, NEW.updated_at
+  )
+  ON CONFLICT(id) DO UPDATE SET
+    slug = NEW.slug,
+    publisher_type = 'USER',
+    publisher_user_id = NEW.developer_user_id,
+    visibility = NEW.visibility,
+    live_version_id = NEW.live_version_id,
+    deleted_at = NEW.deleted_at,
+    created_at = NEW.created_at,
+    updated_at = NEW.updated_at
+  WHERE games.publisher_type = 'USER';
+END;
+
+CREATE TRIGGER trg_sandbox_games_after_update
+AFTER UPDATE ON sandbox_games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Authority conflict: cannot update USER sandbox game corresponding to OWOGG identity')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE id = OLD.id AND publisher_type = 'OWOGG'
+  );
+
+  SELECT RAISE(ABORT, 'Authority conflict: slug is reserved by OWOGG game')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE slug = NEW.slug AND id <> OLD.id AND publisher_type = 'OWOGG'
+  );
+
+  -- Convergent upsert: re-creates a missing USER generic row so that sandbox_games remains the
+  -- single write authority even when the games projection was lost (deployment gap, etc.).
+  INSERT INTO games (
+    id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at, created_at, updated_at
+  ) VALUES (
+    OLD.id, NEW.slug, 'USER', NEW.developer_user_id, NEW.visibility, NEW.live_version_id, NEW.deleted_at, NEW.created_at, NEW.updated_at
+  )
+  ON CONFLICT(id) DO UPDATE SET
+    slug = NEW.slug,
+    publisher_type = 'USER',
+    publisher_user_id = NEW.developer_user_id,
+    visibility = NEW.visibility,
+    live_version_id = NEW.live_version_id,
+    deleted_at = NEW.deleted_at,
+    created_at = NEW.created_at,
+    updated_at = NEW.updated_at
+  WHERE games.publisher_type = 'USER';
+END;
+
+CREATE TRIGGER trg_sandbox_games_after_delete
+AFTER DELETE ON sandbox_games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Authority conflict: cannot delete OWOGG identity via sandbox game delete')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE id = OLD.id AND publisher_type = 'OWOGG'
+  );
+
+  DELETE FROM games
+  WHERE id = OLD.id AND publisher_type = 'USER';
+END;
 `;
 
 /** Schema for D1GameAttemptConsumptionRepository tests (migration 0028) — the minimal slice of
@@ -603,4 +823,86 @@ CREATE TABLE games (
 
 CREATE INDEX idx_games_publisher ON games(publisher_type, publisher_user_id);
 CREATE INDEX idx_games_active_created ON games(created_at DESC) WHERE deleted_at IS NULL;
+
+CREATE TRIGGER trg_sandbox_games_after_insert
+AFTER INSERT ON sandbox_games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Authority conflict: cannot insert USER sandbox game on top of OWOGG identity')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE id = NEW.id AND publisher_type = 'OWOGG'
+  );
+
+  SELECT RAISE(ABORT, 'Authority conflict: slug is reserved by OWOGG game')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE slug = NEW.slug AND id <> NEW.id AND publisher_type = 'OWOGG'
+  );
+
+  INSERT INTO games (
+    id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at, created_at, updated_at
+  ) VALUES (
+    NEW.id, NEW.slug, 'USER', NEW.developer_user_id, NEW.visibility, NEW.live_version_id, NEW.deleted_at, NEW.created_at, NEW.updated_at
+  )
+  ON CONFLICT(id) DO UPDATE SET
+    slug = NEW.slug,
+    publisher_type = 'USER',
+    publisher_user_id = NEW.developer_user_id,
+    visibility = NEW.visibility,
+    live_version_id = NEW.live_version_id,
+    deleted_at = NEW.deleted_at,
+    created_at = NEW.created_at,
+    updated_at = NEW.updated_at
+  WHERE games.publisher_type = 'USER';
+END;
+
+CREATE TRIGGER trg_sandbox_games_after_update
+AFTER UPDATE ON sandbox_games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Authority conflict: cannot update USER sandbox game corresponding to OWOGG identity')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE id = OLD.id AND publisher_type = 'OWOGG'
+  );
+
+  SELECT RAISE(ABORT, 'Authority conflict: slug is reserved by OWOGG game')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE slug = NEW.slug AND id <> OLD.id AND publisher_type = 'OWOGG'
+  );
+
+  -- Convergent upsert: re-creates a missing USER generic row so that sandbox_games remains the
+  -- single write authority even when the games projection was lost (deployment gap, etc.).
+  INSERT INTO games (
+    id, slug, publisher_type, publisher_user_id, visibility, live_version_id, deleted_at, created_at, updated_at
+  ) VALUES (
+    OLD.id, NEW.slug, 'USER', NEW.developer_user_id, NEW.visibility, NEW.live_version_id, NEW.deleted_at, NEW.created_at, NEW.updated_at
+  )
+  ON CONFLICT(id) DO UPDATE SET
+    slug = NEW.slug,
+    publisher_type = 'USER',
+    publisher_user_id = NEW.developer_user_id,
+    visibility = NEW.visibility,
+    live_version_id = NEW.live_version_id,
+    deleted_at = NEW.deleted_at,
+    created_at = NEW.created_at,
+    updated_at = NEW.updated_at
+  WHERE games.publisher_type = 'USER';
+END;
+
+CREATE TRIGGER trg_sandbox_games_after_delete
+AFTER DELETE ON sandbox_games
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'Authority conflict: cannot delete OWOGG identity via sandbox game delete')
+  WHERE EXISTS (
+    SELECT 1 FROM games
+    WHERE id = OLD.id AND publisher_type = 'OWOGG'
+  );
+
+  DELETE FROM games
+  WHERE id = OLD.id AND publisher_type = 'USER';
+END;
 `;

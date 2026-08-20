@@ -9,7 +9,7 @@ import {
 import {
   createSqliteD1,
   GAMES_TEST_SCHEMA,
-  SANDBOX_GAMES_TEST_SCHEMA,
+  LEGACY_SANDBOX_GAMES_TEST_SCHEMA,
 } from "./helpers/sqliteD1.js";
 
 function seedUser(raw: import("node:sqlite").DatabaseSync, id: number, nickname: string) {
@@ -110,7 +110,7 @@ test("public surface export: D1GameIdentityRepository and mappers exported from 
 });
 
 test("0029 migration actual-file: cleanly applies to existing DB and backfills USER rows preserving IDs and parity", () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  const { db, raw } = createSqliteD1(LEGACY_SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "Alice");
   seedUser(raw, 2, "Bob");
 
@@ -201,6 +201,176 @@ test("0029 migration actual-file: cleanly applies to existing DB and backfills U
     assert.deepEqual(g3.publisher, { type: "USER", userId: 1 });
     assert.equal(g3.deletedAt, "2026-08-20T08:00:00.123Z");
   });
+});
+
+test("0030 migration actual-file: closes deployment gap, converges deltas, and enables sync triggers", () => {
+  const { db, raw } = createSqliteD1(LEGACY_SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Alice");
+  seedUser(raw, 2, "Bob");
+
+  // Initial seed
+  const id1 = insertRawSandboxGame(raw, {
+    id: 1,
+    slug: "game-1",
+    developerUserId: 1,
+    visibility: "PRIVATE",
+    createdAt: "2026-08-19T10:00:00.000Z",
+    updatedAt: "2026-08-19T10:00:00.000Z",
+  });
+
+  // Apply 0029 migration
+  const migration0029 = fs.readFileSync(
+    new URL("../migrations/0029_unified_game_identity.sql", import.meta.url),
+    "utf-8",
+  );
+  raw.exec(migration0029);
+
+  // Simulate deployment gap (OLD Worker writes to sandbox_games before new Worker is deployed)
+  // 1. New game inserted by OLD worker (missing from games)
+  const id2 = insertRawSandboxGame(raw, {
+    id: 2,
+    slug: "gap-game-2",
+    developerUserId: 2,
+    visibility: "PUBLIC",
+    liveVersionId: 10,
+    createdAt: "2026-08-20T09:00:00.000Z",
+    updatedAt: "2026-08-20T09:00:00.000Z",
+  });
+
+  // 2. Existing game updated by OLD worker (stale in games)
+  raw
+    .prepare(
+      `UPDATE sandbox_games SET visibility = 'PUBLIC', live_version_id = 99, updated_at = '2026-08-20T09:05:00.000Z' WHERE id = ?`,
+    )
+    .run(id1);
+
+  // Apply 0030 migration
+  const migration0030 = fs.readFileSync(
+    new URL("../migrations/0030_user_identity_write_convergence.sql", import.meta.url),
+    "utf-8",
+  );
+  raw.exec(migration0030);
+
+  const repo = new D1GameIdentityRepository(db);
+
+  // Verify delta repair
+  return Promise.all([repo.findById(id1), repo.findById(id2)]).then(async ([g1, g2]) => {
+    assert.ok(g1);
+    assert.equal(g1.visibility, "PUBLIC");
+    assert.equal(g1.liveVersionId, 99);
+    assert.equal(g1.updatedAt, "2026-08-20T09:05:00.000Z");
+
+    assert.ok(g2);
+    assert.equal(g2.slug, "gap-game-2");
+    assert.equal(g2.visibility, "PUBLIC");
+    assert.equal(g2.liveVersionId, 10);
+
+    // Verify post-0030 transitional triggers
+    // A. INSERT trigger
+    const id3 = insertRawSandboxGame(raw, {
+      id: 3,
+      slug: "post-migration-game",
+      developerUserId: 1,
+      visibility: "PRIVATE",
+      createdAt: "2026-08-20T10:00:00.000Z",
+      updatedAt: "2026-08-20T10:00:00.000Z",
+    });
+
+    const g3 = await repo.findById(id3);
+    assert.ok(g3);
+    assert.equal(g3.slug, "post-migration-game");
+    assert.deepEqual(g3.publisher, { type: "USER", userId: 1 });
+
+    // B. UPDATE trigger (e.g. soft-delete)
+    raw
+      .prepare(
+        `UPDATE sandbox_games SET deleted_at = '2026-08-20T10:30:00.000Z', visibility = 'PRIVATE', updated_at = '2026-08-20T10:30:00.000Z' WHERE id = ?`,
+      )
+      .run(id3);
+
+    const g3Updated = await repo.findById(id3);
+    assert.ok(g3Updated);
+    assert.equal(g3Updated.deletedAt, "2026-08-20T10:30:00.000Z");
+    assert.equal(g3Updated.visibility, "PRIVATE");
+
+    // C. DELETE trigger (hard delete)
+    raw.prepare(`DELETE FROM sandbox_games WHERE id = ?`).run(id3);
+    const g3Deleted = await repo.findById(id3);
+    assert.equal(g3Deleted, null);
+  });
+});
+
+test("0030 migration: authority conflict fail-closed parity guard aborts migration", () => {
+  const { raw } = createSqliteD1(LEGACY_SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Alice");
+
+  insertRawSandboxGame(raw, {
+    id: 10,
+    slug: "reaction-time",
+    developerUserId: 1,
+    visibility: "PRIVATE",
+  });
+
+  // Apply 0029
+  const migration0029 = fs.readFileSync(
+    new URL("../migrations/0029_unified_game_identity.sql", import.meta.url),
+    "utf-8",
+  );
+  raw.exec(migration0029);
+
+  // Intentionally tamper games table to create an OWOGG authority conflict on same id
+  raw
+    .prepare(
+      `UPDATE games SET publisher_type = 'OWOGG', publisher_user_id = NULL, visibility = 'PUBLIC', live_version_id = 1 WHERE id = 10`,
+    )
+    .run();
+
+  // Applying 0030 must fail due to parity guard aborting on authority conflict
+  const migration0030 = fs.readFileSync(
+    new URL("../migrations/0030_user_identity_write_convergence.sql", import.meta.url),
+    "utf-8",
+  );
+  assert.throws(() => raw.exec(migration0030), /CHECK constraint failed: must_be_zero = 0/);
+});
+
+test("0030 triggers: authority conflict rejection prevents tampering with OWOGG games", () => {
+  const { raw } = createSqliteD1(GAMES_TEST_SCHEMA);
+  raw.exec("PRAGMA foreign_keys = ON;");
+  seedUser(raw, 1, "Alice");
+
+  // Insert OWOGG game in games table
+  insertRawGenericGame(raw, {
+    id: 99,
+    slug: "reaction-time",
+    publisherType: "OWOGG",
+    publisherUserId: null,
+    visibility: "PUBLIC",
+    liveVersionId: 1,
+  });
+
+  // Attempt to insert a USER sandbox_game with same id 99 must be rejected by trigger
+  assert.throws(
+    () =>
+      insertRawSandboxGame(raw, {
+        id: 99,
+        slug: "user-reaction-time",
+        developerUserId: 1,
+        visibility: "PRIVATE",
+      }),
+    /Authority conflict: cannot insert USER sandbox game on top of OWOGG identity/,
+  );
+
+  // Attempt to insert a USER sandbox_game with same slug "reaction-time" must be rejected by trigger
+  assert.throws(
+    () =>
+      insertRawSandboxGame(raw, {
+        id: 100,
+        slug: "reaction-time",
+        developerUserId: 1,
+        visibility: "PRIVATE",
+      }),
+    /Authority conflict: slug is reserved by OWOGG game/,
+  );
 });
 
 test("physical SQLite constraints: publisher, visibility, slug, and liveVersion invariants", () => {

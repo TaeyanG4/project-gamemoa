@@ -145,11 +145,11 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return row ? mapGameRow(row) : null;
   }
 
-  // Deliberately NOT filtered by deleted_at — see the port doc comment. Checks existence only
-  // (SELECT 1), not the full row, since the caller just needs a boolean.
+  // Deliberately NOT filtered by deleted_at — see the port doc comment. Checks global existence
+  // in `games` identity table (SELECT 1), not the full row, so slug availability is platform-wide.
   async slugExists(slug: string): Promise<boolean> {
     const row = await this.db
-      .prepare(`SELECT 1 FROM sandbox_games WHERE slug = ?`)
+      .prepare(`SELECT 1 FROM games WHERE slug = ?`)
       .bind(slug)
       .first<{ 1: number }>();
     return row !== null;
@@ -207,7 +207,8 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     // Children first, parent last — explicit rather than relying on the schema's
     // ON DELETE CASCADE actually being enforced (SQLite/D1 foreign-key enforcement is a per-
     // connection PRAGMA; being explicit here doesn't depend on it). One batch() call for
-    // atomicity across the three statements.
+    // atomicity across the statements. The trg_sandbox_games_after_delete trigger automatically
+    // removes the corresponding USER row from `games`.
     await this.db.batch([
       this.db.prepare(`DELETE FROM sandbox_game_review_audit_log WHERE game_id = ?`).bind(id),
       this.db.prepare(`DELETE FROM sandbox_game_versions WHERE game_id = ?`).bind(id),
@@ -225,52 +226,73 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     mode: SandboxGameMode;
     nowIso: string;
   }): Promise<SandboxGameRecord | null> {
-    // INSERT ... SELECT rather than a plain INSERT: the SELECT computes the lowest review_slot
-    // (1 or 2) not already held by this developer, and its WHERE clause makes the SELECT produce
-    // *zero rows* — so the INSERT writes nothing at all — when both slots are already taken. That
-    // makes "is a slot available" and "claim it" one atomic statement instead of a separate
-    // COUNT(*) check followed by an INSERT, which is exactly the TOCTOU race a naive
-    // count-then-insert would have. The partial UNIQUE INDEX in migration 0024 is the backstop of
-    // last resort, not the primary mechanism.
-    const res = await this.db
-      .prepare(
-        `INSERT INTO sandbox_games
-           (slug, developer_user_id, title, short_description, description, genre, mode,
-            review_slot, created_at, updated_at)
-         SELECT ?, ?, ?, ?, ?, ?, ?, avail.slot, ?, ?
-         FROM (
-           SELECT MIN(s.slot) AS slot
-           FROM (SELECT 1 AS slot UNION ALL SELECT 2) s
-           WHERE s.slot NOT IN (
-             SELECT review_slot FROM sandbox_games
-             WHERE developer_user_id = ? AND review_slot IS NOT NULL
-           )
-         ) avail
-         WHERE avail.slot IS NOT NULL`,
-      )
-      .bind(
-        input.slug,
-        input.developerUserId,
-        input.title,
-        input.shortDescription,
-        input.description,
-        input.genre,
-        input.mode,
-        input.nowIso,
-        input.nowIso,
-        input.developerUserId,
-      )
-      .run();
+    // Shared numeric ID namespace allocation:
+    // 1. Statement 1 inserts into generic `games` table, allocating the shared primary key `id`
+    //    while verifying developer review slot availability atomically in a single statement.
+    // 2. Statement 2 inserts into `sandbox_games` referencing the allocated `games.id` and claiming
+    //    the lowest available review slot (1 or 2).
+    // 3. If both slots are already held, both statements write 0 rows atomically and create() returns null.
+    // 4. Executed in a single db.batch() call so that no interleaving is possible and failure in either
+    //    statement rolls back the entire batch.
+    const res = await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT INTO games
+             (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+           SELECT ?, 'USER', ?, 'PRIVATE', NULL, ?, ?
+           WHERE EXISTS (
+             SELECT 1
+             FROM (SELECT 1 AS slot UNION ALL SELECT 2) s
+             WHERE s.slot NOT IN (
+               SELECT review_slot FROM sandbox_games
+               WHERE developer_user_id = ? AND review_slot IS NOT NULL
+             )
+           )`,
+        )
+        .bind(input.slug, input.developerUserId, input.nowIso, input.nowIso, input.developerUserId),
+      this.db
+        .prepare(
+          `INSERT INTO sandbox_games
+             (id, slug, developer_user_id, title, short_description, description, genre, mode,
+              review_slot, created_at, updated_at)
+           SELECT g.id, ?, ?, ?, ?, ?, ?, ?, avail.slot, ?, ?
+           FROM games g, (
+             SELECT MIN(s.slot) AS slot
+             FROM (SELECT 1 AS slot UNION ALL SELECT 2) s
+             WHERE s.slot NOT IN (
+               SELECT review_slot FROM sandbox_games
+               WHERE developer_user_id = ? AND review_slot IS NOT NULL
+             )
+           ) avail
+           WHERE g.slug = ? AND g.publisher_type = 'USER' AND avail.slot IS NOT NULL`,
+        )
+        .bind(
+          input.slug,
+          input.developerUserId,
+          input.title,
+          input.shortDescription,
+          input.description,
+          input.genre,
+          input.mode,
+          input.nowIso,
+          input.nowIso,
+          input.developerUserId,
+          input.slug,
+        ),
+    ]);
 
-    if (!res.meta?.changes) return null; // no review slot available
+    const [gamesResult, sandboxResult] = res as [
+      { meta?: { changes?: number } } | undefined,
+      { meta?: { changes?: number } } | undefined,
+    ];
+    if (!gamesResult?.meta?.changes || !sandboxResult?.meta?.changes) {
+      return null; // no review slot available
+    }
 
     // Deliberately NOT `WHERE rowid = last_insert_rowid()` here: that reads connection-global
     // state, and this repository's whole point is being safe under concurrent callers sharing one
-    // connection — a second create() interleaving its own INSERT between this statement and the
-    // read-back would make this read back *its* row instead of the caller's own (confirmed by a
-    // concurrent-create test that failed exactly this way before this fix). `slug` is UNIQUE and
-    // was just written by this exact call, so filtering on it is race-proof without needing a
-    // connection-scoped identifier at all.
+    // connection. `slug` is UNIQUE and was just written by this exact call, so filtering on it is
+    // race-proof without needing a connection-scoped identifier at all.
     const row = await this.db
       .prepare(`SELECT * FROM sandbox_games WHERE slug = ?`)
       .bind(input.slug)

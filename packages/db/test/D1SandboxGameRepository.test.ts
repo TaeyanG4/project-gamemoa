@@ -891,3 +891,407 @@ test("concurrent createVersion calls each get back their own row, never another 
   assert.deepEqual(results.map((r) => r.objectKey).sort(), ["k-0", "k-1", "k-2", "k-3", "k-4"]);
   assert.equal(new Set(results.map((r) => r.id)).size, 5, "every call must get a distinct row id");
 });
+
+// ── Stage A-3: Write Convergence & Shared ID Namespace ─────────────────────
+
+test("Stage A-3: shared numeric ID namespace does not collide with existing OWOGG games", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+
+  // Pre-seed an OWOGG game in games table at id = 100
+  raw
+    .prepare(
+      `INSERT INTO games (id, slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+       VALUES (100, 'reaction-time', 'OWOGG', NULL, 'PUBLIC', 1, '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z')`,
+    )
+    .run();
+
+  const repo = new D1SandboxGameRepository(db);
+  const created = await repo.create({
+    slug: "my-user-game",
+    developerUserId: 1,
+    title: "User Game",
+    shortDescription: "desc",
+    description: null,
+    genre: "arcade",
+    mode: "single",
+    nowIso: "2026-08-20T12:00:00.000Z",
+  });
+
+  assert.ok(created);
+  assert.equal(created.id, 101, "new game allocates next id in shared games namespace");
+
+  // Verify games table has matching USER row with same id
+  const genericRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(created.id) as Record<
+    string,
+    unknown
+  >;
+  assert.ok(genericRow);
+  assert.equal(genericRow.slug, "my-user-game");
+  assert.equal(genericRow.publisher_type, "USER");
+  assert.equal(genericRow.publisher_user_id, 1);
+
+  // Verify OWOGG row at id = 100 is unchanged
+  const owoggRow = raw.prepare("SELECT * FROM games WHERE id = 100").get() as Record<
+    string,
+    unknown
+  >;
+  assert.ok(owoggRow);
+  assert.equal(owoggRow.publisher_type, "OWOGG");
+  assert.equal(owoggRow.slug, "reaction-time");
+});
+
+test("Stage A-3: create refusal on review slot exhaustion writes zero rows to both games and sandbox_games", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+
+  await seedGame(repo, "game-1", 1);
+  await seedGame(repo, "game-2", 1);
+
+  const initialGamesCount = Number(
+    (raw.prepare("SELECT COUNT(*) as c FROM games").get() as { c: number }).c,
+  );
+  const initialSandboxCount = Number(
+    (raw.prepare("SELECT COUNT(*) as c FROM sandbox_games").get() as { c: number }).c,
+  );
+  assert.equal(initialGamesCount, 2);
+  assert.equal(initialSandboxCount, 2);
+
+  // Third attempt should return null
+  const third = await repo.create({
+    slug: "game-3",
+    developerUserId: 1,
+    title: "Game 3",
+    shortDescription: null,
+    description: null,
+    genre: "puzzle",
+    mode: "single",
+    nowIso: new Date().toISOString(),
+  });
+  assert.equal(third, null);
+
+  // Both tables must have zero new rows written
+  const finalGamesCount = Number(
+    (raw.prepare("SELECT COUNT(*) as c FROM games").get() as { c: number }).c,
+  );
+  const finalSandboxCount = Number(
+    (raw.prepare("SELECT COUNT(*) as c FROM sandbox_games").get() as { c: number }).c,
+  );
+  assert.equal(finalGamesCount, 2);
+  assert.equal(finalSandboxCount, 2);
+});
+
+test("Stage A-3: slugExists checks global games identity namespace including OWOGG games", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+
+  await seedGame(repo, "user-game", 1);
+
+  // Seed an OWOGG game directly in games
+  raw
+    .prepare(
+      `INSERT INTO games (id, slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
+       VALUES (99, 'official-memory-test', 'OWOGG', NULL, 'PUBLIC', 1, '2026-08-19T00:00:00.000Z', '2026-08-19T00:00:00.000Z')`,
+    )
+    .run();
+
+  assert.equal(await repo.slugExists("user-game"), true);
+  assert.equal(await repo.slugExists("official-memory-test"), true);
+  assert.equal(await repo.slugExists("unused-slug"), false);
+});
+
+test("Stage A-3: all write paths maintain exact parity in games identity table", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+
+  // 1. create
+  const game = await seedGame(repo, "parity-game", 1);
+  let gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<
+    string,
+    unknown
+  >;
+  assert.equal(gRow.slug, "parity-game");
+  assert.equal(gRow.publisher_type, "USER");
+  assert.equal(gRow.publisher_user_id, 1);
+  assert.equal(gRow.visibility, "PRIVATE");
+  assert.equal(gRow.live_version_id, null);
+  assert.equal(gRow.deleted_at, null);
+
+  // 2. updateMetadata updates updated_at in games
+  const metaTime = "2026-08-20T14:00:00.000Z";
+  await repo.updateMetadata(game.id, { title: "Updated Title" }, metaTime);
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.updated_at, metaTime);
+
+  // 3. setLogo updates updated_at in games
+  const logoTime = "2026-08-20T14:10:00.000Z";
+  await repo.setLogo(game.id, "games/1/logo.png", logoTime);
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.updated_at, logoTime);
+
+  // 4. setLiveVersion updates live_version_id in games
+  const verTime = "2026-08-20T14:20:00.000Z";
+  await repo.setLiveVersion(game.id, 42, verTime);
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.live_version_id, 42);
+  assert.equal(gRow.updated_at, verTime);
+
+  // 5. setVisibility updates visibility in games
+  const visTime = "2026-08-20T14:30:00.000Z";
+  await repo.setVisibility(game.id, "PUBLIC", visTime);
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.visibility, "PUBLIC");
+  assert.equal(gRow.updated_at, visTime);
+
+  // 6. releaseReviewSlot updates updated_at in games
+  const slotTime = "2026-08-20T14:40:00.000Z";
+  await repo.releaseReviewSlot(game.id, slotTime);
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.updated_at, slotTime);
+
+  // 7. clearLiveVersionIfMatches (with mismatch -> no-op)
+  await repo.clearLiveVersionIfMatches(game.id, 999, "2026-08-20T14:50:00.000Z");
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.live_version_id, 42, "mismatched version must not clear live_version_id");
+  assert.equal(gRow.visibility, "PUBLIC", "mismatched version must not change visibility");
+
+  // 8. clearLiveVersionIfMatches (with match -> clears live_version_id and sets PRIVATE)
+  const clearTime = "2026-08-20T15:00:00.000Z";
+  await repo.clearLiveVersionIfMatches(game.id, 42, clearTime);
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.live_version_id, null);
+  assert.equal(gRow.visibility, "PRIVATE");
+  assert.equal(gRow.updated_at, clearTime);
+
+  // 9. softDelete updates deleted_at and visibility in games
+  const deleteTime = "2026-08-20T15:30:00.000Z";
+  await repo.softDelete(game.id, 99, deleteTime);
+  gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<string, unknown>;
+  assert.equal(gRow.deleted_at, deleteTime);
+  assert.equal(gRow.visibility, "PRIVATE");
+  assert.equal(gRow.updated_at, deleteTime);
+
+  // 10. hardDelete removes row from both sandbox_games and games
+  await repo.hardDelete(game.id);
+  const deletedSandbox = raw.prepare("SELECT * FROM sandbox_games WHERE id = ?").get(game.id);
+  const deletedGeneric = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id);
+  assert.equal(deletedSandbox, undefined);
+  assert.equal(deletedGeneric, undefined);
+});
+
+test("Stage A-3: true second-statement rollback — games INSERT succeeds then sandbox INSERT fails, leaving zero orphan rows", async () => {
+  // This test proves the *correct* partial-batch-failure scenario:
+  //   Statement 1 (games INSERT) succeeds and writes a row.
+  //   Statement 2 (sandbox_games INSERT) is then forcibly aborted by a test-only
+  //   BEFORE INSERT trigger that fires for the exact slug under test.
+  //   The db.batch() helper wraps both statements in BEGIN/COMMIT/ROLLBACK, so
+  //   the abort in Statement 2 causes the entire transaction — including the
+  //   already-committed Statement 1 row — to roll back.
+  //   Final assertion: both games and sandbox_games have 0 rows for that slug.
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  raw.exec("PRAGMA foreign_keys = ON;");
+  // Seed a real, valid user so Statement 1 (games) does NOT fail on FK.
+  seedUser(raw, 1, "Dev");
+
+  // Install a test-only BEFORE INSERT trigger that aborts sandbox_games writes for
+  // the specific slug. This guarantees Statement 1 (games) always succeeds first.
+  raw.exec(`
+      CREATE TRIGGER trg_test_only_sandbox_abort_for_slug
+      BEFORE INSERT ON sandbox_games
+      FOR EACH ROW
+      WHEN NEW.slug = 'second-stmt-fail-game'
+      BEGIN
+        SELECT RAISE(ABORT, 'test-only: forced sandbox_games INSERT failure for rollback proof');
+      END;
+    `);
+
+  const repo = new D1SandboxGameRepository(db);
+
+  // Verify no rows exist before the attempt.
+  const gamesBefore = Number(
+    (
+      raw.prepare("SELECT COUNT(*) as c FROM games WHERE slug = 'second-stmt-fail-game'").get() as {
+        c: number;
+      }
+    ).c,
+  );
+  assert.equal(gamesBefore, 0, "precondition: games is empty before attempt");
+
+  // Statement 2 (sandbox_games) must fail; db.batch() must reject.
+  await assert.rejects(
+    () =>
+      repo.create({
+        slug: "second-stmt-fail-game",
+        developerUserId: 1,
+        title: "Rollback Test",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+        nowIso: new Date().toISOString(),
+      }),
+    /forced sandbox_games INSERT failure/,
+  );
+
+  // After rejection both tables must be clean — the games row written by Statement 1
+  // must have been rolled back together with the failed Statement 2.
+  const gamesCount = Number(
+    (
+      raw.prepare("SELECT COUNT(*) as c FROM games WHERE slug = 'second-stmt-fail-game'").get() as {
+        c: number;
+      }
+    ).c,
+  );
+  const sandboxCount = Number(
+    (
+      raw
+        .prepare("SELECT COUNT(*) as c FROM sandbox_games WHERE slug = 'second-stmt-fail-game'")
+        .get() as { c: number }
+    ).c,
+  );
+  assert.equal(gamesCount, 0, "Statement 1 games row must be rolled back — no orphan in games");
+  assert.equal(sandboxCount, 0, "Statement 2 never inserted — no orphan in sandbox_games either");
+});
+
+test("Stage A-3: FK failure on games INSERT (Statement 1) also leaves zero rows — documented as first-statement, not second-statement, rollback", async () => {
+  // Separate from the second-statement proof above: this exercises the case where the
+  // games INSERT itself fails (bad FK).  The label clarifies it is *first-statement*
+  // failure, not second-statement rollback.
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  raw.exec("PRAGMA foreign_keys = ON;");
+  // Do NOT seed user 999999 — FK on games.publisher_user_id must fire.
+  const repo = new D1SandboxGameRepository(db);
+
+  await assert.rejects(
+    () =>
+      repo.create({
+        slug: "orphan-test-game",
+        developerUserId: 999999,
+        title: "Orphan",
+        shortDescription: null,
+        description: null,
+        genre: "puzzle",
+        mode: "single",
+        nowIso: new Date().toISOString(),
+      }),
+    /FOREIGN KEY constraint failed/,
+  );
+
+  const gamesCount = Number(
+    (raw.prepare("SELECT COUNT(*) as c FROM games").get() as { c: number }).c,
+  );
+  const sandboxCount = Number(
+    (raw.prepare("SELECT COUNT(*) as c FROM sandbox_games").get() as { c: number }).c,
+  );
+  assert.equal(gamesCount, 0, "no orphan rows in games");
+  assert.equal(sandboxCount, 0, "no orphan rows in sandbox_games");
+});
+
+test("Stage A-3: UPDATE trigger recovers a missing USER generic row in games (convergent upsert)", async () => {
+  // Proves the missing-destination hardening: if the games projection row for a
+  // sandbox USER game is somehow absent (deployment gap, direct deletion, etc.),
+  // the AFTER UPDATE trigger on sandbox_games must re-create it with exact parity
+  // rather than silently doing nothing and leaving the tables out of sync.
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+
+  // Create a game normally so both tables are in sync.
+  const game = await seedGame(repo, "recovery-game", 1);
+
+  // Simulate the deployment-gap scenario: manually delete the games row while
+  // keeping sandbox_games intact (as if 0029 migration landed but 0030 triggers
+  // hadn't been installed yet when the row was created).
+  raw.prepare("DELETE FROM games WHERE id = ?").run(game.id);
+  const missingCheck = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id);
+  assert.equal(missingCheck, undefined, "precondition: games row is missing");
+
+  // Trigger an UPDATE on sandbox_games (any field change will do).
+  const repairTime = "2026-08-21T10:00:00.000Z";
+  await repo.updateMetadata(game.id, { title: "Recovered Title" }, repairTime);
+
+  // The AFTER UPDATE trigger must have re-created the games row with exact parity.
+  const recovered = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<
+    string,
+    unknown
+  >;
+  assert.ok(recovered, "games row must be restored by the UPDATE trigger");
+  assert.equal(recovered.slug, game.slug, "slug must match sandbox_games authority");
+  assert.equal(recovered.publisher_type, "USER");
+  assert.equal(Number(recovered.publisher_user_id), 1);
+  assert.equal(recovered.updated_at, repairTime, "updated_at must be the repair timestamp");
+
+  // Subsequent sandbox writes must continue to maintain parity normally.
+  const visTime = "2026-08-21T10:10:00.000Z";
+  await repo.setLiveVersion(game.id, 55, visTime);
+  const afterLV = raw.prepare("SELECT * FROM games WHERE id = ?").get(game.id) as Record<
+    string,
+    unknown
+  >;
+  assert.equal(Number(afterLV.live_version_id), 55);
+  assert.equal(afterLV.updated_at, visTime);
+});
+
+test("Stage A-3: concurrent create by different developers allocates distinct IDs without collision", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev1");
+  seedUser(raw, 2, "Dev2");
+  seedUser(raw, 3, "Dev3");
+  const repo = new D1SandboxGameRepository(db);
+
+  const results = await Promise.all([
+    repo.create({
+      slug: "dev1-game-1",
+      developerUserId: 1,
+      title: "Dev1 G1",
+      shortDescription: null,
+      description: null,
+      genre: "puzzle",
+      mode: "single",
+      nowIso: new Date().toISOString(),
+    }),
+    repo.create({
+      slug: "dev2-game-1",
+      developerUserId: 2,
+      title: "Dev2 G1",
+      shortDescription: null,
+      description: null,
+      genre: "arcade",
+      mode: "single",
+      nowIso: new Date().toISOString(),
+    }),
+    repo.create({
+      slug: "dev3-game-1",
+      developerUserId: 3,
+      title: "Dev3 G1",
+      shortDescription: null,
+      description: null,
+      genre: "action",
+      mode: "single",
+      nowIso: new Date().toISOString(),
+    }),
+  ]);
+
+  assert.equal(results.length, 3);
+  assert.ok(results[0]);
+  assert.ok(results[1]);
+  assert.ok(results[2]);
+
+  const ids = results.map((r) => r!.id);
+  assert.equal(new Set(ids).size, 3, "all created games get distinct IDs");
+
+  // Verify all 3 have exact match in games table
+  for (const r of results) {
+    const gRow = raw.prepare("SELECT * FROM games WHERE id = ?").get(r!.id) as Record<
+      string,
+      unknown
+    >;
+    assert.ok(gRow);
+    assert.equal(gRow.slug, r!.slug);
+    assert.equal(gRow.publisher_type, "USER");
+    assert.equal(gRow.publisher_user_id, r!.developerUserId);
+  }
+});

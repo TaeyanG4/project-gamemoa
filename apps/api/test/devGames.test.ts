@@ -394,10 +394,16 @@ function createDevGamesDb(options: { existingGames?: Array<{ slug: string; revie
           } as T;
         }
         if (query.includes("FROM admin_accounts WHERE user_id")) return null;
-        if (query.includes("FROM sandbox_games WHERE slug")) {
+        if (
+          query.includes("FROM sandbox_games WHERE slug") ||
+          query.includes("FROM games WHERE slug")
+        ) {
           return (games.get(String(values[0])) ?? null) as T;
         }
-        if (query.includes("FROM sandbox_games WHERE id")) {
+        if (
+          query.includes("FROM sandbox_games WHERE id") ||
+          query.includes("FROM games WHERE id")
+        ) {
           const match = [...games.values()].find((g) => g.id === Number(values[0]));
           return (match ?? null) as T;
         }
@@ -407,6 +413,12 @@ function createDevGamesDb(options: { existingGames?: Array<{ slug: string; revie
         return { results: [] } as { results: T[] };
       },
       async run() {
+        if (query.includes("INSERT INTO games")) {
+          const taken = new Set([...games.values()].map((g) => g.review_slot).filter(Boolean));
+          const slot = !taken.has(1) ? 1 : !taken.has(2) ? 2 : null;
+          if (slot === null) return { success: true, meta: { changes: 0 } };
+          return { success: true, meta: { changes: 1 } };
+        }
         if (query.includes("INSERT INTO sandbox_games")) {
           // Mirrors the real slot-claiming logic closely enough for a route-level smoke test: the
           // full atomicity guarantee is proven against real SQLite in
@@ -462,7 +474,7 @@ function createDevGamesDb(options: { existingGames?: Array<{ slug: string; revie
         return statement(query);
       },
       async batch(statements: Array<ReturnType<typeof statement>>) {
-        return statements.map(() => ({ success: true, meta: { changes: 0 } }));
+        return Promise.all(statements.map((s) => s.run()));
       },
     },
   };
