@@ -2,11 +2,9 @@ import {
   GameCreatorMeResponseSchema,
   GameCreatorApplicationRecordSchema,
   SandboxGameListResponseSchema,
-  SandboxGameDetailResponseSchema,
   SandboxGameRecordSchema,
   SandboxGameVersionRecordSchema,
   SandboxGameUploadResponseSchema,
-  type SandboxGameCreateRequest,
   type SandboxGameUploadResponse,
 } from "@owogg/contracts";
 import { apiFetch } from "../lib/api/client";
@@ -41,20 +39,9 @@ export function fetchMyGames() {
   return apiFetch("/api/dev/games", SandboxGameListResponseSchema);
 }
 
-export function fetchDevGameDetail(id: number) {
-  return apiFetch(`/api/dev/games/${id}`, SandboxGameDetailResponseSchema);
-}
-
-export function createDevGame(input: SandboxGameCreateRequest) {
-  return apiFetch("/api/dev/games", SandboxGameRecordSchema, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
 /** Withdraws a not-yet-decided submission, freeing the review slot it was holding (see
- * SANDBOX_GAME_POLICY.MAX_CONCURRENT_REVIEW_SLOTS). A 409 SUBMISSION_LIMIT_REACHED from
- * createDevGame is the caller's cue that this — or waiting for a decision — is needed first. */
+ * SANDBOX_GAME_POLICY.MAX_CONCURRENT_REVIEW_SLOTS). A 409 SUBMISSION_LIMIT_REACHED from an upload
+ * attempt is the caller's cue that this — or waiting for a decision — is needed first. */
 export function withdrawDevGameSubmission(gameId: number) {
   return apiFetch(`/api/dev/games/${gameId}/withdraw`, SandboxGameRecordSchema, {
     method: "POST",

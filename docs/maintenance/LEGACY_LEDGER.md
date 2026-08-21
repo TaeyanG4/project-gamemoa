@@ -126,3 +126,26 @@ link/drift check. The five `DELETE` units can then form an independent F-2; none
   that humans do not use them.
 - Interactive official-admin publication remains blocked on an explicit authority/precedence
   decision.
+
+## F-2 후속 처리
+
+기준 main: `8f531b564c73168f67c8b238a5c0967e28563c60`
+
+- 제거된 publisher-specific runtime의 오래된 긍정적 설명: `DELETE_CONFIRMED`. 현재 generic
+  `GameHost` → `IframeRuntime` → Bridge 구조로 source comment와 수동 확인 안내를 수정했습니다.
+  `examples/ball-dodge`의 지원 상태는 기존 `DEFER_UNKNOWN`으로 유지하며 파일은 삭제하지 않았습니다.
+- `/official-games`, `official-uploads`, release map의 오래된 긍정적 설명: `DELETE_CONFIRMED`.
+  standalone build 설정과 test는 유지하고, 현재 `/games/<gameId>/<versionId>/...` 경로를 설명하도록
+  comment만 수정했습니다. Negative architecture guard와 404 regression test는 보존했습니다.
+- 미사용 Web dev API helper `fetchDevGameDetail`, `createDevGame`: `DELETE_CONFIRMED`. 현재 main에서
+  import, call site, re-export, test, dynamic/string consumer가 없음을 다시 확인한 뒤 helper와 전용
+  import를 제거했습니다. 서버 `POST /api/dev/games` route와 contract/test는 유지했습니다.
+- Core compatibility barrel `repositories/interfaces.ts`: `DELETE_CONFIRMED`. 직접 path import와
+  package subpath export가 없음을 확인하고 파일과 root duplicate export를 제거했습니다. 실제
+  `ports/repositories.ts`는 유지했습니다.
+- `R2GameBundleRepository`: `DELETE_CONFIRMED`. export, binding, construction, workflow, script, test,
+  persistence consumer가 없고 production이 `BackblazeB2GameBundleRepository`를 사용하는 것을 확인한
+  뒤 adapter와 obsolete index comment를 제거했습니다.
+
+재분류된 F-0 `DELETE` 후보는 없습니다. 이 섹션은 F-0 당시 표와 증거를 변경하지 않고 F-2에서
+확인한 후속 처리만 기록합니다.

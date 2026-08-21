@@ -3,10 +3,9 @@ import type { GameRuntimeContext, GameResult } from "@owogg/game-sdk";
 
 /**
  * Adapts the Game Bridge client (the standalone-iframe transport) to the exact same
- * GameRuntimeContext shape games/reaction-time/src/game.tsx already consumes via GameProps — so
- * the game component itself needs zero changes to run standalone instead of through
- * LegacyReactRuntime's direct-prop wiring (see that file — untouched by this migration). The
- * host-side half of this same protocol is apps/web/app/features/game/runtime/gameBridgeHost.ts.
+ * GameRuntimeContext shape games/reaction-time/src/game.tsx already consumes via GameProps, so the
+ * game component itself needs zero changes to run through the generic iframe runtime. The host-side
+ * half of this protocol is apps/web/app/features/game/runtime/gameBridgeHost.ts.
  *
  * No auth/token/API address crosses into this adapter or the iframe it runs in: `user` is always
  * null and `sessionId` is a throwaway id with no meaning to the host. Scoring and identity are
