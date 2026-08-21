@@ -4,7 +4,8 @@ import {
   SandboxGameUseCases,
   SandboxGameUseCaseFailure,
 } from "../src/application/sandboxGameUseCases.js";
-import { GameBundlePublisher } from "../src/application/gameBundlePublisher.js";
+import { GamePublicationService } from "../src/application/gamePublicationService.js";
+import { SandboxGameVersionPublicationRepository } from "../src/application/sandboxGameVersionPublicationRepository.js";
 import type {
   SandboxGameRepository,
   SandboxGameRecord,
@@ -394,7 +395,11 @@ function createUseCases(
   const repo = createFakeRepo();
   const storage = createFakeStorage();
   const archives = createFakeArchiveReader(entries);
-  const publisher = new GameBundlePublisher(repo, storage, archives);
+  const publisher = new GamePublicationService(
+    new SandboxGameVersionPublicationRepository(repo),
+    storage,
+    archives,
+  );
   const useCases = new SandboxGameUseCases(repo, storage, publisher, canonicalRepo);
   return {
     useCases,
@@ -1120,7 +1125,11 @@ test("updateMetadata: a B2 pre-read failure leaves D1 untouched", async () => {
 
 test("updateMetadata: a D1 update failure never reaches B2 at all", async () => {
   const { repo, storage, canonicalRepo } = createUseCases();
-  const publisher = new GameBundlePublisher(repo, storage, createFakeArchiveReader());
+  const publisher = new GamePublicationService(
+    new SandboxGameVersionPublicationRepository(repo),
+    storage,
+    createFakeArchiveReader(),
+  );
   const failingRepo: SandboxGameRepository = {
     ...repo,
     async updateMetadata(): Promise<SandboxGameRecord> {
@@ -1358,7 +1367,11 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
   const repo = createFakeRepo();
   const storage = createFakeStorage();
   const dbFailure = new Error("D1 write failed");
-  const publisher = new GameBundlePublisher(repo, storage, createFakeArchiveReader());
+  const publisher = new GamePublicationService(
+    new SandboxGameVersionPublicationRepository(repo),
+    storage,
+    createFakeArchiveReader(),
+  );
   const useCases = new SandboxGameUseCases(
     {
       ...repo,
@@ -2222,7 +2235,11 @@ test("deleting a game forces it PRIVATE, which is what the serving gates actuall
 test("deletePublishedVersion removes exactly the objects the manifest lists, leaving the source archive", async () => {
   const { publisher, storage, repo, game, version } = await createGameWithLiveVersion();
 
-  await publisher.deletePublishedVersion(repo.versions.get(version.id)!);
+  await publisher.deletePublishedVersion({
+    gameId: version.gameId,
+    versionId: version.id,
+    manifestKey: repo.versions.get(version.id)?.manifestKey ?? null,
+  });
 
   assert.ok(!storage.objects.has(`games/${game.id}/${version.id}/index.html`));
   assert.ok(!storage.objects.has(`games/${game.id}/${version.id}/Build/game.wasm`));

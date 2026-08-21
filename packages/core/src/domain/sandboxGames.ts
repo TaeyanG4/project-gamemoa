@@ -86,7 +86,7 @@ export const SANDBOX_GAME_POLICY = {
   MAX_BUNDLE_BYTES: 20 * 1024 * 1024,
   /** Zip-bomb guard: cap on the sum of *declared* decompressed entry sizes, checked from the
    * archive's central directory before any entry is actually decompressed — see
-   * BundleArchiveReader.readMetadata and GameBundlePublisher.prepare. A 20MiB archive can
+   * BundleArchiveReader.readMetadata and GamePublicationService.prepare. A 20MiB archive can
    * legitimately expand well past 20MiB (WASM and Unity `.data` compress well), so this is
    * deliberately larger than MAX_BUNDLE_BYTES rather than equal to it. */
   MAX_EXTRACTED_BUNDLE_BYTES: 50 * 1024 * 1024,

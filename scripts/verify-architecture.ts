@@ -9,6 +9,7 @@ import path from "node:path";
 import {
   IMPORT_RULES,
   PACKAGE_JSON_RULES,
+  REQUIRED_TOKEN_RULES,
   TOKEN_RULES,
   checkFileAgainstRule,
   type Violation,
@@ -71,7 +72,10 @@ function checkPackageJsonRules(): void {
 function checkTokenRules(): void {
   for (const rule of TOKEN_RULES) {
     const scopeDir = path.join(rootDir, ...rule.scope.split("/"));
-    for (const filePath of sourceFiles(scopeDir, rule.extensions)) {
+    const filePaths = rule.files
+      ? rule.files.map((file) => path.join(scopeDir, file))
+      : sourceFiles(scopeDir, rule.extensions);
+    for (const filePath of filePaths) {
       const sourceText = fs.readFileSync(filePath, "utf-8");
       for (const token of rule.tokens) {
         if (sourceText.includes(token)) {
@@ -82,11 +86,24 @@ function checkTokenRules(): void {
   }
 }
 
+function checkRequiredTokenRules(): void {
+  for (const rule of REQUIRED_TOKEN_RULES) {
+    const filePath = path.join(rootDir, ...rule.file.split("/"));
+    const sourceText = fs.readFileSync(filePath, "utf-8");
+    for (const token of rule.tokens) {
+      if (!sourceText.includes(token)) {
+        violations.push({ file: rule.file, rule: rule.rule, specifier: `missing ${token}` });
+      }
+    }
+  }
+}
+
 console.log("🔍 Checking Architecture Layer Boundaries...");
 
 checkImportRules();
 checkPackageJsonRules();
 checkTokenRules();
+checkRequiredTokenRules();
 
 if (violations.length > 0) {
   console.error(`\n❌ ${violations.length} Architecture Layer Boundary Violation(s) Found:\n`);
@@ -99,6 +116,10 @@ if (violations.length > 0) {
   }
   process.exit(1);
 } else {
-  const scannedRules = IMPORT_RULES.length + PACKAGE_JSON_RULES.length + TOKEN_RULES.length;
+  const scannedRules =
+    IMPORT_RULES.length +
+    PACKAGE_JSON_RULES.length +
+    TOKEN_RULES.length +
+    REQUIRED_TOKEN_RULES.length;
   console.log(`✅ Architecture Layer Boundaries Verified — ${scannedRules} rules, 0 violations.\n`);
 }

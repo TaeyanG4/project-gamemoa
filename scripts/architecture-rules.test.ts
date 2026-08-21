@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   IMPORT_RULES,
+  REQUIRED_TOKEN_RULES,
   TOKEN_RULES,
   checkFileAgainstRule,
   collectModuleReferences,
@@ -220,4 +221,22 @@ test("E-1 generic canonical authority is protected from old Creator repository c
   assert.ok(api?.tokens.includes("creator-games/"));
   assert.ok(coreApplication?.tokens.includes("CreatorGameDefinitionRepository"));
   assert.ok(coreApplication?.tokens.includes("creator-games/"));
+});
+
+test("E-2 publication convergence guards both callers and keeps generic core publisher-neutral", () => {
+  const user = REQUIRED_TOKEN_RULES.find((rule) => rule.file.endsWith("sandboxGameUseCases.ts"));
+  const official = REQUIRED_TOKEN_RULES.find((rule) =>
+    rule.file.endsWith("officialGameBootstrap.ts"),
+  );
+  const officialDuplicates = TOKEN_RULES.find((rule) =>
+    rule.files?.includes("officialGameBootstrap.ts"),
+  );
+  const genericCore = TOKEN_RULES.find((rule) => rule.files?.includes("gamePublicationService.ts"));
+
+  assert.ok(user?.tokens.includes("GamePublicationService"));
+  assert.ok(official?.tokens.includes("GamePublicationService"));
+  assert.ok(officialDuplicates?.tokens.includes("buildBundleManifest"));
+  assert.ok(officialDuplicates?.tokens.includes("publishedObjectKey"));
+  assert.ok(genericCore?.tokens.includes("SandboxGameVersionRecord"));
+  assert.ok(genericCore?.tokens.includes("PENDING_REVIEW"));
 });

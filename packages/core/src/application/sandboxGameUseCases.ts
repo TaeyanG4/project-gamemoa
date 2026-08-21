@@ -35,7 +35,7 @@ import {
   patchUserGameCanonical,
 } from "../domain/userGameCanonical.js";
 import { jsonDeepEqual } from "./jsonDeepEqual.js";
-import type { GameBundlePublisher } from "./gameBundlePublisher.js";
+import type { GamePublicationService } from "./gamePublicationService.js";
 
 export type SandboxGameUseCaseError =
   | "GAME_NOT_FOUND"
@@ -50,7 +50,7 @@ export type SandboxGameUseCaseError =
   | "REASON_REQUIRED"
   | "NO_APPROVED_VERSION"
   /** A version whose files aren't fully published cannot be approved, made live, or served from
-   * its immutable path — see GameBundlePublisher. */
+   * its immutable path — see GamePublicationService. */
   | "VERSION_NOT_PUBLISHED"
   | "VERSION_NOT_APPROVED"
   | "PUBLISH_FAILED"
@@ -154,7 +154,7 @@ export class SandboxGameUseCases {
   constructor(
     private repo: SandboxGameRepository,
     private storage: GameBundleStorageRepository,
-    private publisher: GameBundlePublisher,
+    private publisher: GamePublicationService,
     /** The sole canonical control-plane authority for USER metadata. */
     private gameCanonicalRepo: GameCanonicalRepository,
   ) {}
@@ -450,14 +450,19 @@ export class SandboxGameUseCases {
    * no business seeing. */
   private async publishOrFail(
     version: SandboxGameVersionRecord,
-    prepared: ReturnType<GameBundlePublisher["prepare"]>,
+    prepared: ReturnType<GamePublicationService["prepare"]>,
   ): Promise<SandboxGameVersionRecord> {
     try {
-      return await this.publisher.publish({
-        version,
+      await this.publisher.publish({
+        gameId: version.gameId,
+        versionId: version.id,
+        contentHash: version.contentHash,
         prepared,
-        nowIso: new Date().toISOString(),
+        publishedAt: new Date().toISOString(),
       });
+      const published = await this.repo.findVersionById(version.id);
+      if (!published) throw new Error(`Published version ${version.id} disappeared`);
+      return published;
     } catch {
       throw new SandboxGameUseCaseFailure("PUBLISH_FAILED");
     }
