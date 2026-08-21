@@ -1,8 +1,7 @@
 /**
  * Projects a Creator game's `GameDefinition["status"]` from D1 runtime/lifecycle state — never
  * from B2 canonical (the canonical document has no concept of review/publish state at all, by
- * design — see domain/creatorGameCanonicalDocument.ts's own doc comment on why review/publish
- * status, visibility, and liveVersionId are excluded from it).
+ * design: review/publish status, visibility, and liveVersionId are excluded from it).
  *
  * `GameStatus` (@owogg/game-sdk/contracts) is `"draft" | "beta" | "published" | "hidden"` — SYSTEM
  * games are the only ones that ever use `"beta"` (a build-time editorial choice, declared in

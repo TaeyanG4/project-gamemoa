@@ -24,8 +24,6 @@
     "admin:password:hash": "tsx scripts/admin-password-hash.ts",
     "i18n:sync-check": "tsx scripts/check-i18n-sync.ts",
     "bootstrap:official-games": "tsx scripts/bootstrap-official-games.ts",
-    "backfill:creator-canonical": "tsx scripts/run-creator-canonical-backfill.ts",
-    "migrate:game-canonical": "tsx scripts/run-game-canonical-migration.ts",
     "e2e": "tsx e2e/run.ts",
     "verify": "pnpm install --frozen-lockfile && pnpm format:check && pnpm architecture:check && pnpm registry:check && pnpm lint && pnpm typecheck && pnpm typecheck:scripts && pnpm test && pnpm test:scripts && pnpm build",
     "deploy": "pnpm --filter @owogg/api deploy && pnpm --filter @owogg/web deploy",

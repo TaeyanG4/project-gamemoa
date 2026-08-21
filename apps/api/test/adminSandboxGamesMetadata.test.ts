@@ -3,12 +3,9 @@ import assert from "node:assert/strict";
 import { app } from "../src/index.js";
 import { hashSessionToken } from "@owogg/db";
 
-// Stage C-2 (Creator B2 canonical write-through) route-level wiring — the actual sync logic
-// (patch/first-create/parity-check semantics) is covered thoroughly at the use-case level in
-// packages/core/test/sandboxGameUseCases.test.ts and packages/core/test/
-// creatorGameCanonicalPatch.test.ts; this file only proves PATCH /api/admin/sandbox-games/:id/
-// metadata is wired correctly: it now requires a real B2 config (never a silent D1-only
-// fallback), and request-shape validation still runs before that check.
+// Generic canonical control-plane route wiring. Patch/first-create/parity semantics are covered
+// at the core use-case level; this file proves the route requires real B2 configuration (never a
+// silent D1-only fallback) and still validates the request before that check.
 
 const OWOGG_SESSION_RAW_TOKEN = "valid_session";
 const ADMIN_SESSION_RAW_TOKEN = "admin_session_valid_token";

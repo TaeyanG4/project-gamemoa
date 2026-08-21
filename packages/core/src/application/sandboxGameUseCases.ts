@@ -7,11 +7,8 @@ import type {
   SandboxGamePendingVersionsPage,
   GameBundleStorageRepository,
 } from "../ports/sandboxGames.js";
-import type { CreatorGameDefinitionRepository } from "../ports/creatorGameDefinition.js";
-import type { CreatorGameCanonicalDocument } from "../domain/creatorGameCanonicalDocument.js";
 import type { GameCanonicalRepository } from "../modules/game/ports/gameCanonicalRepository.js";
 import type { GameCanonicalDocument } from "../modules/game/domain/gameCanonicalDocument.js";
-import { creatorCanonicalDocumentToGameCanonicalDocument } from "../modules/game/domain/gameCanonicalMigration.js";
 import type { SandboxGameVisibility, SandboxGameMode } from "../domain/sandboxGames.js";
 import {
   SANDBOX_GAME_POLICY,
@@ -32,13 +29,11 @@ import {
   type PreparedBundleFile,
 } from "../domain/sandboxGameBundle.js";
 import { sha256Hex } from "../domain/contentHash.js";
-import { isCreatorScorePolicyConfigured } from "../domain/creatorScorePolicy.js";
-import { mapSandboxGameRecordToCanonical } from "../domain/creatorGameCanonicalMapper.js";
 import {
-  patchCreatorCanonicalDocument,
-  computeCreatorCanonicalScorePatch,
-} from "../domain/creatorGameCanonicalPatch.js";
-import { canonicalDocumentsEqual } from "./creatorCanonicalBackfill.js";
+  computeUserCanonicalScorePatch,
+  mapUserGameRecordToCanonical,
+  patchUserGameCanonical,
+} from "../domain/userGameCanonical.js";
 import { jsonDeepEqual } from "./jsonDeepEqual.js";
 import type { GameBundlePublisher } from "./gameBundlePublisher.js";
 
@@ -99,16 +94,14 @@ export type SandboxGameUseCaseError =
   /** purgeGame was called on a game that hasn't been soft-deleted yet — purge only ever follows
    * deleteGame, never replaces it, so there is nothing to permanently erase yet. */
   | "NOT_YET_DELETED"
-  /** updateMetadata (Stage C-2): the patch would leave an already-configured B2 canonical score
-   * policy with any of its four required fields (unit/direction/min/max) null. Never interpreted
-   * as "switch to score: null" — see domain/creatorGameCanonicalPatch.ts's own doc comment. */
+  /** The patch would leave an already-configured canonical score policy incomplete. */
   | "SCORE_POLICY_WOULD_BECOME_INCOMPLETE"
-  /** updateMetadata (Stage C-2): the B2 canonical is currently `score: null` (deliberately
+  /** The generic canonical is currently `score: null` (deliberately
    * unscored) and the patch touches a score field, but doesn't supply all four required fields as
    * explicit, non-null values in this same request — activating a score policy is never inferred
    * from D1's own possibly-stale leftover score_* columns. */
   | "AMBIGUOUS_SCORE_POLICY_ACTIVATION"
-  /** updateMetadata (Stage C-2): keeping the B2 canonical document in sync with D1 failed. Covers
+  /** Keeping the generic canonical document in sync with D1 failed. Covers
    * three distinct moments, not just one: the initial pre-read (before D1 is ever touched — D1
    * is NOT updated in this case), a save failure, or a post-write parity mismatch (both of which
    * happen after D1 has already been updated and audited). There is no cross-store transaction
@@ -162,19 +155,7 @@ export class SandboxGameUseCases {
     private repo: SandboxGameRepository,
     private storage: GameBundleStorageRepository,
     private publisher: GameBundlePublisher,
-    /** Stage C-2's B2 canonical write-through target for updateMetadata — see that method's own
-     * doc comment. Provider-neutral (the composition root decides whether this is a real
-     * B2-backed `B2CreatorGameDefinitionRepository` or, in an unconfigured environment, something
-     * that always fails; see apps/api/src/container.ts). Stays the AUTHORITATIVE Creator canonical
-     * for this Stage — see `gameCanonicalRepo` below for what "shadow" means. */
-    private canonicalDefinitions: CreatorGameDefinitionRepository,
-    /** Stage U-3's generic canonical SHADOW write target for updateMetadata — see that method's
-     * own doc comment for the full ordering/failure-semantics contract. Provider-neutral, composed
-     * from the exact same underlying B2 storage as `canonicalDefinitions` (see
-     * apps/api/src/container.ts's own doc comment on `gameCanonicalRepo`) — no second B2 client.
-     * `canonicalDefinitions` (Creator canonical) remains the single authoritative source this
-     * Stage reads and validates against; this repository only ever receives a projection of what
-     * `canonicalDefinitions` already holds, never an independent write. */
+    /** The sole canonical control-plane authority for USER metadata. */
     private gameCanonicalRepo: GameCanonicalRepository,
   ) {}
 
@@ -771,88 +752,15 @@ export class SandboxGameUseCases {
   }
 
   /**
-   * Stage C-2 of the Creator B2 Canonical Registry migration: D1 stays the compatibility mirror
-   * this metadata PATCH has always written, but a B2 canonical document — when one already
-   * exists, or once this very patch first makes the row canonicalizable — is now kept in sync
-   * with it. See domain/creatorGameCanonicalPatch.ts's own doc comment for why an EXISTING
-   * canonical is always patched (never rebuilt from D1 via `mapSandboxGameRecordToCanonical`,
-   * which would silently drop presentation/requiresAuth/leaderboard/an explicit score:null).
+   * Updates D1's compatibility mirror and the sole generic canonical document.
    *
-   * Stage U-3 additionally keeps a SHADOW generic canonical document
-   * (`game-definitions/<slug>/definition.json`, `gameCanonicalRepo`) converging on the Creator
-   * canonical above. The Creator canonical remains the single AUTHORITATIVE source this Stage
-   * reads/validates against — the generic document is always derived from it via
-   * `creatorCanonicalDocumentToGameCanonicalDocument`, never independently computed from D1 or
-   * from `input`. This is deliberate: D1 has no `presentation`/`requiresAuth`-as-play-gate/an
-   * explicit `score: null` distinction of its own, so mapping D1 straight into the generic
-   * document would silently lose exactly the fields the Creator canonical exists to preserve (see
-   * this method's own first paragraph on why the Creator canonical itself is never rebuilt from
-   * D1 either — the shadow inherits that same reasoning one level further).
-   *
-   * Ordering, matching this Stage's own task description exactly:
-   *   1. Load the D1 row (404 if unknown, unchanged from before this Stage).
-   *   2. Read the current Creator canonical for this slug — BEFORE touching D1 at all. If this
-   *      read itself throws (malformed document, storage failure), D1 is never mutated: throws
-   *      `CANONICAL_SYNC_FAILED` and stops here, fail-closed.
-   *   3. Read the current generic canonical shadow for this slug — also BEFORE touching D1. Same
-   *      fail-closed contract as step 2 on a throw. This pre-read exists to surface a storage
-   *      dependency failure or a malformed shadow document early, and to catch one specific
-   *      inconsistent state: Creator canonical MISSING while a generic document already EXISTS
-   *      (an orphan/inconsistent shadow — should never happen under this method's own writes, but
-   *      is never silently auto-deleted or auto-overwritten if it's ever found). A generic
-   *      document that merely EXISTS and DISAGREES with what the current Creator canonical would
-   *      produce is explicitly NOT a blocking condition here — the generic canonical is a shadow,
-   *      not authoritative, in this Stage, and a stale shadow (left behind by an earlier partial
-   *      failure) is exactly what step 5 below is for repairing, not rejecting.
-   *   4. Validate the score-policy transition (see `computeCreatorCanonicalScorePatch`) against
-   *      the EXISTING Creator canonical's own `policy.score` merged with `input` alone — never
-   *      D1's score_* columns, which can genuinely diverge from the canonical (D1 is a
-   *      migration-period compatibility mirror, not a re-derivation source for an
-   *      already-canonical field; see creatorGameCanonicalPatch.ts's own doc comment). Before the
-   *      D1 write, so an invalid mutation (would leave an already-scored canonical's required
-   *      score fields incomplete, or ambiguously "half-activates" a currently-unscored one) never
-   *      reaches D1 at all.
-   *   5. D1 update, then the review-audit entry — in that order, and unconditionally: once D1 is
-   *      mutated, the audit entry is written regardless of what happens to the canonical(s) next,
-   *      so a D1 mutation this method commits to is never left looking like it never happened
-   *      (see METADATA_CHANGED's own established semantics).
-   *   6. Creator canonical sync — re-reads the canonical ONE more time immediately before writing
-   *      (a best-effort narrowing of the write race, same reasoning as `applyBackfill`'s own
-   *      pre-save recheck; see PR #56's own doc comments on why B2's S3-compatible API has no real
-   *      conditional-write primitive to build a stronger guarantee on) and branches on THAT
-   *      freshest read:
-   *        - exists -> patch it (`patchCreatorCanonicalDocument`)
-   *        - missing, row is still pre-canonical (`isCreatorScorePolicyConfigured(updated)` is
-   *          false) -> no Creator write, and (see step 7) no generic write either; this is this
-   *          row's ordinary, current lifecycle state
-   *        - missing, row IS now canonicalizable -> first canonical creation via
-   *          `mapSandboxGameRecordToCanonical(updated)` (the ONLY place in this method that
-   *          mapper is used — never for an already-existing document)
-   *      Every write is followed by a read-back parity check.
-   *   7. Generic shadow sync — runs only when step 6 actually wrote a Creator canonical (created
-   *      or patched); if step 6 was a no-op (still pre-canonical), the shadow write count is also
-   *      zero, preserving "Creator canonical missing -> generic canonical missing" as an
-   *      invariant. When it runs: converts the JUST-CONFIRMED, freshly-read-back Creator canonical
-   *      (never D1, never `input` directly — see this method's own second paragraph) into a
-   *      generic document, saves it, reads it back to confirm parity, then re-reads the Creator
-   *      canonical ONE more time and re-converts it — if that disagrees with what was just
-   *      written as the shadow, a concurrent writer changed the Creator canonical during this
-   *      window, and this is treated as a failure (never a success), the same fail-closed choice
-   *      step 6 already makes for its own concurrent-write case. See `syncGenericCanonicalShadow`'s
-   *      own doc comment for the exact steps.
-   *   8. On ANY failure past step 5 (a save call throwing — including the generic canonical's own
-   *      parser rejecting a document the Creator canonical's looser schema allowed but the generic
-   *      schema doesn't — a read-back throwing, a read-back not matching what was just written, or
-   *      a concurrent-change detection in step 7) this method throws `CANONICAL_SYNC_FAILED` — D1
-   *      has already been updated and audited, but the caller still receives a genuine failure,
-   *      never a success response for a canonical (or shadow) that isn't actually in sync. There
-   *      is NO cross-store/cross-object transaction anywhere in this method (neither B2 store has
-   *      a transactional primitive to build one on) — this is fail-closed best-effort
-   *      synchronization, not atomicity, and the whole operation is designed to be idempotent so
-   *      retrying the exact same request converges cleanly (including re-converging a shadow left
-   *      stale by an earlier partial failure).
-   *   9. Neither canonical ever gets deleted from here, and a failed/partial write is never rolled
-   *      back — a failure is surfaced, not hidden or silently "fixed" by touching anything else.
+   * Ordering is deliberately fail-closed: pre-read and validate generic canonical, commit the D1
+   * update and audit, re-read generic canonical to narrow concurrent-write races, then save and
+   * strictly read back `game-definitions/<slug>/definition.json`. Existing canonical-only state
+   * (presentation, difficulty, supportsReplay, requiresAuth, score:null and richer catalog data)
+   * is patched in place and never reconstructed from D1. A missing document is first-created only
+   * after the row has a complete score policy. There is no cross-store transaction; failures after
+   * D1 commits surface as CANONICAL_SYNC_FAILED and an identical retry safely converges.
    */
   async updateMetadata(
     gameId: number,
@@ -863,30 +771,20 @@ export class SandboxGameUseCases {
     if (!game) throw new SandboxGameUseCaseFailure("GAME_NOT_FOUND");
     if (input.title !== undefined) validateTitle(input.title);
 
-    let existingCanonical: CreatorGameCanonicalDocument | null;
+    let existingCanonical: GameCanonicalDocument | null;
     try {
-      existingCanonical = await this.canonicalDefinitions.findBySlug(game.slug);
+      existingCanonical = await this.gameCanonicalRepo.findBySlug(game.slug);
     } catch {
-      throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
-    }
-
-    let existingGeneric: GameCanonicalDocument | null;
-    try {
-      existingGeneric = await this.gameCanonicalRepo.findBySlug(game.slug);
-    } catch {
-      throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
-    }
-    if (existingCanonical === null && existingGeneric !== null) {
-      // Orphan/inconsistent shadow: a generic document exists with no authoritative Creator
-      // canonical behind it. Never auto-delete, never auto-overwrite — fail closed before D1 is
-      // ever touched (see this method's own doc comment, step 3).
       throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
     }
 
     if (existingCanonical !== null) {
-      const scoreCheck = computeCreatorCanonicalScorePatch(existingCanonical.policy.score, input);
+      const scoreCheck = computeUserCanonicalScorePatch(existingCanonical.policy.score, input);
       if (!scoreCheck.ok) {
         throw new SandboxGameUseCaseFailure(scoreCheck.reason);
+      }
+      if (input.genre !== undefined && existingCanonical.catalog.type !== "GENRE_MODE") {
+        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
       }
     }
 
@@ -902,114 +800,44 @@ export class SandboxGameUseCases {
       nowIso,
     });
 
-    await this.syncCreatorCanonicalAfterMetadataUpdate(updated, input);
+    await this.syncCanonicalAfterMetadataUpdate(existingCanonical, updated, input);
 
     return updated;
   }
 
-  /** The canonical-sync half of updateMetadata's steps 6-7 — see that method's own doc comment
-   * for the full ordering/failure-semantics contract this implements. Never called before D1's
-   * own update + audit have already succeeded. */
-  private async syncCreatorCanonicalAfterMetadataUpdate(
+  /** Synchronizes the single generic canonical after D1 + audit have committed. */
+  private async syncCanonicalAfterMetadataUpdate(
+    preRead: GameCanonicalDocument | null,
     updated: SandboxGameRecord,
     input: SandboxGameMetadataInput,
   ): Promise<void> {
-    let freshCanonical: CreatorGameCanonicalDocument | null;
+    let freshCanonical: GameCanonicalDocument | null;
     try {
-      freshCanonical = await this.canonicalDefinitions.findBySlug(updated.slug);
+      freshCanonical = await this.gameCanonicalRepo.findBySlug(updated.slug);
     } catch {
       throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
     }
 
-    let nextDocument: CreatorGameCanonicalDocument;
+    let nextDocument: GameCanonicalDocument | null;
     if (freshCanonical !== null) {
-      const patched = patchCreatorCanonicalDocument(freshCanonical, updated, input);
+      const patched = patchUserGameCanonical(freshCanonical, updated, input);
       if (!patched.ok) {
-        // The freshest possible read disagrees with what the earlier (pre-D1-mutation)
-        // validation saw — a genuine concurrent-write race (see this class's updateMetadata doc
-        // comment on why this stays best-effort, not atomic). D1 is already updated and audited;
-        // surfacing this as a sync failure (rather than silently applying a stale-relative patch)
-        // is the fail-closed choice — a retry re-validates against the new canonical state.
         throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
       }
       nextDocument = patched.document;
-    } else if (isCreatorScorePolicyConfigured(updated)) {
-      const mapped = mapSandboxGameRecordToCanonical(updated);
-      if (!mapped.ok) {
-        // Unreachable given the isCreatorScorePolicyConfigured check just above (both read the
-        // same four columns) — kept as an explicit fail-closed branch rather than a silent
-        // fallthrough, in case that invariant ever drifts.
-        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
-      }
-      nextDocument = mapped.document;
     } else {
-      // Still pre-canonical — this row's ordinary, current lifecycle state. No Creator write, and
-      // (per updateMetadata's own doc comment, step 7) no generic shadow write either.
-      return;
+      // A document observed before the D1 write must never be reconstructed from D1 if it
+      // disappears. That would erase canonical-only state and turn storage corruption/races into
+      // an implicit repair.
+      if (preRead !== null) throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
+      nextDocument = mapUserGameRecordToCanonical(updated);
+      if (nextDocument === null) return;
     }
 
     try {
-      await this.canonicalDefinitions.save(nextDocument);
-      const readBack = await this.canonicalDefinitions.findBySlug(nextDocument.slug);
-      if (readBack === null || !canonicalDocumentsEqual(readBack, nextDocument)) {
-        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
-      }
-      await this.syncGenericCanonicalShadow(readBack);
-    } catch (err) {
-      if (err instanceof SandboxGameUseCaseFailure) throw err;
-      throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
-    }
-  }
-
-  /**
-   * updateMetadata's own step 7 — see that method's own doc comment for the full contract. Only
-   * ever called with a Creator canonical document that has JUST been saved and read back
-   * successfully by the caller (`syncCreatorCanonicalAfterMetadataUpdate`) — never with a stale or
-   * unconfirmed one.
-   *
-   * `latestCreator` is always the source of truth for the generic projection — this method never
-   * reads D1 or `input`. Steps:
-   *   1. Convert `latestCreator` -> `genericExpected` via
-   *      `creatorCanonicalDocumentToGameCanonicalDocument` (lossless — presentation/requiresAuth/
-   *      leaderboard/an explicit score:null/decimal score bounds all carry over verbatim).
-   *   2. Save `genericExpected`. A throw here covers both a raw storage failure AND the generic
-   *      canonical's own stricter parser rejecting a document the looser Creator canonical schema
-   *      allowed (e.g. `score:null` + `leaderboard:true`, an inverted score range, an
-   *      out-of-bounds `xpPerCompletion` — see gameCanonicalDocument.ts's own doc comment on why
-   *      the generic schema is stricter). Either way this is a genuine sync failure, not silently
-   *      ignored.
-   *   3. Read the generic document back and confirm it deep-equals `genericExpected`
-   *      (`jsonDeepEqual`, the same JSON-safe, key-order-insensitive comparison
-   *      `canonicalDocumentsEqual`/Stage U-2's migration tooling already use) — the same
-   *      read-back-parity discipline `syncCreatorCanonicalAfterMetadataUpdate` already applies to
-   *      the Creator canonical itself.
-   *   4. Best-effort concurrent-write detection: re-read the Creator canonical ONE more time and
-   *      re-convert it. If that disagrees with `genericExpected` (i.e. a concurrent writer changed
-   *      the Creator canonical during this window), this is treated as a failure — never returned
-   *      as success — the same fail-closed choice `syncCreatorCanonicalAfterMetadataUpdate` makes
-   *      for its own pre-save recheck. B2 has no conditional-write primitive to build a stronger
-   *      guarantee on (see PR #56/#58's own doc comments) — this narrows the unsafe window, it
-   *      does not claim cross-object atomicity. A retry of the same request re-converges from
-   *      whatever the Creator canonical now actually is.
-   */
-  private async syncGenericCanonicalShadow(
-    latestCreator: CreatorGameCanonicalDocument,
-  ): Promise<void> {
-    const genericExpected = creatorCanonicalDocumentToGameCanonicalDocument(latestCreator);
-
-    try {
-      await this.gameCanonicalRepo.save(genericExpected);
-      const genericReadBack = await this.gameCanonicalRepo.findBySlug(genericExpected.slug);
-      if (genericReadBack === null || !jsonDeepEqual(genericReadBack, genericExpected)) {
-        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
-      }
-
-      const recheckCreator = await this.canonicalDefinitions.findBySlug(latestCreator.slug);
-      if (recheckCreator === null) {
-        throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
-      }
-      const recheckExpected = creatorCanonicalDocumentToGameCanonicalDocument(recheckCreator);
-      if (!jsonDeepEqual(recheckExpected, genericExpected)) {
+      await this.gameCanonicalRepo.save(nextDocument);
+      const readBack = await this.gameCanonicalRepo.findBySlug(nextDocument.slug);
+      if (readBack === null || !jsonDeepEqual(readBack, nextDocument)) {
         throw new SandboxGameUseCaseFailure("CANONICAL_SYNC_FAILED");
       }
     } catch (err) {

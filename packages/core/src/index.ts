@@ -14,9 +14,6 @@ export * from "./domain/adminUserQuery.js";
 export * from "./domain/gameCreator.js";
 export * from "./domain/sandboxGames.js";
 export * from "./domain/sandboxGameBundle.js";
-export * from "./domain/creatorGameCanonicalDocument.js";
-export * from "./domain/creatorGameCanonicalMapper.js";
-export * from "./domain/creatorGameCanonicalPatch.js";
 export * from "./domain/contentHash.js";
 export * from "./domain/gameSession.js";
 export * from "./domain/creatorScorePolicy.js";
@@ -26,7 +23,6 @@ export * from "./ports/adminAuth.js";
 export * from "./ports/adminAccounts.js";
 export * from "./ports/gameCreator.js";
 export * from "./ports/sandboxGames.js";
-export * from "./ports/creatorGameDefinition.js";
 export * from "./ports/gameScoreAcceptance.js";
 
 // Unified Game Platform foundation. sandbox* exports above remain the control-plane path for
@@ -73,11 +69,6 @@ export * from "./application/gameCreatorUseCases.js";
 export * from "./application/sandboxGameUseCases.js";
 export * from "./application/gameBundlePublisher.js";
 export * from "./application/jsonDeepEqual.js";
-export * from "./application/creatorCanonicalBackfill.js";
-// Unified Game Platform, Stage U-2 — non-destructive Creator canonical -> generic canonical
-// migration/parity orchestration. See this file's own top doc comment for the exhaustive "what
-// stays unwired in production by this Stage" list.
-export * from "./application/genericCanonicalMigration.js";
 export * from "./application/officialGameShadowBootstrap.js";
 export * from "./application/runtimeGameAvailability.js";
 export * from "./application/gameScoreAcceptanceUseCases.js";

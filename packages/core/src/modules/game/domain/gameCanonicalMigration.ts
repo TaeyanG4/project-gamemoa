@@ -1,44 +1,14 @@
 /**
- * Unified Game Platform, Stage U-1 — pure, lossless converters from today's two existing canonical
- * shapes into the new generic {@link GameCanonicalDocument}. No I/O, nothing wired to any adapter
- * or route — these exist only so a future migration Stage has a tested, correct starting point;
- * nothing calls them yet.
+ * Pure conversion of the repository's official game definition into the provider-neutral
+ * canonical document used by official generic bootstrap. USER games already write that document
+ * directly through the control plane and need no intermediate conversion.
  */
 
-import type { CreatorGameCanonicalDocument } from "../../../domain/creatorGameCanonicalDocument.js";
 import {
   GAME_CANONICAL_SCHEMA_VERSION,
   type GameCanonicalDocument,
 } from "./gameCanonicalDocument.js";
 import type { SystemGameDefinition } from "./gameDefinition.js";
-
-/**
- * `CreatorGameCanonicalDocument` (domain/creatorGameCanonicalDocument.ts, Stage A) →
- * {@link GameCanonicalDocument}, lossless: `title`/`shortDescription`/`description`/`policy`/
- * `presentation`/`updatedAt` carry over verbatim (including an explicit `policy.score: null` and
- * every decimal score bound — neither is touched), `genre`/`mode` become a `GENRE_MODE` catalog.
- * `difficulty` is omitted (Creator's canonical schema has no such field to lose — see that
- * document's own doc comment). `supportsReplay` is set to the same `false` this migration's own
- * Creator platform fact already is everywhere else it's asserted (registry/creatorGameRegistry.ts's
- * `projectCreatorGameDefinition`) — not a fabricated default, a restated one.
- */
-export function creatorCanonicalDocumentToGameCanonicalDocument(
-  document: CreatorGameCanonicalDocument,
-): GameCanonicalDocument {
-  return {
-    schemaVersion: GAME_CANONICAL_SCHEMA_VERSION,
-    slug: document.slug,
-    title: document.title,
-    shortDescription: document.shortDescription,
-    description: document.description,
-    policy: document.policy,
-    ...(document.presentation !== undefined ? { presentation: document.presentation } : {}),
-    supportsReplay: false,
-    catalog: { type: "GENRE_MODE", genre: document.genre, mode: document.mode },
-    updatedAt: document.updatedAt,
-  };
-}
-
 /**
  * `SystemGameDefinition` (modules/game/domain/gameDefinition.ts) → {@link GameCanonicalDocument},
  * lossless: `title`/`shortDescription`/`description`/`policy`/`presentation`/`difficulty`/

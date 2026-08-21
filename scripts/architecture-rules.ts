@@ -299,6 +299,12 @@ export const TOKEN_RULES: TokenRule[] = [
     extensions: [".ts"],
   },
   {
+    scope: "packages/core/src/application",
+    rule: "USER control-plane use cases must depend only on the generic canonical repository",
+    tokens: ["CreatorGameDefinitionRepository", "creator-games/"],
+    extensions: [".ts"],
+  },
+  {
     scope: "packages/db/src",
     rule: "packages/db must remain decoupled from the game catalog registry",
     tokens: ["GAME_MANIFEST_MAP", "GAME_MANIFESTS", "GAME_DEFINITIONS"],
@@ -315,6 +321,9 @@ export const TOKEN_RULES: TokenRule[] = [
       "CreatorGameRegistry",
       "D1CreatorScoreAcceptanceRepository",
       "D1GameAttemptConsumptionRepository",
+      "B2CreatorGameDefinitionRepository",
+      "CreatorGameDefinitionRepository",
+      "creator-games/",
     ],
     extensions: [".ts"],
   },

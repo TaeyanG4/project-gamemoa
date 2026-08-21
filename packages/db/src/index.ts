@@ -23,7 +23,6 @@ export * from "./d1/D1GameAssetRepository.js";
 export * from "./storage/BackblazeB2GameBundleRepository.js";
 
 export * from "./storage/UnconfiguredGameBundleRepository.js";
-export * from "./storage/B2CreatorGameDefinitionRepository.js";
 export * from "./storage/B2GameCanonicalRepository.js";
 // R2GameBundleRepository (packages/db/src/storage/R2GameBundleRepository.ts) is intentionally
 // NOT exported here — it's dormant (see the file's own header comment) and not part of this

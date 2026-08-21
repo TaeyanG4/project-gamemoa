@@ -23,7 +23,6 @@ import {
   D1GameAssetRepository,
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
-  B2CreatorGameDefinitionRepository,
   B2GameCanonicalRepository,
   type BackblazeB2Config,
 } from "@owogg/db";
@@ -72,7 +71,6 @@ import {
   type SandboxGameRepository,
   type GameBundleStorageRepository,
   type GameScoreAcceptanceRepository,
-  type CreatorGameDefinitionRepository,
   type GameCanonicalRepository,
   type GameIdentityRepository,
   type GameVersionRepository,
@@ -110,21 +108,7 @@ export interface AppContainer {
    * check this (rather than try/catch-ing putBundle) to return a clean 503 before touching the
    * use case. */
   gameBundlesConfigured: boolean;
-  /** Stage C-2's B2 canonical write-through target — composed from the SAME `gameBundleStorageRepo`
-   * above (no new B2 client; see B2CreatorGameDefinitionRepository's own doc comment), so it is
-   * only really backed by B2 when `gameBundlesConfigured` is true. A route calling
-   * `sandboxGameUseCases.updateMetadata` must check `gameBundlesConfigured` itself and return a
-   * clean 503 before doing so — same convention as `gameBundleStorageRepo`, never a silent
-   * D1-only fallback (see adminSandboxGames.ts's metadata PATCH route). */
-  creatorGameDefinitionRepo: CreatorGameDefinitionRepository;
-  /** Generic canonical repository — composed from the SAME
-   * `gameBundleStorageRepo` above as `creatorGameDefinitionRepo` (no second B2 client; see
-   * B2GameCanonicalRepository's own doc comment), so it too is only really backed by B2 when
-   * `gameBundlesConfigured` is true. `creatorGameDefinitionRepo` (Creator canonical) remains
-   * AUTHORITATIVE this Stage — `sandboxGameUseCases.updateMetadata` only ever writes here as a
-   * projection of what that repository already holds (see that method's own doc comment); nothing
-   * C-1's runtime registry now reads it for both publishers; Creator write-through continues to
-   * project into the same provider-neutral document without changing its review lifecycle. */
+  /** Sole canonical repository for runtime reads and USER metadata control-plane writes. */
   gameCanonicalRepo: GameCanonicalRepository;
   gameIdentityRepo: GameIdentityRepository;
   gameVersionRepo: GameVersionRepository;
@@ -192,15 +176,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
     ? new BackblazeB2GameBundleRepository(b2Config)
     : new UnconfiguredGameBundleRepository();
-  // Stage C-2: composed from the same gameBundleStorageRepo above, never a second B2 client — see
-  // B2CreatorGameDefinitionRepository's own doc comment. Real B2 access only when b2Config was
-  // provided (gameBundlesConfigured); routes must check that flag themselves before calling
-  // sandboxGameUseCases.updateMetadata, same as every other B2-dependent route already does.
-  const creatorGameDefinitionRepo: CreatorGameDefinitionRepository =
-    new B2CreatorGameDefinitionRepository(gameBundleStorageRepo);
-  // Stage U-3: also composed from the same gameBundleStorageRepo above — see this container's own
-  // doc comment on gameCanonicalRepo. Creator canonical (above) stays authoritative; this is a
-  // shadow write target only.
+  // One storage client and one canonical authority. Routes still fail closed when B2 is absent.
   const gameCanonicalRepo: GameCanonicalRepository = new B2GameCanonicalRepository(
     gameBundleStorageRepo,
   );
@@ -254,7 +230,6 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     gameBundleStorageRepo,
     gameBundlePublisher,
-    creatorGameDefinitionRepo,
     gameCanonicalRepo,
   );
   const gameScoreAcceptanceUseCases = new GameScoreAcceptanceUseCases(
@@ -288,7 +263,6 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameAssetRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
-    creatorGameDefinitionRepo,
     gameCanonicalRepo,
     runtimeGameRegistry,
     runtimeGameAvailability,

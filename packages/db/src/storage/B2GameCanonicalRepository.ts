@@ -16,13 +16,13 @@ import {
  * migration/parity tooling continues to use the same provider-neutral destination.
  *
  * Deliberately composes an existing {@link GameBundleStorageRepository} (the exact same
- * `BackblazeB2GameBundleRepository` bundle storage and `B2CreatorGameDefinitionRepository` already
+ * `BackblazeB2GameBundleRepository` bundle storage already
  * reuse — see that class's own doc comment) as a plain byte store, rather than talking to
  * B2/aws4fetch directly. No new B2 client is created here — this adapter adds nothing B2-specific
  * of its own beyond JSON serialize/parse and the fail-closed validation
  * {@link parseGameCanonicalDocument} (core, provider-neutral) already implements. Key layout
  * (`game-definitions/<slug>/definition.json`, {@link gameCanonicalObjectKey}) stays entirely
- * separate from every other existing prefix (`creator-games/`, `games/<gameId>/<versionId>/...`,
+ * separate from bundle prefixes (`games/<gameId>/<versionId>/...`,
  * `uploads/<gameId>/...`) — see that function's own doc
  * comment for why.
  *
