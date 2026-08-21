@@ -41,7 +41,9 @@ export function publicGameToCard(game: PublicGame, dict?: Dictionary): PublicGam
     title: game.title,
     shortDescription: game.shortDescription,
     description: game.description,
-    modes: [game.catalog.mode === "multi" ? "local-multi" : "single"],
+    // GENRE_MODE only declares the coarse canonical single/multi vocabulary. Do not infer local
+    // versus online multiplayer for a legacy card component that has no such source fact.
+    modes: [game.catalog.mode],
     thumbnail: game.mediaUrl ?? "",
     categories: [],
     tags: [],

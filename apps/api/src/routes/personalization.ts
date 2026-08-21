@@ -7,6 +7,7 @@ import {
 } from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer, evaluateAchievementsForUser } from "../container.js";
+import { readB2Config } from "./devGames.js";
 
 export const personalizationRouter = new Hono<ApiEnv>();
 
@@ -54,7 +55,7 @@ personalizationRouter.post("/favorites/:gameId", async (c) => {
   }
 
   const gameId = c.req.param("gameId");
-  const container = createContainer(c.env.DB);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
 
   try {
     await container.personalizationUseCases.addFavorite(user.id, gameId);

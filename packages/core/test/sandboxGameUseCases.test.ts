@@ -20,7 +20,6 @@ import { CREATOR_GAME_DEFINITION_SCHEMA_VERSION } from "../src/domain/creatorGam
 import { SANDBOX_GAME_POLICY } from "../src/domain/sandboxGames.js";
 import type { SandboxGameBundleManifest } from "../src/domain/sandboxGameBundle.js";
 import { GAME_REGISTRATION_MANIFEST_FILENAME } from "../src/domain/sandboxGameBundle.js";
-import { GAME_DEFINITIONS, StaticGameRegistry, type GameRegistry } from "../src/index.js";
 import type { GameCanonicalRepository } from "../src/modules/game/ports/gameCanonicalRepository.js";
 import {
   parseGameCanonicalDocument,
@@ -432,15 +431,8 @@ function createFakeGameCanonicalRepo(): GameCanonicalRepository & {
   };
 }
 
-// Empty by default: none of the arbitrary slugs these tests invent (`my-game`, `ball-dodge`, ...)
-// collide with a real SYSTEM game, so the default keeps every existing test's behaviour exactly
-// as it was before SandboxGameUseCases took a GameRegistry at all. Tests exercising the P-03
-// SYSTEM-slug-collision guard itself pass `new StaticGameRegistry(GAME_DEFINITIONS)` explicitly —
-// the real registry, with the real built-in slugs (reaction-time, memory-test, ...), the same one
-// apps/api/src/container.ts wires in production.
 function createUseCases(
   entries?: Record<string, Uint8Array>,
-  registry: GameRegistry = new StaticGameRegistry([]),
   canonicalRepo: ReturnType<typeof createFakeCanonicalRepo> = createFakeCanonicalRepo(),
   gameCanonicalRepo: ReturnType<typeof createFakeGameCanonicalRepo> = createFakeGameCanonicalRepo(),
 ) {
@@ -452,7 +444,6 @@ function createUseCases(
     repo,
     storage,
     publisher,
-    registry,
     canonicalRepo,
     gameCanonicalRepo,
   );
@@ -462,7 +453,6 @@ function createUseCases(
     storage,
     archives,
     publisher,
-    registry,
     canonicalRepo,
     gameCanonicalRepo,
   };
@@ -573,15 +563,11 @@ test("createGame rejects a slug held by a soft-deleted game, instead of crashing
   );
 });
 
-// ── P-03: a Creator registration must not collide with a SYSTEM game's slug ──
+// ── Generic D1 slug authority ───────────────────────────────────────────────
 
-test("createGame rejects a slug already taken by a SYSTEM game, e.g. reaction-time", async () => {
-  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
-  assert.ok(
-    await systemRegistry.findBySlug("reaction-time"),
-    "test setup: reaction-time must be a real SYSTEM slug for this to prove anything",
-  );
-  const { useCases } = createUseCases(undefined, systemRegistry);
+test("createGame rejects an existing OWOGG generic identity without a registry lookup", async () => {
+  const { useCases, repo } = createUseCases();
+  repo.reservedSlugs.add("reaction-time");
 
   await assert.rejects(
     () =>
@@ -598,22 +584,46 @@ test("createGame rejects a slug already taken by a SYSTEM game, e.g. reaction-ti
   );
 });
 
-test("createGameFromBundle rejects a SYSTEM slug the same way the manual form does", async () => {
-  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
-  const { useCases } = createUseCases(
-    manifestEntries({ slug: "reaction-time", title: "반응속도 클론", genre: "arcade" }),
-    systemRegistry,
-  );
+test("createGame rejects an existing USER generic identity", async () => {
+  const { useCases, repo } = createUseCases();
+  repo.reservedSlugs.add("user-game");
 
   await assert.rejects(
-    () => useCases.createGameFromBundle({ developerUserId: 1, bytes: new ArrayBuffer(10) }),
+    () =>
+      useCases.createGame({
+        slug: "user-game",
+        developerUserId: 1,
+        title: "USER collision",
+        shortDescription: null,
+        description: null,
+        genre: "arcade",
+        mode: "single",
+      }),
     (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
   );
 });
 
-test("the SYSTEM-slug guard doesn't disturb an existing Creator-vs-Creator collision", async () => {
-  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
-  const { useCases } = createUseCases(undefined, systemRegistry);
+test("createGame rejects a permanently reserved slug", async () => {
+  const { useCases, repo } = createUseCases();
+  repo.reservedSlugs.add("retired-game");
+
+  await assert.rejects(
+    () =>
+      useCases.createGame({
+        slug: "retired-game",
+        developerUserId: 1,
+        title: "Retired collision",
+        shortDescription: null,
+        description: null,
+        genre: "arcade",
+        mode: "single",
+      }),
+    (err: unknown) => err instanceof SandboxGameUseCaseFailure && err.code === "SLUG_TAKEN",
+  );
+});
+
+test("the generic slug authority doesn't disturb an existing Creator-vs-Creator collision", async () => {
+  const { useCases } = createUseCases();
 
   await useCases.createGame({
     slug: "my-game",
@@ -640,9 +650,8 @@ test("the SYSTEM-slug guard doesn't disturb an existing Creator-vs-Creator colli
   );
 });
 
-test("a genuinely new slug still registers fine with the SYSTEM registry wired in", async () => {
-  const systemRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
-  const { useCases } = createUseCases(undefined, systemRegistry);
+test("a genuinely free slug still registers normally", async () => {
+  const { useCases } = createUseCases();
 
   const game = await useCases.createGame({
     slug: "brand-new-creator-game",
@@ -1133,7 +1142,6 @@ test("updateMetadata: a D1 update failure never reaches B2 at all", async () => 
     failingRepo,
     storage,
     publisher,
-    new StaticGameRegistry([]),
     canonicalRepo,
     createFakeGameCanonicalRepo(),
   );
@@ -1662,7 +1670,6 @@ test("uploadVersion cleans up the orphaned storage object when the D1 write fail
     },
     storage,
     publisher,
-    new StaticGameRegistry([]),
     createFakeCanonicalRepo(),
     createFakeGameCanonicalRepo(),
   );

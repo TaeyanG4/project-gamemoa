@@ -48,7 +48,7 @@ function fakeContainer(user: User): AppContainer {
     achievementUseCases: {
       getSummary: async () => ({ unlockedCodes: ["FIRST_PLAY"], totalAchievements: 7 }),
     },
-    scoreUseCases: { getUserBestsFormatted: async () => [] },
+    scoreReadUseCases: { getUserBestsFormatted: async () => [] },
     creatorUseCases: { getCreatorProfileByUserId: async () => null },
     personalizationUseCases: {
       getPersonalizationState: async () => ({

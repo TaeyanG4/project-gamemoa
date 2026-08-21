@@ -9,7 +9,6 @@ import type {
 } from "../ports/sandboxGames.js";
 import type { CreatorGameDefinitionRepository } from "../ports/creatorGameDefinition.js";
 import type { CreatorGameCanonicalDocument } from "../domain/creatorGameCanonicalDocument.js";
-import type { GameRegistry } from "../modules/game/ports/gameRegistry.js";
 import type { GameCanonicalRepository } from "../modules/game/ports/gameCanonicalRepository.js";
 import type { GameCanonicalDocument } from "../modules/game/domain/gameCanonicalDocument.js";
 import { creatorCanonicalDocumentToGameCanonicalDocument } from "../modules/game/domain/gameCanonicalMigration.js";
@@ -176,7 +175,6 @@ export class SandboxGameUseCases {
     private repo: SandboxGameRepository,
     private storage: GameBundleStorageRepository,
     private publisher: GameBundlePublisher,
-    private gameRegistry: GameRegistry,
     /** Stage C-2's B2 canonical write-through target for updateMetadata — see that method's own
      * doc comment. Provider-neutral (the composition root decides whether this is a real
      * B2-backed `B2CreatorGameDefinitionRepository` or, in an unconfigured environment, something
@@ -243,17 +241,10 @@ export class SandboxGameUseCases {
     if (!isValidSandboxGameSlug(slug)) throw new SandboxGameUseCaseFailure("INVALID_SLUG");
     const title = validateTitle(input.title);
 
-    // A SYSTEM game's slug (reaction-time, memory-test, ...) lives in a different table entirely
-    // (game-registry/, not sandbox_games) — repo.slugExists alone would never see it, and a
-    // creator could register e.g. "reaction-time" and silently shadow or collide with the
-    // built-in game at every place that resolves a slug through the unified registry (catalog,
-    // scoring, /play/:slug). P-03: a Creator registration must be rejected the same way a
-    // Creator-vs-Creator collision already is, before any row is written.
-    if (await this.gameRegistry.findBySlug(slug)) throw new SandboxGameUseCaseFailure("SLUG_TAKEN");
-
-    // slugExists checks the raw DB constraint (includes soft-deleted rows), not just currently
-    // resolvable games — findBySlug alone would miss a slug held by an admin-soft-deleted game
-    // and let the INSERT below crash on the UNIQUE constraint instead of failing cleanly here.
+    // slugExists is the global D1 identity authority: it includes active/soft-deleted generic game
+    // identities and permanent reservations, regardless of publisher. Never consult a static
+    // registry here; a creator slug must be checked against the same namespace every runtime read
+    // uses.
     if (await this.repo.slugExists(slug)) throw new SandboxGameUseCaseFailure("SLUG_TAKEN");
 
     // repo.create claims a review slot atomically as part of the same insert (see

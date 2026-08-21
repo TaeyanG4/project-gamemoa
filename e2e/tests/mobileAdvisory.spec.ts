@@ -1,5 +1,4 @@
 import { test, expect, devices } from "@playwright/test";
-import { SYSTEM_GAME_RELEASES } from "../../apps/web/app/features/game/runtime/systemGameReleaseMap.generated.js";
 
 /**
  * The mobile-support and orientation advisories GameHost shows in a mobile-like environment (see
@@ -25,9 +24,6 @@ test.describe("Mobile support advisory (mobile-like context)", () => {
     const context = await browser.newContext({ ...devices["Pixel 5"] });
     const page = await context.newPage();
     // e2e-responsive declares mobile.support: "supported" — see prepareLocalGameOrigin.ts.
-    const release = SYSTEM_GAME_RELEASES["e2e-responsive"];
-    expect(release, "no local release map entry for e2e-responsive").toBeTruthy();
-
     await page.goto("/games/e2e-responsive");
     await expect(page.getByTestId("mobile-advisory-experimental")).toHaveCount(0);
     await expect(page.getByTestId("mobile-advisory-unsupported")).toHaveCount(0);
@@ -42,9 +38,6 @@ test.describe("Mobile support advisory (mobile-like context)", () => {
     const context = await browser.newContext({ ...devices["Pixel 5"] });
     const page = await context.newPage();
     // e2e-mobile-experimental declares mobile.support: "experimental".
-    const release = SYSTEM_GAME_RELEASES["e2e-mobile-experimental"];
-    expect(release, "no local release map entry for e2e-mobile-experimental").toBeTruthy();
-
     await page.goto("/games/e2e-mobile-experimental");
     await expect(page.getByTestId("mobile-advisory-experimental")).toHaveCount(1);
     await expect(page.getByTestId("mobile-advisory-unsupported")).toHaveCount(0);
@@ -58,9 +51,6 @@ test.describe("Mobile support advisory (mobile-like context)", () => {
     const context = await browser.newContext({ ...devices["Pixel 5"] });
     const page = await context.newPage();
     // e2e-fixed declares mobile.support: "unsupported".
-    const release = SYSTEM_GAME_RELEASES["e2e-fixed"];
-    expect(release, "no local release map entry for e2e-fixed").toBeTruthy();
-
     await page.goto("/games/e2e-fixed");
     await expect(page.getByTestId("mobile-advisory-unsupported")).toHaveCount(1);
     await expect(page.getByRole("button", { name: "PLAY" })).toBeVisible();
@@ -77,9 +67,6 @@ test.describe("Mobile support advisory (desktop context)", () => {
   }) => {
     // Default Playwright project here is desktop (channel: "chrome", devices["Desktop Chrome"] —
     // see playwright.config.ts) — e2e-fixed's mobile.support: "unsupported" must not surface here.
-    const release = SYSTEM_GAME_RELEASES["e2e-fixed"];
-    expect(release, "no local release map entry for e2e-fixed").toBeTruthy();
-
     await page.goto("/games/e2e-fixed");
     await expect(page.getByTestId("mobile-advisory-unsupported")).toHaveCount(0);
     await expect(page.getByTestId("orientation-advisory")).toHaveCount(0);
@@ -93,9 +80,6 @@ test.describe("Orientation advisory (mobile-like context)", () => {
     // e2e-fixed declares mobile.orientation: "landscape" — Pixel 5's default is portrait.
     const context = await browser.newContext({ ...devices["Pixel 5"] });
     const page = await context.newPage();
-    const release = SYSTEM_GAME_RELEASES["e2e-fixed"];
-    expect(release, "no local release map entry for e2e-fixed").toBeTruthy();
-
     await page.goto("/games/e2e-fixed");
     await expect(page.getByTestId("orientation-advisory")).toHaveCount(1);
     await context.close();
@@ -106,9 +90,6 @@ test.describe("Orientation advisory (mobile-like context)", () => {
   }) => {
     const context = await browser.newContext({ ...devices["Pixel 5 landscape"] });
     const page = await context.newPage();
-    const release = SYSTEM_GAME_RELEASES["e2e-fixed"];
-    expect(release, "no local release map entry for e2e-fixed").toBeTruthy();
-
     await page.goto("/games/e2e-fixed");
     await expect(page.getByTestId("orientation-advisory")).toHaveCount(0);
     await context.close();

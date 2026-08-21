@@ -1,5 +1,4 @@
 import { test, expect } from "@playwright/test";
-import { SYSTEM_GAME_RELEASES } from "../../apps/web/app/features/game/runtime/systemGameReleaseMap.generated.js";
 
 /**
  * GameHost's fullscreen control — Host chrome, gated purely on
@@ -20,9 +19,6 @@ import { SYSTEM_GAME_RELEASES } from "../../apps/web/app/features/game/runtime/s
 
 test.describe("Fullscreen control", () => {
   test("hidden entirely when presentation.fullscreen.supported is false", async ({ page }) => {
-    const release = SYSTEM_GAME_RELEASES["e2e-responsive"];
-    expect(release, "no local release map entry for e2e-responsive").toBeTruthy();
-
     await page.goto("/games/e2e-responsive");
     await expect(page.getByTestId("fullscreen-toggle")).toHaveCount(0);
   });
@@ -30,9 +26,6 @@ test.describe("Fullscreen control", () => {
   test("shown when presentation.fullscreen.supported is true, and toggles real document.fullscreenElement on click", async ({
     page,
   }) => {
-    const release = SYSTEM_GAME_RELEASES["e2e-fixed"];
-    expect(release, "no local release map entry for e2e-fixed").toBeTruthy();
-
     await page.goto("/games/e2e-fixed");
     // GameFrame lazy-mounts the iframe only once PLAY is pressed — needed here so the "wraps the
     // iframe" check below has an actual iframe in the DOM to find.

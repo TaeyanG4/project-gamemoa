@@ -62,6 +62,7 @@ export * from "./modules/game/registry/composedRuntimeGameRegistry.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";
+export * from "./application/genericScoreReadUseCases.js";
 export * from "./application/personalizationUseCases.js";
 export * from "./application/identityUseCases.js";
 export * from "./application/accountMergeUseCases.js";

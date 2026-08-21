@@ -22,7 +22,7 @@ test("falls back to the plain binding when withSession is unavailable", () => {
   };
 
   const container = createReadContainer(plainDb);
-  assert.ok(container.scoreUseCases, "a usable container must still be built");
+  assert.ok(container.scoreRepo, "a usable read container must still be built");
 
   void container.scoreRepo.getLeaderboard("reaction-time", 20, "desc", "normal");
   assert.ok(prepared > 0, "queries must go straight to the plain binding");

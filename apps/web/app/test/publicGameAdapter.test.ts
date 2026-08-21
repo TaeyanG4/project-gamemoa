@@ -54,6 +54,6 @@ test("GENRE_MODE USER games do not receive invented taxonomy metadata", () => {
   assert.equal(card.genre, "arcade");
   assert.deepEqual(card.categories, []);
   assert.deepEqual(card.tags, []);
-  assert.deepEqual(card.modes, ["local-multi"]);
+  assert.deepEqual(card.modes, ["multi"]);
   assert.equal(card.thumbnail, "");
 });
