@@ -1,10 +1,8 @@
 /**
  * Unified Game Platform, Stage U-1 — the provider-neutral "what a game is" document every game
  * (OwOGG official or user-published) converges on. U-1 introduced the schema, strict parser,
- * deterministic object key, and persistence port; C-1 now consumes it through the provider-neutral
- * RuntimeGameRegistry for `/play/:slug`. `CreatorGameCanonicalDocument`
- * (domain/creatorGameCanonicalDocument.ts, Stage A) keeps working exactly as it does today —
- * B2CreatorGameDefinitionRepository still reads/writes it, unchanged.
+ * deterministic object key, and persistence port; C-1 consumes it through the provider-neutral
+ * RuntimeGameRegistry for `/play/:slug`, and E-1 makes it the sole USER metadata authority.
  *
  * ## Runtime architecture (C-1)
  *
@@ -26,12 +24,9 @@
  *   - **catalog**: {@link GameCanonicalCatalog} — see that type's own doc comment for why this is
  *     a shape distinction, not a publisher distinction.
  *   - **policy**: score config, leaderboard participation, xpPerCompletion, requiresAuth — reuses
- *     `ScoreConfig` verbatim, the same shape `GameDefinition.policy`
- *     (modules/game/domain/gameDefinition.ts) and `CreatorGameCanonicalPolicy`
- *     (domain/creatorGameCanonicalDocument.ts) already use. `requiresAuth` is "must a player sign
+ *     `ScoreConfig` verbatim, the same shape `GameDefinition.policy` uses. `requiresAuth` is "must a player sign
  *     in to PLAY at all" — a distinct concern from score-*submission* authentication (see
- *     GameDefinition's own `GamePolicy` doc comment, and creatorGameCanonicalMapper.ts's
- *     `requiresAuth: false` reasoning, which this document's field means identically).
+ *     GameDefinition's own `GamePolicy` doc comment).
  *     `score: null` is a real, explicit "this game deliberately has no score" — never conflated
  *     with an upstream identity row whose score policy simply hasn't been configured yet (see
  *     domain/creatorScorePolicy.ts's own doc comment on why that distinction is load-bearing).
@@ -39,8 +34,7 @@
  *   - **difficulty**: reuses `DifficultyConfig` verbatim.
  *   - **supportsReplay**: whether the game can record/replay a session.
  *
- * D1-only, never duplicated here (unchanged reasoning from Stage A —
- * domain/creatorGameCanonicalDocument.ts's own doc comment on why):
+ * D1-only, never duplicated here:
  *   - **identity**: the D1 row id, slug uniqueness enforcement.
  *   - **publisher**: {@link GamePublisher} — a relational/authority fact, not a game description.
  *     An OWOGG-published game and the same game republished (hypothetically) by a different
@@ -69,7 +63,7 @@ import type { SandboxGameMode } from "../../../domain/sandboxGames.js";
 
 export const GAME_CANONICAL_SCHEMA_VERSION = 1 as const;
 
-/** Same shape as `CreatorGameCanonicalPolicy`/`GameDefinition.policy` — see this file's own top
+/** Same shape as `GameDefinition.policy` — see this file's own top
  * doc comment for the field-by-field meaning. `parseGameCanonicalDocument` enforces, as
  * domain-invalid-state rejections (never silently coerced), the same invariants every existing
  * policy source already guarantees: `score.min < score.max` when scored (decimals allowed, no
@@ -93,7 +87,7 @@ export interface GameCanonicalPolicy {
  * deliberately avoiding "CREATOR"/"SYSTEM"). The two shapes exist because today's two metadata
  * sources genuinely collect different information — Creator submissions have never collected
  * categories/tags/inputMethods/thumbnail/minPlayers/maxPlayers (see
- * domain/creatorGameCanonicalDocument.ts's own "Known v1 gap" note, unchanged by this PR), while
+ * the USER submission model), while
  * `game-registry/` has always required them. Inventing values for the fields one shape doesn't
  * have (a fake thumbnail, guessed categories, ...) would be worse than admitting the gap exists —
  * that is exactly the "never invent a value nothing produced" rule this Stage's task description
@@ -145,9 +139,7 @@ export interface GameCanonicalDocument {
 
 /**
  * Deterministic B2 key for a game's canonical document, keyed by `slug` alone. Deliberately a
- * NEW, separate prefix from every existing one — `creator-games/<slug>/definition.json`
- * (domain/creatorGameCanonicalDocument.ts, Stage A, unchanged and still in production use),
- * `games/<gameId>/<versionId>/...` and `uploads/<gameId>/...`
+ * Separate prefix from `games/<gameId>/<versionId>/...` and `uploads/<gameId>/...`
  * (domain/sandboxGameBundle.ts). Canonical documents stay separate from both source archives and
  * published runtime bytes.
  */
@@ -169,7 +161,7 @@ export type GameCanonicalDocumentRejection = (typeof GAME_CANONICAL_DOCUMENT_REJ
 
 /** Thrown by {@link parseGameCanonicalDocument} — never silently swallowed into a default or
  * empty document. `detail` is a short, non-sensitive diagnostic (a field name, a value) — never
- * the raw stored bytes. Same convention as `CreatorGameCanonicalDocumentError`. */
+ * the raw stored bytes. */
 export class GameCanonicalDocumentError extends Error {
   constructor(
     public readonly code: GameCanonicalDocumentRejection,
@@ -265,9 +257,7 @@ function optionalPositiveNumber(obj: Record<string, unknown>, field: string): nu
   return value;
 }
 
-/** Rejects unrecognised keys at `context` — same reasoning
- * domain/creatorGameCanonicalDocument.ts's own `rejectUnknownKeys` documents: a typo'd or stray
- * field must fail loudly, never be silently dropped and look configured when it isn't. */
+/** Rejects unrecognised keys: a typo or stray field must fail loudly, never be silently dropped. */
 function rejectUnknownKeys(
   obj: Record<string, unknown>,
   allowed: readonly string[],
@@ -316,9 +306,7 @@ function parseScoreConfig(value: unknown): ScoreConfig {
       `policy.score.direction must be one of ${SCORE_DIRECTIONS.join(", ")}`,
     );
   }
-  // Finite decimal bounds, no integer restriction — Creator's own decimal score bounds (e.g. a
-  // 0.5s-precision timer game) must stay representable, matching parseScoreConfig's sibling in
-  // domain/creatorGameCanonicalDocument.ts.
+  // Finite decimal bounds, no integer restriction: sub-second timers must remain representable.
   const min = requireNumber(raw, "min");
   const max = requireNumber(raw, "max");
   // Same strict inequality scripts/game-registry-schema.ts's own score parser already enforces
@@ -374,13 +362,9 @@ function parsePolicy(value: unknown): GameCanonicalPolicy {
 
 // ── presentation ─────────────────────────────────────────────────────────────
 //
-// Field-for-field identical semantics to domain/creatorGameCanonicalDocument.ts's own presentation
-// parser (mode enum, positive finite dimensions, min<=max, preferred-doesn't-contradict-bounds,
-// fixed requires both preferred dimensions, fullscreen's recommended/supported non-contradiction,
-// mobile's support/orientation enums, unknown-key rejection at every level) — a third,
-// independent implementation rather than a shared import, for the same reason Stage A's own
-// parser already is one: this must stay importable from `packages/core` alone, and scripts/'s own
-// parser must stay free of any generic-canonical-specific concept.
+// Strict presentation parsing: mode enum, positive finite dimensions, min<=max,
+// preferred-doesn't-contradict-bounds, fixed preferred dimensions, fullscreen consistency,
+// mobile enums, and unknown-key rejection at every level.
 
 const VIEWPORT_MODES = ["responsive", "fixed"] as const;
 const VIEWPORT_KEYS = [

@@ -6,10 +6,7 @@
  *
  *   game-registry/games/<slug>/{info,policy}.json  (SYSTEM, build-time, compiled to
  *                                                    registry/gameDefinitions.generated.ts)
- *   B2 CreatorGameCanonicalDocument + sandbox_games (CREATOR, D1 identity/runtime + B2 canonical
- *                                                    metadata/policy — see
- *                                                    domain/creatorGameCanonicalDocument.ts and
- *                                                    registry/creatorGameRegistry.ts)
+ *   D1 identity/runtime + GameCanonicalDocument (USER metadata/policy)
  *
  * Deliberately a discriminated union on `owner.type`, not one flat shape with optional fields on
  * both sides — the same reasoning `./publicGame.ts`'s `PublicGame` union already documents for the
@@ -17,9 +14,7 @@
  * input methods and a bundled thumbnail asset; a CREATOR game has a free-text genre, a coarser
  * single/multi mode, and a logo served from its own byte endpoint. Forcing both into one
  * optional-everything shape would mean either inventing categories/tags/thumbnail a creator game
- * doesn't have (this migration's own B2 canonical schema deliberately has no such fields — see
- * domain/creatorGameCanonicalDocument.ts's own doc comment on the known genre/categories gap being
- * real and NOT resolved by inventing a mapping here) or silently dropping genre/mode from a
+ * doesn't have or silently dropping genre/mode from a
  * SYSTEM one. `{@link GameDefinitionCommon}` holds only what both owners genuinely share.
  *
  * Built on `@owogg/game-sdk/contracts`' existing vocabulary (GameMode, InputMethod,
@@ -123,10 +118,8 @@ export interface SystemGameDefinition extends GameDefinitionCommon {
   readonly estimatedRoundSeconds?: number | undefined;
 }
 
-/** A game uploaded through the Game Creator program — D1 identity/runtime
- * (`sandbox_games`/`SandboxGameRepository`) combined with its B2 canonical metadata/policy
- * (`CreatorGameCanonicalDocument`/`CreatorGameDefinitionRepository`); see
- * registry/creatorGameRegistry.ts for the projection that builds one of these. */
+/** A game uploaded through the Game Creator program — D1 identity/runtime combined with generic
+ * canonical metadata/policy. */
 export interface CreatorGameDefinition extends GameDefinitionCommon {
   readonly owner: CreatorGameOwner;
 
