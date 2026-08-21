@@ -22,7 +22,7 @@ import {
  * repositories, never real B2). The classification/apply orchestration itself is covered in
  * packages/core/test/genericCanonicalMigration.test.ts (Stage U-2) — this suite only exercises
  * the thin wiring this file adds on top of it. `readB2ConfigFromEnv` (config reading) already has
- * its own coverage in publish-official-game-bundles.test.ts — not duplicated here.
+ * its own coverage in official-game-bundle-builder.test.ts — not duplicated here.
  */
 
 function fakeSource(): CreatorGameDefinitionRepository & {

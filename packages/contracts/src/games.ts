@@ -124,9 +124,3 @@ export const GameScoreAcceptResponseSchema = z.object({
   newlyUnlockedAchievements: z.array(z.string()).optional(),
 });
 export type GameScoreAcceptResponse = z.infer<typeof GameScoreAcceptResponseSchema>;
-
-/** Transitional endpoint aliases retained for the C-2 client adapter; the wire shape is generic. */
-export const CreatorScoreAcceptRequestSchema = GameScoreAcceptRequestSchema;
-export type CreatorScoreAcceptRequest = GameScoreAcceptRequest;
-export const CreatorScoreAcceptResponseSchema = GameScoreAcceptResponseSchema;
-export type CreatorScoreAcceptResponse = GameScoreAcceptResponse;

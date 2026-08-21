@@ -31,19 +31,15 @@ export type CreatorGameStatusSource = Pick<
 
 /**
  * `row.deletedAt !== null` is a fail-closed assertion, not a case this returns a status for — a
- * soft-deleted Creator game must never reach status projection at all. Both real call sites
- * (`CreatorGameRegistry.findBySlug`, via `SandboxGameRepository.findBySlug`'s own deleted-row
- * exclusion, and `CreatorGameRegistry.listAll`, which filters `deletedAt !== null` rows out before
- * projecting anything) already guarantee this never happens — reaching this throw would mean one
- * of those guarantees broke, which is exactly the kind of DB-invariant violation that must fail
- * loudly rather than silently produce a status for a game that no longer exists.
+ * soft-deleted Creator game must never reach status projection at all. Control-plane callers must
+ * filter deleted rows before projecting anything; reaching this throw means that invariant broke
+ * and must fail loudly rather than silently produce a status for a game that no longer exists.
  */
 export function projectCreatorGameStatus(row: CreatorGameStatusSource): CreatorGameRuntimeStatus {
   if (row.deletedAt !== null) {
     throw new Error(
       "projectCreatorGameStatus called with a soft-deleted row — deleted Creator games must " +
-        "never reach status projection (CreatorGameRegistry's own findBySlug/listAll both " +
-        "exclude deleted_at rows before this is ever called)",
+        "never reach status projection (control-plane reads must exclude deleted_at rows)",
     );
   }
 

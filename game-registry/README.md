@@ -30,30 +30,31 @@ moment creator games are registered here, the boundary has to already be real â€
 retrofitting a trust boundary onto a merged file is how policy fields get quietly
 accepted from untrusted input.
 
-## Current scope: SYSTEM games only
+## Current scope: official bootstrap source only
 
-Only games owned by OwOGG itself (`owner.type === "SYSTEM"`) live here. Creator-owned
-games are still described by `sandbox_games` rows in D1. The direction is a
-B2-backed CreatorGameRegistry, resolved through the same `GameRegistry` port this
-directory feeds â€” not yet implemented.
+Only games owned by OwOGG itself (`owner.type === "SYSTEM"`) live here. The owner field is build
+input, not production publisher authority: runtime authority is the generic D1 identity
+(`publisher_type = 'OWOGG'` or `USER`). User-published games remain managed by the sandbox review
+control plane and converge into the same generic runtime persistence.
 
 ## Runtime status
 
-This directory generates `GAME_DEFINITIONS`, which the composition root wires into
-`StaticGameRegistry` (`apps/api/src/container.ts`) as the `GameRegistry` that
-`ScoreUseCases` and `GameSettingsUseCases` resolve games through. `GAME_MANIFESTS` /
-`GAME_MANIFEST_MAP`, generated from `games/*/src/manifest.ts`, remains the source for
-everything not yet moved onto that port (achievements, personalization, creator/Discord
-tooling).
+This directory generates `GAME_DEFINITIONS` as deterministic source input for official standalone
+bundle builds and the idempotent generic OWOGG bootstrap. It is not queried by production runtime
+delivery. Production resolves every publisher through `RuntimeGameRegistry`: D1 identity/live
+version plus B2 canonical document and generic bundle.
+
+`GAME_MANIFESTS` / `GAME_MANIFEST_MAP`, generated from `games/*/src/manifest.ts`, remains source
+input for achievements, personalization, creator/Discord tooling that has not yet converged. Those
+build/control-plane consumers are why the official game source folders and generators stay.
 
 The two are held to agreement by a machine check, not by discipline:
 
 - `pnpm registry:check` fails if the generated files are stale, if any slug collides,
   or if the two sources disagree about any game.
-- `packages/core/test/gameRegistry.test.ts` asserts the same equivalence as a test.
+- registry-builder/schema tests assert the same equivalence at the build boundary.
 
-That agreement is what makes switching consumers over a small, reviewable change
-later, rather than a rewrite that has to be trusted.
+That agreement protects bootstrap input without creating a second runtime registry.
 
 ## Editing
 

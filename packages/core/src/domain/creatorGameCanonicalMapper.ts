@@ -2,8 +2,7 @@
  * Stage B-1 of the Creator B2 Canonical Registry migration — a pure, provider-neutral mapper from
  * `SandboxGameRecord` (D1's own row shape, ports/sandboxGames.ts) to
  * `CreatorGameCanonicalDocument` (domain/creatorGameCanonicalDocument.ts). No B2, no D1 client, no
- * write anywhere — this PR only builds the mapping function itself; nothing calls it yet (no
- * backfill, no dual-read, no GameRegistry wiring — that's a later Stage).
+ * write anywhere — callers decide when and where the control-plane projection is persisted.
  *
  * Only reads the fields {@link SandboxGameRecordCanonicalSource} lists — never the full
  * `SandboxGameRecord` — so the type signature itself proves this can't accidentally read (and
@@ -45,11 +44,10 @@ export type SandboxGameRecordCanonicalSource = Pick<
  * misrepresents the game: a `SandboxGameRecord` whose score_* columns are only *partially* set
  * (some, but not all, of scoreUnit/scoreDirection/scoreMin/scoreMax non-null) — or, just as
  * importantly, entirely unset. `domain/creatorScorePolicy.ts`'s own
- * `isCreatorScorePolicyConfigured` (the shared "any column null -> incomplete" gate this mapper,
- * `sandboxGameToScorePolicy`, and `CreatorGameRegistry`'s own pre-canonical classification all
- * call, rather than each re-declaring it) already documents why: for a Creator game, unlike a
- * SYSTEM manifest, "no score
- * columns set yet" and "deliberately unscored" are NOT distinguishable from D1 alone — there is
+ * `isCreatorScorePolicyConfigured` is the shared "any column null -> incomplete" gate used by
+ * this mapper rather than re-declaring the rule. For a user-published game, unlike an official
+ * manifest, "no score columns set yet" and "deliberately unscored" are NOT distinguishable from
+ * D1 alone — there is
  * no separate "this game is intentionally unscored" flag anywhere in `sandbox_games`. Collapsing
  * that into `score: null` (this document's spelling of "deliberately unscored") would silently
  * claim a game an admin simply hasn't gotten to yet is unscored on purpose — a wrong canonical
@@ -98,11 +96,9 @@ export type CreatorCanonicalMappingResult =
  *     `sandbox_games`), but a verified, currently-uniform platform fact about the field's ACTUAL
  *     meaning. `GamePolicy.requiresAuth` (gameDefinition.ts's own doc comment) is "whether a
  *     player must be signed in to PLAY at all" — a distinct concern from score-*submission*
- *     authentication, which `CreatorScoreAcceptanceUseCases.accept` requiring a session's `userId`
- *     is actually about, and has no bearing on this field. The real, current answer to "must a
- *     player sign in to play a Creator game" is no: `CreatorGameHost` never gates play on
- *     `isAuthenticated` (guest play is the default, matching every other unauthenticated-visitor
- *     surface), and `toPublicCreatorGame` (domain/publicGame.ts) already hardcodes
+ *     authentication, which signed score acceptance requiring a session's `userId` is actually
+ *     about, and has no bearing on this field. Guest play remains the default unless canonical
+ *     policy explicitly requires authentication, and the public projection preserves
  *     `requiresAuth: false` on the exact same reasoning for the read model this mapper's
  *     canonical document is meant to eventually replace the D1 half of. Written as an explicit
  *     constant with this comment, not silently inlined, so it's visible and searchable the moment

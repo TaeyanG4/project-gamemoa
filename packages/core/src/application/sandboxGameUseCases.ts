@@ -22,8 +22,6 @@ import {
 } from "../domain/sandboxGames.js";
 import {
   sourceArchiveObjectKey,
-  publishedObjectKey,
-  resolveBundleContentType,
   extractGameRegistrationManifest,
   findGameLogoFile,
   sandboxGameLogoObjectKey,
@@ -150,17 +148,6 @@ function validateTitle(title: string): string {
   return trimmed;
 }
 
-/** What the game-serving routes need to answer one request, resolved in one place so the
- * "is this actually live to the public?" rule can't drift between routes. */
-export interface ServableBundleFile {
-  bytes: ArrayBuffer;
-  contentType: string;
-  contentEncoding?: string | undefined;
-  /** True when this came from the version's published objects (the normal path); false when it
-   * was recovered by decompressing the source archive (the migration fallback). */
-  published: boolean;
-}
-
 /**
  * Orchestrates the sandbox game catalog: developer-facing create/upload, admin-facing review
  * (approve/reject a version) and publish (visibility toggle) + metadata adjustment. Ownership and
@@ -199,12 +186,8 @@ export class SandboxGameUseCases {
     return this.repo.listByDeveloper(developerUserId);
   }
 
-  async listPublic(): Promise<SandboxGameRecord[]> {
-    return this.repo.listPublic();
-  }
-
-  /** Every game, including soft-deleted ones, admin-facing — unlike listPublic (PUBLIC only) or
-   * listMine (one developer), this is "everything an ADMIN/OPERATOR should be able to browse" so
+  /** Every game, including soft-deleted ones, admin-facing — unlike listMine (one developer),
+   * this is "everything an ADMIN/OPERATOR should be able to browse" so
    * the admin UI doesn't need to know a game's id ahead of time (see
    * docs/GAME_CREATION_GUIDE.md §3.6.4). Deliberately includes deleted games (2026-08-18 fix) —
    * purgeGame only reaches an already-deleted game, and this list was the one place an admin was
@@ -1062,133 +1045,6 @@ export class SandboxGameUseCases {
       nowIso,
     });
     return updated;
-  }
-
-  // ── Public serving ─────────────────────────────────────────────────────────
-  //
-  // Everything below answers requests from anonymous players. All of it returns null rather than
-  // throwing for "not available", and deliberately cannot distinguish "no such game" from
-  // "exists but private" — a probe must not be able to enumerate unreleased games.
-
-  /**
-   * Resolves what `/play/:slug` should hand a player: the game plus its live version, only when
-   * the game is actually released. Null for an unknown slug, a PRIVATE game, a game with no live
-   * version, or (defensively — the DB CHECK constraint should prevent it) a dangling live id.
-   */
-  async resolveLiveVersion(
-    slug: string,
-  ): Promise<{ game: SandboxGameRecord; version: SandboxGameVersionRecord } | null> {
-    const game = await this.repo.findBySlug(slug);
-    if (!game || game.visibility !== "PUBLIC" || game.liveVersionId === null) return null;
-    const version = await this.repo.findVersionById(game.liveVersionId);
-    if (!version || version.gameId !== game.id) return null;
-    return { game, version };
-  }
-
-  /**
-   * Resolves the bytes for `GET /api/games/sandbox/:slug/logo` — same PUBLIC-only gate and
-   * can't-distinguish-unknown-from-private null as {@link resolveLiveVersion}, plus null when the
-   * game has no logo at all (registered before logos were required, 2026-08-18). Content type is
-   * derived from the stored key's own extension (see domain/sandboxGameBundle.ts's
-   * sandboxGameLogoObjectKey/resolveBundleContentType) rather than a separate stored column.
-   */
-  async resolvePublicLogo(
-    slug: string,
-  ): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
-    const game = await this.repo.findBySlug(slug);
-    if (!game || game.visibility !== "PUBLIC" || game.logoKey === null) return null;
-    const bytes = await this.storage.getObject(game.logoKey);
-    if (!bytes) return null;
-    return { bytes, contentType: resolveBundleContentType(game.logoKey).contentType };
-  }
-
-  /**
-   * Cheap, D1-only up-front gate for `/games/:gameId/:versionId/*`: true only when the game is
-   * currently PUBLIC and this specific version is APPROVED — the same condition
-   * resolvePublishedFile enforces, split out so a caller can check it *without* also paying for
-   * resolvePublishedFile's object-storage read.
-   *
-   * This exists specifically so the route layer can gate access to the byte cache with a
-   * short-lived availability check, independent of how long the actual asset bytes stay cached at
-   * the edge. Published assets are cached as effectively-immutable (a year) because the *bytes*
-   * for a given gameId+versionId never change — but "is this version still allowed to be served
-   * at all" is a mutable fact (an admin can flip visibility to PRIVATE at any time), and that fact
-   * must not be allowed to go stale for as long as the bytes do. Route layer:
-   * `availability gate (this, short TTL) → byte cache (long TTL) → object storage`.
-   */
-  async isVersionServable(gameId: number, versionId: number): Promise<boolean> {
-    const game = await this.repo.findById(gameId);
-    if (!game || game.visibility !== "PUBLIC") return false;
-    const version = await this.repo.findVersionById(versionId);
-    return Boolean(version && version.gameId === game.id && version.status === "APPROVED");
-  }
-
-  /**
-   * Resolves one file of one specific version for the immutable `/games/:gameId/:versionId/*`
-   * path. Requires the game to be PUBLIC and the version to be approved and fully published —
-   * but not to be the *current* live version, so that switching or rolling back a live version
-   * doesn't yank assets out from under players mid-session, and so year-long immutable caching of
-   * a versioned URL stays truthful.
-   *
-   * Falls back to decompressing the source archive when a published object is missing. That is the
-   * migration path away from request-time unzipping (and a safety net if objects are ever lost):
-   * the fast path is a plain CDN-cacheable object read, and this only runs when that read comes up
-   * empty. See docs/WORK_PROGRESS.md for the decision to keep it until real engine builds are
-   * verified end to end.
-   */
-  async resolvePublishedFile(input: {
-    gameId: number;
-    versionId: number;
-    path: string;
-  }): Promise<ServableBundleFile | null> {
-    const game = await this.repo.findById(input.gameId);
-    if (!game || game.visibility !== "PUBLIC") return null;
-
-    const version = await this.repo.findVersionById(input.versionId);
-    if (!version || version.gameId !== game.id || version.status !== "APPROVED") return null;
-
-    if (isPublishedVersion(version.publishStatus)) {
-      const bytes = await this.storage.getObject(
-        publishedObjectKey(game.id, version.id, input.path),
-      );
-      if (bytes) {
-        const { contentType, contentEncoding } = resolveBundleContentType(input.path);
-        return { bytes, contentType, contentEncoding, published: true };
-      }
-    }
-
-    return this.readFromSourceArchive(version, input.path);
-  }
-
-  /** Legacy/fallback read: decompress the source archive and pull one file out of it. Shares the
-   * publisher's validation and single-root unwrapping, so a file resolves to exactly the same path
-   * here as it does when published — there is no second, subtly-different path resolver. */
-  private async readFromSourceArchive(
-    version: SandboxGameVersionRecord,
-    path: string,
-  ): Promise<ServableBundleFile | null> {
-    const archive = await this.storage.getObject(version.objectKey);
-    if (!archive) return null;
-
-    let prepared;
-    try {
-      prepared = this.publisher.prepare(archive);
-    } catch {
-      return null;
-    }
-
-    const file = prepared.files.find((f) => f.path === path);
-    if (!file) return null;
-
-    return {
-      bytes: file.bytes.buffer.slice(
-        file.bytes.byteOffset,
-        file.bytes.byteOffset + file.bytes.byteLength,
-      ) as ArrayBuffer,
-      contentType: file.contentType,
-      contentEncoding: file.contentEncoding,
-      published: false,
-    };
   }
 }
 

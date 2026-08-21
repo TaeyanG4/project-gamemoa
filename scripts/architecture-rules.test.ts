@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   IMPORT_RULES,
+  TOKEN_RULES,
   checkFileAgainstRule,
   collectModuleReferences,
   matchesForbidden,
@@ -192,4 +193,19 @@ test("every import rule carries at least one forbidden specifier and a stated ru
     assert.ok(rule.rule.length > 0, `${rule.scope} has no stated rule`);
     assert.ok(rule.forbidden.length > 0, `${rule.scope} forbids nothing`);
   }
+});
+
+test("D-1 legacy runtime removals are protected by source-token architecture guards", () => {
+  const api = TOKEN_RULES.find((rule) => rule.scope === "apps/api/src");
+  const web = TOKEN_RULES.find((rule) => rule.scope === "apps/web/app");
+  const host = TOKEN_RULES.find((rule) => rule.scope === "apps/web/app/features/game");
+  const deploy = TOKEN_RULES.find((rule) => rule.scope === ".github/workflows");
+
+  assert.ok(api?.tokens.includes("officialGameAssetsRouter"));
+  assert.ok(api?.tokens.includes("StaticGameRegistry"));
+  assert.ok(web?.tokens.includes("LegacyReactRuntime"));
+  assert.ok(web?.tokens.includes("CreatorGameHost"));
+  assert.ok(host?.tokens.includes("submitScoreApi"));
+  assert.ok(deploy?.tokens.includes("publish:official-games"));
+  assert.ok(deploy?.tokens.includes("systemGameReleaseMap"));
 });

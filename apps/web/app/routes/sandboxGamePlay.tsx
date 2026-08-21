@@ -19,10 +19,9 @@ export function sandboxGameRedirectTarget(slug: string): string {
  * the unified provider-neutral route every game now plays from.
  *
  * The fetch-and-render-SandboxGameFrame play UI this route used to own is gone — `/games/:slug`
- * already covers a Creator game end to end (loading state, IframeRuntime, result overlay) through
- * CreatorGameHost, so duplicating any of that here would just be a second, divergent copy of the
- * same page. SandboxGameFrame itself remains available for legacy compatibility tests and rollback
- * tooling; the primary route no longer instantiates it.
+ * already covers a USER game end to end (loading state, IframeRuntime, result overlay) through
+ * GameHost, so duplicating any of that here would just be a second, divergent copy of the same
+ * page.
  */
 export default function SandboxGamePlayRoute() {
   const { slug = "" } = useParams();

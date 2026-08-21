@@ -20,11 +20,7 @@ import { adminGameCreatorsRouter } from "./routes/adminGameCreators.js";
 import { adminSandboxGamesRouter } from "./routes/adminSandboxGames.js";
 import { devGamesRouter } from "./routes/devGames.js";
 import { myAccessRouter } from "./routes/myAccess.js";
-import {
-  gameServingRouter,
-  publishedGameAssetsRouter,
-  officialGameAssetsRouter,
-} from "./routes/gameServing.js";
+import { gameServingRouter, publishedGameAssetsRouter } from "./routes/gameServing.js";
 import { gamesRouter } from "./routes/games.js";
 import { renderRouter } from "./routes/render.js";
 import { createContainer } from "./container.js";
@@ -65,7 +61,7 @@ function isAllowedOrigin(origin: string | undefined, frontendUrl?: string): bool
 // already-public, cookie-free bytes but never appropriate for an endpoint that reads a session.
 //
 // 2026-08-18 production bug: a sandboxed iframe (no allow-same-origin, by design — see
-// SandboxGameFrame.tsx) sends `Origin: null` on its own same-document requests, including
+// GameFrame.tsx) sends `Origin: null` on its own same-document requests, including
 // `<script type="module">` fetches (module scripts are always CORS-checked, unlike classic
 // scripts). When this middleware was global, that request got THIS credentialed policy — which
 // echoes back a specific allowed origin, never "*", once `credentials: true` is set — and the
@@ -156,7 +152,6 @@ app.route("/api/me", myAccessRouter);
 // config that points that hostname here changes later. See docs/GAME_CREATION_GUIDE.md §3.8.
 app.route("/play", gameServingRouter);
 app.route("/games", publishedGameAssetsRouter);
-app.route("/official-games", officialGameAssetsRouter);
 app.route("/api/games", gamesRouter);
 app.route("/api/render", renderRouter);
 

@@ -52,7 +52,7 @@ test("CORS preflight still advertises the other standard methods (no regression 
 
 // ── credentialed API CORS must not reach game-asset routes (2026-08-18 CORS/asset bug) ──────
 //
-// A sandboxed game iframe (no allow-same-origin — see SandboxGameFrame.tsx) sends `Origin: null`
+// A sandboxed game iframe (no allow-same-origin — see GameFrame.tsx) sends `Origin: null`
 // on its own same-document requests, including `<script type="module">` fetches, which are always
 // CORS-checked. When the app-level cors() middleware (credentials: true) applied globally, it
 // answered those requests too — echoing back a specific allowed origin, never "*" once

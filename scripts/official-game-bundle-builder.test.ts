@@ -4,17 +4,15 @@ import path from "node:path";
 import { sha256Hex } from "@owogg/core";
 import {
   readB2ConfigFromEnv,
-  renderReleaseMapModule,
   toArrayBuffer,
   migratedGames,
-  releaseMapPath,
   zipFilesDeterministically,
-} from "./official-game-bundle-publisher.js";
+} from "./official-game-bundle-builder.js";
 
 /**
- * The pure parts of the official-game bundle publisher — build/zip/B2-network side effects are
+ * The pure parts of the official generic bundle builder — build/B2/D1 side effects are
  * exercised for real by games/reaction-time/tests/standaloneBuild.test.ts (the build artifact
- * itself) and, in production, by the deploy workflow's own "Publish Official Game Bundles" step;
+ * itself) and, in production, by the deploy workflow's generic bootstrap step;
  * this suite covers the logic that decides what gets written where.
  */
 
@@ -64,14 +62,6 @@ test("migratedGames: all four SYSTEM games, each pointing at its own standalone 
   }
 });
 
-test("releaseMapPath: points at the exact file GameHost.tsx imports", () => {
-  const p = releaseMapPath("/repo");
-  assert.match(
-    p,
-    /apps[\\/]web[\\/]app[\\/]features[\\/]game[\\/]runtime[\\/]systemGameReleaseMap\.generated\.ts$/,
-  );
-});
-
 test("toArrayBuffer: normalizes a Uint8Array view to exactly its own bytes, not its whole backing buffer", () => {
   const backing = new Uint8Array([1, 2, 3, 4, 5, 6]);
   const view = backing.subarray(2, 4); // [3, 4] — a view over a LARGER buffer
@@ -79,22 +69,9 @@ test("toArrayBuffer: normalizes a Uint8Array view to exactly its own bytes, not 
   assert.deepEqual(new Uint8Array(buf), new Uint8Array([3, 4]));
 });
 
-test("renderReleaseMapModule: renders a valid, importable module mapping slug -> {version, entry}", () => {
-  const content = renderReleaseMapModule({
-    "reaction-time": { version: "deadbeef", entry: "index.html" },
-  });
-  assert.match(content, /export const SYSTEM_GAME_RELEASES/);
-  assert.match(content, /"reaction-time": \{ version: "deadbeef", entry: "index\.html" \}/);
-});
-
-test("renderReleaseMapModule: an empty release set still renders a valid empty map (matches the committed default)", () => {
-  const content = renderReleaseMapModule({});
-  assert.match(content, /export const SYSTEM_GAME_RELEASES:[^=]*=\s*\{\s*\}/);
-});
-
 // ── zipFilesDeterministically: same bytes in -> same ZIP bytes out, every time ──────────────────
 //
-// This is what makes `version` (this ZIP's own sha256, computed in publishAllMigratedGames) a
+// This is what makes the content hash computed by buildOfficialGameBundles stable and reusable as
 // genuine content hash rather than something that drifts on every deploy for a game that hasn't
 // actually changed — fflate defaults an unset entry mtime to Date.now(), and object/directory
 // iteration order isn't guaranteed stable, so both had to be pinned explicitly (see

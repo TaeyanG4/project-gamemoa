@@ -25,7 +25,7 @@ export function createSqliteD1(schemaSql: string): { db: D1Database; raw: Databa
         const info = stmt.run(...(bound as never[]));
         // node:sqlite's own `changes` count and Cloudflare D1's `rows_written` field mean the
         // same thing for a plain INSERT — mirrored under both names so a caller reading either
-        // one (see D1CreatorScoreAcceptanceRepository, which reads rows_written specifically)
+        // one (the generic score-acceptance repository reads rows_written specifically)
         // gets a real, correctly-populated value rather than undefined.
         return {
           success: true,
@@ -684,102 +684,6 @@ END;
     new URL("../../migrations/0031_game_version_write_convergence.sql", import.meta.url),
     "utf8",
   );
-
-/** Schema for D1GameAttemptConsumptionRepository tests (migration 0028) — the minimal slice of
- * SANDBOX_GAMES_TEST_SCHEMA the FK columns need (users, sandbox_games, sandbox_game_versions)
- * plus the table itself. */
-export const GAME_ATTEMPT_CONSUMPTIONS_TEST_SCHEMA = `
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  nickname TEXT NOT NULL,
-  email TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE sandbox_games (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  slug TEXT NOT NULL UNIQUE,
-  developer_user_id INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  genre TEXT NOT NULL,
-  visibility TEXT NOT NULL DEFAULT 'PRIVATE',
-  live_version_id INTEGER,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
-CREATE TABLE sandbox_game_versions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  game_id INTEGER NOT NULL,
-  object_key TEXT NOT NULL,
-  content_hash TEXT NOT NULL,
-  bundle_bytes INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
-  uploaded_at TEXT NOT NULL
-);
-
-CREATE TABLE game_attempt_consumptions (
-  attempt_id TEXT PRIMARY KEY,
-  user_id INTEGER NOT NULL,
-  game_id INTEGER NOT NULL,
-  version_id INTEGER NOT NULL,
-  consumed_at TEXT NOT NULL
-);
-`;
-
-/** Schema for D1CreatorScoreAcceptanceRepository tests (migration 0028's table again, plus
- * `scores` from the initial schema) — the atomic attempt-consume + score-save write. */
-export const CREATOR_SCORE_ACCEPTANCE_TEST_SCHEMA = `
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  nickname TEXT NOT NULL,
-  email TEXT,
-  created_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE sandbox_games (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  slug TEXT NOT NULL UNIQUE,
-  developer_user_id INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  genre TEXT NOT NULL,
-  visibility TEXT NOT NULL DEFAULT 'PRIVATE',
-  live_version_id INTEGER,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
-CREATE TABLE sandbox_game_versions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  game_id INTEGER NOT NULL,
-  object_key TEXT NOT NULL,
-  content_hash TEXT NOT NULL,
-  bundle_bytes INTEGER NOT NULL,
-  status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
-  uploaded_at TEXT NOT NULL
-);
-
-CREATE TABLE game_attempt_consumptions (
-  attempt_id TEXT PRIMARY KEY,
-  user_id INTEGER NOT NULL,
-  game_id INTEGER NOT NULL,
-  version_id INTEGER NOT NULL,
-  consumed_at TEXT NOT NULL
-);
-
-CREATE TABLE scores (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER,
-  nickname TEXT NOT NULL DEFAULT '게스트',
-  avatar_url TEXT,
-  game_id TEXT NOT NULL,
-  score INTEGER NOT NULL,
-  difficulty TEXT NOT NULL DEFAULT 'normal',
-  created_at TEXT NOT NULL DEFAULT (datetime('now')),
-  deleted_at TEXT,
-  deleted_by_admin_id INTEGER
-);
-`;
 
 /** Schema for generic games table tests (migration 0029) — includes users, sandbox_games, and games. */
 export const GAMES_TEST_SCHEMA = `

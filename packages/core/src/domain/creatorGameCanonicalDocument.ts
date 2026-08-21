@@ -6,8 +6,8 @@
  * toward mirrors how SYSTEM games already split (game-registry/games/<slug>/{info,policy}.json,
  * checked into git — see game-registry/README.md):
  *
- *   SYSTEM  → Git GameRegistry (game-registry/)
- *   CREATOR → B2 canonical definition (this file's own document) + D1 runtime/transactional state
+ *   OWOGG/USER runtime → generic D1 identity/version + provider-neutral B2 canonical definition
+ *   USER control plane → this document remains as review/backfill input
  *
  * D1 keeps everything this document deliberately does NOT carry: game/version identity (the D1
  * row id, never this document), developer identity (ownerUserId — see this file's own note
@@ -16,10 +16,8 @@
  * transactional (changes via a review decision, a visibility toggle, a score submission) — not
  * "what the game is", which is the one thing this document exists to describe.
  *
- * **This PR (Stage A) only builds the storage foundation** — the key layout, the document schema,
- * a persistence port, and a B2-backed adapter. Nothing here is wired into the production
- * GameRegistry, no D1 data is migrated or dual-read, and no route touches this yet. See this
- * module's own consumers (or lack thereof) for confirmation.
+ * This document is retained for USER control-plane compatibility and canonical migration tooling;
+ * it is not a runtime registry or publisher-authority source.
  *
  * ## Canonical vs. D1 boundary, explicitly
  *

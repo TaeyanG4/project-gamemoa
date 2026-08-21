@@ -1,7 +1,4 @@
-import {
-  CreatorScoreAcceptResponseSchema,
-  type CreatorScoreAcceptResponse,
-} from "@owogg/contracts";
+import { GameScoreAcceptResponseSchema, type GameScoreAcceptResponse } from "@owogg/contracts";
 import { apiFetch } from "../../lib/api/client";
 
 /**
@@ -12,19 +9,15 @@ import { apiFetch } from "../../lib/api/client";
  *
  * Throws (via apiFetch's ApiClientError) on any rejection — an expired/mismatched/already-spent
  * token, an out-of-policy score, or a since-unpublished game all surface as a thrown error with a
- * server-provided Korean message in `.message`, for creatorScoreFlow.ts to catch and report as a
- * submission failure. Never called directly by a component — see creatorScoreFlow.ts.
+ * server-provided Korean message in `.message`, for gameScoreFlow.ts to catch and report as a
+ * submission failure. Never called directly by a component — see gameScoreFlow.ts.
  */
-export function acceptCreatorScore(
+export function acceptGameScore(
   slug: string,
   input: { token: string; score: number; difficulty?: string; playToken?: string | null },
-): Promise<CreatorScoreAcceptResponse> {
-  return apiFetch(
-    `/api/games/${encodeURIComponent(slug)}/score`,
-    CreatorScoreAcceptResponseSchema,
-    {
-      method: "POST",
-      body: JSON.stringify(input),
-    },
-  );
+): Promise<GameScoreAcceptResponse> {
+  return apiFetch(`/api/games/${encodeURIComponent(slug)}/score`, GameScoreAcceptResponseSchema, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

@@ -112,9 +112,6 @@ function createFakeRepo(): SandboxGameRepository & {
     async listByDeveloper(developerUserId) {
       return [...games.values()].filter((g) => g.developerUserId === developerUserId);
     },
-    async listPublic() {
-      return [...games.values()].filter((g) => g.visibility === "PUBLIC");
-    },
     async listAll() {
       return [...games.values()];
     },
@@ -2514,179 +2511,12 @@ test("setVisibility refuses a soft-deleted game with ALREADY_DELETED", async () 
   );
 });
 
-// ── public serving resolution ────────────────────────────────────────────────
-
-test("resolveLiveVersion returns the live version for a released game", async () => {
-  const { useCases, game, version } = await createGameWithLiveVersion();
-  const resolved = await useCases.resolveLiveVersion("my-game");
-  assert.equal(resolved?.game.id, game.id);
-  assert.equal(resolved?.version.id, version.id);
-});
-
-test("resolveLiveVersion returns null for an unknown slug and for a PRIVATE game alike", async () => {
-  const { useCases, game } = await createGameWithLiveVersion();
-  assert.equal(await useCases.resolveLiveVersion("no-such-game"), null);
-
-  await useCases.setVisibility(game.id, 99, "PRIVATE");
-  assert.equal(await useCases.resolveLiveVersion("my-game"), null);
-});
-
-test("resolvePublishedFile serves a published object with its resolved content type", async () => {
-  const { useCases, game, version } = await createGameWithLiveVersion();
-  const file = await useCases.resolvePublishedFile({
-    gameId: game.id,
-    versionId: version.id,
-    path: "Build/game.wasm",
-  });
-
-  assert.equal(file?.contentType, "application/wasm");
-  assert.equal(file?.published, true);
-  assert.equal(new TextDecoder().decode(file!.bytes), "\0asm fake");
-});
-
-test("resolvePublishedFile refuses any version of a PRIVATE game", async () => {
-  const { useCases, game, version } = await createGameWithLiveVersion();
-  await useCases.setVisibility(game.id, 99, "PRIVATE");
-
-  assert.equal(
-    await useCases.resolvePublishedFile({
-      gameId: game.id,
-      versionId: version.id,
-      path: "index.html",
-    }),
-    null,
-  );
-});
-
-test("isVersionServable matches resolvePublishedFile's own gate: true only for a PUBLIC game's APPROVED version", async () => {
-  const { useCases, game, version } = await createGameWithLiveVersion();
-  assert.equal(await useCases.isVersionServable(game.id, version.id), true);
-
-  await useCases.setVisibility(game.id, 99, "PRIVATE");
-  assert.equal(
-    await useCases.isVersionServable(game.id, version.id),
-    false,
-    "a takedown (PRIVATE) must flip this immediately",
-  );
-});
-
-/**
- * An admin takedown has to stop serving through *every* entry point, not just the catalog listing
- * it is most visibly wired to. deleteGame does this indirectly — it forces visibility back to
- * PRIVATE in the same write as setting deleted_at — which is a deliberate belt-and-suspenders
- * design (see SandboxGameRepository.softDelete) but also means the serving gates never check
- * `deletedAt` themselves. That makes "PRIVATE is forced on delete" a load-bearing invariant rather
- * than a nicety: if a future change ever soft-deleted a row without touching visibility, a deleted
- * game would keep serving and nothing else in the suite would notice.
- */
-test("a soft-deleted game stops serving through every entry point, not just the catalog", async () => {
-  const { useCases, game, version } = await createGameWithLiveVersion();
-  assert.ok(await useCases.resolveLiveVersion("my-game"), "precondition: live before deletion");
-
-  await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
-
-  assert.equal(await useCases.resolveLiveVersion("my-game"), null, "/play/:slug resolver");
-  assert.equal(
-    await useCases.isVersionServable(game.id, version.id),
-    false,
-    "published-asset availability gate",
-  );
-  assert.equal(
-    await useCases.resolvePublishedFile({
-      gameId: game.id,
-      versionId: version.id,
-      path: "index.html",
-    }),
-    null,
-    "published-asset read",
-  );
-  assert.equal(await useCases.resolvePublicLogo("my-game"), null, "public logo route");
-});
-
 test("deleting a game forces it PRIVATE, which is what the serving gates actually read", async () => {
   const { useCases, game } = await createGameWithLiveVersion();
   const deleted = await useCases.deleteGame({ gameId: game.id, actorAdminId: 9 });
 
   assert.notEqual(deleted.deletedAt, null);
   assert.equal(deleted.visibility, "PRIVATE");
-});
-
-test("isVersionServable is false for a version belonging to a different game", async () => {
-  const { useCases, version } = await createGameWithLiveVersion();
-  const other = await useCases.createGame({
-    slug: "other-game",
-    developerUserId: 1,
-    title: "Other",
-    shortDescription: null,
-    description: null,
-    genre: "puzzle",
-    mode: "single",
-  });
-  assert.equal(await useCases.isVersionServable(other.id, version.id), false);
-});
-
-test("isVersionServable is false for a PENDING_REVIEW version even on a PUBLIC game", async () => {
-  const { useCases, game } = await createGameWithLiveVersion();
-  const pending = await useCases.uploadVersion({
-    gameId: game.id,
-    actingUserId: 1,
-    isAdmin: false,
-    bytes: new ArrayBuffer(20),
-  });
-  assert.equal(await useCases.isVersionServable(game.id, pending.id), false);
-});
-
-test("resolvePublishedFile still serves a version that is no longer live, so a rollback can't break a session mid-play", async () => {
-  const { useCases, game, version: v1 } = await createGameWithLiveVersion();
-  const v2 = await useCases.uploadVersion({
-    gameId: game.id,
-    actingUserId: 1,
-    isAdmin: false,
-    bytes: new ArrayBuffer(20),
-  });
-  await useCases.decideVersion({
-    versionId: v2.id,
-    adminId: 99,
-    decision: "APPROVED",
-    reason: null,
-  });
-
-  const stillServed = await useCases.resolvePublishedFile({
-    gameId: game.id,
-    versionId: v1.id,
-    path: "index.html",
-  });
-  assert.equal(stillServed?.published, true);
-});
-
-test("resolvePublishedFile falls back to the source archive when a published object is missing", async () => {
-  const { useCases, storage, game, version } = await createGameWithLiveVersion();
-
-  // Simulate the published object being unavailable — the safety net kept for the transition away
-  // from request-time unzipping.
-  storage.objects.delete(`games/${game.id}/${version.id}/index.html`);
-
-  const file = await useCases.resolvePublishedFile({
-    gameId: game.id,
-    versionId: version.id,
-    path: "index.html",
-  });
-  assert.equal(file?.published, false, "should be flagged as served from the archive fallback");
-  assert.equal(new TextDecoder().decode(file!.bytes), "<h1>hi</h1>");
-});
-
-test("resolvePublishedFile returns null when neither the published object nor the source archive is available", async () => {
-  const { useCases, storage, game, version } = await createGameWithLiveVersion();
-  storage.objects.clear();
-
-  assert.equal(
-    await useCases.resolvePublishedFile({
-      gameId: game.id,
-      versionId: version.id,
-      path: "index.html",
-    }),
-    null,
-  );
 });
 
 test("deletePublishedVersion removes exactly the objects the manifest lists, leaving the source archive", async () => {

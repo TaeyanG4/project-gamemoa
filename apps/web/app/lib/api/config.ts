@@ -40,18 +40,3 @@ export const GAME_ORIGIN = getGameOrigin();
 export function gamePlayUrl(slug: string): string {
   return `${GAME_ORIGIN.replace(/\/+$/, "")}/play/${encodeURIComponent(slug)}`;
 }
-
-/** Compatibility name retained for existing sandbox and Creator call sites. */
-export const sandboxGamePlayUrl = gamePlayUrl;
-
-/**
- * Legacy rollback URL for an official content-hash bundle. C-1's primary official runtime uses
- * {@link gamePlayUrl} and generic numeric D1 versions; this helper and the deploy-generated release
- * map remain available until a later production-verified cleanup removes the legacy route.
- */
-export function officialGameEntryUrl(
-  slug: string,
-  release: { version: string; entry: string },
-): string {
-  return `${GAME_ORIGIN.replace(/\/+$/, "")}/official-games/${encodeURIComponent(slug)}/${encodeURIComponent(release.version)}/${release.entry}`;
-}

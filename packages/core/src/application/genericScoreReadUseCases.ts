@@ -3,8 +3,8 @@ import type { RuntimeGameRegistry } from "../modules/game/ports/runtimeGameRegis
 import type { ScoreRepository } from "../ports/repositories.js";
 
 /**
- * Provider-neutral score reads used by personal-best/profile surfaces. Unlike the legacy
- * ScoreUseCases write/leaderboard helper, this class resolves every game through the generic
+ * Provider-neutral score reads used by personal-best/profile surfaces. This class resolves every
+ * game through the generic
  * runtime identity + live version + canonical document join, so USER and OWOGG policies behave
  * identically and an unresolved historical slug is omitted rather than assigned a guessed order.
  */

@@ -15,8 +15,8 @@ import { classifyBackfillRows, applyBackfill } from "@owogg/core";
  * re-read, the MISSING/MATCH/BLOCKED/CONFLICT/ERROR status model) lives in
  * packages/core/src/application/creatorCanonicalBackfill.ts, provider-neutral and independently
  * tested there — this file is only argv parsing, input-file shape validation, B2 config/repository
- * wiring, and output formatting. No top-level side effects (same split as
- * official-game-bundle-publisher.ts/publish-official-game-bundles.ts): every exported function here
+ * wiring, and output formatting. No top-level side effects (the same split used by the official
+ * generic bundle builder/bootstrap runner): every exported function here
  * is safely importable by this file's own test suite without touching a real filesystem or B2.
  * See run-creator-canonical-backfill.ts for the thin runner that actually calls `main()`.
  *

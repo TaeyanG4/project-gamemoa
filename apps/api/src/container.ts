@@ -17,8 +17,6 @@ import {
   D1UserModerationRepository,
   D1GameCreatorRepository,
   D1SandboxGameRepository,
-  D1GameAttemptConsumptionRepository,
-  D1CreatorScoreAcceptanceRepository,
   D1GameScoreAcceptanceRepository,
   D1GameIdentityRepository,
   D1GameVersionRepository,
@@ -49,16 +47,10 @@ import {
   UserModerationUseCases,
   GameCreatorUseCases,
   SandboxGameUseCases,
-  GameAttemptUseCases,
-  CreatorScoreAcceptanceUseCases,
   GameScoreAcceptanceUseCases,
-  CreatorLeaderboardUseCases,
   GameBundlePublisher,
-  StaticGameRegistry,
   ComposedRuntimeGameRegistry,
   RuntimeGameAvailability,
-  GAME_DEFINITIONS,
-  type GameRegistry,
   type UserRepository,
   type SessionRepository,
   type ScoreRepository,
@@ -79,8 +71,6 @@ import {
   type GameCreatorApplicationRepository,
   type SandboxGameRepository,
   type GameBundleStorageRepository,
-  type GameAttemptConsumptionRepository,
-  type CreatorScoreAcceptanceRepository,
   type GameScoreAcceptanceRepository,
   type CreatorGameDefinitionRepository,
   type GameCanonicalRepository,
@@ -91,23 +81,6 @@ import {
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
 import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleArchiveReader.js";
-
-/**
- * Built once from the compiled game-registry/ output (packages/core/src/registry/
- * gameDefinitions.generated.ts), not per `createContainer` call — SYSTEM games are fixed at
- * deploy time, so there is nothing request-specific to rebuild the way the D1-backed repositories
- * below need a fresh handle each call. Held to agreement with GAME_MANIFESTS by `pnpm
- * registry:check` (scripts/registry-builder.ts's assertDefinitionsMatchManifests), so this is
- * behaviourally the same catalog GameSettingsUseCases resolved through
- * GAME_MANIFEST_MAP/GAME_MANIFESTS before.
- *
- * Exported directly (not only reachable via `createContainer(db).gameRegistry`) because it
- * genuinely needs no `db` argument to exist — a route that only wants to resolve a game id
- * (routes/scores.ts's leaderboard gameId validation, in particular) can import this without first
- * needing a D1 binding to be present, matching the validation-before-DB-check ordering that route
- * already had.
- */
-export const gameRegistry: GameRegistry = new StaticGameRegistry(GAME_DEFINITIONS);
 
 export interface AppContainer {
   userRepo: UserRepository;
@@ -130,14 +103,6 @@ export interface AppContainer {
    * D1GameCreatorRepository's doc comment for why they share one D1 class. */
   gameCreatorRepo: GameCreatorAccessRepository & GameCreatorApplicationRepository;
   sandboxGameRepo: SandboxGameRepository;
-  /** Runtime-only replay protection for a Game Session's attemptId (migration 0028) — not
-   * canonical game/creator metadata, and not yet consulted by any route (see
-   * GameAttemptUseCases's own doc comment). */
-  gameAttemptRepo: GameAttemptConsumptionRepository;
-  /** Atomic attempt-consume + score-save for Creator games (migration 0028's table again, plus
-   * `scores`) — see CreatorScoreAcceptanceRepository's own doc comment for why this is a
-   * separate port from gameAttemptRepo above rather than an extension of it. */
-  creatorScoreAcceptanceRepo: CreatorScoreAcceptanceRepository;
   /** Provider-neutral atomic attempt consume + score insert (migration 0032). */
   gameScoreAcceptanceRepo: GameScoreAcceptanceRepository;
   gameBundleStorageRepo: GameBundleStorageRepository;
@@ -166,14 +131,6 @@ export interface AppContainer {
   gameAssetRepo: GameAssetRepository;
   runtimeGameRegistry: RuntimeGameRegistry;
   runtimeGameAvailability: RuntimeGameAvailability;
-  /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
-   * game is not "missing" from here so much as out of scope, see StaticGameRegistry's doc
-   * comment. Exposed on the container for legacy/admin compatibility. Generic score reads use the
-   * provider-neutral runtime registry instead; GameSettingsUseCases still use this field, so a
-   * future route that needs to resolve a game directly has one place to get it from rather than
-   * reaching back into a generated file. */
-  gameRegistry: GameRegistry;
-
   scoreReadUseCases: GenericScoreReadUseCases;
   personalizationUseCases: PersonalizationUseCases;
   identityUseCases: IdentityUseCases;
@@ -193,10 +150,7 @@ export interface AppContainer {
   userModerationUseCases: UserModerationUseCases;
   gameCreatorUseCases: GameCreatorUseCases;
   sandboxGameUseCases: SandboxGameUseCases;
-  gameAttemptUseCases: GameAttemptUseCases;
-  creatorScoreAcceptanceUseCases: CreatorScoreAcceptanceUseCases;
   gameScoreAcceptanceUseCases: GameScoreAcceptanceUseCases;
-  creatorLeaderboardUseCases: CreatorLeaderboardUseCases;
   gameBundlePublisher: GameBundlePublisher;
 }
 
@@ -231,8 +185,6 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const userModerationRepo = new D1UserModerationRepository(db);
   const gameCreatorRepo = new D1GameCreatorRepository(db);
   const sandboxGameRepo = new D1SandboxGameRepository(db);
-  const gameAttemptRepo = new D1GameAttemptConsumptionRepository(db);
-  const creatorScoreAcceptanceRepo = new D1CreatorScoreAcceptanceRepository(db);
   const gameScoreAcceptanceRepo = new D1GameScoreAcceptanceRepository(db);
   const gameIdentityRepo = new D1GameIdentityRepository(db);
   const gameVersionRepo = new D1GameVersionRepository(db);
@@ -305,19 +257,12 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     creatorGameDefinitionRepo,
     gameCanonicalRepo,
   );
-  const gameAttemptUseCases = new GameAttemptUseCases(gameAttemptRepo);
-  const creatorScoreAcceptanceUseCases = new CreatorScoreAcceptanceUseCases(
-    sandboxGameRepo,
-    creatorScoreAcceptanceRepo,
-  );
   const gameScoreAcceptanceUseCases = new GameScoreAcceptanceUseCases(
     runtimeGameRegistry,
     runtimeGameAvailability,
     gameSettingsRepo,
     gameScoreAcceptanceRepo,
   );
-  const creatorLeaderboardUseCases = new CreatorLeaderboardUseCases(sandboxGameRepo, scoreRepo);
-
   return {
     userRepo,
     sessionRepo,
@@ -337,8 +282,6 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     userModerationRepo,
     gameCreatorRepo,
     sandboxGameRepo,
-    gameAttemptRepo,
-    creatorScoreAcceptanceRepo,
     gameScoreAcceptanceRepo,
     gameIdentityRepo,
     gameVersionRepo,
@@ -349,8 +292,6 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameCanonicalRepo,
     runtimeGameRegistry,
     runtimeGameAvailability,
-    gameRegistry,
-
     scoreReadUseCases,
     personalizationUseCases,
     identityUseCases,
@@ -370,10 +311,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     userModerationUseCases,
     gameCreatorUseCases,
     sandboxGameUseCases,
-    gameAttemptUseCases,
-    creatorScoreAcceptanceUseCases,
     gameScoreAcceptanceUseCases,
-    creatorLeaderboardUseCases,
     gameBundlePublisher,
   };
 }

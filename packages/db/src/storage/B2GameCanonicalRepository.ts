@@ -23,7 +23,7 @@ import {
  * {@link parseGameCanonicalDocument} (core, provider-neutral) already implements. Key layout
  * (`game-definitions/<slug>/definition.json`, {@link gameCanonicalObjectKey}) stays entirely
  * separate from every other existing prefix (`creator-games/`, `games/<gameId>/<versionId>/...`,
- * `uploads/<gameId>/...`, `official-games/<slug>/<version>/...`) — see that function's own doc
+ * `uploads/<gameId>/...`) — see that function's own doc
  * comment for why.
  *
  * `findBySlug`: all format/shape/semantic validation — malformed JSON, an unsupported

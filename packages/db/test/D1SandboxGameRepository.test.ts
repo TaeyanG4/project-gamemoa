@@ -339,11 +339,10 @@ test("approval atomically reserves the slug and reservation survives revoke + ha
   );
 });
 
-test("listByDeveloper and listPublic scope correctly", async () => {
+test("listByDeveloper scopes records to the owning developer", async () => {
   const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
   seedUser(raw, 1, "DevA");
   const repo = new D1SandboxGameRepository(db);
-  const now = new Date().toISOString();
 
   const mine = await seedGame(repo, "mine");
   const alsoMine = await seedGame(repo, "also-mine");
@@ -351,23 +350,6 @@ test("listByDeveloper and listPublic scope correctly", async () => {
     (await repo.listByDeveloper(1)).map((g) => g.id).sort(),
     [mine.id, alsoMine.id].sort(),
   );
-
-  assert.deepEqual(await repo.listPublic(), []);
-
-  const version = await repo.createVersion({
-    gameId: mine.id,
-    objectKey: "k",
-    contentHash: "h",
-    bundleBytes: 1,
-    nowIso: now,
-  });
-  await repo.decideVersion(version.id, "APPROVED", 99, null, now);
-  await repo.setLiveVersion(mine.id, version.id, now);
-  await repo.setVisibility(mine.id, "PUBLIC", now);
-
-  const publicGames = await repo.listPublic();
-  assert.equal(publicGames.length, 1);
-  assert.equal(publicGames[0]?.id, mine.id);
 });
 
 // Regression (2026-08-18): listAll used to exclude soft-deleted games. That made purgeGame
@@ -431,29 +413,6 @@ test("a soft-deleted game is excluded from findBySlug (the /play/:slug lookup pa
   assert.equal(await repo.findBySlug("vanishing-game"), null);
   // findById stays available — admin tooling and audit trails still need to look it up by id.
   assert.notEqual(await repo.findById(game.id), null);
-});
-
-test("a soft-deleted game is excluded from listPublic even if it was PUBLIC beforehand", async () => {
-  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
-  seedUser(raw, 1, "Dev");
-  const repo = new D1SandboxGameRepository(db);
-  const now = new Date().toISOString();
-
-  const game = await seedGame(repo, "public-then-deleted");
-  const version = await repo.createVersion({
-    gameId: game.id,
-    objectKey: "k",
-    contentHash: "h",
-    bundleBytes: 1,
-    nowIso: now,
-  });
-  await repo.decideVersion(version.id, "APPROVED", 99, null, now);
-  await repo.setLiveVersion(game.id, version.id, now);
-  await repo.setVisibility(game.id, "PUBLIC", now);
-  assert.equal((await repo.listPublic()).length, 1);
-
-  await repo.softDelete(game.id, 99, now);
-  assert.equal((await repo.listPublic()).length, 0);
 });
 
 test("a soft-deleted game stays visible to its own developer via listByDeveloper", async () => {

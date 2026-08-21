@@ -123,12 +123,9 @@ export interface SandboxGameRepository {
    * failure instead of returning a clean SLUG_TAKEN. */
   slugExists(slug: string): Promise<boolean>;
   listByDeveloper(developerUserId: number): Promise<SandboxGameRecord[]>;
-  /** Public catalog surface — visibility = 'PUBLIC' only (implies an approved live version, by
-   * the DB CHECK constraint). */
-  listPublic(): Promise<SandboxGameRecord[]>;
   /** Every game, including soft-deleted ones, regardless of developer or visibility — the
    * admin-facing "browse everything" surface (see SandboxGameUseCases.listAll's doc comment for
-   * why deleted games are deliberately included here, unlike listPublic). */
+   * why deleted games are deliberately included here). */
   listAll(): Promise<SandboxGameRecord[]>;
 
   /**

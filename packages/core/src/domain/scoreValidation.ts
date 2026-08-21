@@ -1,7 +1,7 @@
 /**
  * Pure score/difficulty validation — GamePolicy-in, verdict-out. No registry lookup happens here;
- * a caller (ScoreUseCases) resolves `gameId` to a `GameDefinition` through the injected
- * `GameRegistry` port and passes the pieces this file actually needs.
+ * a caller resolves the game through RuntimeGameRegistry and passes the canonical policy pieces
+ * this file actually needs.
  *
  * This file used to do its own lookup, importing `GAME_MANIFEST_MAP` directly from the generated
  * build-time registry (see git history). That coupled score validation to exactly one registry

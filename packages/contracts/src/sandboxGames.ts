@@ -135,36 +135,6 @@ export const SandboxGameListResponseSchema = z.object({
 });
 export type SandboxGameListResponse = z.infer<typeof SandboxGameListResponseSchema>;
 
-// ── Public-facing (anonymous, no auth) ──
-
-/** Deliberately a narrow subset of SandboxGameRecord — an anonymous player never needs
- * developerUserId, reviewSlot, or any review/publish-internal field. Only ever returned for a
- * game that is currently PUBLIC with a live version (see GET /api/games/sandbox/:slug), so its
- * mere presence in a response already implies "this is live to play". */
-export const SandboxGamePublicDetailSchema = z.object({
-  slug: z.string(),
-  title: z.string(),
-  shortDescription: z.string().nullable(),
-  description: z.string().nullable(),
-  genre: z.string(),
-  mode: SandboxGameModeSchema,
-  /** Whether GET /api/games/sandbox/:slug/logo will actually return an image — see
-   * {@link toSandboxGameRecordResponse} for why the raw storage key never leaves the API.
-   * `false` for a game registered before the logo requirement (2026-08-18); the web catalog falls
-   * back to the site favicon rather than treating that as broken. */
-  hasLogo: z.boolean(),
-});
-export type SandboxGamePublicDetail = z.infer<typeof SandboxGamePublicDetailSchema>;
-
-/** GET /api/games/sandbox — every currently-PUBLIC sandbox game, for the main site catalog
- * (apps/web/app/routes/games.tsx merges this in alongside the built-in GameManifest catalog — see
- * apps/web/app/features/catalog/sandboxGameAdapter.ts). Same narrow, review/publish-internal-free
- * shape as the single-game detail above, just plural. */
-export const SandboxGamePublicListResponseSchema = z.object({
-  games: z.array(SandboxGamePublicDetailSchema),
-});
-export type SandboxGamePublicListResponse = z.infer<typeof SandboxGamePublicListResponseSchema>;
-
 export const SandboxGameDetailResponseSchema = z.object({
   game: SandboxGameRecordSchema,
   versions: z.array(SandboxGameVersionRecordSchema),

@@ -155,10 +155,9 @@ test("GET /api/scores/:gameId includes the registry's title on every row, not th
   assert.equal(body.leaderboard[0]?.gameTitle, "반응속도 테스트");
 });
 
-test("GET /api/scores/:gameId still 400s a creator/unknown gameId even with a DB bound", async () => {
-  // ScoreUseCases has never supported creator score submission, and this route's own gameId gate
-  // (now registry-backed) is what enforces the same rule on the read side — a sandbox slug (which
-  // the registry has never heard of) must not silently return an empty-but-200 leaderboard.
+test("GET /api/scores/:gameId still 400s an unknown gameId even with a DB bound", async () => {
+  // RuntimeGameRegistry resolution is the read-side gate: an unknown slug must not silently return
+  // an empty-but-200 leaderboard.
   const db = createDb([]);
   const res = await requestLeaderboard(db, "/api/scores/some-sandbox-game-slug");
 

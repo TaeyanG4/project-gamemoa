@@ -321,7 +321,7 @@ test("the CSP's frame-ancestors comes from FRONTEND_URL, with no hardcoded host"
 
 /**
  * The CSP is the in-document half of the sandbox (the iframe `sandbox` attribute is the other —
- * see apps/web/app/test/sandboxGameFrame.test.ts). The tests above cover the two directives that
+ * see apps/web/app/test/gameFrameSecurity.test.ts). The tests above cover the two directives that
  * were most obviously load-bearing; this one pins the whole set, because every directive here is
  * doing a specific job and a partial policy would still look "present" to a reviewer:
  * `connect-src 'none'` is what stops an uploaded game phoning home or reaching OwOGG's own API,
@@ -368,27 +368,9 @@ test("the CSP never widens connect-src to allow a game to reach the network", as
   assert.equal(connectSrc, "connect-src 'none'");
 });
 
-test("the legacy /play/:slug/* path serves its entry document with the same CSP", async () => {
-  // This path predates the versioned one and is kept only so an older URL still resolves — but it
-  // serves the same third-party HTML, so it must not be a way to get a document without a policy.
-  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
-  const res = await withStorage({ stored: publishedObjects() }, () =>
-    app.request("/play/live-game/index.html", {}, {
-      DB: db,
-      ...B2_ENV,
-      FRONTEND_URL: "https://www.owogg.com",
-    } as any),
-  );
-
-  assert.equal(res.status, 200);
-  const csp = res.headers.get("Content-Security-Policy") ?? "";
-  assert.match(csp, /connect-src 'none'/);
-  assert.match(csp, /frame-ancestors https:\/\/www\.owogg\.com/);
-});
-
 // ── CORS on public bundle assets (2026-08-18 sandbox-iframe CORS bug) ────────
 //
-// A sandboxed game iframe (no allow-same-origin — see SandboxGameFrame.tsx) sends `Origin: null`
+// A sandboxed game iframe (no allow-same-origin — see GameFrame.tsx) sends `Origin: null`
 // on its own same-document requests, including <script type="module"> fetches, which are always
 // CORS-checked by the browser (unlike a classic script). These routes are public, cookie-free
 // bytes — CORS was never a confidentiality boundary here — so fileResponse answers with a plain
@@ -418,16 +400,6 @@ test("a published asset response never carries Access-Control-Allow-Credentials 
   assert.equal(res.status, 200);
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
   assert.equal(res.headers.get("Access-Control-Allow-Credentials"), null);
-});
-
-test("the legacy /play/:slug/* asset path also carries the wildcard ACAO", async () => {
-  const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
-  const res = await withStorage({ stored: publishedObjects() }, () =>
-    app.request("/play/live-game/Build/game.wasm", {}, { DB: db, ...B2_ENV } as any),
-  );
-
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "*");
 });
 
 test("a non-HTML asset carries no CSP — the policy belongs to the document, not the bytes", async () => {
@@ -629,18 +601,25 @@ test("/play/:slug also fails safe to 404 when B2 is not configured", async () =>
   assert.equal(res.status, 404);
 });
 
-// ── legacy slug-relative asset path ─────────────────────────────────────────
-
-test("the legacy /play/:slug/* asset path still resolves through the live version", async () => {
+test("removed slug-relative and official asset routes stay unavailable", async () => {
   const { db } = createDb({ game: LIVE_GAME, version: LIVE_VERSION });
-  const res = await withStorage({ stored: publishedObjects() }, () =>
-    app.request("/play/live-game/Build/game.wasm", {}, { DB: db, ...B2_ENV } as any),
-  );
+  const stub = createStorageStub({ stored: publishedObjects() });
+  try {
+    const slugRelative = await app.request("/play/live-game/Build/game.wasm", {}, {
+      DB: db,
+      ...B2_ENV,
+    } as any);
+    const official = await app.request("/official-games/reaction-time/legacy-hash/index.html", {}, {
+      DB: db,
+      ...B2_ENV,
+    } as any);
 
-  assert.equal(res.status, 200);
-  assert.equal(res.headers.get("Content-Type"), "application/wasm");
-  // Not immutable: this URL's contents follow whatever version is live.
-  assert.ok(!(res.headers.get("Cache-Control") ?? "").includes("immutable"));
+    assert.equal(slugRelative.status, 404);
+    assert.equal(official.status, 404);
+    assert.deepEqual(stub.requestedKeys, []);
+  } finally {
+    stub.restore();
+  }
 });
 
 // ── the source archive really is a normal zip the publisher can read ────────

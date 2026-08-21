@@ -11,8 +11,8 @@ export interface IframeRuntimeProps {
   frameClassName?: string;
   frameStyle?: React.CSSProperties | undefined;
   iframeStyle?: React.CSSProperties | undefined;
-  /** Bumped by GameHost's retry handler — same convention as LegacyReactRuntime's attemptKey.
-   * Applied as GameFrame's `key`, so a retry fully remounts the iframe (fresh `started`/loading
+  /** Bumped by GameHost's retry handler. Applied as GameFrame's `key`, so a retry fully remounts
+   * the iframe (fresh `started`/loading
    * state, a real reload — not just a Bridge reset) exactly the way "다시 시작" already worked;
    * the Bridge for the previous attempt is torn down in the same effect that reacts to this. */
   attemptKey: number;
@@ -30,12 +30,8 @@ export interface IframeRuntimeProps {
 }
 
 /**
- * The iframe-backed counterpart to runtime/LegacyReactRuntime.tsx — mounts a Bridge-driven game
- * inside GameFrame's existing lazy-mount/sandbox embed and wires the Game Bridge to it.
- *
- * Not wired into GameHost yet, and no game uses it yet — this PR only establishes the runtime
- * itself; see the ball-dodge reference-integration follow-up for when GameHost actually chooses
- * between this and LegacyReactRuntime for a given game.
+ * Mounts a Bridge-driven game inside GameFrame's lazy-mount/sandbox embed and wires the Game
+ * Bridge to it. GameHost is the sole runtime consumer for every publisher.
  */
 export function IframeRuntime({
   src,
