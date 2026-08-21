@@ -49,7 +49,6 @@ export * from "./modules/game/domain/runtimeGame.js";
 export * from "./modules/game/ports/runtimeGameRegistry.js";
 export * from "./modules/game/registry/composedRuntimeGameRegistry.js";
 
-export * from "./repositories/interfaces.js";
 export * from "./application/genericScoreReadUseCases.js";
 export * from "./application/personalizationUseCases.js";
 export * from "./application/identityUseCases.js";

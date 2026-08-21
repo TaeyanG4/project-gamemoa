@@ -11,13 +11,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: here,
-  // Relative, not "/" (Vite's default) — this bundle is served from
-  // official-games/reaction-time/<hash>/, never the origin root, and the exact hash segment is
-  // only known at publish time. A relative base makes index.html reference `./assets/...`, which
-  // resolves correctly under whatever prefix the browser's own base URL happens to be — the same
-  // reasoning gameServing.ts's /play/:slug redirect doc comment gives for why a game's own
-  // relative asset references (not this repo rewriting them) are what make an immutable versioned
-  // path work at all.
+  // Relative, not "/" (Vite's default) — this bundle is served from the immutable generic path
+  // /games/<gameId>/<versionId>/..., never the origin root, and the numeric IDs are only known at
+  // publication/live resolution time. A relative base makes index.html reference `./assets/...`,
+  // which resolves correctly under whatever prefix the browser's own base URL happens to be — the
+  // same reasoning gameServing.ts's /play/:slug redirect doc comment gives for an immutable
+  // versioned path.
   base: "./",
   plugins: [react(), tailwindcss()],
   build: {

@@ -11,10 +11,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: here,
-  // Relative, not "/" (Vite's default) — this bundle is served from
-  // official-games/aim-test/<hash>/, never the origin root, and the exact hash segment is only
-  // known at publish time. A relative base makes index.html reference `./assets/...`, which
-  // resolves correctly under whatever prefix the browser's own base URL happens to be — see
+  // Relative, not "/" (Vite's default) — this bundle is served from the immutable generic path
+  // /games/<gameId>/<versionId>/..., never the origin root. See
   // games/reaction-time/standalone/vite.config.ts's own doc comment for the full reasoning
   // (identical here).
   base: "./",

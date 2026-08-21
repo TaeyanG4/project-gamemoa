@@ -6,13 +6,9 @@
 export const SANDBOX_GAME_VISIBILITIES = ["PRIVATE", "PUBLIC"] as const;
 export type SandboxGameVisibility = (typeof SANDBOX_GAME_VISIBILITIES)[number];
 
-/** Player-count shape, declared by the creator in owogg.game.json's `mode` field (2026-08-18) —
- * mirrors the built-in-game catalog's richer `GameMode` (`"single" | "local-multi" |
- * "online-multi"`, packages/game-sdk) at a coarser grain deliberately: OwOGG runs no server-side
- * game-state relay (see docs/GAME_CREATION_GUIDE.md §3.2.2's explicit non-goals), so a sandbox
- * "multi" game is understood as same-device/local multiplayer, never online — the web app maps
- * "multi" -> "local-multi" when rendering it in the shared catalog grid (see
- * apps/web/app/features/catalog/sandboxGameAdapter.ts). */
+/** Player-count shape declared by the creator in owogg.game.json's `mode` field. The generic
+ * canonical `GENRE_MODE` catalog preserves this coarse `"single" | "multi"` source fact rather
+ * than inventing the built-in taxonomy's richer `"local-multi" | "online-multi"` distinction. */
 export const SANDBOX_GAME_MODES = ["single", "multi"] as const;
 export type SandboxGameMode = (typeof SANDBOX_GAME_MODES)[number];
 

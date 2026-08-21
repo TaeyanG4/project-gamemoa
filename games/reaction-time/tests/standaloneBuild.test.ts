@@ -6,10 +6,10 @@ import { fileURLToPath } from "node:url";
 import { build } from "vite";
 
 /**
- * Verifies the actual build artifact scripts/publish-official-game-bundles.ts zips and publishes
- * — not just that `vite build` exits 0, but that the output is genuinely servable from a nested,
- * version-hashed path (official-games/reaction-time/<hash>/, see gameServing.ts). Runs vite's own
- * JS build API directly (rather than shelling out to `pnpm build`) so this test has no dependency
+ * Verifies the actual standalone build artifact — not just that `vite build` exits 0, but that the
+ * output is genuinely servable from the nested immutable generic path
+ * (`/games/<gameId>/<versionId>/...`, see gameServing.ts). Runs vite's own JS build API directly
+ * (rather than shelling out to `pnpm build`) so this test has no dependency
  * on turbo's task ordering — `test` does not depend on this package's own `build` task (see
  * turbo.json: `test`'s `dependsOn` is only `^build`, upstream packages), so `standalone/dist/`
  * cannot be assumed to already exist when this suite runs.
@@ -32,8 +32,8 @@ test("standalone build produces a relative-path index.html plus JS/CSS bundle as
   assert.ok(scriptSrcs.length > 0, "no <script src> found in built index.html");
   assert.ok(linkHrefs.length > 0, "no <link href> found in built index.html");
 
-  // Relative, not absolute — this bundle is served from official-games/reaction-time/<hash>/,
-  // never the origin root, and the hash segment is only known at publish time (see
+  // Relative, not absolute — this bundle is served from /games/<gameId>/<versionId>/..., never the
+  // origin root, and the numeric IDs are only known at publication/live resolution time (see
   // standalone/vite.config.ts's own doc comment on `base: "./"`). An absolute `/assets/...`
   // reference would 404 in production: the browser would request it against the server ROOT
   // instead of the version-specific directory it actually lives in.

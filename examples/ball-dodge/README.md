@@ -1,9 +1,8 @@
-# ball-dodge — Game Bridge reference integration
+# ball-dodge — Game Bridge 참고 통합
 
-The first Creator game wired to `GameHost` through `IframeRuntime` + the Game Bridge
-(`@owogg/game-sdk/bridge`) instead of the plain iframe embed every other sandbox game still uses.
-Registered and served through the **existing, unmodified** Creator lifecycle
-(upload → review → publish → B2) — nothing about that pipeline changed for this to work.
+이 예제는 `GameHost` → `IframeRuntime` → Game Bridge(`@owogg/game-sdk/bridge`) 경로를 수동으로
+확인하기 위한 업로드 가능한 참고 bundle입니다. 현재 USER 게임과 OWOGG 게임은 동일한 generic
+runtime을 사용하며, USER 게임은 별도의 upload → review → publication 제어 흐름을 유지합니다.
 
 Not the same artifact as
 `apps/api/test/fixtures/game-deploy-smoke-test/ball-dodge/` — that fixture is a deliberately
@@ -39,15 +38,13 @@ Bridge really made it into the bundle.
    `createGameFromBundle` — the same call any Creator upload makes.
 3. As an admin, approve the pending version and set the game's visibility to PUBLIC (same review
    flow as any other Creator game).
-4. Visit `/games/ball-dodge` on the web app. `transitionalCreatorGameResolver` resolves it as a
-   Creator game (via `GET /api/games/ball-dodge`) and renders `CreatorGameHost`, which mounts the
-   bundle through `IframeRuntime`.
+4. Web app에서 `/games/ball-dodge`를 엽니다. Generic public game API가 live version을 해석하고
+   `GameHost`가 `IframeRuntime`과 Bridge를 통해 bundle을 실행합니다.
 5. Click 시작 — confirm `GAME_STARTED` fires (no visible signal by itself, but nothing errors).
-6. Let a ball hit the player. Confirm `GameHost`-styled result overlay appears with the survived
-   seconds as the score and a `ballsSpawned` metadata entry — this is `GAME_COMPLETE` reaching the
-   result UI and stopping exactly there, no score submission/leaderboard/XP call made.
+6. 공이 플레이어와 충돌하게 하고, 생존 시간이 score로 표시되며 `ballsSpawned` metadata가
+   `GAME_COMPLETE`를 통해 결과 UI에 도달하는지 확인합니다. Score acceptance는 signed session과
+   server-side canonical policy를 따릅니다.
 7. Click 다시 시작 — confirm the iframe fully reloads (fresh bridge handshake) and the game is
    playable again.
-8. Visit `/games/reaction-time` (or any of the other three built-in games) and confirm play,
-   difficulty, score submission, and the leaderboard preview all work exactly as before — the
-   SYSTEM path (`GameHost` + `LegacyReactRuntime`) is untouched by this integration.
+8. `/games/reaction-time` 또는 다른 OWOGG 게임을 열어 동일한 `GameHost` → `IframeRuntime` → Bridge
+   경로에서 play, difficulty, score submission, leaderboard preview가 동작하는지 확인합니다.

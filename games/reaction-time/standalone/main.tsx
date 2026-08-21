@@ -4,11 +4,9 @@ import { connectStandaloneBridge } from "./bridgeRuntime.js";
 import "./style.css";
 
 /**
- * The standalone entry point — what actually runs inside the sandboxed iframe on
- * play.owogg.com/official-games/reaction-time/<hash>/index.html, in place of GameHost's
- * LegacyReactRuntime + direct GameProps wiring. games/reaction-time/src/game.tsx itself is
- * imported completely unchanged; only how it's mounted and how its `runtime` prop is constructed
- * differ from the LegacyReactRuntime path.
+ * The standalone entry point that runs inside the sandboxed iframe at the immutable generic path
+ * `/games/<gameId>/<versionId>/index.html`. `GameHost` delegates to `IframeRuntime`, and the Bridge
+ * constructs the `runtime` prop while games/reaction-time/src/game.tsx remains unchanged.
  */
 async function main(): Promise<void> {
   const rootEl = document.getElementById("root");
