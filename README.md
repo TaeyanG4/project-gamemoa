@@ -1,8 +1,8 @@
 # OwOGG
 
-Status: Guide
+상태: 가이드
 
-Last verified: 2026-08-21
+마지막 검증: 2026-08-21
 
 OwOGG는 브라우저에서 바로 실행되는 미니게임 플랫폼입니다. React 기반 웹 셸, Hono 기반 API,
 Cloudflare D1, Backblaze B2를 사용하며 OWOGG 게임과 사용자 업로드 게임을 하나의 generic Game

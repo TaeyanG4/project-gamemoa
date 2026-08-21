@@ -1,10 +1,10 @@
-# OwOGG System Architecture
+# OwOGG 시스템 아키텍처
 
-Status: Authoritative
+상태: 기준 문서
 
-Last verified: 2026-08-21
+마지막 검증: 2026-08-21
 
-Source of truth:
+기준 소스:
 
 - `apps/web/app/`
 - `apps/api/src/`
@@ -67,7 +67,7 @@ Browser
 | -------------------- | ------------------------------------------------------------------------ |
 | `packages/contracts` | Zod 기반 HTTP request/response 계약과 공유 DTO                           |
 | `packages/core`      | 순수 domain model, application service/use case, repository/storage port |
-| `packages/db`        | D1 repository, migration, B2 canonical/bundle adapter                    |
+| `packages/db`        | D1 repository와 migration, B2 canonical/bundle adapter                   |
 | `packages/game-sdk`  | game runtime context와 Host↔Game Bridge protocol/client                  |
 | `packages/shared`    | 앱 간 공유 validation, locale, utility                                   |
 | `packages/ui`        | 공통 React UI와 game shell 요소                                          |
@@ -75,7 +75,7 @@ Browser
 `packages/core`는 Hono, React, Cloudflare/D1 구현에 의존하지 않습니다. `packages/db`는 core port의
 adapter이며 게임 정책이나 생성 registry를 runtime authority로 사용하지 않습니다.
 
-## Generic Game Platform
+## 공통 Game Platform
 
 ```text
 D1
@@ -99,13 +99,13 @@ Publication target은 `(gameId, versionId, contentHash)`입니다. `GamePublicat
 `PUBLISHING`으로 바꾸고 개별 파일을 기록한 뒤 `.owogg-manifest.json`을 마지막에 기록하고, 같은
 target에 대해서만 `READY`를 기록합니다. 실패하거나 일부만 기록된 버전은 제공되지 않습니다.
 
-## USER control plane
+## USER 제어 영역
 
 USER 게임은 generic runtime과 별도로 아래 제어 데이터를 유지합니다.
 
-- `sandbox_games`: developer ownership, review slot, editable control-plane metadata, visibility
+- `sandbox_games`: developer 소유권, review slot, 편집 가능한 control-plane metadata, visibility
 - `sandbox_game_versions`: 원본 archive, 심사 상태, reviewer/reason, upload workflow
-- creator program entitlement, review queue, audit trail, approve/reject/revoke/republish
+- creator 프로그램 자격, review queue, audit trail, approve/reject/revoke/republish
 - 사용자별 동시 심사 slot 최대 2개
 
 Migration trigger와 repository write가 USER identity/version/assets를 generic tables로
@@ -116,7 +116,7 @@ Migration trigger와 repository write가 USER identity/version/assets를 generic
 READY != APPROVED
 ```
 
-## OWOGG bootstrap control plane
+## OWOGG bootstrap 제어 영역
 
 OWOGG 게임은 `games/*` 소스와 `game-registry/*` 입력에서 생성된 `GAME_DEFINITIONS`를 사용합니다.
 배포 중 `pnpm bootstrap:official-games`가 다음을 결정론적으로 보장합니다.
@@ -129,7 +129,7 @@ OWOGG 게임은 `games/*` 소스와 `game-registry/*` 입력에서 생성된 `GA
 이 경로는 USER/sandbox/review row를 만들지 않습니다. Git bootstrap과 향후 interactive
 official-admin publication의 우선순위는 아직 결정되지 않았으며 F-1에서 선택하지 않습니다.
 
-## Runtime과 score 경계
+## runtime과 점수 경계
 
 ```text
 /play/:slug

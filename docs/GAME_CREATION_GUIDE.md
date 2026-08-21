@@ -1,10 +1,10 @@
-# OwOGG Game Creation Guide
+# OwOGG 게임 제작 가이드
 
-Status: Guide
+상태: 가이드
 
-Last verified: 2026-08-21
+마지막 검증: 2026-08-21
 
-Source of truth:
+기준 소스:
 
 - `packages/core/src/domain/sandboxGameBundle.ts`
 - `packages/core/src/domain/sandboxGames.ts`
@@ -45,7 +45,7 @@ Bridge는 일반 RPC가 아닙니다. `HOST_INIT`, `GAME_READY`, `GAME_STARTED`,
 score를 완료 메시지로 보낼 수 있지만, 최종 acceptance는 서버 canonical policy와 signed
 session이 결정합니다.
 
-## 2. OWOGG source 게임
+## 2. OWOGG 소스 게임
 
 OWOGG 소유 게임을 저장소에 추가하는 기본 흐름입니다.
 
@@ -105,7 +105,7 @@ owogg.logo.png | .jpg | .jpeg | .webp | .svg
 `POST /api/dev/games/upload`입니다. 과거 호환용 `POST /api/dev/games`는 남아 있지만 현재 Web UI
 등록 흐름은 ZIP drag-and-drop입니다.
 
-### 3.2 새 version ZIP
+### 3.2 새 버전 ZIP
 
 기존 게임 소유자는 `POST /api/dev/games/:id/versions`에 같은 `bundle` field로 새 standalone
 ZIP을 올립니다. 등록 manifest와 logo는 **새 게임 등록**에 필요한 정보입니다. version upload가
@@ -127,9 +127,9 @@ ZIP을 올립니다. 등록 manifest와 logo는 **새 게임 등록**에 필요�
 절대 경로, drive path, `..`, 비정상 압축 비율, 누락된 `index.html`은 거부됩니다. publication은
 request-time unzip serving을 하지 않고 검증된 파일을 version prefix에 개별 객체로 기록합니다.
 
-## 4. Lifecycle을 혼동하지 않기
+## 4. 생명주기를 혼동하지 않기
 
-### 4.1 Source/upload lifecycle
+### 4.1 소스/업로드 생명주기
 
 ```text
 ZIP receive
@@ -142,7 +142,7 @@ ZIP receive
 USER source archive key는 content-addressed `uploads/<gameId>/<contentHash>.zip`입니다. 공개 파일은
 별도의 version-scoped prefix를 사용합니다.
 
-### 4.2 Generic publication lifecycle
+### 4.2 공통 publication 생명주기
 
 ```text
 (gameId, versionId, contentHash)
@@ -156,7 +156,7 @@ USER source archive key는 content-addressed `uploads/<gameId>/<contentHash>.zip
 관리자는 source archive로 같은 numeric version을 republish할 수 있습니다. release map이나
 manifest-only publication은 현재 구조가 아닙니다.
 
-### 4.3 USER review lifecycle
+### 4.3 USER review 생명주기
 
 ```text
 PENDING_REVIEW
@@ -176,7 +176,7 @@ Publication READY != Moderation APPROVED
 identity, live READY version, valid canonical, kill-switch 상태를 검사하고 USER control plane은
 APPROVED/live/visibility 변경 자격을 관리합니다.
 
-## 5. Runtime serving
+## 5. runtime 제공
 
 ```text
 GET /play/:slug
@@ -191,7 +191,7 @@ GET /play/:slug
 Web의 `GameHost`는 publisher를 보고 다른 host를 고르지 않습니다. public game/session을 가져오고
 `IframeRuntime`을 구성하며 Bridge 완료를 score submission과 결과 UI에 연결합니다.
 
-## 6. Score acceptance
+## 6. 점수 승인
 
 게임 시작 전 API가 exact slug/live version/difficulty에 묶인 signed one-use session을 발급합니다.
 완료 후 server는 다음을 다시 검증합니다.

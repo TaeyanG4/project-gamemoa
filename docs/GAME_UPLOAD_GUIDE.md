@@ -1,10 +1,10 @@
-# OwOGG Game Upload Guide
+# OwOGG 게임 업로드 가이드
 
-Status: Guide
+상태: 가이드
 
-Last verified: 2026-08-21
+마지막 검증: 2026-08-21
 
-Source of truth:
+기준 소스:
 
 - `apps/web/app/features/devApi.ts`
 - `apps/api/src/routes/devGames.ts`
@@ -66,7 +66,7 @@ owogg.logo.<png|jpg|jpeg|webp|svg>
 
 `READY`가 화면에 보이더라도 관리자 승인을 뜻하지 않습니다.
 
-## 4. 새 version 업로드
+## 4. 새 버전 업로드
 
 기존 본인 게임의 상세 화면에서 새 standalone ZIP을 올립니다. API는
 `POST /api/dev/games/:id/versions`이며 field는 동일하게 `bundle`입니다.
@@ -97,7 +97,7 @@ READY != APPROVED
 - `APPROVED`: 승인된 version이지만 실제 public serving에는 live-version/visibility와 generic
   runtime validation도 필요합니다.
 
-## 6. Creator 동작
+## 6. 크리에이터 동작
 
 현재 creator API surface에는 다음 동작이 있습니다.
 
@@ -114,7 +114,7 @@ READY != APPROVED
 `POST /api/dev/games` manual catalog endpoint는 호환을 위해 남아 있지만 현재 UI가 사용하는 등록
 절차가 아닙니다.
 
-## 7. 승인 후 runtime
+## 7. 승인 후 runtime 제공
 
 승인/activation된 게임은 USER 전용 host나 slug storage path로 실행되지 않습니다.
 

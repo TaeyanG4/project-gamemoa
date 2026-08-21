@@ -1,12 +1,12 @@
-# OwOGG Database
+# OwOGG 데이터베이스
 
-Status: Authoritative
+상태: 기준 문서
 
-Last verified: 2026-08-21
+마지막 검증: 2026-08-21
 
-Latest migration: `0033_generic_game_assets.sql`
+최신 마이그레이션: `0033_generic_game_assets.sql`
 
-Source of truth:
+기준 소스:
 
 - `packages/db/migrations/`
 - `packages/db/src/d1/`
@@ -17,21 +17,21 @@ Source of truth:
 Cloudflare D1의 실제 schema와 제약조건은 migration 파일이 유일한 권한 원천입니다. 이 문서는
 현재 `0000_initial_schema.sql`부터 `0033_generic_game_assets.sql`까지의 역할을 설명합니다.
 
-## Migration 범위
+## 마이그레이션 범위
 
-| 범위          | 주제                                                                        |
-| ------------- | --------------------------------------------------------------------------- |
-| `0000`–`0005` | 사용자, 점수, identity/merge, progression                                   |
-| `0006`–`0009` | Discord link, guild, guild XP                                               |
-| `0010`–`0014` | creator profile, metrics, review                                            |
-| `0015`–`0018` | admin auth/accounts, locale, activity streak                                |
-| `0019`–`0023` | game settings, difficulty score, profile visibility, monitoring, moderation |
-| `0024`–`0028` | USER sandbox games, staff/program, soft delete, mode/logo, one-use attempts |
-| `0029`        | generic `games` identity와 USER backfill                                    |
-| `0030`        | USER identity write convergence                                             |
-| `0031`        | generic `game_versions`, slug/live-version invariants, version convergence  |
-| `0032`        | generic score acceptance에 필요한 relational binding                        |
-| `0033`        | generic `game_assets`, USER logo convergence                                |
+| 범위          | 주제                                                                     |
+| ------------- | ------------------------------------------------------------------------ |
+| `0000`–`0005` | 사용자, 점수, identity/merge, progression                                |
+| `0006`–`0009` | Discord link, guild, guild XP                                            |
+| `0010`–`0014` | creator profile, metrics, review                                         |
+| `0015`–`0018` | admin 인증/계정, locale, 활동 연속 기록                                  |
+| `0019`–`0023` | 게임 설정, 난이도 점수, 프로필 공개 범위, 모니터링, moderation           |
+| `0024`–`0028` | USER sandbox game, staff/program, soft delete, mode/logo, 일회성 attempt |
+| `0029`        | generic `games` identity와 USER backfill                                 |
+| `0030`        | USER identity write convergence                                          |
+| `0031`        | 공통 `game_versions`, slug/live-version 불변식, version 수렴             |
+| `0032`        | generic score acceptance에 필요한 relational binding                     |
+| `0033`        | generic `game_assets`, USER logo convergence                             |
 
 기존 migration은 변경, squash, 삭제하지 않습니다. 프로덕션 배포는 API보다 먼저
 `pnpm d1:migrate:prod`를 실행합니다.
@@ -49,7 +49,7 @@ route에서 SQL을 직접 실행하는 것이 기본 구조가 아닙니다. 읽
 mapping은 repository가 담당합니다. B2 canonical/bundle은 D1 row와 별도 저장소이지만 core의
 port를 통해 조합됩니다.
 
-## Generic Game Platform tables
+## 공통 Game Platform 테이블
 
 ### `games`
 
@@ -71,7 +71,7 @@ Publisher-neutral bundle identity와 publication 사실을 저장합니다.
 
 - `id`, `game_id`, source/object identity, `content_hash`, bundle bytes
 - `UPLOADED | PUBLISHING | READY | FAILED`
-- published manifest key, size, file count, timestamps/error
+- publication된 manifest key, 크기, 파일 수, timestamp/error
 
 불변 publication target은 `(gameId, versionId, contentHash)`입니다. `READY`만 runtime 제공 후보가
 되며 live pointer, visibility, kill switch, canonical/manifest validation도 모두 통과해야 합니다.
@@ -81,7 +81,7 @@ Publisher-neutral bundle identity와 publication 사실을 저장합니다.
 게임 단위 provider-neutral 자산 메타데이터입니다. 현재 `LOGO`가 사용되며 object bytes는 B2에
 있습니다. 자산은 game 단위이고 version bundle과 분리됩니다.
 
-## USER control-plane tables
+## USER 제어 영역 테이블
 
 ### `sandbox_games`
 
@@ -98,7 +98,7 @@ USER upload/review workflow의 제어 데이터입니다.
 USER 버전의 심사와 원본 upload 정보를 저장합니다.
 
 - review status: `PENDING_REVIEW | APPROVED | REJECTED | WITHDRAWN`
-- reviewer, reject/revoke reason, audit relationship
+- reviewer, reject/revoke 사유, audit 관계
 - source archive와 publication compatibility fields
 
 USER version은 generic `game_versions`와 같은 숫자 ID를 공유합니다. `0029`–`0033`의 backfill과
@@ -123,7 +123,7 @@ READY != APPROVED
 실패한 publication은 같은 numeric version과 source archive를 사용해 republish할 수 있습니다.
 검토 결정과 publication failure는 별도입니다.
 
-## `0033` logo convergence는 현재 필요함
+## `0033` logo 수렴은 현재 필요함
 
 `0033_generic_game_assets.sql`은 기존 `sandbox_games.logo_key`를 `game_assets(LOGO)`로
 backfill하고 insert/update/clear를 동기화하는 trigger를 추가합니다. 이 compatibility layer는
@@ -138,7 +138,7 @@ UPDATE sandbox_games SET logo_key = ?, updated_at = ? WHERE id = ?
 따라서 trigger 제거, `sandbox_games.logo_key` 제거, migration history 수정은 먼저 write path를
 이전하고 검증하는 별도 작업 없이는 안전하지 않습니다.
 
-## 주요 비게임 domain
+## 주요 비게임 도메인
 
 - **Identity/auth**: `users`, provider identity/link/merge, user/admin sessions, managed admin
   accounts와 permission grants
@@ -152,7 +152,7 @@ UPDATE sandbox_games SET logo_key = ?, updated_at = ? WHERE id = ?
 정확한 column, index, foreign key, trigger는 해당 migration과 `packages/db/src/d1` query를
 확인해야 합니다. 이 문서는 SQL 원문을 복제하지 않습니다.
 
-## Runtime read composition
+## runtime 읽기 조합
 
 Public game은 단일 table만 읽어 완성하지 않습니다.
 

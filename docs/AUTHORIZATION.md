@@ -1,10 +1,10 @@
-# OwOGG Authorization Model
+# OwOGG 인가 모델
 
-Status: Authoritative
+상태: 기준 문서
 
-Last verified: 2026-08-21
+마지막 검증: 2026-08-21
 
-Source of truth:
+기준 소스:
 
 - `packages/core/src/domain/staffRoles.ts`
 - `packages/core/src/domain/gameCreator.ts`
@@ -44,7 +44,7 @@ admin login fallback도 여전히 compatibility 경로로 사용됩니다. 이 f
 `MIGRATE_THEN_DELETE` 대상이지 문서 단계에서 제거할 수 있는 dead code가 아닙니다. 구체적인 secret
 설정 runbook은 현재 저장소에 없으므로 이 문서가 미검증 운영 절차를 대신하지 않습니다.
 
-## Staff roles
+## Staff role
 
 `admin_accounts.role`은 다음 네 값 중 하나입니다.
 
@@ -56,7 +56,7 @@ admin login fallback도 여전히 compatibility 경로로 사용됩니다. 이 f
 역할은 숫자 서열로 비교하지 않습니다. 각 non-ADMIN 역할의 default permission을 독립적으로
 나열합니다.
 
-## Permission catalog와 기본 bundle
+## Permission 목록과 기본 묶음
 
 현재 catalog:
 
@@ -92,7 +92,7 @@ roles.manage
 ADMIN은 표의 bundle을 쓰지 않고 `PERMISSIONS` 전체를 보유합니다. `roles.manage`도 ADMIN의
 암묵적 권한으로만 성립합니다.
 
-## Individual permission grants
+## 개별 permission 부여
 
 유효 permission은 non-ADMIN role default와 `admin_permission_grants`의 합집합입니다.
 SYSTEM_DEVELOPER에게 `admin.center.access`와 필요한 좁은 permission만 추가하는 것이 대표적인
@@ -102,7 +102,7 @@ SYSTEM_DEVELOPER에게 `admin.center.access`와 필요한 좁은 permission만 �
 role이 자신이나 타인의 role/permission을 확대할 수 없습니다. Web에서 메뉴를 숨기는 것은 편의일
 뿐이며 API route가 `requirePermission`으로 다시 검사합니다.
 
-## Protected ADMIN
+## 보호되는 ADMIN
 
 `isProtectedStaffRole(role)`은 `ADMIN`에만 true입니다.
 
@@ -113,7 +113,7 @@ role이 자신이나 타인의 role/permission을 확대할 수 없습니다. We
 이 규칙은 일반 login/logout을 막는 것이 아니라 privilege 관리와 moderation에서 lockout/escalation을
 방지합니다.
 
-## GAME_CREATOR program
+## GAME_CREATOR 프로그램
 
 GAME_CREATOR는 Staff Role이 아닙니다. 일반 사용자에게 game upload/control-plane 사용 자격을 주는
 별도 entitlement입니다.
@@ -126,7 +126,7 @@ Access를 만족하는 현재 경로:
 `MODERATOR`는 implicit access 대상이 아닙니다. Admin/operator의 direct grant/revoke와 신청 승인
 흐름은 persistence/audit를 사용하며 staff role 자체를 변경하지 않습니다.
 
-### Self-service 신청은 현재 닫힘
+### 셀프서비스 신청은 현재 닫힘
 
 현재 코드의 사실은 다음과 같습니다.
 
@@ -150,19 +150,19 @@ OWO_PLUS gate가 아닙니다.
 이 구분 없이 “누구나 신청 가능” 또는 “GAME_CREATOR 프로그램 전체가 비활성”이라고 쓰면 둘 다
 현재 구현과 맞지 않습니다.
 
-## STREAMER/Creator program
+## STREAMER/Creator 프로그램
 
 채널 소유권과 Featured 심사를 다루는 creator/streamer system은 GAME_CREATOR upload entitlement와
 다릅니다. 한 사용자가 둘 다 가질 수 있지만 하나가 다른 하나를 암묵적으로 부여하지 않습니다.
 [Creator System](CREATOR_SYSTEM.md)이 채널 검증의 세부 문서입니다.
 
-## Subscription
+## 구독
 
 OWO_PLUS subscription table/route/contract는 현재 구현되어 있지 않습니다. 미래 subscription을
 GAME_CREATOR 신청 조건으로 사용할지 역시 현재 authorization fact가 아닙니다. 구현 전 proposal을
 현재 정책처럼 기록하지 않습니다.
 
-## Publisher authority
+## 게임 publisher 권한
 
 게임 publisher는 generic `games` identity의 relational authority입니다.
 
@@ -180,7 +180,7 @@ official-admin publication과 bootstrap 중 무엇이 authoritative인지/어떤
 미결정입니다. [Game Platform Architecture](GAME_PLATFORM_ARCHITECTURE.md)의 선택지를 유지하며 F-1은
 정책을 선택하지 않습니다.
 
-## Route별 enforcement 예시
+## route별 권한 검사 예시
 
 - `/api/dev/*`: 일반 session + Game Creator access + ownership/admin 조건
 - `/api/admin/sandbox-games/*`: admin session + `sandbox_games.review` 또는 delete permission

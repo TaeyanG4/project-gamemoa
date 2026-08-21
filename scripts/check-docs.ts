@@ -195,7 +195,7 @@ export function validateMigrationMetadata(repositoryRoot: string): DocsCheckIssu
   }
 
   const markdown = readFileSync(databaseDocument, "utf8");
-  const documentedMigration = markdown.match(/^Latest migration:\s*`([^`]+)`\s*$/m)?.[1];
+  const documentedMigration = markdown.match(/^최신 마이그레이션:\s*`([^`]+)`\s*$/m)?.[1];
   if (documentedMigration === latestMigration) {
     return [];
   }
@@ -204,7 +204,7 @@ export function validateMigrationMetadata(repositoryRoot: string): DocsCheckIssu
     {
       code: "MIGRATION_METADATA_MISMATCH",
       file: "docs/DATABASE.md",
-      message: `Latest migration metadata is ${documentedMigration ?? "missing"}; expected ${latestMigration}`,
+      message: `최신 마이그레이션 metadata는 ${documentedMigration ?? "누락"}이며, 실제 최신 파일은 ${latestMigration}입니다.`,
     },
   ];
 }

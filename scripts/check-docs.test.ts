@@ -67,7 +67,7 @@ test("database metadata follows the latest migration filename", () => {
   const root = createRepository();
   write(root, "packages/db/migrations/0001_first.sql", "-- first\n");
   write(root, "packages/db/migrations/0010_latest.sql", "-- latest\n");
-  write(root, "docs/DATABASE.md", "Latest migration: `0001_first.sql`\n");
+  write(root, "docs/DATABASE.md", "최신 마이그레이션: `0001_first.sql`\n");
 
   assert.equal(
     latestMigrationFilename(path.join(root, "packages/db/migrations")),
@@ -77,7 +77,8 @@ test("database metadata follows the latest migration filename", () => {
     {
       code: "MIGRATION_METADATA_MISMATCH",
       file: "docs/DATABASE.md",
-      message: "Latest migration metadata is 0001_first.sql; expected 0010_latest.sql",
+      message:
+        "최신 마이그레이션 metadata는 0001_first.sql이며, 실제 최신 파일은 0010_latest.sql입니다.",
     },
   ]);
 });

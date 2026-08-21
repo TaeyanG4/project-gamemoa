@@ -54,6 +54,6 @@ JSON / Embed 즉시 응답 (3초 이내)
   컬럼/테이블 없이 이 원장을 그때그때 `SUM(amount)`으로 합산해 계산합니다.
 - `discord_play_contexts`: 1회용 플레이 세션 컨텍스트 (`0008`)
 
-마이그레이션별 현재 schema는 [Database](DATABASE.md)와 실제 migration 파일이 권한 원천입니다.
-과거 Phase 구축 서사와 설치/credential/장애 대응 runbook은 현재 저장소에 없으며, 필요한 운영
+마이그레이션별 현재 schema는 [데이터베이스](DATABASE.md)와 실제 migration 파일이 권한 원천입니다.
+과거 Phase 구축 서사와 설치/자격 증명/장애 대응 운영 절차서는 현재 저장소에 없으며, 필요한 운영
 절차는 별도 운영 문서 단계에서 현재 환경을 검증한 뒤 작성해야 합니다.
