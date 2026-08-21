@@ -289,7 +289,28 @@ export interface TokenRule {
   rule: string;
   tokens: string[];
   extensions: string[];
+  /** Optional repo-relative files within scope; omit to scan the whole scope recursively. */
+  files?: string[];
 }
+
+export interface RequiredTokenRule {
+  file: string;
+  rule: string;
+  tokens: string[];
+}
+
+export const REQUIRED_TOKEN_RULES: RequiredTokenRule[] = [
+  {
+    file: "packages/core/src/application/sandboxGameUseCases.ts",
+    rule: "USER publication must delegate to the provider-neutral publication core",
+    tokens: ["GamePublicationService"],
+  },
+  {
+    file: "packages/core/src/application/officialGameBootstrap.ts",
+    rule: "OWOGG publication must delegate to the provider-neutral publication core",
+    tokens: ["GamePublicationService"],
+  },
+];
 
 export const TOKEN_RULES: TokenRule[] = [
   {
@@ -301,7 +322,27 @@ export const TOKEN_RULES: TokenRule[] = [
   {
     scope: "packages/core/src/application",
     rule: "USER control-plane use cases must depend only on the generic canonical repository",
-    tokens: ["CreatorGameDefinitionRepository", "creator-games/"],
+    tokens: ["CreatorGameDefinitionRepository", "creator-games/", "GameBundlePublisher"],
+    extensions: [".ts"],
+  },
+  {
+    scope: "packages/core/src/application",
+    files: ["officialGameBootstrap.ts"],
+    rule: "official bootstrap must not implement generic object or manifest publication itself",
+    tokens: ["publishedObjectKey", "publishedManifestObjectKey", "buildBundleManifest"],
+    extensions: [".ts"],
+  },
+  {
+    scope: "packages/core/src/application",
+    files: ["gamePublicationService.ts"],
+    rule: "generic publication core must not depend on publisher-specific review records",
+    tokens: [
+      "SandboxGameRepository",
+      "SandboxGameRecord",
+      "SandboxGameVersionRecord",
+      "sandbox_game_versions",
+      "PENDING_REVIEW",
+    ],
     extensions: [".ts"],
   },
   {

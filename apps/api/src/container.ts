@@ -47,7 +47,8 @@ import {
   GameCreatorUseCases,
   SandboxGameUseCases,
   GameScoreAcceptanceUseCases,
-  GameBundlePublisher,
+  GamePublicationService,
+  SandboxGameVersionPublicationRepository,
   ComposedRuntimeGameRegistry,
   RuntimeGameAvailability,
   type UserRepository,
@@ -135,7 +136,7 @@ export interface AppContainer {
   gameCreatorUseCases: GameCreatorUseCases;
   sandboxGameUseCases: SandboxGameUseCases;
   gameScoreAcceptanceUseCases: GameScoreAcceptanceUseCases;
-  gameBundlePublisher: GameBundlePublisher;
+  gamePublicationService: GamePublicationService;
 }
 
 /**
@@ -221,15 +222,15 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     userRepo,
   );
   const gameCreatorUseCases = new GameCreatorUseCases(gameCreatorRepo, userRepo, gameCreatorRepo);
-  const gameBundlePublisher = new GameBundlePublisher(
-    sandboxGameRepo,
+  const gamePublicationService = new GamePublicationService(
+    new SandboxGameVersionPublicationRepository(sandboxGameRepo),
     gameBundleStorageRepo,
     new FflateBundleArchiveReader(),
   );
   const sandboxGameUseCases = new SandboxGameUseCases(
     sandboxGameRepo,
     gameBundleStorageRepo,
-    gameBundlePublisher,
+    gamePublicationService,
     gameCanonicalRepo,
   );
   const gameScoreAcceptanceUseCases = new GameScoreAcceptanceUseCases(
@@ -286,7 +287,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameCreatorUseCases,
     sandboxGameUseCases,
     gameScoreAcceptanceUseCases,
-    gameBundlePublisher,
+    gamePublicationService,
   };
 }
 

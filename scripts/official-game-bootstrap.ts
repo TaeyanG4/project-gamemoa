@@ -3,10 +3,12 @@ import path from "node:path";
 import {
   GAME_DEFINITIONS,
   isSystemGameDefinition,
-  OfficialGameShadowBootstrap,
+  GamePublicationService,
+  OfficialGameBootstrap,
   type GameIdentity,
   type GameVersion,
-  type OfficialGameShadowRepository,
+  type GamePublicationFacts,
+  type OfficialGameBootstrapRepository,
 } from "@owogg/core";
 import {
   BackblazeB2GameBundleRepository,
@@ -61,16 +63,18 @@ export class WranglerRemoteD1Executor implements D1SqlExecutor {
     }>;
     const result = parsed[0];
     if (!result?.success) {
-      throw new Error(`D1 official shadow query failed: ${result?.error?.text ?? "unknown error"}`);
+      throw new Error(
+        `D1 official bootstrap query failed: ${result?.error?.text ?? "unknown error"}`,
+      );
     }
     return result.results ?? [];
   }
 }
 
-/** D1 implementation of B-1's narrow official-only persistence port. Every mutation is scoped to
+/** D1 implementation of the narrow official-only persistence port. Every mutation is scoped to
  * publisher_type = OWOGG and relies on the A-4 D1 guards for slug and same-game live-version
  * authority; it has no code path that inserts a USER/sandbox/review row. */
-export class D1OfficialGameShadowRepository implements OfficialGameShadowRepository {
+export class D1OfficialGameBootstrapRepository implements OfficialGameBootstrapRepository {
   constructor(private readonly sql: D1SqlExecutor) {}
 
   async ensureOwoggIdentity(input: { slug: string; nowIso: string }): Promise<GameIdentity> {
@@ -124,27 +128,19 @@ export class D1OfficialGameShadowRepository implements OfficialGameShadowReposit
     return mapGameVersionRow(rows[0]);
   }
 
-  async retryPublishingVersion(versionId: number): Promise<GameVersion> {
+  async markPublishing(versionId: number): Promise<void> {
     const rows = await this.sql.query(
       `UPDATE game_versions
        SET publish_status = 'PUBLISHING', publish_error = NULL, published_at = NULL,
            manifest_key = NULL, published_size_bytes = NULL, file_count = NULL
        WHERE id = ? AND publish_status <> 'READY'
-       RETURNING id, game_id, object_key, content_hash, bundle_bytes, publish_status, publish_error,
-                 published_at, manifest_key, published_size_bytes, file_count, uploaded_at`,
+       RETURNING id`,
       [versionId],
     );
-    if (!rows[0]) throw new Error(`Official generic version ${versionId} cannot be retried`);
-    return mapGameVersionRow(rows[0]);
+    if (!rows[0]) throw new Error(`Official generic version ${versionId} cannot start publishing`);
   }
 
-  async markVersionReady(input: {
-    versionId: number;
-    publishedAt: string;
-    manifestKey: string;
-    publishedSizeBytes: number;
-    fileCount: number;
-  }): Promise<GameVersion> {
+  async markReady(versionId: number, facts: GamePublicationFacts): Promise<void> {
     const rows = await this.sql.query(
       `UPDATE game_versions
        SET publish_status = 'READY', publish_error = NULL, published_at = ?, manifest_key = ?,
@@ -152,20 +148,12 @@ export class D1OfficialGameShadowRepository implements OfficialGameShadowReposit
        WHERE id = ? AND publish_status = 'PUBLISHING'
        RETURNING id, game_id, object_key, content_hash, bundle_bytes, publish_status, publish_error,
                  published_at, manifest_key, published_size_bytes, file_count, uploaded_at`,
-      [
-        input.publishedAt,
-        input.manifestKey,
-        input.publishedSizeBytes,
-        input.fileCount,
-        input.versionId,
-      ],
+      [facts.publishedAt, facts.manifestKey, facts.publishedSizeBytes, facts.fileCount, versionId],
     );
-    if (!rows[0])
-      throw new Error(`Official generic version ${input.versionId} cannot become READY`);
-    return mapGameVersionRow(rows[0]);
+    if (!rows[0]) throw new Error(`Official generic version ${versionId} cannot become READY`);
   }
 
-  async markVersionFailed(versionId: number, reason: string): Promise<void> {
+  async markFailed(versionId: number, reason: string): Promise<void> {
     await this.sql.query(
       `UPDATE game_versions
        SET publish_status = 'FAILED', publish_error = ?, published_at = NULL, manifest_key = NULL,
@@ -227,10 +215,14 @@ export function createOfficialGenericBundleConsumer(input: {
   b2Config: BackblazeB2Config;
 }): OfficialBundlePreparedConsumer {
   const storage = new BackblazeB2GameBundleRepository(input.b2Config);
-  const bootstrap = new OfficialGameShadowBootstrap(
-    new D1OfficialGameShadowRepository(new WranglerRemoteD1Executor(input.repoRoot)),
+  const repository = new D1OfficialGameBootstrapRepository(
+    new WranglerRemoteD1Executor(input.repoRoot),
+  );
+  const bootstrap = new OfficialGameBootstrap(
+    repository,
     storage,
     new B2GameCanonicalRepository(storage),
+    new GamePublicationService(repository, storage),
   );
   const definitions = new Map(GAME_DEFINITIONS.map((definition) => [definition.slug, definition]));
 
@@ -238,7 +230,7 @@ export function createOfficialGenericBundleConsumer(input: {
     async onBundlePrepared(bundle) {
       const definition = definitions.get(bundle.slug);
       if (!definition || !isSystemGameDefinition(definition)) {
-        throw new Error(`Official shadow bootstrap has no SYSTEM definition for ${bundle.slug}`);
+        throw new Error(`Official bootstrap has no SYSTEM definition for ${bundle.slug}`);
       }
       await bootstrap.bootstrap({
         definition,
@@ -267,6 +259,6 @@ export function renderD1Sql(sql: string, values: readonly SqlValue[]): string {
   return rendered.trimEnd().endsWith(";") ? rendered : `${rendered};`;
 }
 
-export function officialShadowScriptRepoRoot(fromScriptDirectory: string): string {
+export function officialBootstrapScriptRepoRoot(fromScriptDirectory: string): string {
   return path.resolve(fromScriptDirectory, "..");
 }

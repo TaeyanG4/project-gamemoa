@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  D1OfficialGameShadowRepository,
+  D1OfficialGameBootstrapRepository,
   renderD1Sql,
   type D1SqlExecutor,
-} from "./official-game-shadow-bootstrap.js";
+} from "./official-game-bootstrap.js";
 
-test("B-1 remote D1 executor renders bound values safely and always terminates a Wrangler command", () => {
+test("remote D1 executor renders bound values safely and always terminates a Wrangler command", () => {
   assert.equal(
     renderD1Sql("SELECT ? AS text, ? AS number, ? AS nothing", ["O'Reilly", 42, null]),
     "SELECT 'O''Reilly' AS text, 42 AS number, NULL AS nothing;",
@@ -14,7 +14,7 @@ test("B-1 remote D1 executor renders bound values safely and always terminates a
   assert.equal(renderD1Sql("SELECT 1;", []), "SELECT 1;");
 });
 
-test("B-1 D1 identity allocation is OWOGG-only and fails closed for an existing USER slug", async () => {
+test("D1 identity allocation is OWOGG-only and fails closed for an existing USER slug", async () => {
   const calls: string[] = [];
   let inserted = false;
   const executor: D1SqlExecutor = {
@@ -43,7 +43,7 @@ test("B-1 D1 identity allocation is OWOGG-only and fails closed for an existing 
       throw new Error(`unexpected SQL: ${sql}`);
     },
   };
-  const repo = new D1OfficialGameShadowRepository(executor);
+  const repo = new D1OfficialGameBootstrapRepository(executor);
   const identity = await repo.ensureOwoggIdentity({
     slug: "reaction-time",
     nowIso: "2026-08-21T00:00:00.000Z",
@@ -74,10 +74,41 @@ test("B-1 D1 identity allocation is OWOGG-only and fails closed for an existing 
   };
   await assert.rejects(
     () =>
-      new D1OfficialGameShadowRepository(userExecutor).ensureOwoggIdentity({
+      new D1OfficialGameBootstrapRepository(userExecutor).ensureOwoggIdentity({
         slug: "reaction-time",
         nowIso: "2026-08-21T00:00:00.000Z",
       }),
     /authority conflict/,
+  );
+});
+
+test("official D1 publication adapter exposes only generic PUBLISHING/READY/FAILED transitions", async () => {
+  const calls: Array<{ sql: string; values: readonly (string | number | null)[] }> = [];
+  const executor: D1SqlExecutor = {
+    async query<T extends Record<string, unknown>>(
+      sql: string,
+      values: readonly (string | number | null)[] = [],
+    ): Promise<readonly T[]> {
+      calls.push({ sql, values });
+      return sql.includes("RETURNING id") ? ([{ id: 55 }] as unknown as T[]) : [];
+    },
+  };
+  const repo = new D1OfficialGameBootstrapRepository(executor);
+
+  await repo.markPublishing(55);
+  await repo.markReady(55, {
+    publishedAt: "2026-08-21T00:00:00.000Z",
+    manifestKey: "games/9/55/.owogg-manifest.json",
+    publishedSizeBytes: 123,
+    fileCount: 2,
+  });
+  await repo.markFailed(55, "bundle publication failed (Error)");
+
+  assert.match(calls[0]?.sql ?? "", /publish_status = 'PUBLISHING'/);
+  assert.match(calls[1]?.sql ?? "", /publish_status = 'READY'/);
+  assert.match(calls[2]?.sql ?? "", /publish_status = 'FAILED'/);
+  assert.equal(
+    calls.some((call) => /sandbox|review/i.test(call.sql)),
+    false,
   );
 });

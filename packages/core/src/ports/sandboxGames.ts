@@ -304,7 +304,7 @@ export interface BundleArchiveReader {
   /**
    * Cheap, decompression-free pass over the archive's central directory: entry names and their
    * *declared* compressed/uncompressed sizes only, no entry's content bytes are produced. This
-   * exists so `GameBundlePublisher.prepare` can reject an oversized/invalid archive
+   * exists so `GamePublicationService.prepare` can reject an oversized/invalid archive
    * (path/count/declared-size/compression-ratio checks — see domain/sandboxGameBundle.ts's
    * `validateBundleEntryMetadata`) before paying for full decompression: a 20MiB upload can still
    * declare (or genuinely contain) hundreds of megabytes once decompressed, and that must be
@@ -317,7 +317,7 @@ export interface BundleArchiveReader {
     archive: ArrayBuffer,
   ): Array<{ path: string; declaredSize: number; compressedSize: number }>;
   /** Full decompression. Only ever called after readMetadata has already validated the archive —
-   * see GameBundlePublisher.prepare. Throws on a malformed/unreadable archive; the publisher
+   * see GamePublicationService.prepare. Throws on a malformed/unreadable archive; the publisher
    * converts that into BUNDLE_MALFORMED. */
   read(archive: ArrayBuffer): Record<string, Uint8Array>;
 }

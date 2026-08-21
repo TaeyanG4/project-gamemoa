@@ -2,7 +2,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { buildOfficialGameBundles, readB2ConfigFromEnv } from "./official-game-bundle-builder.js";
-import { createOfficialGenericBundleConsumer } from "./official-game-shadow-bootstrap.js";
+import { createOfficialGenericBundleConsumer } from "./official-game-bootstrap.js";
 
 /**
  * Builds every OWOGG standalone iframe bundle deterministically and converges it into generic D1
@@ -13,7 +13,7 @@ import { createOfficialGenericBundleConsumer } from "./official-game-shadow-boot
  * caught by main().catch below, which exits non-zero. In a GitHub Actions job that stops the
  * workflow immediately, so no later Web build/deploy runs against incomplete generic state. See
  * official-game-bundle-builder.ts for deterministic build/hash/validation and
- * official-game-shadow-bootstrap.ts for staged D1/B2 convergence.
+ * official-game-bootstrap.ts for staged D1/B2 convergence.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
