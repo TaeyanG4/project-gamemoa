@@ -1,139 +1,140 @@
-# OwOGG 샌드박스 게임 제작 가이드 (초안)
+# OwOGG Game Upload Guide
 
-> **상태**: 게임 크리에이터(GAME_CREATOR)에게 전달할 내용의 초안입니다. `/wiki` 정식 등록은
-> 보류 중입니다 — 이 저장소의 Wiki 본문은 4개 국어 동시 번역이 원칙이고
-> (`docs/WORK_PROGRESS.md` §3 P3), 대형 Wiki 본문 번역은 **운영자 명시적 지시 시에만 착수**하기로
-> 이미 합의되어 있습니다. 이 문서는 그 전까지 게임 크리에이터에게 링크로 직접 전달하는 용도이며,
-> 지시가 내려오면 그대로 `/wiki/games/development` 콘텐츠(한국어 원문)로 옮기고 번역만 추가하면
-> 됩니다.
+Status: Guide
 
----
+Last verified: 2026-08-21
 
-## 0. 게임 크리에이터가 되려면
+Source of truth:
 
-게임을 업로드하려면 먼저 **게임 크리에이터(GAME_CREATOR) 자격**이 있어야 합니다. 두 가지 방법이
-있습니다:
+- `apps/web/app/features/devApi.ts`
+- `apps/api/src/routes/devGames.ts`
+- `apps/api/src/routes/adminSandboxGames.ts`
+- `packages/core/src/application/sandboxGameUseCases.ts`
+- `packages/core/src/domain/sandboxGameBundle.ts`
 
-- **운영자가 직접 임명**: 신청 없이 운영팀이 바로 자격을 부여하는 기존 방식입니다.
-- **직접 신청**: 로그인 후 [게임 크리에이터 센터](/game-creator)에서 신청서(선택적으로 소개
-  메시지 포함)를 제출하면, 운영팀이 검토 후 승인/반려를 결정합니다. 반려되어도 다시 신청할 수
-  있고, 신청을 제출한 뒤 마음이 바뀌면 언제든 철회할 수 있습니다.
+이 문서는 GAME_CREATOR 자격이 있는 사용자가 현재 Game Creator Center에서 standalone Web 게임을
+등록하고 새 version을 올리는 절차입니다. bundle 규격과 runtime 개발 계약은
+[Game Creation Guide](GAME_CREATION_GUIDE.md)를 먼저 확인하세요.
 
-어느 경로든 승인이 나면 프로필 메뉴와 [게임 크리에이터 센터](/game-creator)에 게임 등록/업로드
-화면이 나타납니다. 이 프로그램이 Staff(운영진) 역할이 아니라는 점, 향후 OwO Plus 구독과의 관계는
-[`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §5~§6에 정리되어 있습니다.
+## 1. 접근 자격
 
----
+로그인만으로 upload할 수 있는 것은 아닙니다. 다음 중 하나가 Game Creator access를 충족합니다.
 
-## 1. 무엇을 올릴 수 있나
+- 활성 `game_creator_access` entitlement
+- `ADMIN`, `OPERATOR`, `SYSTEM_DEVELOPER` staff role의 implicit access
 
-**웹으로 빌드되는 것이면 장르 제약 없이 전부 가능**합니다 — 슈터, 퍼즐, 캐주얼, 액션, 무엇이든
-좋습니다. 유일한 조건은 결과물이 **`index.html`을 진입점으로 갖는 정적 웹 파일 묶음**이어야
-한다는 것입니다.
+`MODERATOR`는 implicit upload access가 없습니다. Self-service 신청은 현재
+`canApplyForGameCreator() === false`로 운영상 닫혀 있습니다. 관리자 직접 grant와 기존/implicit
+access는 계속 동작합니다.
 
-| 제작 환경                 | 내보내기 방법                  |
-| ------------------------- | ------------------------------ |
-| Unity                     | Build Settings → WebGL → Build |
-| Godot                     | Project → Export → HTML5       |
-| Phaser / PixiJS / 순수 JS | 그대로 정적 파일로 배포        |
-| Construct / GDevelop      | HTML5 Export                   |
+## 2. 새 게임 준비
 
-빌드 결과 폴더를 통째로 ZIP으로 압축해서 올리면 됩니다.
+ZIP root에 최소 다음 파일을 둡니다.
 
-**용량 제한 (베타)**: ZIP 1개당 최대 **20MiB**(업로드 시점 압축 크기 기준), 압축을 풀었을 때 총
-**50MiB** 이하, 파일 개수 **300개** 이하. 초과하면 업로드 단계에서 바로 거부됩니다.
-
----
-
-## 2. 호스트와 연동하기 — SDK 2줄
-
-게임이 OwOGG 호스트에게 알려야 할 건 "로딩 끝남"과 "게임 종료 + 점수" 두 가지뿐입니다.
-
-```html
-<script src="https://games.owogg.com/sdk/v1.js"></script>
-<script>
-  OwOGG.ready(); // 로딩 완료 → 호스트가 로딩 스피너 제거
-  OwOGG.submit(1250); // 게임 종료 + 최종 점수 제출
-</script>
+```text
+index.html
+owogg.game.json
+owogg.logo.<png|jpg|jpeg|webp|svg>
 ```
 
-- Unity: `.jslib` 플러그인에서 위 두 함수를 호출
-- Godot: `JavaScriptBridge.eval`로 동일하게 호출
+`owogg.game.json` 예시:
 
-> ⚠️ SDK 스크립트 URL(`games.owogg.com`)은 실제 서빙 도메인이 확정되면 갱신됩니다 — 현재는
-> 인프라 준비 전 임시 표기입니다.
+```json
+{
+  "slug": "my-game",
+  "title": "My Game",
+  "genre": "arcade",
+  "shortDescription": "한 줄 소개",
+  "description": "상세 설명",
+  "mode": "single"
+}
+```
 
----
+- ZIP 안에서 `index.html`이 직접 보이게 압축하는 것이 가장 명확합니다.
+- 모든 CSS/JS/image/WASM 경로는 bundle 안에서 해석되는 상대 경로여야 합니다.
+- source map, 개발 서버 설정, 비밀값, 서버 전용 코드는 넣지 않습니다.
+- 최대 compressed 20 MiB, extracted 50 MiB, 300 files, path depth 16, logo 2 MiB입니다.
 
-## 3. 샌드박스 제약 — 미리 알아두면 좋은 것
+## 3. 새 게임 업로드
 
-여러분의 게임은 **`owogg.com`과 완전히 다른 도메인**, 격리된 `iframe` 안에서 실행됩니다. 이건
-신뢰의 문제가 아니라 모든 업로드 게임에 동일하게 적용되는 구조적 보안 장치입니다. 그래서:
+1. Game Creator Center에서 새 게임 ZIP을 drag-and-drop 합니다.
+2. Web은 `POST /api/dev/games/upload`에 multipart field `bundle`로 전송합니다.
+3. 서버가 manifest/logo/path/size를 검증하고 game과 첫 generic numeric version을 생성합니다.
+4. 원본 ZIP은 retry를 위한 source archive로 보관됩니다.
+5. `GamePublicationService`가 files와 manifest를 B2에 기록합니다.
+6. publication 성공 시 version은 `READY`, review 상태는 `PENDING_REVIEW`입니다.
 
-- **외부 서버와 통신 불가** (`connect-src 'none'`) — 자체 분석 스크립트, 광고 SDK, 외부 API 호출이
-  동작하지 않습니다. 필요한 에셋은 전부 번들 안에 포함하세요.
-- **부모 페이지(OwOGG 세션 쿠키 등) 접근 불가** — 애초에 접근할 이유도, 방법도 없습니다.
-- **포인터 락은 허용**됩니다 — 슈터/1인칭 장르에서 마우스 락이 필요하면 정상 동작합니다.
-- **팝업/새 탭 열기, 최상위 페이지 이동 불가**.
+`READY`가 화면에 보이더라도 관리자 승인을 뜻하지 않습니다.
 
----
+## 4. 새 version 업로드
 
-## 4. 제출 → 심사 → 공개, 세 단계
+기존 본인 게임의 상세 화면에서 새 standalone ZIP을 올립니다. API는
+`POST /api/dev/games/:id/versions`이며 field는 동일하게 `bundle`입니다.
 
-1. **업로드**: [게임 크리에이터 센터](/game-creator)에서 ZIP 최상위에 `owogg.game.json`과
-   로고 이미지 파일을 넣어 둔 번들을 페이지에 끌어다 놓습니다 — 그 한 번으로 게임 등록과 첫 버전
-   업로드가 끝납니다.
-   - `owogg.game.json`: `slug`/`title`/`genre`/`mode`(`"single"` 또는 `"multi"`) 필수,
-     `shortDescription`/`description`은 선택. `mode`가 `"multi"`면 **같은 기기에서 함께 즐기는
-     로컬 멀티플레이**를 뜻합니다(온라인 대전은 지원하지 않음).
-   - 로고: `owogg.logo.png`/`.jpg`/`.jpeg`/`.webp`/`.svg` 중 하나(최대 2MiB) — **필수**입니다.
-     게임 카탈로그 카드의 썸네일로 쓰입니다.
-   - 형식은 [`GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md) §3.6.2 참고. 업로드 직후는
-     본인에게만 보이며, 다른 유저에게는 어디에도 노출되지 않습니다. 이미 등록한 게임에 새 버전을
-     올릴 때는 목록의 "버전 업로드"를 씁니다(이때는 `owogg.game.json`/로고가 필요 없습니다).
-2. **심사(승인/반려)**: 관리자가 실제로 플레이해보고 콘텐츠를 확인합니다. **승인되어도 자동으로
-   공개되지 않습니다** — 승인은 "이 버전은 안전하고 정상 동작한다"는 확인일 뿐입니다.
-3. **공개 전환**: 관리자가 별도로 "공개"로 전환해야 그 순간부터 실제 유저에게 서비스가
-   시작됩니다 — **사이트 메인 게임 카탈로그(`/games`)에도 내장 게임과 함께 노출**되고, 점수 제출도
-   허용됩니다. 재업로드(새 버전)를 올려도 기존에 승인/공개된 버전은 그대로 서비스되며, 새 버전은
-   별도로 재심사를 받습니다.
+- owner 또는 허용된 admin만 접근할 수 있습니다.
+- 새 version은 기존 파일을 덮어쓰지 않고 새 numeric version prefix에 publication됩니다.
+- version upload는 게임 단위 metadata/logo를 자동 변경하지 않습니다.
+- 심사 중인 게임 slot은 사용자별 최대 2개입니다. slot이 모두 사용 중이면 기존 submission을
+  승인/반려/withdraw 처리한 뒤 다시 시도해야 합니다.
 
-**반려되면**: 사유가 함께 통보되며, 문제를 고쳐 새 버전을 다시 업로드하면 됩니다 — 게임 자체가
-삭제되지 않습니다.
+## 5. 상태 읽기
 
-**삭제하려면**: 아직 한 번도 승인된 버전이 없는 자신의 게임은 게임 크리에이터 센터에서 직접
-완전히 삭제할 수 있습니다(되돌릴 수 없음) — 등록을 잘못했거나 다시 만들고 싶을 때 같은 이름으로
-바로 재등록할 수 있습니다. 이미 승인된 게임은 관리자(ADMIN/OPERATOR)만 삭제할 수 있으며, 이
-경우 즉시 비공개로 전환되고 게임 기록은 감사 목적으로 남습니다 — **같은 이름으로는 바로
-재등록되지 않습니다** (슬러그가 계속 예약된 상태로 남기 때문). 같은 이름을 다시 쓰고 싶다면
-관리자에게 문의하세요 — 관리자가 기록을 완전히 지우면(슬러그 재사용 가능) 그때부터 재등록할
-수 있습니다.
+두 상태를 따로 확인합니다.
 
----
+| 축          | 상태                                                  | 의미                 |
+| ----------- | ----------------------------------------------------- | -------------------- |
+| Publication | `UPLOADED`, `PUBLISHING`, `READY`, `FAILED`           | bundle 저장 완전성   |
+| Review      | `PENDING_REVIEW`, `APPROVED`, `REJECTED`, `WITHDRAWN` | USER moderation 결정 |
 
-## 5. 메타데이터와 XP
+```text
+READY != APPROVED
+```
 
-제목/설명/장르/점수 표시 방식(단위·정렬 방향·최소값·최대값) 등은 관리자가 승인 이후에도 자유롭게
-조정할 수 있습니다 — 번들을 다시 올릴 필요가 없습니다. **완료 시 지급되는 XP는 기본값 0이며,
-관리자가 게임별로 직접 설정합니다.** 제작자가 임의로 높은 XP를 요청할 수는 없습니다 — 이건 여러
-게임을 만들어 XP를 부풀리는 것을 막기 위한 장치입니다.
+- `FAILED`: publication retry 대상일 수 있습니다. 관리자 republish는 원본 source archive와 같은
+  version을 사용합니다.
+- `REJECTED`: review 결정이며 publication failure와 다른 축입니다.
+- `WITHDRAWN`: creator가 제출을 철회한 상태입니다.
+- `APPROVED`: 승인된 version이지만 실제 public serving에는 live-version/visibility와 generic
+  runtime validation도 필요합니다.
 
----
+## 6. Creator 동작
 
-## 6. 콘텐츠 정책
+현재 creator API surface에는 다음 동작이 있습니다.
 
-다음은 금지됩니다: 불법 콘텐츠, 혐오/차별 표현, 성인 콘텐츠, 타인의 IP를 침해하는 에셋/텍스트,
-악성 코드나 다른 유저에게 피해를 주는 로직, OwOGG의 전체적인 톤·브랜드와 크게 어긋나는 콘텐츠.
+- `GET /api/dev/me`: access와 application 상태
+- `POST /api/dev/apply`: self-service 신청(현재 policy상 닫힘)
+- `POST /api/dev/apply/:id/withdraw`: 신청 철회
+- `GET /api/dev/games`: 본인 게임 목록
+- `POST /api/dev/games/upload`: ZIP으로 새 게임과 첫 version 등록
+- `GET /api/dev/games/:id`: 본인/admin 상세
+- `POST /api/dev/games/:id/versions`: 새 version upload
+- `POST /api/dev/games/:id/withdraw`: pending version 철회
+- `DELETE /api/dev/games/:id`: 허용되는 미승인 게임 self-delete
 
----
+`POST /api/dev/games` manual catalog endpoint는 호환을 위해 남아 있지만 현재 UI가 사용하는 등록
+절차가 아닙니다.
 
-## 7. 점수 관련 주의사항
+## 7. 승인 후 runtime
 
-제출되는 점수는 클라이언트(브라우저)에서 오는 값이라 위조 자체를 막을 방법은 없습니다. 그래서
-샌드박스 게임의 리더보드는 운영 게임과 별도로 분리되어 운영되며, 이상 징후가 확인되면 해당 게임의
-공개가 철회될 수 있습니다.
+승인/activation된 게임은 USER 전용 host나 slug storage path로 실행되지 않습니다.
 
----
+```text
+/play/:slug
+→ /games/<gameId>/<versionId>/index.html
+→ GameHost → IframeRuntime → Bridge
+```
 
-_더 자세한 기술 설계는 [`docs/GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md) §3을, 권한/신청
-모델은 [`docs/AUTHORIZATION.md`](AUTHORIZATION.md) §5를 참고하세요 (운영자/개발자 내부 문서)._
+bundle URL은 version-scoped immutable 경로입니다. `/official-games/*`, release map,
+`CreatorGameHost`, `transitionalCreatorGameResolver`를 요구하는 가이드는 현재 구현과 맞지 않습니다.
+
+## 8. 오류 확인 순서
+
+- `401`: 로그인 session 확인
+- `403`: Game Creator access 또는 ownership 확인
+- `409`: slug, review slot, lifecycle invariant 등 충돌 확인
+- `413` 또는 bundle rejection: compressed/extracted/logo/file/path 제한 확인
+- `503 GAME_BUNDLES_NOT_CONFIGURED`: 해당 환경의 B2 binding 문제이며 bundle 내용 문제가 아님
+- `FAILED`: 관리자 republish 대상인지 publication error 확인
+
+운영자가 수행하는 approve/reject/revoke/republish/live/visibility 조작은 creator가 직접 호출하는
+API가 아닙니다. 권한 경계는 [Authorization](AUTHORIZATION.md)을 참조하세요.

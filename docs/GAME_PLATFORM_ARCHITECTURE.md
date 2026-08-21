@@ -1,5 +1,22 @@
 # OwOGG Game Platform Architecture
 
+Status: Authoritative
+
+Last verified: 2026-08-21
+
+Source of truth:
+
+- `packages/core/src/modules/game/`
+- `packages/core/src/application/gamePublicationService.ts`
+- `packages/core/src/application/officialGameBootstrap.ts`
+- `apps/api/src/routes/games.ts`
+- `apps/api/src/routes/gameServing.ts`
+- `apps/web/app/features/game/GameHost.tsx`
+- `packages/db/migrations/0029_unified_game_identity.sql`
+- `packages/db/migrations/0031_game_version_write_convergence.sql`
+- `packages/db/migrations/0032_generic_score_acceptance.sql`
+- `packages/db/migrations/0033_generic_game_assets.sql`
+
 이 문서는 현재 production의 게임 identity, publication, runtime, score 경계를 설명합니다. USER와
 OWOGG는 같은 runtime/storage 모델을 사용하지만 authorization과 publication control plane은 서로
 다릅니다.
@@ -67,7 +84,7 @@ choose and specify one of these models before such an API is implemented:
 - **Option C — Explicit provenance and precedence:** persist publication provenance/authority and
   define deterministic conflict and activation precedence.
 
-E-3 records these options but does not select or implement one.
+This document records these options but does not select or implement one.
 
 ## Known scalability debt
 

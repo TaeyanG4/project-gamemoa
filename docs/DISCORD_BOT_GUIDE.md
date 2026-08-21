@@ -52,5 +52,6 @@ OwOGG Discord 연동은 상시 구동 WebSocket 데몬(Gateway) 없이 **Discord
 - **계정 연동 오류 (`이미 연동된 계정`)**:
   - 다른 OwOGG 계정에 이미 해당 Discord 계정이 연결되어 있는 경우 발생하며, 프로필 설정에서 기존 연동을 해제하거나 계정 통합(Merge)을 진행해야 합니다.
 
-Worker 환경변수, Developer Portal 설정, 명령어 등록/드리프트 점검, 그 외 장애 진단 절차는
-[`docs/runbooks/discord-bot-ops.md`](runbooks/discord-bot-ops.md)에 정리되어 있습니다.
+Worker 환경변수, Developer Portal 설정, 명령어 등록/드리프트 점검, 장애 진단을 다루는 검증된
+운영 runbook은 현재 저장소에 없습니다. 실제 credential과 운영 절차는 별도 운영 문서 단계에서
+작성해야 합니다.
