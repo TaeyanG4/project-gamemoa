@@ -1,6 +1,8 @@
 import type { BundleArchiveReader, GameBundleStorageRepository } from "../ports/sandboxGames.js";
 import {
   buildBundleManifest,
+  isSha256ContentHash,
+  isValidSandboxGameBundleManifest,
   prepareBundleFromArchive,
   publishedManifestObjectKey,
   publishedObjectKey,
@@ -10,6 +12,7 @@ import {
 } from "../domain/sandboxGameBundle.js";
 import type {
   GamePublicationFacts,
+  GamePublicationTarget,
   GameVersionPublicationRepository,
 } from "../modules/game/ports/gameVersionPublicationRepository.js";
 
@@ -30,19 +33,24 @@ export class GamePublicationService {
     return prepareBundleFromArchive(this.archives, archive);
   }
 
-  async publish(input: {
-    gameId: number;
-    versionId: number;
-    contentHash: string;
-    prepared: PreparedBundle;
-    publishedAt: string;
-  }): Promise<GamePublicationFacts> {
-    await this.versions.markPublishing(input.versionId);
+  async publish(
+    input: GamePublicationTarget & {
+      prepared: PreparedBundle;
+      publishedAt: string;
+    },
+  ): Promise<GamePublicationFacts> {
+    const target: GamePublicationTarget = {
+      gameId: input.gameId,
+      versionId: input.versionId,
+      contentHash: input.contentHash,
+    };
+    assertPublicationTarget(target);
+    await this.versions.markPublishing(target);
 
     try {
       for (const file of input.prepared.files) {
         await this.storage.putObject({
-          key: publishedObjectKey(input.gameId, input.versionId, file.path),
+          key: publishedObjectKey(target.gameId, target.versionId, file.path),
           bytes: file.bytes,
           contentType: file.contentType,
           contentEncoding: file.contentEncoding,
@@ -50,15 +58,15 @@ export class GamePublicationService {
       }
 
       const manifest = buildBundleManifest({
-        gameId: input.gameId,
-        versionId: input.versionId,
-        contentHash: input.contentHash,
+        gameId: target.gameId,
+        versionId: target.versionId,
+        contentHash: target.contentHash,
         prepared: input.prepared,
         publishedAt: input.publishedAt,
       });
       const facts: GamePublicationFacts = {
         publishedAt: input.publishedAt,
-        manifestKey: publishedManifestObjectKey(input.gameId, input.versionId),
+        manifestKey: publishedManifestObjectKey(target.gameId, target.versionId),
         publishedSizeBytes: manifest.totalSize,
         fileCount: manifest.fileCount,
       };
@@ -67,17 +75,17 @@ export class GamePublicationService {
         bytes: new TextEncoder().encode(JSON.stringify(manifest)),
         contentType: "application/json; charset=utf-8",
       });
-      await this.versions.markReady(input.versionId, facts);
+      await this.versions.markReady(target, facts);
       return facts;
     } catch (error) {
-      await this.recordFailure(input.versionId, error);
+      await this.recordFailure(target, error);
       throw error;
     }
   }
 
   /** Used by a control plane when a pre/post-publication step fails outside the bundle engine. */
-  async recordFailure(versionId: number, error: unknown): Promise<void> {
-    await this.versions.markFailed(versionId, describePublicationFailure(error)).catch(() => {});
+  async recordFailure(target: GamePublicationTarget, error: unknown): Promise<void> {
+    await this.versions.markFailed(target, describePublicationFailure(error)).catch(() => {});
   }
 
   async readManifest(manifestKey: string | null): Promise<SandboxGameBundleManifest | null> {
@@ -85,20 +93,29 @@ export class GamePublicationService {
     const bytes = await this.storage.getObject(manifestKey);
     if (!bytes) return null;
     try {
-      return JSON.parse(new TextDecoder().decode(bytes)) as SandboxGameBundleManifest;
+      const parsed: unknown = JSON.parse(new TextDecoder().decode(bytes));
+      return isValidSandboxGameBundleManifest(parsed) ? parsed : null;
     } catch {
       return null;
     }
   }
 
   /** Generic GC primitive; source archive lifecycle remains a control-plane concern. */
-  async deletePublishedVersion(input: {
-    gameId: number;
-    versionId: number;
-    manifestKey: string | null;
-  }): Promise<void> {
+  async deletePublishedVersion(
+    input: GamePublicationTarget & {
+      manifestKey: string | null;
+    },
+  ): Promise<void> {
+    assertPublicationTarget(input);
     const manifest = await this.readManifest(input.manifestKey);
     if (manifest) {
+      if (
+        manifest.gameId !== input.gameId ||
+        manifest.versionId !== input.versionId ||
+        manifest.contentHash !== input.contentHash
+      ) {
+        throw new Error("Published manifest does not match deletion target");
+      }
       for (const file of manifest.files) {
         await this.storage.deleteObject(
           publishedObjectKey(input.gameId, input.versionId, file.path),
@@ -106,7 +123,19 @@ export class GamePublicationService {
       }
     }
     if (input.manifestKey) await this.storage.deleteObject(input.manifestKey);
-    await this.versions.markFailed(input.versionId, "published objects deleted");
+    await this.versions.markFailed(input, "published objects deleted");
+  }
+}
+
+function assertPublicationTarget(target: GamePublicationTarget): void {
+  if (
+    !Number.isInteger(target.gameId) ||
+    target.gameId <= 0 ||
+    !Number.isInteger(target.versionId) ||
+    target.versionId <= 0 ||
+    !isSha256ContentHash(target.contentHash)
+  ) {
+    throw new Error("Invalid game publication target");
   }
 }
 

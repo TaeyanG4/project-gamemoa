@@ -4,17 +4,21 @@ import {
   GamePublicationService,
   describePublicationFailure,
 } from "../src/application/gamePublicationService.js";
-import type { GameBundleStorageRepository } from "../src/ports/sandboxGames.js";
-import type {
-  GamePublicationFacts,
-  GameVersionPublicationRepository,
-} from "../src/modules/game/ports/gameVersionPublicationRepository.js";
 import type { PreparedBundle } from "../src/domain/sandboxGameBundle.js";
 import { buildBundleManifest } from "../src/domain/sandboxGameBundle.js";
+import type {
+  GamePublicationFacts,
+  GamePublicationTarget,
+  GameVersionPublicationRepository,
+} from "../src/modules/game/ports/gameVersionPublicationRepository.js";
+import type { GameBundleStorageRepository } from "../src/ports/sandboxGames.js";
+
+const HASH_A = "a".repeat(64);
+const TARGET: GamePublicationTarget = { gameId: 12, versionId: 34, contentHash: HASH_A };
 
 const prepared: PreparedBundle = {
   entry: "index.html",
-  totalSize: 16,
+  totalSize: 15,
   files: [
     {
       path: "index.html",
@@ -33,21 +37,30 @@ function stateRepository(): GameVersionPublicationRepository & {
   states: string[];
   readyFacts: GamePublicationFacts | null;
   failure: string | null;
+  failReadyOnce: boolean;
 } {
   return {
     states: [],
     readyFacts: null,
     failure: null,
-    async markPublishing() {
+    failReadyOnce: false,
+    async markPublishing(target) {
+      assert.deepEqual(target, TARGET);
       this.states.push("PUBLISHING");
       this.readyFacts = null;
       this.failure = null;
     },
-    async markReady(_versionId, facts) {
+    async markReady(target, facts) {
+      assert.deepEqual(target, TARGET);
       this.states.push("READY");
+      if (this.failReadyOnce) {
+        this.failReadyOnce = false;
+        throw new Error("READY transition failed");
+      }
       this.readyFacts = facts;
     },
-    async markFailed(_versionId, reason) {
+    async markFailed(target, reason) {
+      assert.deepEqual(target, TARGET);
       this.states.push("FAILED");
       this.failure = reason;
     },
@@ -65,8 +78,9 @@ function storage(): GameBundleStorageRepository & {
     failKey: null,
     async putObject(input) {
       this.writes.push(input.key);
-      if (input.key === this.failKey)
+      if (input.key === this.failKey) {
         throw new Error(`provider request failed: ${"x".repeat(300)}`);
+      }
       const bytes = input.bytes instanceof Uint8Array ? input.bytes : new Uint8Array(input.bytes);
       this.objects.set(input.key, bytes);
     },
@@ -87,9 +101,7 @@ test("publishes numeric generic paths, writes manifest last, and records exact R
   const objects = storage();
   const service = new GamePublicationService(states, objects);
   const facts = await service.publish({
-    gameId: 12,
-    versionId: 34,
-    contentHash: "hash-abc",
+    ...TARGET,
     prepared,
     publishedAt: "2026-08-21T00:00:00.000Z",
   });
@@ -115,18 +127,31 @@ test("publishes numeric generic paths, writes manifest last, and records exact R
     serializedManifest,
     JSON.stringify(
       buildBundleManifest({
-        gameId: 12,
-        versionId: 34,
-        contentHash: "hash-abc",
+        ...TARGET,
         prepared,
         publishedAt: "2026-08-21T00:00:00.000Z",
       }),
     ),
   );
-  const manifest = JSON.parse(serializedManifest) as Record<string, unknown>;
-  assert.equal(manifest.gameId, 12);
-  assert.equal(manifest.versionId, 34);
-  assert.equal(manifest.contentHash, "hash-abc");
+});
+
+test("a mismatched publication target is rejected before any B2 file write", async () => {
+  const states = stateRepository();
+  const objects = storage();
+  const service = new GamePublicationService(states, objects);
+
+  await assert.rejects(
+    () =>
+      service.publish({
+        ...TARGET,
+        gameId: 99,
+        prepared,
+        publishedAt: "2026-08-21T00:00:00.000Z",
+      }),
+    /Expected values to be strictly deep-equal/,
+  );
+  assert.deepEqual(objects.writes, []);
+  assert.deepEqual(states.states, []);
 });
 
 test("a file failure never writes a manifest or READY state and stores a bounded safe reason", async () => {
@@ -137,9 +162,7 @@ test("a file failure never writes a manifest or READY state and stores a bounded
 
   await assert.rejects(() =>
     service.publish({
-      gameId: 12,
-      versionId: 34,
-      contentHash: "hash-abc",
+      ...TARGET,
       prepared,
       publishedAt: "2026-08-21T00:00:00.000Z",
     }),
@@ -157,9 +180,7 @@ test("a manifest failure remains non-READY and retry converges on the same numer
   objects.failKey = manifestKey;
   const service = new GamePublicationService(states, objects);
   const input = {
-    gameId: 12,
-    versionId: 34,
-    contentHash: "hash-abc",
+    ...TARGET,
     prepared,
     publishedAt: "2026-08-21T00:00:00.000Z",
   };
@@ -172,6 +193,56 @@ test("a manifest failure remains non-READY and retry converges on the same numer
   assert.equal(facts.manifestKey, manifestKey);
   assert.deepEqual(states.states, ["PUBLISHING", "FAILED", "PUBLISHING", "READY"]);
   assert.ok(objects.objects.has(manifestKey));
+});
+
+test("a READY transition failure is reported and retry remains on the same numeric version", async () => {
+  const states = stateRepository();
+  const objects = storage();
+  states.failReadyOnce = true;
+  const service = new GamePublicationService(states, objects);
+  const input = {
+    ...TARGET,
+    prepared,
+    publishedAt: "2026-08-21T00:00:00.000Z",
+  };
+
+  await assert.rejects(() => service.publish(input), /READY transition failed/);
+  assert.deepEqual(states.states, ["PUBLISHING", "READY", "FAILED"]);
+
+  await service.publish(input);
+  assert.deepEqual(states.states, ["PUBLISHING", "READY", "FAILED", "PUBLISHING", "READY"]);
+});
+
+test("readManifest accepts only the strict existing bundle-manifest contract", async () => {
+  const states = stateRepository();
+  const objects = storage();
+  const service = new GamePublicationService(states, objects);
+  const manifestKey = "games/12/34/.owogg-manifest.json";
+  const valid = buildBundleManifest({
+    ...TARGET,
+    prepared,
+    publishedAt: "2026-08-21T00:00:00.000Z",
+  });
+
+  const store = (value: unknown) => {
+    objects.objects.set(manifestKey, new TextEncoder().encode(JSON.stringify(value)));
+  };
+
+  store(valid);
+  assert.deepEqual(await service.readManifest(manifestKey), JSON.parse(JSON.stringify(valid)));
+
+  for (const malformed of [
+    { ...valid, contentHash: "not-a-sha256" },
+    { ...valid, fileCount: valid.fileCount + 1 },
+    { ...valid, totalSize: valid.totalSize + 1 },
+    { ...valid, publishedAt: "not-a-timestamp" },
+    { ...valid, entry: "../index.html" },
+    { ...valid, files: [{ ...valid.files[0], path: "../escape.js" }, valid.files[1]] },
+    { ...valid, files: "not-an-array" },
+  ]) {
+    store(malformed);
+    assert.equal(await service.readManifest(manifestKey), null);
+  }
 });
 
 test("failure normalization never exposes arbitrary non-Error text", () => {

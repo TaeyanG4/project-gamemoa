@@ -240,3 +240,29 @@ test("E-2 publication convergence guards both callers and keeps generic core pub
   assert.ok(genericCore?.tokens.includes("SandboxGameVersionRecord"));
   assert.ok(genericCore?.tokens.includes("PENDING_REVIEW"));
 });
+
+test("E-3 guards exact publication targets and publisher-specific authority boundaries", () => {
+  const targetCore = REQUIRED_TOKEN_RULES.find((rule) =>
+    rule.file.endsWith("gamePublicationService.ts"),
+  );
+  const userTarget = REQUIRED_TOKEN_RULES.find((rule) =>
+    rule.file.endsWith("sandboxGameVersionPublicationRepository.ts"),
+  );
+  const officialTarget = REQUIRED_TOKEN_RULES.find((rule) =>
+    rule.file.endsWith("official-game-bootstrap.ts"),
+  );
+  const userAuthority = TOKEN_RULES.find((rule) =>
+    rule.files?.includes("sandboxGameVersionPublicationRepository.ts"),
+  );
+  const officialAuthority = TOKEN_RULES.find(
+    (rule) => rule.scope === "scripts" && rule.tokens.includes("sandbox_game_versions"),
+  );
+
+  assert.ok(targetCore?.tokens.includes("GamePublicationTarget"));
+  assert.ok(targetCore?.tokens.includes("markReady(target, facts)"));
+  assert.ok(userTarget?.tokens.includes("version.gameId !== target.gameId"));
+  assert.ok(userTarget?.tokens.includes("version.contentHash !== target.contentHash"));
+  assert.ok(officialTarget?.tokens.includes("id = ? AND game_id = ? AND content_hash = ?"));
+  assert.ok(userAuthority?.tokens.includes('type: "OWOGG"'));
+  assert.ok(officialAuthority?.tokens.includes("sandbox_games"));
+});
