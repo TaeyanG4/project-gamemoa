@@ -8,9 +8,6 @@ import {
   PublicGameAvailabilityResponseSchema,
   PublicGameListResponseSchema,
   PublicGameSchema,
-  SandboxGamePublicDetailSchema,
-  SandboxGamePublicListResponseSchema,
-  toSandboxGameRecordResponse,
 } from "@owogg/contracts";
 import {
   GAME_SESSION_POLICY,
@@ -64,68 +61,11 @@ gamesRouter.get("/availability", edgeCache({ ttlSeconds: 60 }), async (c) => {
   return c.json(PublicGameAvailabilityResponseSchema.parse({ disabledGameIds }), 200);
 });
 
-// GET /api/games/sandbox/:slug — public, no auth. The one piece of sandbox-game metadata a
-// player-facing page needs (title/description/genre) before they hit PLAY, without exposing
-// anything review/publish-internal. Reuses resolveLiveVersion — the exact same PUBLIC +
-// live-version gate the actual bundle-serving routes use (apps/api/src/routes/gameServing.ts) —
-// so this can never say "found" for a game a player couldn't actually then go play. Same
-// can't-distinguish-unknown-from-private 404 shape as everywhere else in the sandbox game surface.
-gamesRouter.get("/sandbox/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
-  if (!c.env?.DB) return c.text("Not Found", 404);
-
-  const { sandboxGameUseCases } = createContainer(c.env.DB);
-  const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
-  if (!resolved) return c.text("Not Found", 404);
-
-  return c.json(
-    SandboxGamePublicDetailSchema.parse(toSandboxGameRecordResponse(resolved.game)),
-    200,
-  );
-});
-
-// GET /api/games/sandbox — every currently-PUBLIC sandbox game, for the main site catalog (see
-// apps/web/app/features/catalog/sandboxGameAdapter.ts, which merges this into the built-in-game
-// grid on /games and the home page). Same 60s edge cache as the single-game route above — this
-// list changes only when an admin approves/publishes/unpublishes a game.
-gamesRouter.get("/sandbox", edgeCache({ ttlSeconds: 60 }), async (c) => {
-  if (!c.env?.DB) return c.json(SandboxGamePublicListResponseSchema.parse({ games: [] }), 200);
-
-  const { sandboxGameUseCases } = createContainer(c.env.DB);
-  const games = await sandboxGameUseCases.listPublic();
-
-  return c.json(
-    SandboxGamePublicListResponseSchema.parse({
-      games: games.map((game) => toSandboxGameRecordResponse(game)),
-    }),
-    200,
-  );
-});
-
-// GET /api/games/sandbox/:slug/logo — public, no auth. The actual logo image bytes, served
-// separately from the JSON detail route above so the web catalog can point a plain <img src>
-// straight at this URL. Never returns a raw storage key to any client — see
-// SandboxGameUseCases.resolvePublicLogo and SandboxGameRecordSchema's `hasLogo` transform.
-// Long-lived cache: the logo is set once at registration and there is currently no route to
-// change it afterward, so there is nothing to invalidate.
-gamesRouter.get("/sandbox/:slug/logo", edgeCache({ ttlSeconds: 3600 }), async (c) => {
-  if (!c.env?.DB) return c.text("Not Found", 404);
-
-  const { sandboxGameUseCases } = createContainer(c.env.DB, readB2Config(c.env));
-  const resolved = await sandboxGameUseCases.resolvePublicLogo(c.req.param("slug"));
-  if (!resolved) return c.text("Not Found", 404);
-
-  return new Response(resolved.bytes, {
-    status: 200,
-    headers: { "Content-Type": resolved.contentType, "Cache-Control": "public, max-age=3600" },
-  });
-});
-
 // ── Generic public Game read model ───────────────────────────────────────────
 //
 // Generic D1 identity + live READY version + strict B2 canonical is the sole public authority.
-// Legacy sandbox routes above remain compatibility surfaces, but the primary catalog/detail path
-// never merges StaticGameRegistry with sandbox metadata and never falls back when generic state
-// is incomplete.
+// The catalog/detail path never merges sandbox control-plane metadata and never falls back when
+// generic state is incomplete.
 
 async function publicGameProjection(
   c: Context<ApiEnv>,

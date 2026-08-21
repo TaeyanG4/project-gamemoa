@@ -35,22 +35,11 @@ on:
       # typing-test/reaction-time would fail that build too.
       - "games/**"
       # Every package here is a real, verified dependency: contracts/core/game-sdk/shared/ui are
-      # all direct deps of apps/web; core is also imported directly by
-      # prepareLocalGameOrigin.ts (sha256Hex, GAME_MANIFESTS); db is pulled in transitively the
-      # moment that same file imports writeReleaseMap from
-      # scripts/official-game-bundle-publisher.ts, which imports BackblazeB2GameBundleRepository
-      # at module load time even though this harness never calls it.
+      # all direct deps of apps/web.
       - "packages/**"
       # The harness itself — prepare/run scripts, Playwright config, fixtures/, the spec files.
       - "e2e/**"
-      # The exact four scripts/ files this pipeline actually imports/executes, not the whole
-      # directory: official-game-bundle-publisher.ts (writeReleaseMap — see
-      # prepareLocalGameOrigin.ts), registry-builder.ts (renderCoreRegistryModule — same file,
-      # same reason: this is how the two synthetic E2E-only games get appended to a *temporary*
-      # copy of the real registry without a hand-written second template), and
-      # prepare-web-build.ts/post-web-build.ts (apps/web's own "build" script runs both around
-      # react-router build).
-      - "scripts/official-game-bundle-publisher.ts"
+      # Build hooks executed by apps/web's own build script.
       - "scripts/registry-builder.ts"
       - "scripts/prepare-web-build.ts"
       - "scripts/post-web-build.ts"

@@ -3,10 +3,8 @@
 // Compiled from game-registry/games/<slug>/{info,policy}.json. Edit those files, then run
 // `pnpm generate:registry`; `pnpm registry:check` fails the build if this drifts from them.
 //
-// SYSTEM-owned games only. The composition root wires this into StaticGameRegistry
-// (apps/api/src/container.ts), which ScoreUseCases/GameSettingsUseCases resolve games through —
-// GAME_MANIFESTS (gameRegistry.generated.ts) remains the source for everything not yet moved
-// onto that port.
+// SYSTEM-owned source definitions only. Production runtime authority is generic D1/B2; this
+// generated file feeds deterministic OWOGG bootstrap and build-time parity checks.
 import type { GameDefinition } from "../modules/game/domain/gameDefinition.js";
 
 export const GAME_DEFINITIONS: GameDefinition[] = [

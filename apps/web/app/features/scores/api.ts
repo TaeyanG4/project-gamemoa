@@ -97,7 +97,7 @@ export async function fetchLeaderboardApi(
   const list = data.leaderboard || [];
 
   // gameTitle is resolved server-side now (apps/api/src/routes/scores.ts, off the same
-  // GameRegistry the leaderboard query itself used) — no second request and no direct import of
+  // RuntimeGameRegistry the leaderboard query itself used) — no second request and no direct import of
   // core's generated registry needed here. Falls back to the raw gameId only for a response from
   // an old cached edge response predating this field, or a malformed one; not expected in
   // practice, since the schema always resolves an id.

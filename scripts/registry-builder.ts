@@ -20,8 +20,8 @@ export interface GameEntry {
 export interface RegistryBuildResult {
   coreRegistryCode: string;
   webLoaderCode: string;
-  /** `GAME_DEFINITIONS`, built from game-registry/. Generated and checked in; the composition
-   * root wires it into StaticGameRegistry (apps/api/src/container.ts) — see loadGameDefinitions. */
+  /** `GAME_DEFINITIONS`, built from game-registry/. Generated and checked in as official generic
+   * bootstrap/source metadata — see loadGameDefinitions. */
   gameDefinitionsCode: string;
   gameEntries: GameEntry[];
   definitions: GameDefinition[];
@@ -30,11 +30,10 @@ export interface RegistryBuildResult {
 /**
  * Reads `game-registry/games/<slug>/{info,policy}.json` into validated GameDefinitions.
  *
- * This directory is the canonical description of SYSTEM-owned games. It does feed the runtime —
- * the composition root wires `StaticGameRegistry(GAME_DEFINITIONS)` as the `GameRegistry`
- * ScoreUseCases/GameSettingsUseCases resolve games through (apps/api/src/container.ts) —
- * alongside `GAME_MANIFESTS` (built from `games/*​/src/manifest.ts`, below), which everything not
- * yet moved onto that port still reads directly. Both are generated here so that
+ * This directory is the build/source description of SYSTEM-owned games. Production runtime
+ * authority is generic D1/B2; `GAME_DEFINITIONS` feeds official bootstrap and `GAME_MANIFESTS`
+ * (built from `games/*​/src/manifest.ts`, below) feeds source tooling. Both are generated here so
+ * that
  * assertDefinitionsMatchManifests can hold them to agreement on every build; that agreement is
  * what makes switching the remaining consumers over later a small change instead of a leap of
  * faith.
@@ -187,9 +186,8 @@ function diffDefinitionAgainstManifest(
 /**
  * Pure string-rendering half of the core manifest registry — separated from `buildRegistrySources`
  * (which reads `games/*` off disk, writes the result to `packages/core/src/registry/
- * gameRegistry.generated.ts`, and applies Prettier) the same way `renderReleaseMapModule` is split
- * from `writeReleaseMap` in scripts/official-game-bundle-publisher.ts: this can be called directly
- * with any manifest list, with no filesystem involved.
+ * gameDefinitions.generated.ts`, and applies Prettier) can be called directly with any manifest
+ * list, with no filesystem involved.
  *
  * That's what lets e2e/prepareLocalGameOrigin.ts reuse the exact real codegen — not a hand-copied
  * second template that could drift — to build a *temporary* registry module containing the real
@@ -346,10 +344,8 @@ ${loaderEntries}
 // Compiled from game-registry/games/<slug>/{info,policy}.json. Edit those files, then run
 // \`pnpm generate:registry\`; \`pnpm registry:check\` fails the build if this drifts from them.
 //
-// SYSTEM-owned games only. The composition root wires this into StaticGameRegistry
-// (apps/api/src/container.ts), which ScoreUseCases/GameSettingsUseCases resolve games through —
-// GAME_MANIFESTS (gameRegistry.generated.ts) remains the source for everything not yet moved
-// onto that port.
+// SYSTEM-owned source definitions only. Production runtime authority is generic D1/B2; this
+// generated file feeds deterministic OWOGG bootstrap and build-time parity checks.
 import type { GameDefinition } from "../modules/game/domain/gameDefinition.js";
 
 export const GAME_DEFINITIONS: GameDefinition[] = ${JSON.stringify(definitions, null, 2)};

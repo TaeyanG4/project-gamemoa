@@ -997,18 +997,7 @@ export interface Dictionary {
     submittingLabel: string;
     successLabel: string;
     retrySubmitCta: string;
-    /** CreatorGameHost's own score-save status text — deliberately separate from the
-     * leaderboard-flavored strings above (submittingLabel/successLabel/guestNotice*), which name
-     * a ranking/leaderboard Creator games don't have yet. Reuses guestLoginCta as-is for the
-     * button label ("로그인"/"Sign in" needs no Creator-specific variant). */
-    creatorScoreGuestNoticeTitle: string;
-    creatorScoreGuestNoticeBody: string;
-    creatorScoreSubmittingLabel: string;
-    creatorScoreSuccessLabel: string;
-    creatorScoreErrorFallback: string;
-    /** Marks the current player's own row in CreatorGameHost's leaderboard preview — reuses
-     * leaderboardTitle/leaderboardEmpty above as-is (already generic, no ranking-page-specific
-     * wording), this is the one new string that preview needed. */
+    /** Marks the current player's own row in GameHost's leaderboard preview. */
     leaderboardYou: string;
     retryGameCta: string;
     backToListResult: string;
@@ -2326,11 +2315,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       submittingLabel: "랭킹에 점수 등록 중...",
       successLabel: "기록이 랭킹에 등록되었습니다!",
       retrySubmitCta: "점수 다시 제출",
-      creatorScoreGuestNoticeTitle: "게스트로 플레이 중입니다",
-      creatorScoreGuestNoticeBody: "로그인하면 점수가 저장됩니다.",
-      creatorScoreSubmittingLabel: "점수 저장 중...",
-      creatorScoreSuccessLabel: "점수가 저장되었습니다!",
-      creatorScoreErrorFallback: "점수 저장에 실패했습니다.",
       leaderboardYou: "나",
       retryGameCta: "🔄 다시 하기",
       backToListResult: "목록으로",
@@ -3628,11 +3612,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       submittingLabel: "Submitting score to leaderboard...",
       successLabel: "Your record has been added to the leaderboard!",
       retrySubmitCta: "Resubmit score",
-      creatorScoreGuestNoticeTitle: "You're playing as a guest",
-      creatorScoreGuestNoticeBody: "Sign in to save your score.",
-      creatorScoreSubmittingLabel: "Saving your score...",
-      creatorScoreSuccessLabel: "Your score has been saved!",
-      creatorScoreErrorFallback: "Failed to save your score.",
       leaderboardYou: "You",
       retryGameCta: "🔄 Play again",
       backToListResult: "Back to list",
@@ -4929,11 +4908,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       submittingLabel: "ランキングにスコアを登録中...",
       successLabel: "記録がランキングに登録されました！",
       retrySubmitCta: "スコアを再送信",
-      creatorScoreGuestNoticeTitle: "ゲストとしてプレイ中です",
-      creatorScoreGuestNoticeBody: "ログインするとスコアが保存されます。",
-      creatorScoreSubmittingLabel: "スコアを保存中...",
-      creatorScoreSuccessLabel: "スコアが保存されました！",
-      creatorScoreErrorFallback: "スコアの保存に失敗しました。",
       leaderboardYou: "自分",
       retryGameCta: "🔄 もう一度プレイ",
       backToListResult: "リストに戻る",
@@ -6176,11 +6150,6 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       submittingLabel: "正在提交分数到排行榜...",
       successLabel: "记录已登记到排行榜！",
       retrySubmitCta: "重新提交分数",
-      creatorScoreGuestNoticeTitle: "您正在以访客身份游玩",
-      creatorScoreGuestNoticeBody: "登录后即可保存分数。",
-      creatorScoreSubmittingLabel: "正在保存分数...",
-      creatorScoreSuccessLabel: "分数已保存！",
-      creatorScoreErrorFallback: "分数保存失败。",
       leaderboardYou: "我",
       retryGameCta: "🔄 再玩一次",
       backToListResult: "返回列表",

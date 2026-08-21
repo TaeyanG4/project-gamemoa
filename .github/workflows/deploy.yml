@@ -180,26 +180,15 @@ jobs:
         env:
           CREATOR_ENABLED_PROVIDERS: ${{ vars.CREATOR_ENABLED_PROVIDERS || '' }}
 
-      # Builds + publishes every migrated SYSTEM game's standalone iframe bundle to
-      # official-games/<slug>/<version>/ (SystemGameBundlePublisher) and writes the release map
-      # the web build below bakes into its bundle — see scripts/publish-official-game-bundles.ts
-      # and apps/web/app/features/game/runtime/systemGameReleaseMap.generated.ts.
-      #
-      # MUST run before "Build Web Frontend", and any failure here MUST stop the deploy: a game's
-      # `version` is the sha256 of its own built ZIP bytes, so a failed/incomplete publish means
-      # there is no real, servable URL for GameHost.tsx to iframe yet. A default `if: failure()`
-      # step here would be wrong — the whole point is that a publish failure leaves the OLD
-      # release map (this repo's committed-empty default, or whatever a prior successful deploy
-      # last wrote) in place and never reaches Build/Deploy Web Frontend, so a broken iframe URL
-      # is never shipped. B2 secrets are the same ones the API Worker's own bundle storage uses
-      # (see readB2Config in apps/api/src/routes/devGames.ts) — never printed, piped only through
-      # this step's own env.
-      - name: Publish Official Game Bundles
-        run: pnpm publish:official-games
+      # Deterministically builds and converges all OWOGG standalone bundles into generic D1/B2.
+      # MUST run before the Web build; any identity/version/canonical/bundle conflict stops the
+      # deploy rather than shipping a Web build whose /play resolver cannot serve every official
+      # game. No legacy content-hash publication or deploy-time release map remains.
+      - name: Bootstrap Official Generic Games
+        run: pnpm bootstrap:official-games
         env:
-          # B-1 shadow bootstrap runs inside the existing official publication step. These are the
-          # same deploy-only D1 credentials the migration/API steps already use; no manual D1 run
-          # is introduced, and a shadow convergence failure stops Web deployment fail-closed.
+          # Same deploy-only D1 credentials the migration/API steps already use; no manual D1 run
+          # is introduced, and convergence failure stops Web deployment fail-closed.
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           B2_ENDPOINT: ${{ secrets.B2_ENDPOINT }}

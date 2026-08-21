@@ -15,7 +15,7 @@ import {
   mapGameVersionRow,
   type BackblazeB2Config,
 } from "@owogg/db";
-import type { OfficialBundlePreparedObserver } from "./official-game-bundle-publisher.js";
+import type { OfficialBundlePreparedConsumer } from "./official-game-bundle-builder.js";
 
 type SqlValue = string | number | null;
 
@@ -221,13 +221,11 @@ export class D1OfficialGameShadowRepository implements OfficialGameShadowReposit
   }
 }
 
-/** Hooks B-1 into the existing official publisher without changing its legacy path or release map.
- * The same prepared ZIP that was deterministically hashed for official-games/ is shadow-published
- * to games/<gameId>/<versionId>/ immediately after the legacy publication succeeds. */
-export function createOfficialShadowBundleObserver(input: {
+/** Connects deterministic OWOGG build output to the generic staged bootstrap. */
+export function createOfficialGenericBundleConsumer(input: {
   repoRoot: string;
   b2Config: BackblazeB2Config;
-}): OfficialBundlePreparedObserver {
+}): OfficialBundlePreparedConsumer {
   const storage = new BackblazeB2GameBundleRepository(input.b2Config);
   const bootstrap = new OfficialGameShadowBootstrap(
     new D1OfficialGameShadowRepository(new WranglerRemoteD1Executor(input.repoRoot)),

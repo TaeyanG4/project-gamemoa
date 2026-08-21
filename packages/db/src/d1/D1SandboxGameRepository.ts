@@ -172,15 +172,6 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     return (res.results || []).map(mapGameRow);
   }
 
-  async listPublic(): Promise<SandboxGameRecord[]> {
-    const res = await this.db
-      .prepare(
-        `SELECT * FROM sandbox_games WHERE visibility = 'PUBLIC' AND deleted_at IS NULL ORDER BY created_at DESC`,
-      )
-      .all<Record<string, unknown>>();
-    return (res.results || []).map(mapGameRow);
-  }
-
   // Deliberately NOT filtered by deleted_at — see the port doc comment. This is the admin's only
   // browse-everything surface, and purgeGame only ever applies to an already-deleted game, so
   // admins need to be able to find one here without already knowing its id.

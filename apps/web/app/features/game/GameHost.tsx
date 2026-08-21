@@ -23,8 +23,8 @@ import { GameThumbnail } from "../../components/ui/GameThumbnail";
 import { XIcon } from "../../components/ui/XIcon";
 import { IframeRuntime } from "./runtime/IframeRuntime";
 import { fetchGameSession } from "./gameSessionApi";
-import { acceptCreatorScore } from "./creatorScoreAcceptApi";
-import { createCreatorScoreFlow } from "./creatorScoreFlow";
+import { acceptGameScore } from "./gameScoreAcceptApi";
+import { createGameScoreFlow } from "./gameScoreFlow";
 import { resolvePresentationLayout } from "./presentationLayoutResolver";
 import {
   shouldShowFullscreenControl,
@@ -83,11 +83,10 @@ export function formatMetadataValue(key: string, value: unknown): string {
 }
 
 /**
- * C-1's primary official runtime URL. The API's generic resolver owns the numeric live version;
- * the deploy-generated release map remains available as rollback infrastructure but is not a
- * primary runtime input anymore.
+ * Provider-neutral runtime URL. The API's generic resolver owns the numeric live version for
+ * both OWOGG and USER games.
  */
-export function resolveOfficialRuntimeUrl(slug: string): string {
+export function resolveGameRuntimeUrl(slug: string): string {
   return gamePlayUrl(slug);
 }
 
@@ -109,9 +108,9 @@ export function resolveOfficialRuntimeUrl(slug: string): string {
 export function shouldRemountIframeOnDifficultyChange(
   previousDifficultyId: string | undefined,
   nextDifficultyId: string,
-  context: { runtimeKind: "iframe" | "legacy"; hasDifficultyTiers: boolean },
+  context: { hasDifficultyTiers: boolean },
 ): boolean {
-  if (context.runtimeKind !== "iframe" || !context.hasDifficultyTiers) return false;
+  if (!context.hasDifficultyTiers) return false;
   if (previousDifficultyId === undefined) return false;
   return previousDifficultyId !== nextDifficultyId;
 }
@@ -119,8 +118,8 @@ export function shouldRemountIframeOnDifficultyChange(
 /**
  * Adapts the Game Bridge's reduced GAME_COMPLETE payload ({score?, metadata?}) into the full
  * GameResult shape runtime.complete (below) already expects, so the iframe path can feed the exact
- * same score/local-best/leaderboard/share pipeline LegacyReactRuntime's games use — no duplicated
- * submission logic, no changed /api/scores contract.
+ * same score/local-best/leaderboard/share pipeline GameHost owns — no duplicated submission
+ * logic.
  *
  * Returns null for a completion with no score: runtime.complete's downstream (saveLocalBestScore,
  * handleScoreSubmission) has nothing meaningful to do with an absent score, so GameHost simply
@@ -413,11 +412,8 @@ function toScoreConfig(input: PublicGame["policy"]["score"]): ScoreConfig | unde
 }
 
 /**
- * Owns the full built-in-game play lifecycle — loading, difficulty, the runtime session handed to
- * the game module, score submission, the result/leaderboard/share overlay, and retry — for
- * whichever OwOGG UI chrome surrounds any runtime, legacy or (eventually) iframe. See
- * runtime/LegacyReactRuntime.tsx for why "which runtime renders the actual game surface" is
- * deliberately the one thing carved out of this component instead.
+ * Owns the full provider-neutral game lifecycle — loading, difficulty, parent-held signed Game
+ * Session, iframe Bridge, score submission, result/leaderboard/share overlay, and retry.
  *
  * Split out of routes/game-slug.tsx (formerly one 740-line route component) so the route file is
  * just param extraction; this is everything else, unchanged. No behavior or UI changed by the
@@ -457,8 +453,6 @@ export function GameHost({ slug }: GameHostProps) {
     [game?.policy.score],
   );
   const isDisabled = useIsGameDisabled(slug);
-
-  const runtimeKind = "iframe" as const;
 
   // Presentation layout — see presentationLayoutResolver.ts's own doc comment for the math, and
   // useElementSize's/useViewportHeight's for why width and height each come from the source they
@@ -575,9 +569,7 @@ export function GameHost({ slug }: GameHostProps) {
 
   // Difficulty selection — only meaningful for games with canonical difficulty. Resets to the
   // game's default whenever navigating between games. A change here only affects the NEXT
-  // attempt: for LegacyReactRuntime that's handleStart inside the game component (an
-  // already-in-progress round keeps whatever it captured when it started, never flips difficulty
-  // mid-round); for IframeRuntime, "next attempt" means the next iframe mount — see the
+  // attempt: "next attempt" means the next iframe mount — see the
   // iframeAttemptDifficultyRef effect below for why an already-mounted iframe can't be updated
   // live.
   const [selectedDifficultyId, setSelectedDifficultyId] = useState<string>("normal");
@@ -594,12 +586,12 @@ export function GameHost({ slug }: GameHostProps) {
   // controller. It is never included in HOST_INIT or any iframe bridge message.
   const scoreFlow = useMemo(
     () =>
-      createCreatorScoreFlow(
+      createGameScoreFlow(
         {
           slug,
           fetchGameSession,
           acceptScore: (gameSlug, input) =>
-            acceptCreatorScore(gameSlug, {
+            acceptGameScore(gameSlug, {
               ...input,
               playToken: consumeActivePlayToken(),
             }),
@@ -661,11 +653,10 @@ export function GameHost({ slug }: GameHostProps) {
     setAttemptKey((prev) => prev + 1);
   }, []);
 
-  // Forces a fresh iframe mount when the difficulty selector changes for an iframe-runtime game
-  // that has real difficulty tiers (aim-test today). The Game Bridge's HOST_INIT bootstrap is a
-  // one-time handshake — unlike LegacyReactRuntime, which re-reads runtime.difficultyId fresh
-  // every time the game component itself calls handleStart, an already-connected iframe has no
-  // way to learn a NEW difficulty short of a full reload. Reusing handleRetryGame's own reset
+  // Forces a fresh iframe mount when the difficulty selector changes for a game that has real
+  // difficulty tiers (aim-test today). The Game Bridge's HOST_INIT bootstrap is a one-time
+  // handshake, so an already-connected iframe has no way to learn a NEW difficulty short of a
+  // full reload. Reusing handleRetryGame's own reset
   // (new sessionId, cleared result/leaderboard, bumped attemptKey) is what remounts IframeRuntime
   // — see its `key={attemptKey}` in GameFrame — with the new value baked into its next HOST_INIT.
   //
@@ -680,17 +671,16 @@ export function GameHost({ slug }: GameHostProps) {
         iframeAttemptDifficultyRef.current,
         selectedDifficultyId,
         {
-          runtimeKind,
           hasDifficultyTiers,
         },
       )
     ) {
       handleRetryGame();
     }
-    if (runtimeKind === "iframe" && hasDifficultyTiers) {
+    if (hasDifficultyTiers) {
       iframeAttemptDifficultyRef.current = selectedDifficultyId;
     }
-  }, [selectedDifficultyId, runtimeKind, game, handleRetryGame]);
+  }, [selectedDifficultyId, game, handleRetryGame]);
 
   // Fetch a compact leaderboard preview as soon as the game ends (not gated on score
   // submission succeeding — guests and rejected submissions still get competitive context).
@@ -851,11 +841,9 @@ export function GameHost({ slug }: GameHostProps) {
     ],
   );
 
-  // IframeRuntime callbacks — the Bridge-driven counterpart to the `runtime` object above.
-  // Deliberately funnel into the SAME `runtime.complete`/`recordRecentPlay`/`navigate` calls
-  // LegacyReactRuntime's games already use, rather than a parallel result pipeline: score
-  // submission, local-best tracking, the leaderboard preview effect, and share all stay exactly as
-  // they are today (see buildGameResultFromBridgeComplete's own doc comment for why this is safe).
+  // IframeRuntime callbacks deliberately funnel into the same
+  // `runtime.complete`/`recordRecentPlay`/`navigate` calls so score submission, local-best
+  // tracking, leaderboard preview, and sharing have one path.
   const handleIframeStarted = useCallback(() => {
     void recordRecentPlay(slug);
   }, [recordRecentPlay, slug]);
@@ -1284,7 +1272,7 @@ export function GameHost({ slug }: GameHostProps) {
             {resultOverlay}
             <div className="p-6" ref={iframeAreaRef}>
               <IframeRuntime
-                src={resolveOfficialRuntimeUrl(slug)}
+                src={resolveGameRuntimeUrl(slug)}
                 title={localizedTitle ?? slug}
                 attemptKey={attemptKey}
                 frameClassName={iframeFrameClassName}

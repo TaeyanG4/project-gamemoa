@@ -41,7 +41,7 @@ function tamperSignedToken(token: string): string {
 }
 
 // POST /api/games/:slug/score — route-layer wiring only. The generic D1/B2 runtime acceptance path is
-// proven against real SQLite in packages/db/test/D1CreatorScoreAcceptanceRepository.test.ts, and
+// Proven against real SQLite in packages/db/test/D1GameScoreAcceptanceRepository.test.ts, and
 // every pre-write check (availability, token validity, context match, score policy) is proven
 // against a fake repository in packages/core/test/creatorScoreAcceptanceUseCases.test.ts. This
 // file only confirms HTTP-level wiring — auth gating, status codes per error, and that a real
@@ -171,7 +171,7 @@ function createDb(options: {
       prepare(query: string) {
         return statement(query);
       },
-      // Models the D1CreatorScoreAcceptanceRepository batch in JS state: statement 0 is the
+      // Models the D1GameScoreAcceptanceRepository batch in JS state: statement 0 is the
       // attempt-consumption claim (ON CONFLICT DO NOTHING), statement 1 is the scores insert
       // gated on statement 0's own success — see that repository's doc comment for why this must
       // be one atomic unit rather than two independent writes.
@@ -200,7 +200,7 @@ function createDb(options: {
         }
         return [
           { success: true, meta: { changes: attemptChanges, rows_written: attemptChanges } },
-          // rows_written is the field D1CreatorScoreAcceptanceRepository actually reads to decide
+          // rows_written is the field D1GameScoreAcceptanceRepository actually reads to decide
           // `accepted` — populated here (not left undefined) so this fake models a real D1 batch
           // result, not just changes, which the repository deliberately no longer trusts.
           {

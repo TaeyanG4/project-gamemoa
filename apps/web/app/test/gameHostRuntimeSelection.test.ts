@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  resolveOfficialRuntimeUrl,
+  resolveGameRuntimeUrl,
   buildGameResultFromBridgeComplete,
   shouldRemountIframeOnDifficultyChange,
 } from "../features/game/GameHost";
@@ -16,28 +16,17 @@ import { API_URL } from "../lib/api/config";
  * this is the part of the new runtime-selection logic that's actually testable without one.
  */
 
-test("official primary runtime URLs use the generic /play resolver, independent of the release map", () => {
-  for (const slug of ["reaction-time", "aim-test", "memory-test", "typing-test"]) {
-    assert.equal(resolveOfficialRuntimeUrl(slug), `${API_URL}/play/${slug}`, slug);
+test("every publisher uses the generic /play resolver", () => {
+  for (const slug of ["reaction-time", "aim-test", "memory-test", "typing-test", "ball-dodge"]) {
+    assert.equal(resolveGameRuntimeUrl(slug), `${API_URL}/play/${slug}`, slug);
   }
 });
 
 // ── shouldRemountIframeOnDifficultyChange ────────────────────────────────────
 
-test("shouldRemountIframeOnDifficultyChange: never fires for a legacy-runtime game, even with difficulty tiers", () => {
+test("shouldRemountIframeOnDifficultyChange: never fires for a game with no difficulty tiers", () => {
   assert.equal(
     shouldRemountIframeOnDifficultyChange("normal", "hard", {
-      runtimeKind: "legacy",
-      hasDifficultyTiers: true,
-    }),
-    false,
-  );
-});
-
-test("shouldRemountIframeOnDifficultyChange: never fires for an iframe-runtime game with no difficulty tiers (memory-test, typing-test, reaction-time)", () => {
-  assert.equal(
-    shouldRemountIframeOnDifficultyChange("normal", "hard", {
-      runtimeKind: "iframe",
       hasDifficultyTiers: false,
     }),
     false,
@@ -47,7 +36,6 @@ test("shouldRemountIframeOnDifficultyChange: never fires for an iframe-runtime g
 test("shouldRemountIframeOnDifficultyChange: never fires on the very first render for a slug (no prior attempt tracked yet)", () => {
   assert.equal(
     shouldRemountIframeOnDifficultyChange(undefined, "normal", {
-      runtimeKind: "iframe",
       hasDifficultyTiers: true,
     }),
     false,
@@ -57,24 +45,21 @@ test("shouldRemountIframeOnDifficultyChange: never fires on the very first rende
 test("shouldRemountIframeOnDifficultyChange: does not fire when the difficulty is unchanged", () => {
   assert.equal(
     shouldRemountIframeOnDifficultyChange("normal", "normal", {
-      runtimeKind: "iframe",
       hasDifficultyTiers: true,
     }),
     false,
   );
 });
 
-test("shouldRemountIframeOnDifficultyChange: fires when an iframe-runtime game with difficulty tiers actually changes tier (aim-test normal -> hard)", () => {
+test("shouldRemountIframeOnDifficultyChange: fires when a game with difficulty tiers changes tier", () => {
   assert.equal(
     shouldRemountIframeOnDifficultyChange("normal", "hard", {
-      runtimeKind: "iframe",
       hasDifficultyTiers: true,
     }),
     true,
   );
   assert.equal(
     shouldRemountIframeOnDifficultyChange("hard", "normal", {
-      runtimeKind: "iframe",
       hasDifficultyTiers: true,
     }),
     true,

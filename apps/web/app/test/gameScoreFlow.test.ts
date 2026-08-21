@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createCreatorScoreFlow } from "../features/game/creatorScoreFlow";
+import { createGameScoreFlow } from "../features/game/gameScoreFlow";
 
-// creatorScoreFlow.ts is the framework-free controller CreatorGameHost.tsx wraps — see that
+// gameScoreFlow.ts is the framework-free controller GameHost.tsx wraps — see that
 // module's own doc comment for why this is a plain factory function rather than a hook (apps/web
 // has no component-render test harness; gameBridgeEndToEnd.test.ts is the established precedent
 // for testing this kind of orchestration directly, without a DOM). This file covers the PR's own
@@ -24,7 +24,7 @@ function createFakeDeps() {
 
   async function acceptScore(slug: string, input: { token: string; score: number }) {
     acceptedCalls.push({ slug, token: input.token, score: input.score });
-    // Mirrors the server's own one-time-consumption guarantee (D1CreatorScoreAcceptanceRepository)
+    // Mirrors the server's own one-time-consumption guarantee (D1GameScoreAcceptanceRepository)
     // at this fake's level — a second call with an already-spent token is rejected, the same shape
     // of failure a real ALREADY_CONSUMED response would produce.
     if (consumedTokens.has(input.token)) {
@@ -50,7 +50,7 @@ function createDeferred<T>() {
 
 function createFlow(deps: ReturnType<typeof createFakeDeps>, slug = "ball-dodge") {
   const statuses: Array<{ state: string; message?: string }> = [];
-  const flow = createCreatorScoreFlow(
+  const flow = createGameScoreFlow(
     {
       slug,
       // Indirected through deps rather than binding deps.fetchGameSession/acceptScore directly —

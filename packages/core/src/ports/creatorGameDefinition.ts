@@ -3,8 +3,8 @@ import type { CreatorGameCanonicalDocument } from "../domain/creatorGameCanonica
 /**
  * Persistence port for a Creator game's canonical definition (Stage A — see
  * domain/creatorGameCanonicalDocument.ts's own doc comment for the full B2/D1 boundary). Deliberately
- * minimal: no listing, no B2 prefix/index operation. A future GameRegistry that also resolves
- * creator games can enumerate identities from D1 (which already has to track every game row
+ * minimal: no listing, no B2 prefix/index operation. Migration/control-plane callers enumerate
+ * identities from D1 (which already has to track every game row
  * regardless) and resolve each one's canonical definition through {@link findBySlug} here — that
  * is what lets this port stay this small without needing a separate B2-side `registry-index.json`
  * (and the write-concurrency problem a shared index file would introduce) at all.

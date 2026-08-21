@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import process from "node:process";
-import { readB2ConfigFromEnv } from "./official-game-bundle-publisher.js";
+import { readB2ConfigFromEnv } from "./official-game-bundle-builder.js";
 import {
   parseBackfillCliArgs,
   buildCreatorGameDefinitionRepositoryFromB2Config,

@@ -71,8 +71,8 @@ export type ApiEnv = {
      * wrangler.jsonc entry required, same reasoning as the B2_* values above. */
     GAME_ORIGIN?: string;
     /** HMAC secret for signing/verifying Game Session tokens (packages/core/src/domain/
-     * gameSession.ts) — the prerequisite CreatorGameHost's actual score submission depends on
-     * (apps/web/app/features/game/creatorScoreFlow.ts). Plain `wrangler secret put
+     * gameSession.ts) — the generic GameHost score flow depends on it
+     * (apps/web/app/features/game/gameScoreFlow.ts). Plain `wrangler secret put
      * GAME_SESSION_SECRET`, not a Cloudflare binding — no wrangler.jsonc entry required, same
      * reasoning as the B2_* and GAME_ORIGIN values above. Optional here at the type level so a
      * local/preview environment without it still boots (POST /api/games/:slug/session fails

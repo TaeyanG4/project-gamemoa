@@ -361,10 +361,9 @@ export function validateBundleEntryMetadata(entries: BundleEntryMetadata[]): voi
 
 /**
  * Full archive-to-PreparedBundle pipeline: metadata pass (zip-bomb guard, no decompression) →
- * validate → full decompression → prepare. Extracted from GameBundlePublisher.prepare so a second
- * publisher (SystemGameBundlePublisher — see application/systemGameBundlePublisher.ts) doesn't
- * have to duplicate this exact validation sequence; nothing here is Creator-specific — it takes a
- * {@link BundleArchiveReader} and raw bytes, nothing else, and both publishers pass a real archive
+ * validate → full decompression → prepare. Extracted from GameBundlePublisher.prepare so the
+ * official generic bootstrap can reuse the exact validation sequence; nothing here is
+ * publisher-specific — it takes a {@link BundleArchiveReader} and raw bytes, and callers pass a real archive
  * reader implementation of the same port. See GameBundlePublisher.prepare's own doc comment for why
  * the two passes must stay in this order (metadata-only before paying for full decompression).
  */

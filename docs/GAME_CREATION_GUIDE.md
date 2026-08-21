@@ -629,6 +629,13 @@ secret**입니다 — 그래서 `apps/api/wrangler.jsonc`를 건드릴 필요가
 
 ### 3.10 SYSTEM(공식) 게임 standalone bundle 발행 기반 (2026-08-19)
 
+> **역사 기록 — D-1(2026-08-21)에서 운영 경로 제거됨.** 아래의 문자열 version,
+> `official-games/` 저장소/라우트, manifest-only publish, release-map 방식은 과도기 구현을 설명하기
+> 위해 남긴 기록이며 현재 API·배포 런타임이 아닙니다. 현재 공식 게임도 generic numeric
+> `games.id`/`game_versions.id`, `games/<gameId>/<versionId>/`, provider-neutral canonical,
+> `RuntimeGameRegistry`를 사용합니다. 다만 `games/*` 소스와 standalone deterministic ZIP 빌드는
+> generic OWOGG bootstrap 입력이므로 유지합니다.
+
 `modules/game/domain/gameOwner.ts`가 이미 명시한 방향대로, SYSTEM과 CREATOR 게임은 "등록·버전관리·
 불변 오브젝트 스토리지 발행·격리된 게임 오리진에서 서빙·같은 호스트로 플레이"라는 배포 방식으로
 수렴하도록 설계되어 있습니다. `feat/official-game-publisher-foundation`은 이 수렴의 **발행(publish)

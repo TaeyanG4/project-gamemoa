@@ -17,8 +17,8 @@ export interface D1PreparedStatement {
   all<T = unknown>(): Promise<{ results: T[] }>;
   /** `meta.changes` (when present) reports rows actually written by this statement —
    * used to detect whether an `ON CONFLICT DO NOTHING` insert was a no-op. `meta.rows_written` is
-   * the same signal under Cloudflare D1's own field name (see D1CreatorScoreAcceptanceRepository,
-   * which reads that field specifically rather than `changes`). */
+   * the same signal under Cloudflare D1's own field name; generic score acceptance reads that
+   * field specifically rather than `changes`. */
   run(): Promise<D1Result>;
 }
 

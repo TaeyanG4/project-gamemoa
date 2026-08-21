@@ -9,7 +9,7 @@ import type { GameDifficulty, GamePolicy } from "../src/modules/game/domain/game
 /**
  * Pure unit tests — no registry, no generated file, just policy objects in and a verdict out.
  * Equivalence with the real four official games (their actual score bounds and difficulty tiers,
- * exercised end-to-end through ScoreUseCases) lives in scoreUseCases.test.ts, which runs these
+ * exercised end-to-end through generic score acceptance) lives in gameScoreAcceptanceUseCases.test.ts, which runs these
  * same rules through the real, generated GAME_DEFINITIONS.
  */
 
@@ -57,7 +57,7 @@ test("validateScoreAgainstPolicy still enforces bounds on a decimal score exactl
 
 test("validateScoreAgainstPolicy rejects null policy — an unknown game, not a loose fallback (2026-08-17 beta hardening)", () => {
   // Preserved from before this refactor: an unrecognized/sandbox game id must not fall back to a
-  // loose "0..1,000,000" bound. `null` is what a GameRegistry.findBySlug miss maps to.
+  // loose "0..1,000,000" bound. `null` is what an unresolved runtime policy maps to.
   for (const score of [0, 1, 500, 999999, 1000000]) {
     assert.equal(
       validateScoreAgainstPolicy(null, score).valid,

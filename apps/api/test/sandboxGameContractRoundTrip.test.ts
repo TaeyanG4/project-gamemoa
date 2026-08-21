@@ -5,8 +5,6 @@ import {
   SandboxGameListResponseSchema,
   SandboxGameDetailResponseSchema,
   SandboxGameUploadResponseSchema,
-  SandboxGamePublicDetailSchema,
-  SandboxGamePublicListResponseSchema,
   SandboxGameReviewQueueResponseSchema,
   SandboxGameVersionRecordSchema,
   toSandboxGameRecordResponse,
@@ -158,20 +156,6 @@ test("SandboxGameReviewQueueResponseSchema round-trips its own output", () => {
     page: 1,
     pageSize: 20,
   });
-});
-
-test("public sandbox schemas round-trip their own output", () => {
-  const publicDetail = {
-    slug: "ball-dodge",
-    title: "공 피하기",
-    shortDescription: null,
-    description: null,
-    genre: "arcade",
-    mode: "single" as const,
-    hasLogo: true,
-  };
-  assertRoundTrips(SandboxGamePublicDetailSchema, publicDetail);
-  assertRoundTrips(SandboxGamePublicListResponseSchema, { games: [publicDetail] });
 });
 
 test("a raw core record fails to parse — forgetting the mapper is loud, not silent", () => {

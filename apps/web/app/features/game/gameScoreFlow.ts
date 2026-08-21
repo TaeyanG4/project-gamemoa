@@ -4,7 +4,7 @@
  * suite has no DOM/component renderer (see gameHostMetadata.test.ts's own doc comment, and
  * gameBridgeHost.ts for the established precedent of pulling exactly this kind of orchestration
  * out into a plain, dependency-injected factory function so it can be unit-tested directly —
- * creatorScoreFlow.test.ts is this module's counterpart to gameBridgeEndToEnd.test.ts).
+ * gameScoreFlow.test.ts is this module's counterpart to gameBridgeEndToEnd.test.ts).
  * GameHost.tsx holds one instance and forwards its status callback into React state,
  * mirroring exactly how IframeRuntime.tsx wraps createGameBridgeHost.
  *
@@ -21,7 +21,7 @@
  *   same attempt — whether a genuine duplicate GAME_COMPLETE from a buggy/compromised game, or
  *   this module being called twice for any other reason — can never reach the network a second
  *   time. The server's own one-time attemptId consumption (packages/core's
- *   CreatorScoreAcceptanceUseCases) is the real, authoritative guarantee; this is defense in
+ *   GameScoreAcceptanceUseCases) is the real, authoritative guarantee; this is defense in
  *   depth at the layer closest to the UI, not a replacement for it.
  * - A failed fetchGameSession or acceptScore call never throws out of either method — gameplay
  *   itself (the local result GameHost already rendered) must survive a session/scoring
@@ -47,9 +47,9 @@
  * attempts from both landing a score.
  */
 
-export type CreatorScoreSubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
+export type GameScoreSubmissionState = "idle" | "guest" | "submitting" | "success" | "error";
 
-export interface CreatorScoreFlowDeps {
+export interface GameScoreFlowDeps {
   slug: string;
   fetchGameSession: (
     slug: string,
@@ -61,11 +61,11 @@ export interface CreatorScoreFlowDeps {
   ) => Promise<{ success: true }>;
 }
 
-export interface CreatorScoreFlowCallbacks {
-  onStatusChange: (state: CreatorScoreSubmissionState, message?: string) => void;
+export interface GameScoreFlowCallbacks {
+  onStatusChange: (state: GameScoreSubmissionState, message?: string) => void;
 }
 
-export interface CreatorScoreFlow {
+export interface GameScoreFlow {
   startAttempt(authenticated: boolean, difficulty?: string): Promise<void>;
   handleComplete(
     authenticated: boolean,
@@ -73,10 +73,10 @@ export interface CreatorScoreFlow {
   ): Promise<void>;
 }
 
-export function createCreatorScoreFlow(
-  deps: CreatorScoreFlowDeps,
-  callbacks: CreatorScoreFlowCallbacks,
-): CreatorScoreFlow {
+export function createGameScoreFlow(
+  deps: GameScoreFlowDeps,
+  callbacks: GameScoreFlowCallbacks,
+): GameScoreFlow {
   let heldToken: string | null = null;
   let heldDifficulty = "normal";
   let spentForThisAttempt = false;

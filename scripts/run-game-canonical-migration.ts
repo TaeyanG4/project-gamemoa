@@ -1,5 +1,5 @@
 import process from "node:process";
-import { readB2ConfigFromEnv } from "./official-game-bundle-publisher.js";
+import { readB2ConfigFromEnv } from "./official-game-bundle-builder.js";
 import {
   parseGameCanonicalMigrationCliArgs,
   buildGameCanonicalMigrationRepositoriesFromB2Config,
@@ -34,7 +34,7 @@ async function main(): Promise<void> {
 
   // Same env-var convention every other B2-backed script/route already reads
   // (B2_ENDPOINT/B2_REGION/B2_BUCKET_NAME/B2_KEY_ID/B2_APPLICATION_KEY) — see
-  // readB2ConfigFromEnv's own doc comment (official-game-bundle-publisher.ts). No new
+  // readB2ConfigFromEnv's own doc comment (official-game-bundle-builder.ts). No new
   // "B2_CONFIG_MISSING" sentinel invented here: a plain, descriptive Error caught by
   // `main().catch` below (which always exits 1) is this repo's existing convention for exactly
   // this failure — run-creator-canonical-backfill.ts does the same.

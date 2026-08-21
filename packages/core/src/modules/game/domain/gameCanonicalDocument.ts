@@ -148,9 +148,8 @@ export interface GameCanonicalDocument {
  * NEW, separate prefix from every existing one — `creator-games/<slug>/definition.json`
  * (domain/creatorGameCanonicalDocument.ts, Stage A, unchanged and still in production use),
  * `games/<gameId>/<versionId>/...` and `uploads/<gameId>/...`
- * (domain/sandboxGameBundle.ts), and `official-games/<slug>/<version>/...`
- * (domain/systemGameBundle.ts) — this Stage does not move, alias, or delete any existing object at
- * any of those prefixes; this key exists only for a future migration Stage to write to.
+ * (domain/sandboxGameBundle.ts). Canonical documents stay separate from both source archives and
+ * published runtime bytes.
  */
 export function gameCanonicalObjectKey(slug: string): string {
   return `game-definitions/${slug}/definition.json`;

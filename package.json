@@ -23,7 +23,7 @@
     "discord:commands:check": "tsx scripts/discord-commands-check.ts",
     "admin:password:hash": "tsx scripts/admin-password-hash.ts",
     "i18n:sync-check": "tsx scripts/check-i18n-sync.ts",
-    "publish:official-games": "tsx scripts/publish-official-game-bundles.ts",
+    "bootstrap:official-games": "tsx scripts/bootstrap-official-games.ts",
     "backfill:creator-canonical": "tsx scripts/run-creator-canonical-backfill.ts",
     "migrate:game-canonical": "tsx scripts/run-game-canonical-migration.ts",
     "e2e": "tsx e2e/run.ts",
