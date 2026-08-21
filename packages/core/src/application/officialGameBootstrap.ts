@@ -73,6 +73,12 @@ export class OfficialGameBootstrap {
         });
       }
 
+      const target = {
+        gameId: identity.id,
+        versionId: version.id,
+        contentHash,
+      } as const;
+
       try {
         await this.storage.putObject({
           key: sourceArchiveObjectKey(identity.id, contentHash),
@@ -80,14 +86,12 @@ export class OfficialGameBootstrap {
           contentType: "application/zip",
         });
         await this.publication.publish({
-          gameId: identity.id,
-          versionId: version.id,
-          contentHash,
+          ...target,
           prepared,
           publishedAt: nowIso,
         });
       } catch (error) {
-        await this.publication.recordFailure(version.id, error);
+        await this.publication.recordFailure(target, error);
         throw error;
       }
 

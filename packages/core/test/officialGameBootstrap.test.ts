@@ -12,6 +12,7 @@ import {
   type GameIdentity,
   type GameVersion,
   type GamePublicationFacts,
+  type GamePublicationTarget,
   type OfficialGameBootstrapRepository,
   type PreparedBundle,
   type SystemGameDefinition,
@@ -21,7 +22,7 @@ const OFFICIAL = GAME_DEFINITIONS.filter(isSystemGameDefinition);
 const archive = new Uint8Array([1, 2, 3, 4]);
 const prepared: PreparedBundle = {
   entry: "index.html",
-  totalSize: 31,
+  totalSize: 30,
   files: [
     {
       path: "index.html",
@@ -35,6 +36,10 @@ const prepared: PreparedBundle = {
     },
   ],
 };
+
+function testHash(seed: number): string {
+  return seed.toString(16).padStart(64, "0");
+}
 
 class FakeOfficialRepository implements OfficialGameBootstrapRepository {
   identities = new Map<string, GameIdentity>();
@@ -98,8 +103,8 @@ class FakeOfficialRepository implements OfficialGameBootstrapRepository {
     return version;
   }
 
-  async markPublishing(versionId: number): Promise<void> {
-    const version = this.requireVersion(versionId);
+  async markPublishing(target: GamePublicationTarget): Promise<void> {
+    const version = this.requireTarget(target);
     if (version.publishStatus === "READY") throw new Error("cannot retry READY");
     const retried = {
       ...version,
@@ -110,11 +115,11 @@ class FakeOfficialRepository implements OfficialGameBootstrapRepository {
       publishedSizeBytes: null,
       fileCount: null,
     };
-    this.versions.set(versionId, retried);
+    this.versions.set(target.versionId, retried);
   }
 
-  async markReady(versionId: number, facts: GamePublicationFacts): Promise<void> {
-    const version = this.requireVersion(versionId);
+  async markReady(target: GamePublicationTarget, facts: GamePublicationFacts): Promise<void> {
+    const version = this.requireTarget(target);
     if (version.publishStatus !== "PUBLISHING") throw new Error("version is not PUBLISHING");
     const ready = {
       ...version,
@@ -127,11 +132,11 @@ class FakeOfficialRepository implements OfficialGameBootstrapRepository {
     this.versions.set(version.id, ready);
   }
 
-  async markFailed(versionId: number, reason: string): Promise<void> {
-    const version = this.requireVersion(versionId);
+  async markFailed(target: GamePublicationTarget, reason: string): Promise<void> {
+    const version = this.requireTarget(target);
     if (version.publishStatus === "READY") return;
     const wasFailed = version.publishStatus === "FAILED";
-    this.versions.set(versionId, {
+    this.versions.set(target.versionId, {
       ...version,
       publishStatus: "FAILED",
       publishError: reason,
@@ -140,7 +145,7 @@ class FakeOfficialRepository implements OfficialGameBootstrapRepository {
       publishedSizeBytes: null,
       fileCount: null,
     });
-    if (!wasFailed) this.failed.push(versionId);
+    if (!wasFailed) this.failed.push(target.versionId);
   }
 
   async ensureSlugReservation(input: { slug: string; gameId: number }): Promise<void> {
@@ -174,6 +179,14 @@ class FakeOfficialRepository implements OfficialGameBootstrapRepository {
   private requireVersion(id: number): GameVersion {
     const version = this.versions.get(id);
     if (!version) throw new Error(`missing version ${id}`);
+    return version;
+  }
+
+  private requireTarget(target: GamePublicationTarget): GameVersion {
+    const version = this.requireVersion(target.versionId);
+    if (version.gameId !== target.gameId || version.contentHash !== target.contentHash) {
+      throw new Error(`Official publication target mismatch for version ${target.versionId}`);
+    }
     return version;
   }
 }
@@ -260,19 +273,21 @@ test("bootstrap publishes all four official games with OWOGG-only identities, RE
     "typing-test",
   ]);
 
-  for (const definition of OFFICIAL) await run(service, definition, `hash-${definition.slug}`);
+  for (const [index, definition] of OFFICIAL.entries()) {
+    await run(service, definition, testHash(index + 1));
+  }
 
   assert.equal(repo.identities.size, 4);
   assert.equal(repo.versions.size, 4);
   assert.equal(repo.reservations.size, 4);
   assert.equal(repo.activated.length, 4);
-  for (const definition of OFFICIAL) {
+  for (const [index, definition] of OFFICIAL.entries()) {
     const identity = repo.identities.get(definition.slug);
     assert.deepEqual(identity?.publisher, { type: "OWOGG" });
     assert.equal(identity?.visibility, "PUBLIC");
     assert.equal(repo.reservations.get(definition.slug), identity?.id);
     assert.ok(identity?.liveVersionId);
-    assert.ok(storage.objects.has(`uploads/${identity?.id}/hash-${definition.slug}.zip`));
+    assert.ok(storage.objects.has(`uploads/${identity?.id}/${testHash(index + 1)}.zip`));
     assert.ok(storage.objects.has(`games/${identity?.id}/${identity?.liveVersionId}/index.html`));
     assert.ok(
       storage.objects.has(`games/${identity?.id}/${identity?.liveVersionId}/.owogg-manifest.json`),
@@ -287,11 +302,11 @@ test("bootstrap publishes all four official games with OWOGG-only identities, RE
 test("unchanged hash reuses READY without republishing; changed hash allocates and activates a new version", async () => {
   const { repo, storage, service } = bootstrap();
   const definition = OFFICIAL[0] as SystemGameDefinition;
-  const first = await run(service, definition, "same-hash");
+  const first = await run(service, definition, testHash(10));
   const writesAfterFirst = storage.writes.length;
-  const same = await run(service, definition, "same-hash", "2026-08-22T00:00:00.000Z");
+  const same = await run(service, definition, testHash(10), "2026-08-22T00:00:00.000Z");
   assert.equal(storage.writes.length, writesAfterFirst);
-  const changed = await run(service, definition, "changed-hash", "2026-08-23T00:00:00.000Z");
+  const changed = await run(service, definition, testHash(11), "2026-08-23T00:00:00.000Z");
   assert.equal(same.reusedReadyVersion, true);
   assert.equal(same.versionId, first.versionId);
   assert.notEqual(changed.versionId, first.versionId);
@@ -303,11 +318,11 @@ test("a failed official version retries through the common publisher under the s
   const { repo, storage, service } = bootstrap();
   const definition = OFFICIAL[0] as SystemGameDefinition;
   storage.failKey = "games/100/1000/.owogg-manifest.json";
-  await assert.rejects(() => run(service, definition, "retry-hash"), /B2 write failed/);
+  await assert.rejects(() => run(service, definition, testHash(12)), /B2 write failed/);
   assert.equal(repo.versions.get(1000)?.publishStatus, "FAILED");
 
   storage.failKey = null;
-  const retried = await run(service, definition, "retry-hash", "2026-08-22T00:00:00.000Z");
+  const retried = await run(service, definition, testHash(12), "2026-08-22T00:00:00.000Z");
   assert.equal(retried.versionId, 1000);
   assert.equal(repo.versions.size, 1);
   assert.equal(repo.versions.get(1000)?.publishStatus, "READY");
@@ -318,7 +333,7 @@ test("partial generic publish never becomes live and is marked FAILED", async ()
   const { repo, storage, service } = bootstrap();
   const definition = OFFICIAL[0] as SystemGameDefinition;
   storage.failKey = "games/100/1000/.owogg-manifest.json";
-  await assert.rejects(() => run(service, definition, "partial-hash"), /B2 write failed/);
+  await assert.rejects(() => run(service, definition, testHash(13)), /B2 write failed/);
   assert.equal(repo.activated.length, 0);
   assert.equal(repo.failed.length, 1);
   assert.equal(repo.versions.get(1000)?.publishStatus, "FAILED");
@@ -328,7 +343,7 @@ test("USER authority and conflicting canonical state fail closed before activati
   const { repo, canonicals, service } = bootstrap();
   const definition = OFFICIAL[0] as SystemGameDefinition;
   repo.conflictSlug = definition.slug;
-  await assert.rejects(() => run(service, definition, "authority-conflict"), /authority conflict/);
+  await assert.rejects(() => run(service, definition, testHash(14)), /authority conflict/);
   assert.equal(repo.versions.size, 0);
 
   repo.conflictSlug = null;
@@ -336,6 +351,6 @@ test("USER authority and conflicting canonical state fail closed before activati
     ...systemGameDefinitionToGameCanonicalDocument(definition, "2026-08-21T00:00:00.000Z"),
     title: "conflict",
   });
-  await assert.rejects(() => run(service, definition, "canonical-conflict"), /canonical conflict/);
+  await assert.rejects(() => run(service, definition, testHash(15)), /canonical conflict/);
   assert.equal(repo.activated.length, 0);
 });

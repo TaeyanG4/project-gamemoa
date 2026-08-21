@@ -310,6 +310,30 @@ export const REQUIRED_TOKEN_RULES: RequiredTokenRule[] = [
     rule: "OWOGG publication must delegate to the provider-neutral publication core",
     tokens: ["GamePublicationService"],
   },
+  {
+    file: "packages/core/src/application/gamePublicationService.ts",
+    rule: "every publication state transition must carry the immutable publication target",
+    tokens: [
+      "GamePublicationTarget",
+      "markPublishing(target)",
+      "markReady(target, facts)",
+      "markFailed(target,",
+    ],
+  },
+  {
+    file: "packages/core/src/application/sandboxGameVersionPublicationRepository.ts",
+    rule: "USER publication must verify game, version, and content hash as one target",
+    tokens: [
+      "version.id !== target.versionId",
+      "version.gameId !== target.gameId",
+      "version.contentHash !== target.contentHash",
+    ],
+  },
+  {
+    file: "scripts/official-game-bootstrap.ts",
+    rule: "OWOGG D1 publication transitions must bind id, game_id, and content_hash",
+    tokens: ["id = ? AND game_id = ? AND content_hash = ?"],
+  },
 ];
 
 export const TOKEN_RULES: TokenRule[] = [
@@ -327,8 +351,36 @@ export const TOKEN_RULES: TokenRule[] = [
   },
   {
     scope: "packages/core/src/application",
+    files: ["officialGameBootstrap.ts", "sandboxGameUseCases.ts"],
+    rule: "publisher control planes must not implement generic object or manifest publication",
+    tokens: ["publishedObjectKey", "publishedManifestObjectKey", "buildBundleManifest"],
+    extensions: [".ts"],
+  },
+  {
+    scope: "packages/core/src/application",
     files: ["officialGameBootstrap.ts"],
-    rule: "official bootstrap must not implement generic object or manifest publication itself",
+    rule: "official bootstrap must not create USER review or sandbox state",
+    tokens: ["SandboxGameRepository", "sandbox_games", "sandbox_game_versions", "PENDING_REVIEW"],
+    extensions: [".ts"],
+  },
+  {
+    scope: "packages/core/src/application",
+    files: ["sandboxGameUseCases.ts", "sandboxGameVersionPublicationRepository.ts"],
+    rule: "USER publication must not assert OWOGG authority",
+    tokens: ["ensureOwoggIdentity", 'type: "OWOGG"', "publisher_type = 'OWOGG'"],
+    extensions: [".ts"],
+  },
+  {
+    scope: "scripts",
+    files: ["official-game-bootstrap.ts"],
+    rule: "official deployment bootstrap must not create USER review or sandbox state",
+    tokens: ["sandbox_games", "sandbox_game_versions", "PENDING_REVIEW", "publisher_type = 'USER'"],
+    extensions: [".ts"],
+  },
+  {
+    scope: "scripts",
+    files: ["official-game-bootstrap.ts"],
+    rule: "official deployment bootstrap must delegate manifest and file publication to core",
     tokens: ["publishedObjectKey", "publishedManifestObjectKey", "buildBundleManifest"],
     extensions: [".ts"],
   },

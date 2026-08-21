@@ -8,6 +8,7 @@ import {
   type GameIdentity,
   type GameVersion,
   type GamePublicationFacts,
+  type GamePublicationTarget,
   type OfficialGameBootstrapRepository,
 } from "@owogg/core";
 import {
@@ -128,38 +129,50 @@ export class D1OfficialGameBootstrapRepository implements OfficialGameBootstrapR
     return mapGameVersionRow(rows[0]);
   }
 
-  async markPublishing(versionId: number): Promise<void> {
+  async markPublishing(target: GamePublicationTarget): Promise<void> {
     const rows = await this.sql.query(
       `UPDATE game_versions
        SET publish_status = 'PUBLISHING', publish_error = NULL, published_at = NULL,
            manifest_key = NULL, published_size_bytes = NULL, file_count = NULL
-       WHERE id = ? AND publish_status <> 'READY'
+       WHERE id = ? AND game_id = ? AND content_hash = ? AND publish_status <> 'READY'
        RETURNING id`,
-      [versionId],
+      [target.versionId, target.gameId, target.contentHash],
     );
-    if (!rows[0]) throw new Error(`Official generic version ${versionId} cannot start publishing`);
+    if (!rows[0]) {
+      throw new Error(`Official publication target ${target.versionId} cannot start publishing`);
+    }
   }
 
-  async markReady(versionId: number, facts: GamePublicationFacts): Promise<void> {
+  async markReady(target: GamePublicationTarget, facts: GamePublicationFacts): Promise<void> {
     const rows = await this.sql.query(
       `UPDATE game_versions
        SET publish_status = 'READY', publish_error = NULL, published_at = ?, manifest_key = ?,
            published_size_bytes = ?, file_count = ?
-       WHERE id = ? AND publish_status = 'PUBLISHING'
+       WHERE id = ? AND game_id = ? AND content_hash = ? AND publish_status = 'PUBLISHING'
        RETURNING id, game_id, object_key, content_hash, bundle_bytes, publish_status, publish_error,
                  published_at, manifest_key, published_size_bytes, file_count, uploaded_at`,
-      [facts.publishedAt, facts.manifestKey, facts.publishedSizeBytes, facts.fileCount, versionId],
+      [
+        facts.publishedAt,
+        facts.manifestKey,
+        facts.publishedSizeBytes,
+        facts.fileCount,
+        target.versionId,
+        target.gameId,
+        target.contentHash,
+      ],
     );
-    if (!rows[0]) throw new Error(`Official generic version ${versionId} cannot become READY`);
+    if (!rows[0]) {
+      throw new Error(`Official publication target ${target.versionId} cannot become READY`);
+    }
   }
 
-  async markFailed(versionId: number, reason: string): Promise<void> {
+  async markFailed(target: GamePublicationTarget, reason: string): Promise<void> {
     await this.sql.query(
       `UPDATE game_versions
        SET publish_status = 'FAILED', publish_error = ?, published_at = NULL, manifest_key = NULL,
            published_size_bytes = NULL, file_count = NULL
-       WHERE id = ? AND publish_status <> 'READY'`,
-      [reason, versionId],
+       WHERE id = ? AND game_id = ? AND content_hash = ? AND publish_status <> 'READY'`,
+      [reason, target.versionId, target.gameId, target.contentHash],
     );
   }
 

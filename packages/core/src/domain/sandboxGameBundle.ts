@@ -477,6 +477,81 @@ export interface SandboxGameBundleManifest {
   files: SandboxGameBundleManifestFile[];
 }
 
+const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
+
+export function isSha256ContentHash(value: unknown): value is string {
+  return typeof value === "string" && SHA256_HEX_PATTERN.test(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+/**
+ * Strictly validates the one existing published-bundle manifest shape. This is deliberately kept
+ * beside {@link buildBundleManifest}: readers and writers share one domain contract rather than
+ * growing a second storage-specific schema.
+ */
+export function isValidSandboxGameBundleManifest(
+  value: unknown,
+): value is SandboxGameBundleManifest {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const manifest = value as Partial<SandboxGameBundleManifest>;
+
+  if (!isPositiveInteger(manifest.gameId) || !isPositiveInteger(manifest.versionId)) return false;
+  if (!isSha256ContentHash(manifest.contentHash)) return false;
+  if (
+    typeof manifest.entry !== "string" ||
+    normalizeBundleEntryPath(manifest.entry) !== manifest.entry
+  ) {
+    return false;
+  }
+  if (
+    !isPositiveInteger(manifest.fileCount) ||
+    manifest.fileCount > SANDBOX_GAME_POLICY.MAX_BUNDLE_FILE_COUNT ||
+    !isNonNegativeInteger(manifest.totalSize) ||
+    manifest.totalSize > SANDBOX_GAME_POLICY.MAX_EXTRACTED_BUNDLE_BYTES ||
+    typeof manifest.publishedAt !== "string" ||
+    !Number.isFinite(Date.parse(manifest.publishedAt)) ||
+    new Date(manifest.publishedAt).toISOString() !== manifest.publishedAt ||
+    !Array.isArray(manifest.files) ||
+    manifest.files.length !== manifest.fileCount
+  ) {
+    return false;
+  }
+
+  const paths = new Set<string>();
+  let totalSize = 0;
+  for (const candidate of manifest.files) {
+    if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) {
+      return false;
+    }
+    const file = candidate as Partial<SandboxGameBundleManifestFile>;
+    if (
+      typeof file.path !== "string" ||
+      normalizeBundleEntryPath(file.path) !== file.path ||
+      file.path === PUBLISHED_MANIFEST_FILENAME ||
+      paths.has(file.path) ||
+      !isNonNegativeInteger(file.size) ||
+      typeof file.contentType !== "string" ||
+      file.contentType.length === 0 ||
+      (file.contentEncoding !== undefined &&
+        (typeof file.contentEncoding !== "string" || file.contentEncoding.length === 0))
+    ) {
+      return false;
+    }
+    paths.add(file.path);
+    totalSize += file.size;
+    if (totalSize > SANDBOX_GAME_POLICY.MAX_EXTRACTED_BUNDLE_BYTES) return false;
+  }
+
+  return paths.has(manifest.entry) && totalSize === manifest.totalSize;
+}
+
 export function buildBundleManifest(input: {
   gameId: number;
   versionId: number;

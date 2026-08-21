@@ -1,6 +1,7 @@
 import type { SandboxGameRepository } from "../ports/sandboxGames.js";
 import type {
   GamePublicationFacts,
+  GamePublicationTarget,
   GameVersionPublicationRepository,
 } from "../modules/game/ports/gameVersionPublicationRepository.js";
 
@@ -8,8 +9,9 @@ import type {
 export class SandboxGameVersionPublicationRepository implements GameVersionPublicationRepository {
   constructor(private readonly sandboxGames: SandboxGameRepository) {}
 
-  async markPublishing(versionId: number): Promise<void> {
-    await this.sandboxGames.setVersionPublishState(versionId, {
+  async markPublishing(target: GamePublicationTarget): Promise<void> {
+    await this.requireTarget(target);
+    const updated = await this.sandboxGames.setVersionPublishState(target.versionId, {
       publishStatus: "PUBLISHING",
       publishError: null,
       publishedAt: null,
@@ -17,10 +19,12 @@ export class SandboxGameVersionPublicationRepository implements GameVersionPubli
       publishedSizeBytes: null,
       fileCount: null,
     });
+    assertTarget(updated, target);
   }
 
-  async markReady(versionId: number, facts: GamePublicationFacts): Promise<void> {
-    await this.sandboxGames.setVersionPublishState(versionId, {
+  async markReady(target: GamePublicationTarget, facts: GamePublicationFacts): Promise<void> {
+    await this.requireTarget(target);
+    const updated = await this.sandboxGames.setVersionPublishState(target.versionId, {
       publishStatus: "READY",
       publishError: null,
       publishedAt: facts.publishedAt,
@@ -28,10 +32,12 @@ export class SandboxGameVersionPublicationRepository implements GameVersionPubli
       publishedSizeBytes: facts.publishedSizeBytes,
       fileCount: facts.fileCount,
     });
+    assertTarget(updated, target);
   }
 
-  async markFailed(versionId: number, safeReason: string): Promise<void> {
-    await this.sandboxGames.setVersionPublishState(versionId, {
+  async markFailed(target: GamePublicationTarget, safeReason: string): Promise<void> {
+    await this.requireTarget(target);
+    const updated = await this.sandboxGames.setVersionPublishState(target.versionId, {
       publishStatus: "FAILED",
       publishError: safeReason,
       publishedAt: null,
@@ -39,5 +45,25 @@ export class SandboxGameVersionPublicationRepository implements GameVersionPubli
       publishedSizeBytes: null,
       fileCount: null,
     });
+    assertTarget(updated, target);
+  }
+
+  private async requireTarget(target: GamePublicationTarget): Promise<void> {
+    const version = await this.sandboxGames.findVersionById(target.versionId);
+    if (!version) throw new Error(`Game publication version ${target.versionId} does not exist`);
+    assertTarget(version, target);
+  }
+}
+
+function assertTarget(
+  version: { id: number; gameId: number; contentHash: string },
+  target: GamePublicationTarget,
+): void {
+  if (
+    version.id !== target.versionId ||
+    version.gameId !== target.gameId ||
+    version.contentHash !== target.contentHash
+  ) {
+    throw new Error(`Game publication target mismatch for version ${target.versionId}`);
   }
 }

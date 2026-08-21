@@ -94,19 +94,26 @@ test("official D1 publication adapter exposes only generic PUBLISHING/READY/FAIL
     },
   };
   const repo = new D1OfficialGameBootstrapRepository(executor);
+  const target = { gameId: 9, versionId: 55, contentHash: "a".repeat(64) };
 
-  await repo.markPublishing(55);
-  await repo.markReady(55, {
+  await repo.markPublishing(target);
+  await repo.markReady(target, {
     publishedAt: "2026-08-21T00:00:00.000Z",
     manifestKey: "games/9/55/.owogg-manifest.json",
     publishedSizeBytes: 123,
     fileCount: 2,
   });
-  await repo.markFailed(55, "bundle publication failed (Error)");
+  await repo.markFailed(target, "bundle publication failed (Error)");
 
   assert.match(calls[0]?.sql ?? "", /publish_status = 'PUBLISHING'/);
   assert.match(calls[1]?.sql ?? "", /publish_status = 'READY'/);
   assert.match(calls[2]?.sql ?? "", /publish_status = 'FAILED'/);
+  for (const call of calls) {
+    assert.match(call.sql, /id = \? AND game_id = \? AND content_hash = \?/);
+    assert.ok(call.values.includes(target.versionId));
+    assert.ok(call.values.includes(target.gameId));
+    assert.ok(call.values.includes(target.contentHash));
+  }
   assert.equal(
     calls.some((call) => /sandbox|review/i.test(call.sql)),
     false,

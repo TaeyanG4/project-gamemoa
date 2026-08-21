@@ -2238,6 +2238,7 @@ test("deletePublishedVersion removes exactly the objects the manifest lists, lea
   await publisher.deletePublishedVersion({
     gameId: version.gameId,
     versionId: version.id,
+    contentHash: version.contentHash,
     manifestKey: repo.versions.get(version.id)?.manifestKey ?? null,
   });
 

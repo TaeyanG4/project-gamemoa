@@ -68,19 +68,23 @@ API Composition Root (apps/api/src/container.ts)
 @owogg/db (D1 Repository 어댑터 - 게임 카탈로그 매니페스트와 완전 분리)
 ```
 
-### 2.1 통합 게임 Identity/Version 경계
+### 2.1 Production 통합 게임 플랫폼 경계
 
 - D1 `games`는 OWOGG/USER 공통 identity, publisher authority, visibility, live version 포인터를
   저장합니다.
 - D1 `game_versions`는 공통 bundle identity와 publish 상태만 저장합니다. USER 심사 상태·심사자·
   반려 사유는 계속 `sandbox_game_versions`에 남습니다.
-- A-4 동안 USER의 `sandbox_game_versions` 쓰기는 migration trigger로 `game_versions`에 수렴하지만,
-  production runtime read authority는 아직 기존 SYSTEM/Creator 경로에서 전환하지 않습니다.
+- USER의 `sandbox_game_versions` 쓰기는 migration trigger로 `game_versions`에 수렴하며, production
+  runtime은 OWOGG/USER 모두 `RuntimeGameRegistry`의 generic identity/version/canonical 경로를 사용합니다.
 - `games.live_version_id`는 같은 `games.id`에 속한 `game_versions.id`만 가리킬 수 있습니다.
 - 신규 USER version ID는 `game_versions` 공통 숫자 namespace에서 먼저 할당한 뒤 동일한 ID로 USER
   심사 row를 원자적으로 생성합니다.
 - 제목·설명·점수·presentation 등 canonical 의미는 B2
   `game-definitions/<slug>/definition.json`에 유지하며 D1 identity/version과 분리합니다.
+- bundle publication은 publisher-neutral `GamePublicationService`가 담당하고, USER review workflow와
+  OWOGG deterministic deploy bootstrap은 별도의 authorization/control-plane 경계로 유지합니다.
+- 현재 production 전체 그림과 official-admin authority의 미결정 사항은
+  [`docs/GAME_PLATFORM_ARCHITECTURE.md`](GAME_PLATFORM_ARCHITECTURE.md)를 참조합니다.
 
 ---
 
