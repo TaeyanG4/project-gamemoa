@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { Gamepad2, Search } from "lucide-react";
-import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
-import { useSandboxCatalogManifests } from "../features/catalog/sandboxGameAdapter";
+import { usePublicGames } from "../features/publicGamesApi";
+import { publicGameToCard } from "../features/catalog/publicGameAdapter";
 import { GameGrid } from "../components/ui/GameGrid";
 import { GridColumnSwitcher } from "../components/ui/GridColumnSwitcher";
 import { CategoryChips } from "../components/ui/CategoryChips";
@@ -26,19 +26,15 @@ export default function Games() {
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
-  const builtInGameManifests = useEnabledGameManifests();
-  // Approved sandbox games (Game Creator uploads) merged in alongside the built-in catalog —
-  // see features/catalog/sandboxGameAdapter.ts. Built-in games first so the catalog's existing
-  // order doesn't shuffle as sandbox games are added/removed.
-  const sandboxGameManifests = useSandboxCatalogManifests();
+  const { dict } = useI18n();
+  const { games: publicGames } = usePublicGames();
   const gameManifests = useMemo(
-    () => [...builtInGameManifests, ...sandboxGameManifests],
-    [builtInGameManifests, sandboxGameManifests],
+    () => publicGames.map((game) => publicGameToCard(game, dict)),
+    [publicGames, dict],
   );
 
   const { favoriteGameIds } = usePersonalization();
   const { isAuthenticated, openLoginModal } = useAuth();
-  const { dict } = useI18n();
 
   const handleSelectCategory = (categoryId: string) => {
     if (categoryId === "favorites" && !isAuthenticated) {
@@ -54,13 +50,14 @@ export default function Games() {
       const matchesSearch =
         !searchQuery ||
         title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        shortDescription.toLowerCase().includes(searchQuery.toLowerCase());
+        shortDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (game.genre?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
 
       const matchesCategory =
         selectedCategory === "all"
           ? true
           : selectedCategory === "favorites"
-            ? favoriteGameIds.includes(game.slug) || favoriteGameIds.includes(game.id)
+            ? favoriteGameIds.includes(game.slug)
             : game.categories.includes(selectedCategory);
 
       return matchesSearch && matchesCategory;

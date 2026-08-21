@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Gamepad2, Sparkles, Clock, Bookmark, TrendingUp } from "lucide-react";
-import { useEnabledGameManifests } from "../features/catalog/gameAvailability";
-import { useSandboxCatalogManifests } from "../features/catalog/sandboxGameAdapter";
+import { usePublicGames } from "../features/publicGamesApi";
+import { publicGameToCard } from "../features/catalog/publicGameAdapter";
 import { GameGrid } from "../components/ui/GameGrid";
 import { GridColumnSwitcher } from "../components/ui/GridColumnSwitcher";
 import { CategoryChips } from "../components/ui/CategoryChips";
@@ -22,19 +22,14 @@ export default function Home() {
   const initialCategory = searchParams.get("category") || "all";
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const { mobileColumns, setMobileColumns, desktopColumns, setDesktopColumns } = useGridColumns();
-  const builtInGameManifests = useEnabledGameManifests();
-  // Approved sandbox games merged in alongside the built-in catalog, same as /games (see
-  // features/catalog/sandboxGameAdapter.ts) -- this page has its own separate "미니게임 라인업"
-  // section with its own filteredGames/popularGames/etc., so it needs the same merge, not just
-  // /games (2026-08-18: this section was still built-in-only after #10/#16 fixed only /games).
-  const sandboxGameManifests = useSandboxCatalogManifests();
+  const { dict } = useI18n();
+  const { games: publicGames } = usePublicGames();
   const gameManifests = useMemo(
-    () => [...builtInGameManifests, ...sandboxGameManifests],
-    [builtInGameManifests, sandboxGameManifests],
+    () => publicGames.map((game) => publicGameToCard(game, dict)),
+    [publicGames, dict],
   );
 
   const { favoriteGameIds, recentPlays } = usePersonalization();
-  const { dict } = useI18n();
   const { isAuthenticated, openLoginModal } = useAuth();
 
   const handleSelectCategory = (categoryId: string) => {
@@ -55,9 +50,7 @@ export default function Home() {
   const filteredGames = useMemo(() => {
     if (selectedCategory === "all") return gameManifests;
     if (selectedCategory === "favorites") {
-      return gameManifests.filter(
-        (game) => favoriteGameIds.includes(game.slug) || favoriteGameIds.includes(game.id),
-      );
+      return gameManifests.filter((game) => favoriteGameIds.includes(game.slug));
     }
     return gameManifests.filter((game) => game.categories.includes(selectedCategory));
   }, [gameManifests, selectedCategory, favoriteGameIds]);
@@ -68,14 +61,14 @@ export default function Home() {
 
   const recentGames = useMemo(() => {
     return recentPlays
-      .map((r) => gameManifests.find((g) => g.slug === r.gameId || g.id === r.gameId))
+      .map((r) => gameManifests.find((g) => g.slug === r.gameId))
       .filter((g): g is (typeof gameManifests)[0] => Boolean(g))
       .slice(0, 4);
   }, [gameManifests, recentPlays]);
 
   const favoriteGames = useMemo(() => {
     return favoriteGameIds
-      .map((id) => gameManifests.find((g) => g.slug === id || g.id === id))
+      .map((id) => gameManifests.find((g) => g.slug === id))
       .filter((g): g is (typeof gameManifests)[0] => Boolean(g))
       .slice(0, 4);
   }, [gameManifests, favoriteGameIds]);

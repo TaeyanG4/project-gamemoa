@@ -230,14 +230,14 @@ scoresRouter.get("/user/me", async (c) => {
   }
 
   try {
-    const { sessionRepo, scoreUseCases } = createContainer(c.env.DB);
+    const { sessionRepo, scoreReadUseCases } = createContainer(c.env.DB, readB2Config(c.env));
     const authData = await sessionRepo.findSession(sessionId);
 
     if (!authData) {
       return c.json({ authenticated: false, bests: {} });
     }
 
-    const bests = await scoreUseCases.getUserBests(authData.user.id);
+    const bests = await scoreReadUseCases.getUserBests(authData.user.id);
 
     return c.json({
       authenticated: true,

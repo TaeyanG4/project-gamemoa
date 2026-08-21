@@ -10,6 +10,7 @@ import {
 } from "@owogg/contracts";
 import type { ApiEnv } from "./auth.js";
 import { createContainer, getPublicProfileData } from "../container.js";
+import { readB2Config } from "./devGames.js";
 
 export const profileRouter = new Hono<ApiEnv>();
 
@@ -24,7 +25,7 @@ profileRouter.get("/public/:userId", async (c) => {
     return c.json({ error: "Database unavailable" }, 500);
   }
 
-  const container = createContainer(c.env.DB);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
   const viewerId = await getAuthUserId(c);
   const data = await getPublicProfileData(container, userId, viewerId);
   if (!data) {

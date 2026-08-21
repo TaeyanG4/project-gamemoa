@@ -1,7 +1,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, devices } from "@playwright/test";
-import { GAME_ORIGIN_PORT, WEB_SPA_PORT, WEB_BASE_URL } from "./config.js";
+import { GAME_ORIGIN_PORT, WEB_API_PORT, WEB_SPA_PORT, WEB_BASE_URL } from "./config.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, "..");
@@ -11,11 +11,11 @@ const WEB_BUILD_ROOT = path.join(REPO_ROOT, "apps", "web", "build", "client");
 
 /**
  * Chromium only — this suite checks DOM-level invariants (iframe sandbox/src/height), not
- * cross-browser rendering quirks, so one engine is enough for what it's actually testing. Both
- * static servers are started here (via `webServer`, Playwright's own "wait for it to be ready,
- * tear it down after") rather than in e2e/run.ts — run.ts's job ends at "produce a built
- * apps/web/build/client and a populated e2e/.local-game-origin/", both of which must already
- * exist on disk before either server here has anything to serve.
+ * cross-browser rendering quirks, so one engine is enough for what it's actually testing. Local
+ * game, API, and web servers are started here (via `webServer`, Playwright's own "wait for
+ * it to be ready, tear it down after") rather than in e2e/run.ts — run.ts's job ends at "produce a
+ * built apps/web/build/client and a populated e2e/.local-game-origin/", both of which must already
+ * exist on disk before the servers here have anything to serve.
  *
  * `channel: "chrome"` on the one project below runs against the OS-installed Google Chrome
  * (GitHub's ubuntu-24.04 runner image ships it preinstalled; a local dev machine needs a system
@@ -64,6 +64,15 @@ export default defineConfig({
         E2E_STATIC_ROOT: WEB_BUILD_ROOT,
         E2E_STATIC_PORT: String(WEB_SPA_PORT),
         E2E_STATIC_SPA_FALLBACK: "1",
+      },
+    },
+    {
+      command: "tsx e2e/serveApiCli.ts",
+      port: WEB_API_PORT,
+      cwd: REPO_ROOT,
+      reuseExistingServer: false,
+      env: {
+        E2E_API_PORT: String(WEB_API_PORT),
       },
     },
   ],

@@ -1,14 +1,42 @@
-import { PublicGameSchema } from "@owogg/contracts";
+import { useEffect, useState } from "react";
+import { PublicGameListResponseSchema, PublicGameSchema } from "@owogg/contracts";
 import { apiFetch } from "../lib/api/client";
 
 /**
- * GET /api/games/:slug — the unified Game Platform read model (SYSTEM ∪ CREATOR;
- * apps/api/src/routes/games.ts), returned as `PublicGame`'s discriminated union. Today this has
- * exactly one caller: features/game/transitionalCreatorGameResolver.ts, which uses it purely to
- * decide "is this slug a Creator game?" — not a general-purpose catalog client. The main catalog
- * still reads GET /api/games/sandbox* (features/catalog/sandboxGameAdapter.ts) unchanged; folding
- * that over onto this unified endpoint is a separate, later step (see games.ts's own doc comment).
+ * Generic public game reads. The API is the sole catalog/detail authority for both publishers;
+ * legacy sandbox endpoints remain available only for compatibility callers.
  */
 export function fetchPublicGame(slug: string) {
   return apiFetch(`/api/games/${encodeURIComponent(slug)}`, PublicGameSchema);
+}
+
+export function fetchPublicGames() {
+  return apiFetch("/api/games", PublicGameListResponseSchema);
+}
+
+/** Shared catalog hook. A failed public read fails closed to an empty catalog; no static registry
+ * or sandbox metadata fallback is allowed on the primary production path. */
+export function usePublicGames() {
+  const [games, setGames] = useState<Awaited<ReturnType<typeof fetchPublicGames>>["games"]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    fetchPublicGames()
+      .then((response) => {
+        if (!cancelled) setGames(response.games);
+      })
+      .catch(() => {
+        if (!cancelled) setGames([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { games, isLoading };
 }

@@ -1,5 +1,4 @@
-import type { GameManifest } from "@owogg/game-sdk";
-import { GameCard } from "./GameCard";
+import { GameCard, type GameCardProps } from "./GameCard";
 import type { MobileColumns, DesktopColumns } from "../../features/personalization/useGridColumns";
 
 /** Static class strings per (mobile, desktop) column pair — Tailwind can't see dynamically-built
@@ -26,7 +25,7 @@ const GRID_CLASSES: Record<MobileColumns, Record<DesktopColumns, string>> = {
 };
 
 interface GameGridProps {
-  games: readonly GameManifest[];
+  games: readonly GameCardProps[];
   mobileColumns: MobileColumns;
   desktopColumns: DesktopColumns;
   emptyMessage?: React.ReactNode;

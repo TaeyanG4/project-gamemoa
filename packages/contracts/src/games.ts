@@ -1,104 +1,113 @@
 import { z } from "zod";
-import { SandboxGameModeSchema } from "./sandboxGames.js";
 
-/**
- * The unified public Game read model — `GET /api/games` (catalog) and `GET /api/games/:slug`
- * (detail). Mirrors packages/core/src/modules/game/domain/publicGame.ts's `PublicGame` union
- * field-for-field; see that file's doc comment for why SYSTEM and CREATOR stay two distinct
- * shapes rather than one shape with optional fields on both sides.
- *
- * Compatibility note: this does NOT replace `GET /api/games/sandbox`/`GET /api/games/sandbox/:slug`
- * (SandboxGamePublicDetailSchema below) — both surfaces are served side by side. Nothing currently
- * consuming those routes (apps/web/app/features/catalog/sandboxGameAdapter.ts in particular) has
- * been switched over yet.
- */
+const ScoreConfigSchema = z.object({
+  unit: z.string(),
+  direction: z.enum(["asc", "desc"]),
+  min: z.number(),
+  max: z.number(),
+  displayPrefix: z.string().optional(),
+  displaySuffix: z.string().optional(),
+});
 
-// Mirrors @owogg/game-sdk/contracts' GameMode/InputMethod/GameStatus literal unions. Duplicated
-// here rather than imported: packages/contracts has no dependency on @owogg/game-sdk (it is meant
-// to stay a leaf package with only zod as a dependency — see packages/contracts/package.json),
-// and a wire schema's literals are pinned to what actually travels over HTTP regardless of how
-// the internal type is defined. Same precedent as SandboxGameModeSchema below, which duplicates
-// domain/sandboxGames.ts's SandboxGameMode the same way.
-const PublicGameModeSchema = z.enum(["single", "local-multi", "online-multi"]);
-const PublicGameInputMethodSchema = z.enum(["mouse", "keyboard", "touch"]);
-const PublicGameStatusSchema = z.enum(["draft", "beta", "published", "hidden"]);
+const DifficultyConfigSchema = z.object({
+  levels: z.array(z.object({ id: z.string(), label: z.string() })),
+  defaultLevelId: z.string(),
+});
 
-export const PublicGameOwnerTypeSchema = z.enum(["SYSTEM", "CREATOR"]);
-export type PublicGameOwnerType = z.infer<typeof PublicGameOwnerTypeSchema>;
+const GamePolicySchema = z.object({
+  score: ScoreConfigSchema.nullable(),
+  leaderboard: z.boolean(),
+  xpPerCompletion: z.number().int().nonnegative(),
+  requiresAuth: z.boolean(),
+});
 
-export const PublicSystemGameSchema = z.object({
-  ownerType: z.literal("SYSTEM"),
-  slug: z.string(),
-  title: z.string(),
-  shortDescription: z.string(),
-  description: z.string(),
-  status: PublicGameStatusSchema,
+const GamePresentationSchema = z.object({
+  viewport: z.discriminatedUnion("mode", [
+    z.object({
+      mode: z.literal("responsive"),
+      preferredWidth: z.number().positive().optional(),
+      preferredHeight: z.number().positive().optional(),
+      minWidth: z.number().positive().optional(),
+      minHeight: z.number().positive().optional(),
+      maxWidth: z.number().positive().optional(),
+      maxHeight: z.number().positive().optional(),
+    }),
+    z.object({
+      mode: z.literal("fixed"),
+      preferredWidth: z.number().positive(),
+      preferredHeight: z.number().positive(),
+      minWidth: z.number().positive().optional(),
+      minHeight: z.number().positive().optional(),
+      maxWidth: z.number().positive().optional(),
+      maxHeight: z.number().positive().optional(),
+    }),
+  ]),
+  fullscreen: z.object({
+    supported: z.boolean(),
+    recommended: z.boolean().optional(),
+  }),
+  mobile: z.object({
+    support: z.enum(["supported", "experimental", "unsupported"]),
+    orientation: z.enum(["any", "portrait", "landscape"]).optional(),
+  }),
+});
+
+const TaxonomyCatalogSchema = z.object({
+  type: z.literal("TAXONOMY"),
   categories: z.array(z.string()),
   tags: z.array(z.string()),
-  modes: z.array(PublicGameModeSchema),
-  inputMethods: z.array(PublicGameInputMethodSchema),
+  modes: z.array(z.enum(["single", "local-multi", "online-multi"])),
+  inputMethods: z.array(z.enum(["mouse", "keyboard", "touch"])),
   minPlayers: z.number().int().positive(),
   maxPlayers: z.number().int().positive(),
   thumbnail: z.string(),
   accent: z.string().optional(),
-  requiresAuth: z.boolean(),
-  supportsLeaderboard: z.boolean(),
+  estimatedRoundSeconds: z.number().positive().optional(),
 });
-export type PublicSystemGame = z.infer<typeof PublicSystemGameSchema>;
 
-/** No developerUserId, no review/publish-internal field — same narrowness as
- * SandboxGamePublicDetailSchema below, which this shape is a superset of (adds ownerType,
- * requiresAuth, supportsLeaderboard for symmetry with PublicSystemGameSchema). */
-export const PublicCreatorGameSchema = z.object({
-  ownerType: z.literal("CREATOR"),
+const GenreModeCatalogSchema = z.object({
+  type: z.literal("GENRE_MODE"),
+  genre: z.string(),
+  mode: z.enum(["single", "multi"]),
+});
+
+const PublicGameSchemaBase = {
   slug: z.string(),
   title: z.string(),
-  shortDescription: z.string().nullable(),
-  description: z.string().nullable(),
-  genre: z.string(),
-  mode: SandboxGameModeSchema,
-  hasLogo: z.boolean(),
-  requiresAuth: z.boolean(),
-  supportsLeaderboard: z.boolean(),
-});
-export type PublicCreatorGame = z.infer<typeof PublicCreatorGameSchema>;
+  shortDescription: z.string(),
+  description: z.string(),
+  catalog: z.union([TaxonomyCatalogSchema, GenreModeCatalogSchema]),
+  policy: GamePolicySchema,
+  presentation: GamePresentationSchema.optional(),
+  difficulty: DifficultyConfigSchema.optional(),
+  supportsReplay: z.boolean(),
+  mediaUrl: z.union([z.string().url(), z.string().startsWith("/")]).nullable(),
+};
 
-export const PublicGameSchema = z.discriminatedUnion("ownerType", [
-  PublicSystemGameSchema,
-  PublicCreatorGameSchema,
+/** Provider authority is an explicit wire discriminant. No publisher user id or review fields
+ * are part of either branch; the canonical catalog shape remains the only metadata union. */
+export const PublicGameSchema = z.discriminatedUnion("publisherType", [
+  z.object({ ...PublicGameSchemaBase, publisherType: z.literal("OWOGG") }),
+  z.object({ ...PublicGameSchemaBase, publisherType: z.literal("USER") }),
 ]);
 export type PublicGame = z.infer<typeof PublicGameSchema>;
 
-/** GET /api/games — SYSTEM games first, then every currently-PUBLIC creator game. See
- * mergePublicGames's doc comment (packages/core) for the ordering rationale. */
 export const PublicGameListResponseSchema = z.object({
   games: z.array(PublicGameSchema),
 });
 export type PublicGameListResponse = z.infer<typeof PublicGameListResponseSchema>;
 
-/**
- * POST /api/games/:slug/session — a short-lived, HMAC-signed Game Session token (see
- * packages/core/src/domain/gameSession.ts). `token` is an opaque string; a client has no reason to
- * parse it, only to hold it and eventually attach it to a future request. `expiresAt` is
- * informational (ISO 8601) — the token is self-describing and self-expiring server-side regardless
- * of whether a caller ever reads this field.
- */
+/** POST /api/games/:slug/session — short-lived parent-side Game Session token. */
 export const GameSessionResponseSchema = z.object({
   token: z.string(),
   expiresAt: z.string(),
 });
 export type GameSessionResponse = z.infer<typeof GameSessionResponseSchema>;
 
-/**
- * POST /api/games/:slug/score — provider-neutral server-side score acceptance. `token` is the Game
- * Session token from GameSessionResponseSchema, spent exactly once by this call. Difficulty is
- * optional on the wire because the signed token is authoritative; when supplied it must match.
- */
 export const GameScoreAcceptRequestSchema = z.object({
   token: z.string(),
   score: z.number(),
   difficulty: z.string().optional(),
-  /** Separate Discord guild play context; never reaches the iframe or replaces the game token. */
   playToken: z.string().optional(),
 });
 export type GameScoreAcceptRequest = z.infer<typeof GameScoreAcceptRequestSchema>;
@@ -116,7 +125,7 @@ export const GameScoreAcceptResponseSchema = z.object({
 });
 export type GameScoreAcceptResponse = z.infer<typeof GameScoreAcceptResponseSchema>;
 
-/** Transitional names retained for CreatorGameHost callers; the endpoint is now generic. */
+/** Transitional endpoint aliases retained for the C-2 client adapter; the wire shape is generic. */
 export const CreatorScoreAcceptRequestSchema = GameScoreAcceptRequestSchema;
 export type CreatorScoreAcceptRequest = GameScoreAcceptRequest;
 export const CreatorScoreAcceptResponseSchema = GameScoreAcceptResponseSchema;

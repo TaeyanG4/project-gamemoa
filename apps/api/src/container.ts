@@ -22,6 +22,7 @@ import {
   D1GameScoreAcceptanceRepository,
   D1GameIdentityRepository,
   D1GameVersionRepository,
+  D1GameAssetRepository,
   BackblazeB2GameBundleRepository,
   UnconfiguredGameBundleRepository,
   B2CreatorGameDefinitionRepository,
@@ -29,7 +30,7 @@ import {
   type BackblazeB2Config,
 } from "@owogg/db";
 import {
-  ScoreUseCases,
+  GenericScoreReadUseCases,
   PersonalizationUseCases,
   IdentityUseCases,
   AccountMergeUseCases,
@@ -85,6 +86,7 @@ import {
   type GameCanonicalRepository,
   type GameIdentityRepository,
   type GameVersionRepository,
+  type GameAssetRepository,
   type RuntimeGameRegistry,
 } from "@owogg/core";
 import type { D1Database } from "@cloudflare/workers-types";
@@ -96,7 +98,7 @@ import { FflateBundleArchiveReader } from "./infrastructure/games/FflateBundleAr
  * deploy time, so there is nothing request-specific to rebuild the way the D1-backed repositories
  * below need a fresh handle each call. Held to agreement with GAME_MANIFESTS by `pnpm
  * registry:check` (scripts/registry-builder.ts's assertDefinitionsMatchManifests), so this is
- * behaviourally the same catalog ScoreUseCases/GameSettingsUseCases resolved through
+ * behaviourally the same catalog GameSettingsUseCases resolved through
  * GAME_MANIFEST_MAP/GAME_MANIFESTS before.
  *
  * Exported directly (not only reachable via `createContainer(db).gameRegistry`) because it
@@ -161,16 +163,18 @@ export interface AppContainer {
   gameCanonicalRepo: GameCanonicalRepository;
   gameIdentityRepo: GameIdentityRepository;
   gameVersionRepo: GameVersionRepository;
+  gameAssetRepo: GameAssetRepository;
   runtimeGameRegistry: RuntimeGameRegistry;
   runtimeGameAvailability: RuntimeGameAvailability;
   /** SYSTEM games only today (game-registry/, compiled to GAME_DEFINITIONS) — a creator-owned
    * game is not "missing" from here so much as out of scope, see StaticGameRegistry's doc
-   * comment. Exposed on the container, not just threaded privately into ScoreUseCases/
-   * GameSettingsUseCases, so a future route that needs to resolve a game directly has one place
-   * to get it from rather than reaching back into a generated file. */
+   * comment. Exposed on the container for legacy/admin compatibility. Generic score reads use the
+   * provider-neutral runtime registry instead; GameSettingsUseCases still use this field, so a
+   * future route that needs to resolve a game directly has one place to get it from rather than
+   * reaching back into a generated file. */
   gameRegistry: GameRegistry;
 
-  scoreUseCases: ScoreUseCases;
+  scoreReadUseCases: GenericScoreReadUseCases;
   personalizationUseCases: PersonalizationUseCases;
   identityUseCases: IdentityUseCases;
   accountMergeUseCases: AccountMergeUseCases;
@@ -232,6 +236,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
   const gameScoreAcceptanceRepo = new D1GameScoreAcceptanceRepository(db);
   const gameIdentityRepo = new D1GameIdentityRepository(db);
   const gameVersionRepo = new D1GameVersionRepository(db);
+  const gameAssetRepo = new D1GameAssetRepository(db);
   const gameBundleStorageRepo: GameBundleStorageRepository = b2Config
     ? new BackblazeB2GameBundleRepository(b2Config)
     : new UnconfiguredGameBundleRepository();
@@ -258,7 +263,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameSettingsRepo,
   );
 
-  const scoreUseCases = new ScoreUseCases(scoreRepo, gameRegistry);
+  const scoreReadUseCases = new GenericScoreReadUseCases(scoreRepo, runtimeGameRegistry);
   const personalizationUseCases = new PersonalizationUseCases(personalizationRepo);
   const identityUseCases = new IdentityUseCases(userRepo);
   const accountMergeUseCases = new AccountMergeUseCases(
@@ -297,7 +302,6 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     sandboxGameRepo,
     gameBundleStorageRepo,
     gameBundlePublisher,
-    gameRegistry,
     creatorGameDefinitionRepo,
     gameCanonicalRepo,
   );
@@ -338,6 +342,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     gameScoreAcceptanceRepo,
     gameIdentityRepo,
     gameVersionRepo,
+    gameAssetRepo,
     gameBundleStorageRepo,
     gameBundlesConfigured: Boolean(b2Config),
     creatorGameDefinitionRepo,
@@ -346,7 +351,7 @@ export function createContainer(db: D1Database, b2Config?: BackblazeB2Config): A
     runtimeGameAvailability,
     gameRegistry,
 
-    scoreUseCases,
+    scoreReadUseCases,
     personalizationUseCases,
     identityUseCases,
     accountMergeUseCases,
@@ -385,7 +390,7 @@ export async function evaluateAchievementsForUser(
 ): Promise<string[]> {
   const [progress, bests, personalization] = await Promise.all([
     container.progressionUseCases.getProgressionSummary(userId),
-    container.scoreUseCases.getUserBests(userId),
+    container.scoreReadUseCases.getUserBests(userId),
     container.personalizationUseCases.getPersonalizationState(userId),
   ]);
 
@@ -447,7 +452,7 @@ export async function getPublicProfileData(
       container.progressionUseCases.getProgressionSummary(userId),
       container.progressionUseCases.getGlobalXpRank(userId),
       container.achievementUseCases.getSummary(userId),
-      container.scoreUseCases.getUserBestsFormatted(userId),
+      container.scoreReadUseCases.getUserBestsFormatted(userId),
       container.creatorUseCases.getCreatorProfileByUserId(userId),
       needsPersonalization
         ? container.personalizationUseCases.getPersonalizationState(userId)

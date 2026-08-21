@@ -54,12 +54,15 @@ export * from "./modules/game/domain/gameIdentity.js";
 export * from "./modules/game/ports/gameIdentityRepository.js";
 export * from "./modules/game/domain/gameVersion.js";
 export * from "./modules/game/ports/gameVersionRepository.js";
+export * from "./modules/game/domain/gameAsset.js";
+export * from "./modules/game/ports/gameAssetRepository.js";
 export * from "./modules/game/domain/runtimeGame.js";
 export * from "./modules/game/ports/runtimeGameRegistry.js";
 export * from "./modules/game/registry/composedRuntimeGameRegistry.js";
 
 export * from "./repositories/interfaces.js";
 export * from "./application/scoreUseCases.js";
+export * from "./application/genericScoreReadUseCases.js";
 export * from "./application/personalizationUseCases.js";
 export * from "./application/identityUseCases.js";
 export * from "./application/accountMergeUseCases.js";

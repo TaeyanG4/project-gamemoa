@@ -60,6 +60,9 @@ function createUseCases(runtime: RuntimeGame) {
     async findBySlug(slug) {
       return slug === runtime.identity.slug ? runtime : null;
     },
+    async listPublic() {
+      return [runtime];
+    },
   };
   const availability = {
     async isVersionServable(gameId: number, versionId: number) {

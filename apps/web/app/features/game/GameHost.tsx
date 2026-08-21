@@ -1,8 +1,13 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useNavigate, Link } from "react-router";
-import { gameManifests } from "../catalog/registry";
 import { useIsGameDisabled } from "../catalog/gameAvailability";
-import { formatScore, type GameRuntimeContext, type GameResult } from "@owogg/game-sdk";
+import {
+  formatScore,
+  type GameRuntimeContext,
+  type GameResult,
+  type GamePresentation,
+  type ScoreConfig,
+} from "@owogg/game-sdk";
 import {
   saveLocalBestScore,
   extractPlayTokenFromLocation,
@@ -13,7 +18,6 @@ import { getReactionTierById } from "@owogg/shared";
 import { useAuth } from "../auth";
 import { usePersonalization } from "../personalization";
 import { useI18n } from "../i18n/I18nContext";
-import { getLocalizedGameContent } from "../catalog/localizedGameContent";
 import { localizedDifficultyLabel } from "../catalog/difficultyLabels";
 import { GameThumbnail } from "../../components/ui/GameThumbnail";
 import { XIcon } from "../../components/ui/XIcon";
@@ -29,7 +33,8 @@ import {
 } from "./presentationAdvisory";
 import { gamePlayUrl } from "../../lib/api/config";
 import type { Dictionary } from "../i18n/dictionary";
-import type { LeaderRecord } from "@owogg/contracts";
+import type { LeaderRecord, PublicGame } from "@owogg/contracts";
+import { fetchPublicGame } from "../publicGamesApi";
 import {
   ArrowLeft,
   AlertCircle,
@@ -119,7 +124,7 @@ export function shouldRemountIframeOnDifficultyChange(
  *
  * Returns null for a completion with no score: runtime.complete's downstream (saveLocalBestScore,
  * handleScoreSubmission) has nothing meaningful to do with an absent score, so GameHost simply
- * doesn't call it rather than synthesizing a fake one (mirrors CreatorGameHost's own `result.score
+ * doesn't call it rather than synthesizing a fake one (mirrors GameHost's own `result.score
  * !== undefined` guard around its score-submission call).
  *
  * gameId/sessionId/durationMs/clientStartedAt/clientEndedAt are all placeholder-filled where the
@@ -163,7 +168,7 @@ const LEGACY_IFRAME_FRAME_CLASS_NAME = "h-[70vh] min-h-[480px] max-h-[720px] w-f
  * Measures a DOM element's content box, live across resizes. The one piece of DOM measurement
  * `resolvePresentationLayout` itself deliberately has none of (pure function, no DOM — see its
  * own doc comment); this is the thin wiring around it, same split as
- * transitionalCreatorGameResolver.ts's resolveGameSource/useGameSourceResolution.
+ * old publisher-specific resolver paths.
  *
  * Returns a callback ref rather than accepting a `useRef` object: the element this measures
  * (the iframe area, below) is conditionally rendered — not present on GameHost's very first
@@ -348,6 +353,65 @@ export interface GameHostProps {
   slug: string;
 }
 
+function publicGameAccent(game: PublicGame | null): string | undefined {
+  return game?.catalog.type === "TAXONOMY" ? game.catalog.accent : undefined;
+}
+
+/** Wire schemas permit explicit `undefined` on optional properties; the SDK domain types use
+ * exact-optional properties. Normalize at this boundary instead of weakening either contract. */
+function toGamePresentation(input: PublicGame["presentation"]): GamePresentation | undefined {
+  if (!input) return undefined;
+  const viewport = input.viewport;
+  const bounds = {
+    ...(viewport.minWidth !== undefined ? { minWidth: viewport.minWidth } : {}),
+    ...(viewport.minHeight !== undefined ? { minHeight: viewport.minHeight } : {}),
+    ...(viewport.maxWidth !== undefined ? { maxWidth: viewport.maxWidth } : {}),
+    ...(viewport.maxHeight !== undefined ? { maxHeight: viewport.maxHeight } : {}),
+  };
+  return {
+    viewport:
+      viewport.mode === "fixed"
+        ? {
+            mode: "fixed",
+            preferredWidth: viewport.preferredWidth,
+            preferredHeight: viewport.preferredHeight,
+            ...bounds,
+          }
+        : {
+            mode: "responsive",
+            ...(viewport.preferredWidth !== undefined
+              ? { preferredWidth: viewport.preferredWidth }
+              : {}),
+            ...(viewport.preferredHeight !== undefined
+              ? { preferredHeight: viewport.preferredHeight }
+              : {}),
+            ...bounds,
+          },
+    fullscreen: {
+      supported: input.fullscreen.supported,
+      ...(input.fullscreen.recommended !== undefined
+        ? { recommended: input.fullscreen.recommended }
+        : {}),
+    },
+    mobile: {
+      support: input.mobile.support,
+      ...(input.mobile.orientation !== undefined ? { orientation: input.mobile.orientation } : {}),
+    },
+  };
+}
+
+function toScoreConfig(input: PublicGame["policy"]["score"]): ScoreConfig | undefined {
+  if (!input) return undefined;
+  return {
+    unit: input.unit,
+    direction: input.direction,
+    min: input.min,
+    max: input.max,
+    ...(input.displayPrefix !== undefined ? { displayPrefix: input.displayPrefix } : {}),
+    ...(input.displaySuffix !== undefined ? { displaySuffix: input.displaySuffix } : {}),
+  };
+}
+
 /**
  * Owns the full built-in-game play lifecycle — loading, difficulty, the runtime session handed to
  * the game module, score submission, the result/leaderboard/share overlay, and retry — for
@@ -381,12 +445,18 @@ export function GameHost({ slug }: GameHostProps) {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
   // Result-screen leaderboard preview — only fetched for games that opt in
-  // (manifest.supportsLeaderboard), so casual games where rank doesn't matter can skip it.
+  // (game.policy.leaderboard), so casual games where rank doesn't matter can skip it.
   const [resultLeaderboard, setResultLeaderboard] = useState<LeaderRecord[] | null>(null);
 
-  const manifest = useMemo(() => gameManifests.find((m) => m.slug === slug), [slug]);
-  const localizedTitle = manifest ? getLocalizedGameContent(dict, manifest).title : undefined;
-  const isDisabled = useIsGameDisabled(manifest?.id ?? slug);
+  const [game, setGame] = useState<PublicGame | null>(null);
+  const localizedTitle =
+    game?.publisherType === "OWOGG" ? (dict.gameContent[slug]?.title ?? game.title) : game?.title;
+  const presentation = useMemo(() => toGamePresentation(game?.presentation), [game?.presentation]);
+  const scoreConfig = useMemo(
+    () => toScoreConfig(game?.policy.score ?? null),
+    [game?.policy.score],
+  );
+  const isDisabled = useIsGameDisabled(slug);
 
   const runtimeKind = "iframe" as const;
 
@@ -411,9 +481,9 @@ export function GameHost({ slug }: GameHostProps) {
   // `available` is a fresh object every render; the memo below depends on its primitive fields
   // instead so this only recomputes when they actually change, not on every render.
   const presentationLayout = useMemo(
-    () => resolvePresentationLayout(manifest?.presentation, available),
+    () => resolvePresentationLayout(presentation, available),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [manifest?.presentation, available?.width, available?.height],
+    [presentation, available?.width, available?.height],
   );
   // Game preference ∩ Platform constraints ∩ Actual available viewport → Host decides (see
   // GamePresentation's own doc comment). "legacy" is every shipped game today: the exact
@@ -451,23 +521,20 @@ export function GameHost({ slug }: GameHostProps) {
   const gameSurfaceRef = useRef<HTMLDivElement>(null);
   const { isFullscreen, isFullscreenApiAvailable, toggleFullscreen } =
     useFullscreen(gameSurfaceRef);
-  const showFullscreenControl = shouldShowFullscreenControl(
-    manifest?.presentation,
-    isFullscreenApiAvailable,
-  );
+  const showFullscreenControl = shouldShowFullscreenControl(presentation, isFullscreenApiAvailable);
   // A hint only (button prominence / a small badge) — never automatic requestFullscreen. See
   // GamePresentationFullscreen's own doc comment on why there is deliberately no "required" field
   // for this to escalate into.
-  const fullscreenRecommended = manifest?.presentation?.fullscreen.recommended === true;
+  const fullscreenRecommended = presentation?.fullscreen.recommended === true;
 
   // Mobile/orientation advisories — see presentationAdvisory.ts's own doc comment. Both resolvers
   // return "no advisory" outright whenever isMobileLikeEnvironment is false, so nothing here ever
   // shows on desktop regardless of what a game's presentation.mobile declares.
   const isMobileLikeEnvironment = useIsMobileLikeEnvironment();
   const actualOrientation = useActualOrientation();
-  const mobileAdvisory = resolveMobileAdvisory(manifest?.presentation, isMobileLikeEnvironment);
+  const mobileAdvisory = resolveMobileAdvisory(presentation, isMobileLikeEnvironment);
   const orientationAdvisory = resolveOrientationAdvisory(
-    manifest?.presentation,
+    presentation,
     isMobileLikeEnvironment,
     actualOrientation,
   );
@@ -506,7 +573,7 @@ export function GameHost({ slug }: GameHostProps) {
       </div>
     ) : null;
 
-  // Difficulty selection — only meaningful for games with manifest.difficulty. Resets to the
+  // Difficulty selection — only meaningful for games with canonical difficulty. Resets to the
   // game's default whenever navigating between games. A change here only affects the NEXT
   // attempt: for LegacyReactRuntime that's handleStart inside the game component (an
   // already-in-progress round keeps whatever it captured when it started, never flips difficulty
@@ -519,9 +586,9 @@ export function GameHost({ slug }: GameHostProps) {
   // the only other place this ref is written.
   const iframeAttemptDifficultyRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    setSelectedDifficultyId(manifest?.difficulty?.defaultLevelId ?? "normal");
+    setSelectedDifficultyId(game?.difficulty?.defaultLevelId ?? "normal");
     iframeAttemptDifficultyRef.current = undefined;
-  }, [manifest]);
+  }, [game]);
 
   // The generic Game Session is acquired before each attempt and held only in this parent-side
   // controller. It is never included in HOST_INIT or any iframe bridge message.
@@ -552,13 +619,29 @@ export function GameHost({ slug }: GameHostProps) {
     void scoreFlow.startAttempt(isAuthenticated, selectedDifficultyId);
   }, [authLoading, isAuthenticated, scoreFlow, selectedDifficultyId, attemptKey]);
 
-  // Official games now always load through the generic /play resolver. The legacy React modules
-  // stay in the repository as rollback infrastructure, but are no longer a primary runtime input.
+  // One generic detail fetch supplies canonical policy/presentation/media for both publishers.
+  // No static manifest or sandbox-specific resolver is consulted on the primary play path.
   useEffect(() => {
+    let cancelled = false;
     extractPlayTokenFromLocation();
+    setIsLoading(true);
+    setGame(null);
     setError(null);
-    setIsLoading(false);
-  }, [slug]);
+    setResult(null);
+    fetchPublicGame(slug)
+      .then((resolved) => {
+        if (!cancelled) setGame(resolved);
+      })
+      .catch(() => {
+        if (!cancelled) setError(dict.gamePlay.errorGameNotFound);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, dict.gamePlay.errorGameNotFound]);
 
   // Handle Score Submission (Authenticated Attempts Only)
   const handleScoreSubmission = useCallback(
@@ -591,7 +674,7 @@ export function GameHost({ slug }: GameHostProps) {
   // selectedDifficultyId via the `difficultyId` prop passed to IframeRuntime below, so forcing an
   // extra remount before anything has even loaded once would be pure waste.
   useEffect(() => {
-    const hasDifficultyTiers = Boolean(manifest?.difficulty);
+    const hasDifficultyTiers = Boolean(game?.difficulty);
     if (
       shouldRemountIframeOnDifficultyChange(
         iframeAttemptDifficultyRef.current,
@@ -607,13 +690,13 @@ export function GameHost({ slug }: GameHostProps) {
     if (runtimeKind === "iframe" && hasDifficultyTiers) {
       iframeAttemptDifficultyRef.current = selectedDifficultyId;
     }
-  }, [selectedDifficultyId, runtimeKind, manifest, handleRetryGame]);
+  }, [selectedDifficultyId, runtimeKind, game, handleRetryGame]);
 
   // Fetch a compact leaderboard preview as soon as the game ends (not gated on score
   // submission succeeding — guests and rejected submissions still get competitive context).
   // Skipped entirely for games with supportsLeaderboard: false.
   useEffect(() => {
-    if (!result || !manifest?.supportsLeaderboard) return;
+    if (!result || !game?.policy.leaderboard) return;
     let isMounted = true;
     fetchLeaderboardApi(slug, selectedDifficultyId)
       .then((records) => {
@@ -625,7 +708,7 @@ export function GameHost({ slug }: GameHostProps) {
     return () => {
       isMounted = false;
     };
-  }, [result, manifest, slug, selectedDifficultyId]);
+  }, [result, game, slug, selectedDifficultyId]);
 
   // Share Result — scoped to X (official web intent) and a screenshot-copy of the result card.
   // A dedicated Discord button used to sit here too, but it only ever copied the same text a
@@ -643,11 +726,11 @@ export function GameHost({ slug }: GameHostProps) {
   >("idle");
 
   const buildShareText = useCallback(() => {
-    if (!result || !manifest) return null;
-    const scoreText = formatScore(result.score, manifest.scoreConfig);
-    const title = getLocalizedGameContent(dict, manifest).title;
+    if (!result || !game) return null;
+    const scoreText = formatScore(result.score, scoreConfig);
+    const title = localizedTitle ?? game.title;
     return dict.gamePlay.shareText.replace("{title}", title).replace("{score}", scoreText);
-  }, [result, manifest, dict]);
+  }, [result, game, localizedTitle, scoreConfig, dict]);
 
   const captureScreenshotBlob = useCallback(async (): Promise<Blob | null> => {
     if (!shareCardRef.current) return null;
@@ -738,7 +821,7 @@ export function GameHost({ slug }: GameHostProps) {
       complete: async (gameResult) => {
         setResult(gameResult);
 
-        const lowerIsBetter = manifest?.scoreConfig?.direction === "asc";
+        const lowerIsBetter = scoreConfig?.direction === "asc";
         saveLocalBestScore(slug, gameResult.score, lowerIsBetter);
 
         // Read isAuthenticated live at completion time rather than a value frozen at round
@@ -762,7 +845,7 @@ export function GameHost({ slug }: GameHostProps) {
       selectedDifficultyId,
       navigate,
       slug,
-      manifest,
+      scoreConfig,
       handleScoreSubmission,
       recordRecentPlay,
     ],
@@ -816,9 +899,9 @@ export function GameHost({ slug }: GameHostProps) {
         >
           <div className="mb-3 flex items-center justify-center gap-2">
             <GameThumbnail
-              thumbnail={manifest?.thumbnail ?? ""}
+              thumbnail={game?.mediaUrl ?? ""}
               title={localizedTitle ?? ""}
-              accent={manifest?.accent}
+              accent={publicGameAccent(game)}
               className="h-6 w-6"
               rounded="rounded-md"
             />
@@ -828,7 +911,7 @@ export function GameHost({ slug }: GameHostProps) {
             {isAuthenticated ? dict.gamePlay.finalScoreLabel : dict.gamePlay.deviceBestLabel}
           </p>
           <p className="text-5xl font-black text-brand mb-1">
-            {formatScore(result.score, manifest?.scoreConfig)}
+            {formatScore(result.score, scoreConfig)}
           </p>
 
           {resultTier && (
@@ -919,7 +1002,7 @@ export function GameHost({ slug }: GameHostProps) {
           )}
 
           {/* Leaderboard preview — skipped for games with supportsLeaderboard: false */}
-          {manifest?.supportsLeaderboard && resultLeaderboard && (
+          {game?.policy.leaderboard && resultLeaderboard && (
             <div className="rounded-2xl border border-border bg-surface-raised p-4 text-left">
               <p className="mb-2 flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-text-muted">
                 <Trophy className="h-3.5 w-3.5 text-accent-yellow" />
@@ -1068,7 +1151,7 @@ export function GameHost({ slug }: GameHostProps) {
   }
 
   // Auth Protection Enforcer
-  const isAuthBlocked = manifest?.requiresAuth && !isAuthenticated;
+  const isAuthBlocked = game?.policy.requiresAuth && !isAuthenticated;
 
   return (
     <div ref={gameSurfaceRef} className="flex flex-col flex-1 bg-[#09090b] select-none">
@@ -1088,9 +1171,9 @@ export function GameHost({ slug }: GameHostProps) {
 
           <div className="flex items-center gap-3">
             <GameThumbnail
-              thumbnail={manifest?.thumbnail ?? ""}
+              thumbnail={game?.mediaUrl ?? ""}
               title={localizedTitle ?? ""}
-              accent={manifest?.accent}
+              accent={publicGameAccent(game)}
               className="h-6 w-6"
               rounded="rounded-md"
             />
@@ -1099,9 +1182,9 @@ export function GameHost({ slug }: GameHostProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          {manifest?.difficulty && (
+          {game?.difficulty && (
             <div className="flex items-center gap-1 rounded-xl border border-border/80 bg-surface-raised p-1">
-              {manifest.difficulty.levels.map((level) => {
+              {game.difficulty.levels.map((level) => {
                 const isSelected = level.id === selectedDifficultyId;
                 return (
                   <button
@@ -1122,7 +1205,7 @@ export function GameHost({ slug }: GameHostProps) {
             </div>
           )}
 
-          {manifest?.supportsLeaderboard && (
+          {game?.policy.leaderboard && (
             <Link
               to={`/games/${slug}/ranking`}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
@@ -1207,7 +1290,7 @@ export function GameHost({ slug }: GameHostProps) {
                 frameClassName={iframeFrameClassName}
                 frameStyle={iframeFrameStyle}
                 iframeStyle={iframeElementStyle}
-                {...(manifest?.difficulty ? { difficultyId: selectedDifficultyId } : {})}
+                {...(game?.difficulty ? { difficultyId: selectedDifficultyId } : {})}
                 onStarted={handleIframeStarted}
                 onComplete={handleIframeComplete}
                 onCancel={runtime.cancel}

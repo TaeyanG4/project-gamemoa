@@ -1,5 +1,4 @@
 import { test, expect } from "@playwright/test";
-import { SYSTEM_GAME_RELEASES } from "../../apps/web/app/features/game/runtime/systemGameReleaseMap.generated.js";
 
 /**
  * The first real-browser verification of GameHost's responsive/fixed Presentation viewport math
@@ -23,12 +22,6 @@ test.describe("GamePresentation viewport — responsive", () => {
   test("a game's own preferred/min never forces the platform's actual (narrower) viewport to overflow", async ({
     page,
   }) => {
-    const release = SYSTEM_GAME_RELEASES["e2e-responsive"];
-    expect(
-      release,
-      "no local release map entry for e2e-responsive — did e2e/run.ts's prepare step run?",
-    ).toBeTruthy();
-
     await page.goto("/games/e2e-responsive");
     await page.getByRole("button", { name: "PLAY" }).click();
 
@@ -58,12 +51,6 @@ test.describe("GamePresentation viewport — fixed", () => {
   test("logical iframe viewport stays 1280x720 regardless of the smaller available box; the displayed surface shrinks with aspect ratio preserved, never upscaled", async ({
     page,
   }) => {
-    const release = SYSTEM_GAME_RELEASES["e2e-fixed"];
-    expect(
-      release,
-      "no local release map entry for e2e-fixed — did e2e/run.ts's prepare step run?",
-    ).toBeTruthy();
-
     await page.goto("/games/e2e-fixed");
     await page.getByRole("button", { name: "PLAY" }).click();
 

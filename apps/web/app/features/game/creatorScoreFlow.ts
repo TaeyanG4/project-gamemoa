@@ -1,17 +1,17 @@
 /**
- * Pure, framework-free controller connecting CreatorGameHost's play lifecycle to the Game
+ * Pure, framework-free controller connecting GameHost's play lifecycle to the generic Game
  * Session + Creator score acceptance endpoints. Deliberately not a React hook: apps/web's test
  * suite has no DOM/component renderer (see gameHostMetadata.test.ts's own doc comment, and
  * gameBridgeHost.ts for the established precedent of pulling exactly this kind of orchestration
  * out into a plain, dependency-injected factory function so it can be unit-tested directly —
  * creatorScoreFlow.test.ts is this module's counterpart to gameBridgeEndToEnd.test.ts).
- * CreatorGameHost.tsx holds one instance and forwards its status callback into React state,
+ * GameHost.tsx holds one instance and forwards its status callback into React state,
  * mirroring exactly how IframeRuntime.tsx wraps createGameBridgeHost.
  *
  * Lifecycle contract:
  * - startAttempt() once per attempt (component mount AND every retry) — fetches a fresh Game
  *   Session token for an authenticated caller and holds it internally. The token NEVER leaves
- *   this module: it is not returned, not logged, and CreatorGameHost must never pass it to
+ *   this module: it is not returned, not logged, and GameHost must never pass it to
  *   IframeRuntime/HOST_INIT — the iframe has no legitimate use for it and every check that
  *   matters (PUBLIC + live version, session validity, context match, score policy, one-time
  *   consumption) happens server-side regardless of what the iframe does or doesn't send.
@@ -24,7 +24,7 @@
  *   CreatorScoreAcceptanceUseCases) is the real, authoritative guarantee; this is defense in
  *   depth at the layer closest to the UI, not a replacement for it.
  * - A failed fetchGameSession or acceptScore call never throws out of either method — gameplay
- *   itself (the local result CreatorGameHost already rendered) must survive a session/scoring
+ *   itself (the local result GameHost already rendered) must survive a session/scoring
  *   failure untouched. Failure is reported only through onStatusChange, for the result screen to
  *   show.
  *

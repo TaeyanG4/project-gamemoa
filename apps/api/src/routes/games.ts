@@ -10,16 +10,18 @@ import {
   PublicGameSchema,
   SandboxGamePublicDetailSchema,
   SandboxGamePublicListResponseSchema,
+  toSandboxGameRecordResponse,
 } from "@owogg/contracts";
 import {
   GAME_SESSION_POLICY,
+  publicGameMediaUrl,
+  resolveBundleContentType,
+  toPublicGame,
   validateDifficultyAgainstDefinition,
-  mergePublicGames,
-  resolvePublicGame,
   signGameSession,
-  toPublicCreatorGame,
   type GameScoreAcceptError,
   type GameSessionPayload,
+  type RuntimeGame,
 } from "@owogg/core";
 import { createContainer, evaluateAchievementsForUser } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
@@ -75,10 +77,10 @@ gamesRouter.get("/sandbox/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
   const resolved = await sandboxGameUseCases.resolveLiveVersion(c.req.param("slug"));
   if (!resolved) return c.text("Not Found", 404);
 
-  // toPublicCreatorGame's shape is a strict superset of SandboxGamePublicDetailSchema's (adds
-  // ownerType/requiresAuth/supportsLeaderboard for symmetry with PublicSystemGame) — zod strips
-  // the extra fields on parse, so this route's wire response is byte-for-byte unchanged.
-  return c.json(SandboxGamePublicDetailSchema.parse(toPublicCreatorGame(resolved.game)), 200);
+  return c.json(
+    SandboxGamePublicDetailSchema.parse(toSandboxGameRecordResponse(resolved.game)),
+    200,
+  );
 });
 
 // GET /api/games/sandbox — every currently-PUBLIC sandbox game, for the main site catalog (see
@@ -92,7 +94,9 @@ gamesRouter.get("/sandbox", edgeCache({ ttlSeconds: 60 }), async (c) => {
   const games = await sandboxGameUseCases.listPublic();
 
   return c.json(
-    SandboxGamePublicListResponseSchema.parse({ games: games.map(toPublicCreatorGame) }),
+    SandboxGamePublicListResponseSchema.parse({
+      games: games.map((game) => toSandboxGameRecordResponse(game)),
+    }),
     200,
   );
 });
@@ -116,55 +120,103 @@ gamesRouter.get("/sandbox/:slug/logo", edgeCache({ ttlSeconds: 3600 }), async (c
   });
 });
 
-// ── Unified public Game read model ────────────────────────────────────────────
+// ── Generic public Game read model ───────────────────────────────────────────
 //
-// GET /api/games and GET /api/games/:slug — the first Game Platform surface that answers "what
-// games exist" across SYSTEM (game-registry/) and CREATOR (sandbox_games) without a caller
-// needing to know which one it's asking about. Deliberately does NOT replace the routes above:
-// GET /api/games/sandbox* stays exactly as it was for compatibility, and nothing on the web side
-// (sandboxGameAdapter.ts, GameCard's owner-based routing) has been switched over to this yet —
-// that is a later, separate step.
-//
-// Registered after every /sandbox* route above and after /availability, and deliberately so:
-// GET /api/games/:slug is a catch-all single path segment, and it must never have a chance to
-// shadow a more specific literal route. apps/api/test/publicGames.test.ts asserts this ordering
-// holds (a request to /api/games/sandbox still reaches the sandbox-list handler, not this one).
+// Generic D1 identity + live READY version + strict B2 canonical is the sole public authority.
+// Legacy sandbox routes above remain compatibility surfaces, but the primary catalog/detail path
+// never merges StaticGameRegistry with sandbox metadata and never falls back when generic state
+// is incomplete.
 
-// GET /api/games — every SYSTEM game, then every currently-PUBLIC creator game whose slug doesn't
-// collide with a SYSTEM one (same "SYSTEM wins" policy as the single-slug route below, applied to
-// a list — see mergePublicGames's doc comment in packages/core for why a collision is dropped
-// here rather than left to appear twice under one slug).
+async function publicGameProjection(
+  c: Context<ApiEnv>,
+  runtime: RuntimeGame | null,
+): Promise<ReturnType<typeof toPublicGame> | null> {
+  if (!runtime) return null;
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  try {
+    if (
+      !(await container.runtimeGameAvailability.isVersionServable(
+        runtime.identity.id,
+        runtime.liveVersion.id,
+      ))
+    ) {
+      return null;
+    }
+    const asset = await container.gameAssetRepo.findByGameId(runtime.identity.id, "LOGO");
+    const endpoint = new URL(
+      `/api/games/${encodeURIComponent(runtime.identity.slug)}/media/logo`,
+      c.req.url,
+    ).toString();
+    return toPublicGame(runtime, publicGameMediaUrl(runtime, asset, endpoint));
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/games — every currently public, live, READY generic game. D1 kill-switch state is
+// applied after the provider-neutral runtime registry has resolved identity/version/canonical.
 gamesRouter.get("/", edgeCache({ ttlSeconds: 60 }), async (c) => {
   if (!c.env?.DB) return c.json(PublicGameListResponseSchema.parse({ games: [] }), 200);
 
-  const { gameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
-  const [systemGames, creatorGames] = await Promise.all([
-    gameRegistry.listAll(),
-    sandboxGameUseCases.listPublic(),
-  ]);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  const runtimes = await container.runtimeGameRegistry.listPublic();
+  const games = await Promise.all(
+    runtimes.map(async (runtime) => {
+      const projection = await publicGameProjection(c, runtime);
+      return projection ? PublicGameSchema.parse(projection) : null;
+    }),
+  );
 
   return c.json(
-    PublicGameListResponseSchema.parse({ games: mergePublicGames(systemGames, creatorGames) }),
+    PublicGameListResponseSchema.parse({
+      games: games.filter((game): game is NonNullable<typeof game> => game !== null),
+    }),
     200,
   );
 });
 
-// GET /api/games/:slug — resolves a SYSTEM game first (a synchronous, in-memory lookup — no D1
-// round trip), and only falls through to the sandbox PUBLIC+live-version-gated lookup when no
-// SYSTEM game claims the slug. This ordering is what makes SYSTEM always win a same-slug
-// collision, not an incidental side effect of it happening to run first — see resolvePublicGame's
-// doc comment (packages/core) for why that guarantee matters and what it does not fix.
+// Generic public USER logo bytes. The object key is resolved from provider-neutral D1 metadata and
+// never included in JSON responses. Availability is checked before touching B2 so private,
+// deleted, malformed, or disabled games cannot leak media.
+gamesRouter.get("/:slug/media/logo", edgeCache({ ttlSeconds: 3600 }), async (c) => {
+  if (!c.env?.DB) return c.text("Not Found", 404);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  const runtime = await container.runtimeGameRegistry.findBySlug(c.req.param("slug"));
+  try {
+    if (
+      !runtime ||
+      !(await container.runtimeGameAvailability.isVersionServable(
+        runtime.identity.id,
+        runtime.liveVersion.id,
+      ))
+    ) {
+      return c.text("Not Found", 404);
+    }
+    const asset = await container.gameAssetRepo.findByGameId(runtime.identity.id, "LOGO");
+    if (!asset) return c.text("Not Found", 404);
+    const bytes = await container.gameBundleStorageRepo.getObject(asset.objectKey);
+    if (!bytes) return c.text("Not Found", 404);
+    return new Response(bytes, {
+      status: 200,
+      headers: {
+        "Content-Type": resolveBundleContentType(asset.objectKey).contentType,
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  } catch {
+    // Unknown, private, disabled, malformed, or unavailable media is indistinguishable.
+    return c.text("Not Found", 404);
+  }
+});
+
+// GET /api/games/:slug — one provider-neutral runtime resolution path for OWOGG and USER.
 gamesRouter.get("/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
 
-  const { gameRegistry, sandboxGameUseCases } = createContainer(c.env.DB);
-  const slug = c.req.param("slug");
-
-  const systemGame = await gameRegistry.findBySlug(slug);
-  const creatorResolved = systemGame ? null : await sandboxGameUseCases.resolveLiveVersion(slug);
-  const game = resolvePublicGame(systemGame, creatorResolved?.game ?? null);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  const runtime = await container.runtimeGameRegistry.findBySlug(c.req.param("slug"));
+  const game = await publicGameProjection(c, runtime);
   if (!game) return c.text("Not Found", 404);
-
   return c.json(PublicGameSchema.parse(game), 200);
 });
 

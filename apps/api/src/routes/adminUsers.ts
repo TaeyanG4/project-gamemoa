@@ -19,6 +19,7 @@ import {
   requirePermission,
 } from "../auth/adminSession.js";
 import { resolveAdminEligibility, resolveEffectiveStaffRole } from "../auth/adminEligibility.js";
+import { readB2Config } from "./devGames.js";
 import type { ApiEnv } from "./auth.js";
 
 export const adminUsersRouter = new Hono<ApiEnv>();
@@ -143,11 +144,11 @@ adminUsersRouter.get("/:userId", async (c) => {
     return c.json({ error: { code: "INVALID_REQUEST", message: "잘못된 사용자 ID입니다." } }, 400);
   }
 
-  const container = createContainer(c.env.DB);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
   const [user, providers, bests, moderation, auditLog, isProtectedAdmin] = await Promise.all([
     container.userRepo.findById(userId),
     container.userRepo.getOAuthAccounts(userId),
-    container.scoreUseCases.getUserBestsFormatted(userId),
+    container.scoreReadUseCases.getUserBestsFormatted(userId),
     container.userModerationUseCases.getModeration(userId),
     container.userModerationUseCases.getAuditLog(userId),
     isProtectedAdminTarget(c, container, userId),
