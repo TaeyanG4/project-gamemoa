@@ -34,8 +34,9 @@
 | **CHZZK**   | Chzzk Channel ID (`content.channelId`) | Naver OAuth (authorization code) | `GET https://openapi.chzzk.naver.com/open/v1/users/me`                                 |
 | **SOOP**    | SOOP User ID (`user_id`)               | Authorization code grant         | `GET https://openapi.sooplive.co.kr/user/me`                                           |
 
-개발자 포털 등록 절차와 CI/CD 자격 증명 배선은
-[`docs/runbooks/creator-verification-setup.md`](runbooks/creator-verification-setup.md) 참고.
+개발자 포털 등록과 CI/CD 자격 증명 배선의 검증된 운영 절차서는 현재 저장소에 없습니다. 실제
+자격 증명 절차는 별도 운영 문서 단계에서 작성해야 하며, 이 문서는 미검증 설정값을 추측하지
+않습니다.
 
 ---
 
