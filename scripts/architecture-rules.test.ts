@@ -206,6 +206,15 @@ test("D-1 legacy runtime removals are protected by source-token architecture gua
   assert.ok(api?.tokens.includes("StaticGameRegistry"));
   assert.ok(web?.tokens.includes("LegacyReactRuntime"));
   assert.ok(web?.tokens.includes("CreatorGameHost"));
+  assert.ok(web?.tokens.includes("GAME_LOADERS"));
+  for (const packageName of [
+    "@owogg/game-aim-test",
+    "@owogg/game-memory-test",
+    "@owogg/game-reaction-time",
+    "@owogg/game-typing-test",
+  ]) {
+    assert.ok(web?.tokens.includes(packageName));
+  }
   assert.ok(host?.tokens.includes("submitScoreApi"));
   assert.ok(deploy?.tokens.includes("publish:official-games"));
   assert.ok(deploy?.tokens.includes("systemGameReleaseMap"));

@@ -19,7 +19,6 @@ export interface GameEntry {
 
 export interface RegistryBuildResult {
   coreRegistryCode: string;
-  webLoaderCode: string;
   /** `GAME_DEFINITIONS`, built from game-registry/. Generated and checked in as official generic
    * bootstrap/source metadata — see loadGameDefinitions. */
   gameDefinitionsCode: string;
@@ -323,22 +322,7 @@ export async function buildRegistrySources(rootDir = process.cwd()): Promise<Reg
   // this is a separately exported, pure function rather than inlined here.
   const rawCoreRegistryCode = renderCoreRegistryModule(manifests);
 
-  // 2. Web Loader Registry Raw Code
-  const loaderEntries = gameEntries
-    .map((e) => `  "${e.manifest.slug}": () => import("${e.packageName}"),`)
-    .join("\n");
-
-  const rawWebLoaderCode = `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
-import type { GameModule } from "@owogg/game-sdk";
-
-export type GameLoader = () => Promise<{ default: GameModule } | GameModule>;
-
-export const GAME_LOADERS: Record<string, GameLoader> = {
-${loaderEntries}
-};
-`;
-
-  // 3. Game Definitions Raw Code — the file-based registry's compiled form.
+  // 2. Game Definitions Raw Code — the file-based registry's compiled form.
   const rawGameDefinitionsCode = `// AUTO-GENERATED FILE BY scripts/generate-game-registry.ts - DO NOT EDIT MANUALLY
 //
 // Compiled from game-registry/games/<slug>/{info,policy}.json. Edit those files, then run
@@ -365,15 +349,6 @@ export const GAME_DEFINITION_MAP: Record<string, GameDefinition> = ${JSON.string
     "registry",
     "gameRegistry.generated.ts",
   );
-  const webOutputPath = path.join(
-    rootDir,
-    "apps",
-    "web",
-    "app",
-    "features",
-    "catalog",
-    "gameLoaders.generated.ts",
-  );
   const definitionsOutputPath = path.join(
     rootDir,
     "packages",
@@ -384,19 +359,12 @@ export const GAME_DEFINITION_MAP: Record<string, GameDefinition> = ${JSON.string
   );
 
   const coreConfig = (await prettier.resolveConfig(coreOutputPath)) || {};
-  const webConfig = (await prettier.resolveConfig(webOutputPath)) || {};
   const definitionsConfig = (await prettier.resolveConfig(definitionsOutputPath)) || {};
 
   // Format canonically using Prettier with resolved config and filepath
   const coreRegistryCode = await prettier.format(rawCoreRegistryCode, {
     ...coreConfig,
     filepath: coreOutputPath,
-    parser: "typescript",
-  });
-
-  const webLoaderCode = await prettier.format(rawWebLoaderCode, {
-    ...webConfig,
-    filepath: webOutputPath,
     parser: "typescript",
   });
 
@@ -408,7 +376,6 @@ export const GAME_DEFINITION_MAP: Record<string, GameDefinition> = ${JSON.string
 
   return {
     coreRegistryCode,
-    webLoaderCode,
     gameDefinitionsCode,
     gameEntries,
     definitions,

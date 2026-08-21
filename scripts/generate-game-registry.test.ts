@@ -14,33 +14,32 @@ test("buildRegistrySources produces canonical Prettier-formatted code determinis
     "registry",
     "gameRegistry.generated.ts",
   );
-  const webPath = path.join(
+  const definitionsPath = path.join(
     rootDir,
-    "apps",
-    "web",
-    "app",
-    "features",
-    "catalog",
-    "gameLoaders.generated.ts",
+    "packages",
+    "core",
+    "src",
+    "registry",
+    "gameDefinitions.generated.ts",
   );
 
   const result1 = await buildRegistrySources(rootDir);
   const result2 = await buildRegistrySources(rootDir);
 
   assert.equal(result1.coreRegistryCode, result2.coreRegistryCode);
-  assert.equal(result1.webLoaderCode, result2.webLoaderCode);
+  assert.equal(result1.gameDefinitionsCode, result2.gameDefinitionsCode);
 
   const coreConfig = (await prettier.resolveConfig(corePath)) || {};
-  const webConfig = (await prettier.resolveConfig(webPath)) || {};
+  const definitionsConfig = (await prettier.resolveConfig(definitionsPath)) || {};
 
   const coreFormatted = await prettier.format(result1.coreRegistryCode, {
     ...coreConfig,
     filepath: corePath,
     parser: "typescript",
   });
-  const webFormatted = await prettier.format(result1.webLoaderCode, {
-    ...webConfig,
-    filepath: webPath,
+  const definitionsFormatted = await prettier.format(result1.gameDefinitionsCode, {
+    ...definitionsConfig,
+    filepath: definitionsPath,
     parser: "typescript",
   });
 
@@ -48,7 +47,10 @@ test("buildRegistrySources produces canonical Prettier-formatted code determinis
     result1.coreRegistryCode.replace(/\r\n/g, "\n"),
     coreFormatted.replace(/\r\n/g, "\n"),
   );
-  assert.equal(result1.webLoaderCode.replace(/\r\n/g, "\n"), webFormatted.replace(/\r\n/g, "\n"));
+  assert.equal(
+    result1.gameDefinitionsCode.replace(/\r\n/g, "\n"),
+    definitionsFormatted.replace(/\r\n/g, "\n"),
+  );
 });
 
 test("buildRegistrySources includes all filesystem games in deterministic slug order", async () => {
