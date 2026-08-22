@@ -69,4 +69,8 @@ jobs:
     needs: ci
     permissions:
       contents: read
+    # The called job selects the `staging` Environment. Reusable workflows still require the
+    # caller to forward its available secrets; without this, Environment vars resolve but every
+    # Environment secret is an empty string and the fail-closed preflight stops before deploy.
+    secrets: inherit
     uses: ./.github/workflows/deploy-staging.yml
