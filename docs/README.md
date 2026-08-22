@@ -2,7 +2,7 @@
 
 상태: 가이드
 
-마지막 검증: 2026-08-21
+마지막 검증: 2026-08-22
 
 이 인덱스는 문서를 독자의 목적과 문서 역할에 따라 안내합니다. 구현 사실은 현재 코드,
 마이그레이션, 워크플로 순으로 확인하며 문서와 구현이 다르면 구현이 우선합니다.
@@ -57,10 +57,13 @@
 
 ## 유지보수
 
-- [Legacy Ledger](maintenance/LEGACY_LEDGER.md) — **기록**, F-0 저장소/legacy 판정 기록
+- [Cleanup Status](maintenance/CLEANUP_STATUS.md) — **기준 문서**, F-0~F-5 정리 결과와 현재
+  compatibility/defer 상태
+- [Legacy Ledger](maintenance/LEGACY_LEDGER.md) — **기록**, F-0 시점의 저장소/legacy 판정 기록
 
-이 ledger의 `DELETE`, `MIGRATE_THEN_DELETE`, `KEEP_REQUIRED`, `KEEP_PLANNED`, `DEFER_UNKNOWN`
-판정은 후속 정리 작업의 입력입니다. 문서 수정 자체가 삭제 권한을 부여하지는 않습니다.
+현재 정리 상태는 `Cleanup Status`를 기준으로 확인합니다. Historical ledger의 `DELETE`,
+`MIGRATE_THEN_DELETE`, `KEEP_REQUIRED`, `KEEP_PLANNED`, `DEFER_UNKNOWN` 판정은 후속 작업의
+입력이었던 F-0 기록이며, 현재 삭제 권한이나 현재 상태를 뜻하지 않습니다.
 
 ## 운영 문서 공백
 
