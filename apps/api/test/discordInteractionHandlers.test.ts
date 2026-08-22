@@ -505,6 +505,7 @@ test("/owogg achievements shows unlocked (✅) vs locked (⬜) achievements with
   );
   const embed = response.data?.embeds?.[0];
   assert.match(embed?.title ?? "", /Achiever/);
+  assert.equal(embed?.url, `${FRONTEND_URL}/users/9`);
   assert.match(embed?.description ?? "", /✅.*첫 게임 완료/);
   assert.match(embed?.description ?? "", /⬜/); // at least one still-locked achievement listed
   assert.match(embed?.footer?.text ?? "", /1 \/ 7/);
