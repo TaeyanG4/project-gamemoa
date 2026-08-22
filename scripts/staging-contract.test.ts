@@ -77,14 +77,12 @@ test("Staging environment preflight accepts only the exact isolated target tuple
     B2_BUCKET_NAME: PRODUCTION.b2Bucket,
     STAGING_D1_DATABASE_ID: PRODUCTION.d1Id,
     DISCORD_COMMAND_SYNC_ENABLED: "true",
-    STAGING_LEGACY_ADMIN_USER_IDS: "1",
   };
   const errors = validateStagingEnvironment(crossed).join("\n");
   assert.match(errors, /FRONTEND_URL/);
   assert.match(errors, /B2_BUCKET_NAME/);
   assert.match(errors, /Production D1/);
   assert.match(errors, /DISCORD_COMMAND_SYNC_ENABLED/);
-  assert.match(errors, /ADMIN_USER_IDS/);
 });
 
 test("Staging Web smoke requires both Cloudflare Access service-token values when enabled", () => {
@@ -174,7 +172,10 @@ test("Staging workflow is push-after-CI only and contains no Production variable
   assert.match(deploy, /environment: staging/);
   assert.match(deploy, /group: owogg-staging/);
   assert.doesNotMatch(deploy, /secrets:\s*inherit/);
-  assert.match(deploy, /STAGING_LEGACY_ADMIN_USER_IDS:\s*\$\{\{ vars\.ADMIN_USER_IDS/);
+  // `vars.ADMIN_USER_IDS` would resolve the repository-level Production variable when the
+  // Staging Environment intentionally has no variable by that name. Never reference it here;
+  // Staging uses its explicitly scoped name and maps it only at the Worker boundary below.
+  assert.doesNotMatch(deploy, /vars\.ADMIN_USER_IDS/);
   assert.doesNotMatch(deploy, /^\s+ADMIN_USER_IDS:\s*\$\{\{ vars\.ADMIN_USER_IDS/gm);
   assert.doesNotMatch(deploy, /vars\.(?:YOUTUBE|TWITCH|CHZZK|SOOP)_/);
   assert.doesNotMatch(deploy, /publish:official-games/);

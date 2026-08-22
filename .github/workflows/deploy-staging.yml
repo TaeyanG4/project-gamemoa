@@ -42,9 +42,6 @@ jobs:
           DISCORD_REDIRECT_URI: ${{ vars.DISCORD_REDIRECT_URI }}
           DISCORD_TEST_GUILD_ID: ${{ vars.DISCORD_TEST_GUILD_ID }}
           STAGING_ADMIN_USER_IDS: ${{ vars.STAGING_ADMIN_USER_IDS || '' }}
-          # Audit only: preflight rejects the old generic name so it can never silently leave the
-          # Staging root admin list empty. This value is not forwarded to the Worker.
-          STAGING_LEGACY_ADMIN_USER_IDS: ${{ vars.ADMIN_USER_IDS || '' }}
           STAGING_D1_DATABASE_ID: ${{ vars.STAGING_D1_DATABASE_ID }}
           STAGING_WEB_SMOKE_ENABLED: ${{ vars.STAGING_WEB_SMOKE_ENABLED || 'false' }}
           B2_APPLICATION_KEY: ${{ secrets.B2_APPLICATION_KEY }}

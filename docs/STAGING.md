@@ -126,9 +126,11 @@ Staging workflow에 generic `ADMIN_USER_IDS`, Creator provider 설정, Repositor
 secret/variable을 추가하지 않습니다. `DISCORD_COMMAND_SYNC_ENABLED`는 항상 `false`이고 배포는
 `discord:commands:register:guild`만 호출합니다.
 
-`ADMIN_USER_IDS`라는 legacy variable이 `staging` Environment에 남아 있으면 preflight는 실패합니다.
-값을 `STAGING_ADMIN_USER_IDS`로 옮긴 뒤 legacy variable을 삭제해야 하며, workflow는 legacy 값을 Worker
-runtime으로 폴백하거나 전달하지 않습니다.
+`staging` Environment에는 generic `ADMIN_USER_IDS`를 만들지 않고 `STAGING_ADMIN_USER_IDS`만 둡니다.
+GitHub의 `vars.ADMIN_USER_IDS` 표현식은 Environment에 같은 이름이 없으면 Production이 사용하는
+repository-level 변수를 상속하므로 Staging workflow에서는 이 표현식을 참조하지 않습니다. 배포
+직전에 `STAGING_ADMIN_USER_IDS`만 Worker runtime의 `ADMIN_USER_IDS`로 명시적으로 매핑합니다. 실제
+Environment 변수 이름 감사에는 `gh variable list --env staging`을 사용합니다.
 
 ## 3. 배포 흐름
 
