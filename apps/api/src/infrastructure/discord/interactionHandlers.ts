@@ -486,7 +486,7 @@ async function handleAchievementsCommand(
 
   return ephemeralEmbed({
     title: `🏅 ${escapeMarkdown(user.nickname)}님의 도전과제`,
-    url: `${frontendUrl}/profile`,
+    url: `${frontendUrl}/users/${user.id}`,
     description: lines.join("\n"),
     color: COLOR_XP,
     thumbnail: { url: discordAvatarUrl(discordUser) },
