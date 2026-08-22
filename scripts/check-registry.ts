@@ -3,7 +3,7 @@ import path from "node:path";
 import { buildRegistrySources } from "./registry-builder.js";
 
 async function checkRegistry() {
-  console.log("🔍 Checking Game Registry & Plugin Invariants (Pure In-Memory Verification)...");
+  console.log("🔍 Checking Game Registry Source Invariants (Pure In-Memory Verification)...");
 
   const rootDir = process.cwd();
   const coreFile = path.join(
@@ -14,16 +14,6 @@ async function checkRegistry() {
     "registry",
     "gameRegistry.generated.ts",
   );
-  const webFile = path.join(
-    rootDir,
-    "apps",
-    "web",
-    "app",
-    "features",
-    "catalog",
-    "gameLoaders.generated.ts",
-  );
-
   const definitionsFile = path.join(
     rootDir,
     "packages",
@@ -36,31 +26,22 @@ async function checkRegistry() {
   const committedCoreContent = fs.existsSync(coreFile)
     ? fs.readFileSync(coreFile, "utf-8").replace(/\r\n/g, "\n")
     : "";
-  const committedWebContent = fs.existsSync(webFile)
-    ? fs.readFileSync(webFile, "utf-8").replace(/\r\n/g, "\n")
-    : "";
   const committedDefinitionsContent = fs.existsSync(definitionsFile)
     ? fs.readFileSync(definitionsFile, "utf-8").replace(/\r\n/g, "\n")
     : "";
 
   // buildRegistrySources also reconciles game-registry/ against games/*/src/manifest.ts and
   // throws on any disagreement, so that check runs here too — this script is what CI calls.
-  const { coreRegistryCode, webLoaderCode, gameDefinitionsCode, gameEntries, definitions } =
+  const { coreRegistryCode, gameDefinitionsCode, gameEntries, definitions } =
     await buildRegistrySources(rootDir);
 
   const expectedCoreContent = coreRegistryCode.replace(/\r\n/g, "\n");
-  const expectedWebContent = webLoaderCode.replace(/\r\n/g, "\n");
   const expectedDefinitionsContent = gameDefinitionsCode.replace(/\r\n/g, "\n");
 
   let hasStale = false;
 
   if (committedCoreContent !== expectedCoreContent) {
     console.error(`❌ Core Game Registry is STALE! Path: ${coreFile}`);
-    hasStale = true;
-  }
-
-  if (committedWebContent !== expectedWebContent) {
-    console.error(`❌ Web Loader Registry is STALE! Path: ${webFile}`);
     hasStale = true;
   }
 
@@ -76,15 +57,14 @@ async function checkRegistry() {
     process.exit(1);
   }
 
-  // Verify full 3-set invariant matching: games/* package set == manifest set == web loader set
-  const fsGameSlugs = gameEntries.map((e) => e.manifest.slug).sort();
-  const loaderSlugs = Array.from(expectedWebContent.matchAll(/"([^"]+)":\s*\(\)\s*=>\s*import/g))
-    .map((m) => m[1])
-    .sort();
+  // Verify the current two-source invariant explicitly. buildRegistrySources also checks every
+  // shared field, while this comparison keeps the slug-set contract visible in the CI entrypoint.
+  const manifestSlugs = gameEntries.map((entry) => entry.manifest.slug).sort();
+  const definitionSlugs = definitions.map((definition) => definition.slug).sort();
 
-  if (JSON.stringify(fsGameSlugs) !== JSON.stringify(loaderSlugs)) {
+  if (JSON.stringify(manifestSlugs) !== JSON.stringify(definitionSlugs)) {
     console.error(
-      `\n❌ Invariant Mismatch! Filesystem game slugs !== Web loader registry slugs.\n`,
+      `\n❌ Invariant Mismatch! games/* manifest slugs !== game-registry/* definition slugs.\n`,
     );
     process.exit(1);
   }
@@ -114,7 +94,7 @@ async function checkRegistry() {
   }
 
   console.log(
-    `✅ Verified Plugin Architecture Invariants: ${fsGameSlugs.length} games registered identically across filesystem, manifest registry, and web loaders.`,
+    `✅ Verified Registry Source Invariants: ${manifestSlugs.length} games agree across games/* manifests and game-registry/* definitions.`,
   );
   console.log(
     `✅ Verified Game Registry: ${definitions.length} SYSTEM game definitions in game-registry/, all slugs unique and in agreement with games/*/src/manifest.ts.`,

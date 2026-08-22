@@ -76,5 +76,5 @@ export * from "./application/gameScoreAcceptanceUseCases.js";
 export * from "./registry/gameRegistry.generated.js";
 // Compiled from game-registry/. GAME_DEFINITIONS is a build/bootstrap input for official generic
 // publication, while GAME_MANIFESTS remains source metadata for achievements, personalization,
-// creator/Discord tooling, and game source loaders. Neither is a production runtime registry.
+// creator/Discord, and build tooling. Neither is a production runtime registry.
 export * from "./registry/gameDefinitions.generated.js";

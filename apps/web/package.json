@@ -5,11 +5,7 @@
   "dependencies": {
     "@owogg/contracts": "workspace:*",
     "@owogg/core": "workspace:*",
-    "@owogg/game-aim-test": "workspace:*",
-    "@owogg/game-memory-test": "workspace:*",
-    "@owogg/game-reaction-time": "workspace:*",
     "@owogg/game-sdk": "workspace:*",
-    "@owogg/game-typing-test": "workspace:*",
     "@owogg/shared": "workspace:*",
     "@owogg/ui": "workspace:*",
     "@react-router/cloudflare": "^7.7.0",

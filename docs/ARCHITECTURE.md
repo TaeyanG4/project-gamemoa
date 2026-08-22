@@ -95,6 +95,10 @@ ComposedRuntimeGameRegistry
 동일한 public/READY/live/canonical 불변식을 통과해야 합니다. generic 상태가 불완전하면 과거
 metadata로 fallback하지 않고 fail closed 합니다.
 
+Web은 `GAME_MANIFESTS`를 catalog/source metadata로만 사용합니다. Source game package dynamic
+loader는 gameplay 경로가 아니며, 게임 실행은 항상 generic versioned bundle을 iframe에서
+제공합니다.
+
 Publication target은 `(gameId, versionId, contentHash)`입니다. `GamePublicationService`가 상태를
 `PUBLISHING`으로 바꾸고 개별 파일을 기록한 뒤 `.owogg-manifest.json`을 마지막에 기록하고, 같은
 target에 대해서만 `READY`를 기록합니다. 실패하거나 일부만 기록된 버전은 제공되지 않습니다.

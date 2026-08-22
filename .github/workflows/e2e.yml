@@ -29,11 +29,6 @@ on:
       # build is a single Vite build of the whole app, so any file under here is a real build-time
       # dependency, not just the game-related routes/components.
       - "apps/web/**"
-      # apps/web's build dynamically imports all four (GAME_LOADERS in
-      # gameLoaders.generated.ts), which Vite resolves and bundles at build time regardless of
-      # this suite's own fixture never touching a real game — a broken aim-test/memory-test/
-      # typing-test/reaction-time would fail that build too.
-      - "games/**"
       # Every package here is a real, verified dependency: contracts/core/game-sdk/shared/ui are
       # all direct deps of apps/web.
       - "packages/**"

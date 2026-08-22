@@ -111,21 +111,9 @@ importers:
       "@owogg/core":
         specifier: workspace:*
         version: link:../../packages/core
-      "@owogg/game-aim-test":
-        specifier: workspace:*
-        version: link:../../games/aim-test
-      "@owogg/game-memory-test":
-        specifier: workspace:*
-        version: link:../../games/memory-test
-      "@owogg/game-reaction-time":
-        specifier: workspace:*
-        version: link:../../games/reaction-time
       "@owogg/game-sdk":
         specifier: workspace:*
         version: link:../../packages/game-sdk
-      "@owogg/game-typing-test":
-        specifier: workspace:*
-        version: link:../../games/typing-test
       "@owogg/shared":
         specifier: workspace:*
         version: link:../../packages/shared
