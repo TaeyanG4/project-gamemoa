@@ -166,26 +166,31 @@ GAME_CREATOR 신청 조건으로 사용할지 역시 현재 authorization fact�
 
 게임 publisher는 generic `games` identity의 relational authority입니다.
 
+관리자 UI는 `/admin/games`의 **게임 관리 및 심사** 화면으로 통합되어 있습니다. 이 화면 안에서도
+OWOGG 업로드·전체 게임 안전 제어(`games.moderate`)와 사용자 제작 게임 심사
+(`sandbox_games.review`)는 독립 권한으로 검사합니다. `/admin/sandbox-games`는 이전 링크 호환용이며
+새 문서나 메뉴의 진입점으로 사용하지 않습니다.
+
 ```ts
 type GamePublisher = { type: "OWOGG" } | { type: "USER"; userId: number };
 ```
 
-- `OWOGG`는 server/bootstrap이 assertion하는 authority이며 public caller가 선택하는 값이 아닙니다.
+- `OWOGG`는 elevated admin publication route가 assertion하는 authority이며 public caller가 선택하는
+  값이 아닙니다.
 - `USER.userId`는 정확한 OwOGG user identity입니다.
 - slug, title, developer display name, canonical text는 소유권/인가 판정에 사용하지 않습니다.
 - public “공식” 배지는 canonical v2의 `publisher.official` 메타데이터입니다. 이것은 표시값일 뿐
   권한 원천이 아니며 Creator 요청/manifest가 선택할 수 없습니다.
 - runtime registry는 publisher에 따라 다른 serving 구현을 선택하지 않습니다.
 
-현재 결정론적 Git deployment bootstrap이 OWOGG publication을 관리합니다. 향후 interactive
-official-admin publication과 bootstrap 중 무엇이 authoritative인지/어떤 precedence를 가질지는
-미결정입니다. [Game Platform Architecture](GAME_PLATFORM_ARCHITECTURE.md)의 선택지를 유지하며 F-1은
-정책을 선택하지 않습니다.
+`POST /api/admin/games/upload`만 OWOGG publisher를 생성·갱신할 수 있습니다. deploy workflow와
+Game Creator route는 OWOGG authority나 live version을 선택하지 않습니다.
 
 ## route별 권한 검사 예시
 
 - `/api/dev/*`: 일반 session + Game Creator access + ownership/admin 조건
 - `/api/admin/sandbox-games/*`: admin session + `sandbox_games.review` 또는 delete permission
+- `/api/admin/games/upload`: elevated admin session + `games.moderate`; publisher는 서버가 OWOGG로 고정
 - `/api/admin/game-creators/*`: `game_creators.manage`
 - `/api/admin/accounts/*`: managed ADMIN과 `roles.manage` invariant
 - public game/score: publisher label이 아니라 generic game/version/session/canonical policy

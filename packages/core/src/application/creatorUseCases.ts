@@ -1,5 +1,5 @@
-import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
 import { levelForTotalXp } from "../domain/progression.js";
+import type { PublicGameCatalog } from "./publicGameCatalog.js";
 import {
   FEATURED_POLICY,
   evaluateFeaturedInitial,
@@ -44,6 +44,7 @@ export class CreatorUseCases {
   constructor(
     private creatorRepo: CreatorRepository,
     private reviewRepo?: CreatorReviewRepository,
+    private games?: PublicGameCatalog,
   ) {}
 
   async getCreatorRankings(options: {
@@ -57,8 +58,10 @@ export class CreatorUseCases {
     const offset = Math.max(options.offset ?? 0, 0);
 
     const selectedGameId = options.gameId && options.gameId !== "all" ? options.gameId : undefined;
-    const manifest = selectedGameId ? GAME_MANIFEST_MAP[selectedGameId] : undefined;
-    const direction = manifest?.scoreConfig?.direction ?? "desc";
+    const games = this.games ? await this.games.list() : [];
+    const gamesBySlug = new Map(games.map((game) => [game.identity.slug, game]));
+    const selectedGame = selectedGameId ? gamesBySlug.get(selectedGameId) : undefined;
+    const direction = selectedGame?.canonical.policy.score?.direction ?? "desc";
 
     const queryOpts: {
       mode: "score" | "xp";
@@ -80,14 +83,15 @@ export class CreatorUseCases {
 
     const entries: CreatorRankEntry[] = res.entries.map((entry) => {
       if (options.mode === "score" && entry.gameId && entry.score !== undefined) {
-        const gManifest = GAME_MANIFEST_MAP[entry.gameId];
-        const formattedScore = gManifest?.scoreConfig
-          ? `${entry.score.toLocaleString()} ${gManifest.scoreConfig.unit}`
+        const game = gamesBySlug.get(entry.gameId);
+        const score = game?.canonical.policy.score;
+        const formattedScore = score
+          ? `${score.displayPrefix ?? ""}${entry.score.toLocaleString()}${score.displaySuffix ?? ` ${score.unit}`}`
           : String(entry.score);
         return {
           ...entry,
           formattedScore,
-          gameTitle: gManifest ? gManifest.title : entry.gameId,
+          gameTitle: game?.canonical.title ?? entry.gameId,
         };
       } else if (options.mode === "xp" && entry.totalXp !== undefined) {
         const level = levelForTotalXp(entry.totalXp);

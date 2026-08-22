@@ -5,7 +5,7 @@
  *
  * `GameStatus` (@owogg/game-sdk/contracts) is `"draft" | "beta" | "published" | "hidden"` — SYSTEM
  * games are the only ones that ever use `"beta"` (a build-time editorial choice, declared in
- * game-registry/games/<slug>/info.json); nothing about a Creator game's D1 lifecycle maps to it,
+ * an old Git metadata file); nothing about a Creator game's D1 lifecycle maps to it,
  * so {@link CreatorGameRuntimeStatus} deliberately excludes it at the type level rather than just
  * by convention.
  *

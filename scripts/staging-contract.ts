@@ -285,6 +285,11 @@ export function validateStagingEnvironment(env: Environment): string[] {
   if (adminIds && !adminIds.split(",").every((id) => /^[1-9]\d*$/.test(id.trim()))) {
     errors.push("STAGING_ADMIN_USER_IDS must be empty or a comma-separated list of positive IDs");
   }
+  if (env.STAGING_LEGACY_ADMIN_USER_IDS?.trim()) {
+    errors.push(
+      "GitHub staging Environment의 ADMIN_USER_IDS는 금지됩니다. 값을 STAGING_ADMIN_USER_IDS로 옮기고 legacy variable을 삭제하세요.",
+    );
+  }
 
   for (const secret of [
     "B2_APPLICATION_KEY",
@@ -364,27 +369,6 @@ export function materializeStagingWranglerConfig(source: string, d1Id: string): 
     );
   }
   return source.replace(STAGING_D1_ID_SENTINEL, d1Id);
-}
-
-export type DeployEnvironment = "production" | "staging";
-
-export function assertOfficialGameBootstrapTargets(env: Environment): DeployEnvironment {
-  const deployment = env.OWOGG_DEPLOY_ENVIRONMENT?.trim();
-  if (deployment !== "production" && deployment !== "staging") {
-    throw new Error("OWOGG_DEPLOY_ENVIRONMENT must be explicitly production or staging");
-  }
-  const expected = deployment === "staging" ? STAGING : PRODUCTION;
-  if (env.D1_DATABASE_NAME?.trim() !== expected.d1Name) {
-    throw new Error(
-      `${deployment} official bootstrap requires D1_DATABASE_NAME=${expected.d1Name}`,
-    );
-  }
-  if (env.B2_BUCKET_NAME?.trim() !== expected.b2Bucket) {
-    throw new Error(
-      `${deployment} official bootstrap requires B2_BUCKET_NAME=${expected.b2Bucket}`,
-    );
-  }
-  return deployment;
 }
 
 export function resolveSmokeTargets(env: Environment): { apiUrl: string; webUrl: string } {

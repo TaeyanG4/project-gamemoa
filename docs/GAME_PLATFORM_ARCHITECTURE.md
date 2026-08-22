@@ -2,13 +2,14 @@
 
 상태: 기준 문서
 
-마지막 검증: 2026-08-22
+마지막 검증: 2026-08-23
 
 기준 소스:
 
 - `packages/core/src/modules/game/`
 - `packages/core/src/application/gamePublicationService.ts`
-- `packages/core/src/application/officialGameBootstrap.ts`
+- `packages/core/src/application/officialGameUploadUseCases.ts`
+- `packages/db/src/d1/D1OfficialGameUploadRepository.ts`
 - `apps/api/src/routes/games.ts`
 - `apps/api/src/routes/gameServing.ts`
 - `apps/web/app/features/game/GameHost.tsx`
@@ -50,7 +51,7 @@ OwOGG Game Platform
   불변이며 version 범위로 유지됩니다.
 - `GameCanonicalDocument` v2는 title, description, policy, presentation, difficulty, catalog와 public
   `publisher.official` 표시 메타데이터를 소유합니다. 소유권/인가, live-version 상태, 환경 URL,
-  secret은 소유하지 않습니다. USER 경로는 항상 `official: false`, 신뢰된 OWOGG bootstrap만
+  secret은 소유하지 않습니다. USER 경로는 항상 `official: false`, 인증·인가된 관리자 업로드만
   `official: true`를 기록합니다.
 - `GamePublicationService`는 유일한 file/manifest publication loop입니다. manifest를 마지막에 쓰고,
   검증한 동일 publication target에만 READY를 표시합니다.
@@ -70,29 +71,15 @@ creator entitlement는 계속 유지합니다. `sandbox_games`, `sandbox_game_ve
 배포에서 expand와 drop을 함께 수행하지 않습니다.
 실패한 publication은 동일한 숫자 version과 source archive로 다시 시도합니다.
 
-## OWOGG bootstrap 제어 영역
+## OWOGG 관리자 게시 제어 영역
 
-네 개의 source game 폴더와 `GAME_DEFINITIONS`는 Git이 관리하는 입력입니다. 결정론적 build는
-SHA-256 content hash를 생성하고, 배포 bootstrap은 OWOGG identity, 숫자 version, canonical parity,
-영구 slug 예약, live 활성화를 보장합니다. USER, sandbox, review row는 만들지 않습니다. 변경되지 않은
-READY hash는 기존 version을 재사용하고, 변경된 hash는 활성화 전에 새 version을 할당하고
-publication합니다.
+OWOGG publication authority는 Admin Center입니다. 관리자 ZIP 업로드가 generic D1 identity/version과
+B2 canonical/bundle을 만들고 READY version을 live로 활성화합니다. 같은 content hash의 READY version은
+재사용하며 archive는 OWOGG authority를 스스로 선언할 수 없습니다. Git deploy는 게임 bytes를 만들거나
+live pointer를 변경하지 않으므로 관리자 게시 결과가 다음 코드 배포에 되돌아가지 않습니다.
 
-## official-admin publication 권한 결정
-
-현재 production authority는 결정론적 Git 배포 bootstrap입니다. 대화형 official-admin upload를 얇은
-API wrapper로 안전하게 추가할 수는 없습니다. 이후 배포가 bootstrap을 실행해 Git 관리 version을
-다시 활성화할 수 있기 때문입니다. 이 API를 구현하기 전에 향후 product/control-plane 결정으로
-다음 model 중 하나를 선택하고 명시해야 합니다.
-
-- **선택지 A — Git 권한 원천:** 배포 bootstrap이 계속 OWOGG live version을 제어하며, admin tooling이
-  이를 독립적으로 대체할 수 없습니다.
-- **선택지 B — Admin 권한 원천:** admin 관리 version이 live pointer를 제어하고, 배포 bootstrap은
-  seed/ensure 역할만 합니다.
-- **선택지 C — 명시적 provenance와 precedence:** publication provenance/authority를 저장하고,
-  결정론적인 conflict와 activation precedence를 정의합니다.
-
-이 문서는 선택지를 기록하지만 어느 것도 선택하거나 구현하지 않습니다.
+Git 기반 game registry와 생성 metadata는 제거되었습니다. public catalog, serving, score acceptance,
+official badge와 publisher name은 모두 환경별 D1/B2에서 해석합니다.
 
 ## 알려진 확장성 부채
 

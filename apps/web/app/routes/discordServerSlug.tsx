@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router";
 import {
   fetchDiscordGuildBySlug,
@@ -10,8 +10,8 @@ import type {
   GuildXpLeaderboardEntryDto,
   ServerGameLeaderboardEntryDto,
 } from "@owogg/contracts";
-import { gameManifests } from "../features/catalog/registry";
-import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import { usePublicGames } from "../features/publicGamesApi";
+import { publicGameToCard } from "../features/catalog/publicGameAdapter";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
 
 import { ApiClientError } from "../lib/api/errors";
@@ -30,6 +30,8 @@ type ServerTab = "alltime" | "weekly" | "games";
  * the whitespace reads as intentional instead of like unfinished padding. */
 export default function DiscordServerSlugRoute() {
   const { dict } = useI18n();
+  const { games: publicGames } = usePublicGames();
+  const games = useMemo(() => publicGames.map((game) => publicGameToCard(game)), [publicGames]);
   const { slug } = useParams<{ slug: string }>();
   const [guild, setGuild] = useState<DiscordGuildDto | null>(null);
   const [isManager, setIsManager] = useState(false);
@@ -38,9 +40,7 @@ export default function DiscordServerSlugRoute() {
   const [topWeekly, setTopWeekly] = useState<GuildXpLeaderboardEntryDto[]>([]);
 
   const [activeTab, setActiveTab] = useState<ServerTab>("alltime");
-  const [selectedGameId, setSelectedGameId] = useState<string>(
-    gameManifests[0]?.id ?? "reaction-time",
-  );
+  const [selectedGameId, setSelectedGameId] = useState("");
   const [gameLeaderboard, setGameLeaderboard] = useState<ServerGameLeaderboardEntryDto[]>([]);
   const [loadingGameScores, setLoadingGameScores] = useState(false);
 
@@ -83,9 +83,16 @@ export default function DiscordServerSlugRoute() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const firstGame = games[0];
+    if (firstGame && !games.some((game) => game.slug === selectedGameId)) {
+      setSelectedGameId(firstGame.slug);
+    }
+  }, [games, selectedGameId]);
+
   // Fetch Game Scores when game tab or selected game changes
   useEffect(() => {
-    if (!slug || activeTab !== "games") return;
+    if (!slug || activeTab !== "games" || !selectedGameId) return;
     setLoadingGameScores(true);
 
     fetchGuildServerGameLeaderboard(slug, selectedGameId)
@@ -142,10 +149,8 @@ export default function DiscordServerSlugRoute() {
 
   if (!guild) return null;
 
-  const currentManifest = gameManifests.find((m) => m.id === selectedGameId);
-  const currentGameTitle = currentManifest
-    ? getLocalizedGameContent(dict, currentManifest).title
-    : "";
+  const currentGame = games.find((game) => game.slug === selectedGameId);
+  const currentGameTitle = currentGame?.title ?? "";
 
   const visibilityToneClass =
     guild.visibility === "PUBLIC"
@@ -322,23 +327,23 @@ export default function DiscordServerSlugRoute() {
         {activeTab === "games" && (
           <div className="flex flex-col gap-4">
             <div className="scrollbar-none flex items-center gap-2 overflow-x-auto pb-1">
-              {gameManifests.map((g) => {
-                const title = getLocalizedGameContent(dict, g).title;
+              {games.map((game) => {
+                const title = game.title;
                 return (
                   <button
-                    key={g.id}
+                    key={game.slug}
                     type="button"
-                    onClick={() => setSelectedGameId(g.id)}
+                    onClick={() => setSelectedGameId(game.slug)}
                     className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
-                      selectedGameId === g.id
+                      selectedGameId === game.slug
                         ? "border-brand bg-brand text-white shadow-lg shadow-brand/25"
                         : "border-border bg-surface-raised text-text-secondary hover:text-text-primary"
                     }`}
                   >
                     <GameThumbnail
-                      thumbnail={g.thumbnail}
+                      thumbnail={game.thumbnail}
                       title={title}
-                      accent={g.accent}
+                      accent={game.accent}
                       className="h-4 w-4 rounded"
                     />
                     <span>{title}</span>
@@ -367,7 +372,7 @@ export default function DiscordServerSlugRoute() {
                     nickname={entry.nickname}
                     avatarUrl={entry.avatarUrl}
                     subtext={entry.createdAt.slice(0, 10)}
-                    valueLabel={`${entry.score.toLocaleString()} ${currentManifest?.scoreConfig?.unit ?? "pts"}`}
+                    valueLabel={`${entry.score.toLocaleString()} ${currentGame?.scoreUnit ?? "pts"}`}
                   />
                 ))}
               </div>

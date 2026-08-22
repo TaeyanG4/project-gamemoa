@@ -9,41 +9,12 @@ import {
   type RuntimeGameAvailability,
   type RuntimeGameRegistry,
 } from "../src/index.js";
-import { systemGameDefinitionToGameCanonicalDocument } from "../src/modules/game/domain/gameCanonicalMigration.js";
-import { GAME_DEFINITIONS } from "../src/registry/gameDefinitions.generated.js";
+import { runtimeGameFixture } from "./runtimeGameFixture.js";
 
 const SECRET = "c2-focused-test-secret";
 
 function runtimeGame(slug = "reaction-time"): RuntimeGame {
-  const definition = GAME_DEFINITIONS.find((item) => item.slug === slug);
-  assert.ok(definition);
-  return {
-    identity: {
-      id: 91,
-      slug,
-      publisher: { type: "OWOGG" },
-      visibility: "PUBLIC",
-      liveVersionId: 17,
-      deletedAt: null,
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-    },
-    liveVersion: {
-      id: 17,
-      gameId: 91,
-      objectKey: "games/91/17/index.html",
-      contentHash: "hash",
-      bundleBytes: 1,
-      publishStatus: "READY",
-      publishError: null,
-      publishedAt: "2026-01-01T00:00:00.000Z",
-      manifestKey: "games/91/17/.owogg-manifest.json",
-      publishedSizeBytes: 1,
-      fileCount: 1,
-      uploadedAt: "2026-01-01T00:00:00.000Z",
-    },
-    canonical: systemGameDefinitionToGameCanonicalDocument(definition, "2026-01-01T00:00:00.000Z"),
-  };
+  return runtimeGameFixture(slug);
 }
 
 function createUseCases(runtime: RuntimeGame) {

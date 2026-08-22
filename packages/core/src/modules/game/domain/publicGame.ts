@@ -5,6 +5,7 @@ import type { RuntimeGame } from "./runtimeGame.js";
  * user ids, review state, storage keys, and live numeric ids never cross this boundary. */
 export interface PublicGame {
   readonly publisherType: "OWOGG" | "USER";
+  readonly publisherName: string;
   readonly slug: string;
   readonly title: string;
   readonly shortDescription: string;
@@ -18,11 +19,16 @@ export interface PublicGame {
   readonly mediaUrl: string | null;
 }
 
-export function toPublicGame(runtime: RuntimeGame, mediaUrl: string | null): PublicGame {
+export function toPublicGame(
+  runtime: RuntimeGame,
+  mediaUrl: string | null,
+  publisherName = runtime.canonical.publisher.official ? "OWOGG" : "USER",
+): PublicGame {
   return {
     // Public official presentation comes from canonical metadata. D1 publisher identity remains
     // the authorization fact and is intentionally not exposed as the badge source.
     publisherType: runtime.canonical.publisher.official ? "OWOGG" : "USER",
+    publisherName,
     slug: runtime.identity.slug,
     title: runtime.canonical.title,
     shortDescription: runtime.canonical.shortDescription,
@@ -40,15 +46,13 @@ export function toPublicGame(runtime: RuntimeGame, mediaUrl: string | null): Pub
   };
 }
 
-/** Resolve the public media projection without leaking a storage key. TAXONOMY games keep the
- * canonical static thumbnail; USER game logos are served through the provider-neutral endpoint. */
+/** Resolve the public media projection without leaking a storage key. A D1 logo asset always wins;
+ * older TAXONOMY compatibility metadata remains a fallback until an admin uploads a logo. */
 export function publicGameMediaUrl(
   runtime: RuntimeGame,
   asset: GameAsset | null,
   mediaEndpoint: string,
 ): string | null {
-  if (runtime.canonical.catalog.type === "TAXONOMY") {
-    return runtime.canonical.catalog.thumbnail;
-  }
-  return asset?.kind === "LOGO" ? mediaEndpoint : null;
+  if (asset?.kind === "LOGO") return mediaEndpoint;
+  return runtime.canonical.catalog.type === "TAXONOMY" ? runtime.canonical.catalog.thumbnail : null;
 }

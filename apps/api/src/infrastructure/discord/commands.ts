@@ -2,8 +2,6 @@
 // truth for both command registration (scripts/register-discord-commands.ts) and the
 // interaction router (routes/discordInteractions.ts), so they can never drift apart.
 
-import { GAME_MANIFEST_MAP } from "@owogg/core";
-
 export const OWOGG_COMMAND_NAME = "owogg";
 
 export const DISCORD_SUBCOMMANDS = {
@@ -24,14 +22,6 @@ export type DiscordSubcommand = (typeof DISCORD_SUBCOMMANDS)[keyof typeof DISCOR
 const OPTION_TYPE_SUB_COMMAND = 1;
 const OPTION_TYPE_STRING = 3;
 
-const gameChoices = Object.values(GAME_MANIFEST_MAP).map((m) => ({
-  name: m.title,
-  value: m.id,
-}));
-// Static `choices` (not live autocomplete, ApplicationCommandOptionType 4) is deliberate here —
-// Discord allows up to 25 static choices, and the catalog only has 4 games. Autocomplete earns
-// its complexity (a second interaction round-trip, live filtering) once the catalog grows past
-// that cap or gets a live/user-submitted source (see #16) — not before.
 const periodChoices = [
   { name: "전체 기간", value: "alltime" },
   { name: "이번 주", value: "weekly" },
@@ -69,9 +59,8 @@ export const OWOGG_DISCORD_COMMAND = {
         {
           type: OPTION_TYPE_STRING,
           name: "game",
-          description: "플레이할 미니게임을 선택합니다 (선택사항)",
+          description: "플레이할 게임 slug를 입력합니다 (선택사항, /owogg games에서 확인)",
           required: false,
-          choices: gameChoices,
         },
       ],
     },

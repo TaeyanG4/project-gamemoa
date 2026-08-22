@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, Link } from "react-router";
 import {
   ArrowLeft,
@@ -15,8 +15,8 @@ import {
 import { useAuth } from "../features/auth";
 import { useI18n } from "../features/i18n/I18nContext";
 import { fetchPublicProfileApi } from "../features/profile/api";
-import { gameManifests } from "../features/catalog/registry";
-import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
+import { usePublicGames } from "../features/publicGamesApi";
+import { publicGameToCard } from "../features/catalog/publicGameAdapter";
 import { GameThumbnail } from "../components/ui/GameThumbnail";
 import { GameFavoriteCard, GameActivityCard } from "../components/ui/GameLinkCard";
 import { ACHIEVEMENT_DEFINITIONS, type AchievementCode } from "@owogg/core";
@@ -57,6 +57,8 @@ export default function UserProfileRoute() {
   const { id } = useParams();
   const { dict } = useI18n();
   const { user: viewer } = useAuth();
+  const { games: publicGames } = usePublicGames();
+  const games = useMemo(() => publicGames.map((game) => publicGameToCard(game)), [publicGames]);
 
   const [data, setData] = useState<PublicProfileResponse | null>(null);
   const [state, setState] = useState<LoadState>("loading");
@@ -127,15 +129,15 @@ export default function UserProfileRoute() {
   const flag = data.country ? countryFlagEmoji(data.country) : "";
 
   const favoriteGames = (data.favoriteGameIds ?? [])
-    .map((id) => gameManifests.find((g) => g.slug === id || g.id === id))
-    .filter((g): g is (typeof gameManifests)[number] => Boolean(g));
+    .map((id) => games.find((game) => game.slug === id))
+    .filter((game): game is (typeof games)[number] => Boolean(game));
 
   const recentGames = (data.recentPlays ?? [])
     .map((r) => {
-      const game = gameManifests.find((g) => g.slug === r.gameId || g.id === r.gameId);
+      const game = games.find((candidate) => candidate.slug === r.gameId);
       return game ? { game, lastPlayedAt: r.lastPlayedAt } : null;
     })
-    .filter((entry): entry is { game: (typeof gameManifests)[number]; lastPlayedAt: string } =>
+    .filter((entry): entry is { game: (typeof games)[number]; lastPlayedAt: string } =>
       Boolean(entry),
     )
     // The profile page is a snapshot, not a full history — cap at 8 even though the API can
@@ -145,14 +147,14 @@ export default function UserProfileRoute() {
 
   const gameRecords = data.gameBests
     .map((best) => {
-      const manifest = gameManifests.find((g) => g.slug === best.gameId || g.id === best.gameId);
+      const manifest = games.find((game) => game.slug === best.gameId);
       return manifest ? { manifest, best } : null;
     })
     .filter(
       (
         entry,
       ): entry is {
-        manifest: (typeof gameManifests)[number];
+        manifest: (typeof games)[number];
         best: (typeof data.gameBests)[number];
       } => Boolean(entry),
     );
@@ -308,7 +310,7 @@ export default function UserProfileRoute() {
         ) : (
           <div className="flex flex-col divide-y divide-border/60">
             {gameRecords.map(({ manifest, best }) => {
-              const title = getLocalizedGameContent(dict, manifest).title;
+              const title = manifest.title;
               return (
                 <Link
                   key={manifest.slug}

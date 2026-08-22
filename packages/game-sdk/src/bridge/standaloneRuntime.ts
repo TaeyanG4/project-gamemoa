@@ -3,16 +3,9 @@ import type { GameRuntimeContext } from "../react/module.js";
 import type { GameResult } from "../contracts/result.js";
 
 /**
- * Adapts a Game Bridge client into the exact `GameRuntimeContext` shape every games/* React
- * component already consumes via `GameProps` — shared by every migrated SYSTEM game's
- * `standalone/bridgeRuntime.ts` (aim-test, memory-test, typing-test) so the same ~20 lines of glue
- * isn't hand-copied three more times. reaction-time's own `standalone/bridgeRuntime.ts` predates
- * this file and is left as its own hand-written copy rather than migrated onto it — this is the
- * one piece of genuine, verbatim duplication across the four games' standalone adapters;
- * everything else (main.tsx bootstrap, index.html, vite.config.ts, style.css) stays per-game
- * because each has real per-game differences (title, Tailwind content globs, entry component
- * import). Deliberately NOT a bigger "standalone game framework" — see GameHost.tsx's own doc
- * comment on resolveGameRuntimeKind for the same minimal-extraction posture on the host side.
+ * Adapts a Game Bridge client into the exact `GameRuntimeContext` shape standalone React game
+ * builds consume via `GameProps`. This remains reusable SDK support for independently built game
+ * bundles; production publication and loading do not depend on a Git game-source workspace.
  *
  * `user` is always `null` and `sessionId` is a throwaway id with no meaning to the host — no
  * auth/token/API address ever crosses into a standalone game bundle. `difficultyId` comes from

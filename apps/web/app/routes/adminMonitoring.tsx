@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { Activity, Database, Gamepad2, RefreshCw, ShieldAlert, Users } from "lucide-react";
 import { useAuth } from "../features/auth";
 import { fetchAdminMonitoring } from "../features/adminApi";
-import { gameManifests } from "../features/catalog/registry";
-import { getLocalizedGameContent } from "../features/catalog/localizedGameContent";
-import { useI18n } from "../features/i18n/I18nContext";
+import { usePublicGames } from "../features/publicGamesApi";
+import { publicGameToCard } from "../features/catalog/publicGameAdapter";
 import type { AdminMonitoringResponse } from "@owogg/contracts";
 import { ApiClientError } from "../lib/api";
 
@@ -22,7 +21,11 @@ export function meta() {
  * dashboard, so a manual refresh button (same pattern as adminGames.tsx) is enough for v1. */
 export default function AdminMonitoringRoute() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { dict } = useI18n();
+  const { games: publicGames } = usePublicGames();
+  const gamesBySlug = useMemo(
+    () => new Map(publicGames.map((game) => [game.slug, publicGameToCard(game)])),
+    [publicGames],
+  );
   const [data, setData] = useState<AdminMonitoringResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -165,8 +168,7 @@ export default function AdminMonitoringRoute() {
             ) : (
               <div className="flex flex-col gap-3">
                 {data.gamePlayCounts.map(({ gameId, count }) => {
-                  const manifest = gameManifests.find((g) => g.slug === gameId || g.id === gameId);
-                  const title = manifest ? getLocalizedGameContent(dict, manifest).title : gameId;
+                  const title = gamesBySlug.get(gameId)?.title ?? gameId;
                   const widthPercent = maxPlayCount > 0 ? (count / maxPlayCount) * 100 : 0;
                   return (
                     <div key={gameId} className="flex flex-col gap-1">

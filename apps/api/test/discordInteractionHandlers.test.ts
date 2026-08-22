@@ -4,7 +4,7 @@ import { handleOwoggCommand } from "../src/infrastructure/discord/interactionHan
 import type { AppContainer } from "../src/container.js";
 import { DISCORD_INTERACTION_TYPE } from "../src/infrastructure/discord/types.js";
 import type { DiscordInteraction } from "../src/infrastructure/discord/types.js";
-import type { OAuthAccount, User } from "@owogg/core";
+import type { OAuthAccount, RuntimeGame, User } from "@owogg/core";
 
 const FRONTEND_URL = "https://owogg.com";
 const API_BASE_URL = "https://api.owogg.com";
@@ -52,6 +52,7 @@ function fakeContainer(overrides: {
     totalAchievements: number;
     recentlyUnlocked: { achievementCode: string; unlockedAt: string }[];
   }>;
+  listPublicGames?: () => Promise<readonly RuntimeGame[]>;
 }): AppContainer {
   return {
     userRepo: {
@@ -113,6 +114,18 @@ function fakeContainer(overrides: {
       getSummary:
         overrides.getAchievementSummary ??
         (async () => ({ unlockedCodes: [], totalAchievements: 7, recentlyUnlocked: [] })),
+    },
+    publicGameCatalog: {
+      list:
+        overrides.listPublicGames ??
+        (async () =>
+          [
+            {
+              identity: { slug: "reaction-time" },
+              canonical: { title: "반응속도 테스트" },
+            },
+          ] as unknown as RuntimeGame[]),
+      findBySlug: async () => null,
     },
     // Unused by these handlers, but required by AppContainer's shape.
   } as unknown as AppContainer;

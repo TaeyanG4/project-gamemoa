@@ -50,20 +50,12 @@ function OpsCenterContent() {
             desc="검색, 경고성 조치, 정지/차단"
           />
         )}
-        {can("games.moderate") && (
+        {(can("games.moderate") || can("sandbox_games.review")) && (
           <NavCard
             to="/admin/games"
             icon={Gamepad2}
-            title="게임 관리"
-            desc="빌트인 게임 강제 비활성화"
-          />
-        )}
-        {can("sandbox_games.review") && (
-          <NavCard
-            to="/admin/sandbox-games"
-            icon={Gamepad2}
-            title="제작 게임 심사"
-            desc="업로드된 버전 승인/거절, 공개 전환"
+            title="게임 관리 및 심사"
+            desc="OWOGG 게시, 전체 게임 안전 제어, 사용자 게임 심사"
           />
         )}
         {can("game_creators.manage") && (

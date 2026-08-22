@@ -20,6 +20,8 @@ import { OwoWordmarkIcon } from "../ui/OwoWordmarkIcon";
 import { RegisteredServersMenu } from "../ui/RegisteredServersMenu";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { fetchMyAccess } from "../../features/myAccess";
+import { ApiClientError } from "../../lib/api/errors.js";
+import { retryAsync } from "../../lib/api/retry.js";
 import type { MyAccessResponse, StaffRoleValue } from "@owogg/contracts";
 
 interface HeaderProps {
@@ -56,21 +58,35 @@ export function Header({ onToggleMobileSidebar }: HeaderProps) {
   // login, not per dropdown-open. A plain USER gets back staffRole: null and both programs false,
   // so nothing extra renders for them — frontend display only follows what the backend actually
   // grants; it is never itself the authorization check (see routes' requirePermission calls).
+  // Network/5xx failures are retried and preserve the last successful access snapshot. A browser
+  // reconnect/focus rechecks it so a temporary API outage cannot hide Staff Center entries for
+  // the rest of the SPA session.
   useEffect(() => {
     if (!isAuthenticated) {
       setMyAccess(null);
       return;
     }
     let cancelled = false;
-    fetchMyAccess()
-      .then((res) => {
-        if (!cancelled) setMyAccess(res);
-      })
-      .catch(() => {
-        if (!cancelled) setMyAccess(null);
-      });
+    const refreshMyAccess = async () => {
+      try {
+        const response = await retryAsync(fetchMyAccess);
+        if (!cancelled) setMyAccess(response);
+      } catch (error) {
+        // Only an authoritative 401 clears the access snapshot. Transient outages keep the last
+        // known value until the focus/online retry succeeds instead of silently removing menus.
+        if (!cancelled && error instanceof ApiClientError && error.status === 401) {
+          setMyAccess(null);
+        }
+      }
+    };
+    const retryAfterReconnect = () => void refreshMyAccess();
+    void refreshMyAccess();
+    window.addEventListener("online", retryAfterReconnect);
+    window.addEventListener("focus", retryAfterReconnect);
     return () => {
       cancelled = true;
+      window.removeEventListener("online", retryAfterReconnect);
+      window.removeEventListener("focus", retryAfterReconnect);
     };
   }, [isAuthenticated]);
 

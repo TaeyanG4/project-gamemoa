@@ -17,7 +17,7 @@
  * Entirely optional and inert on its own: a game with no `presentation` field works exactly as it
  * always has (every game shipped today has none). Nothing in this PR *reads* the field yet —
  * GameHost's own viewport calculation, fullscreen UI, and any wiring through Creator manifests,
- * the public API, or game-registry/'s JSON sources are all explicitly a later PR's job. This is
+ * the public API are separate integration concerns. This is
  * the shared vocabulary those PRs will build on, not the implementation.
  */
 export interface GamePresentation {

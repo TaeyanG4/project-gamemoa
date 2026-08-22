@@ -10,7 +10,7 @@
 - `packages/core/src/domain/sandboxGames.ts`
 - `packages/core/src/application/gamePublicationService.ts`
 - `packages/core/src/application/sandboxGameUseCases.ts`
-- `packages/core/src/application/officialGameBootstrap.ts`
+- `packages/core/src/application/officialGameUploadUseCases.ts`
 - `apps/api/src/routes/devGames.ts`
 - `apps/api/src/routes/adminSandboxGames.ts`
 - `apps/api/src/routes/gameServing.ts`
@@ -19,10 +19,10 @@
 
 OwOGG에는 두 개의 **입력/control-plane**이 있지만 하나의 production runtime이 있습니다.
 
-| 입력                          | 목적                                      | Runtime 결과               |
-| ----------------------------- | ----------------------------------------- | -------------------------- |
-| `games/*` + `game-registry/*` | OWOGG 소유 게임을 Git에서 build/bootstrap | generic D1/B2 game/version |
-| Game Creator ZIP upload       | USER 게임 등록, publication, moderation   | generic D1/B2 game/version |
+| 입력                           | 목적                                    | Runtime 결과               |
+| ------------------------------ | --------------------------------------- | -------------------------- |
+| Admin Center ZIP upload        | OWOGG 게임 즉시 publication             | generic D1/B2 game/version |
+| Game Creator Center ZIP upload | USER 게임 등록, publication, moderation | generic D1/B2 game/version |
 
 두 경로 모두 최종적으로 generic `games`, `game_versions`, `game_assets`와 B2 canonical/bundle을
 사용합니다. `StaticGameRegistry`, publisher별 host/runtime, `/official-games/*`는 현재 production
@@ -30,7 +30,7 @@ OwOGG에는 두 개의 **입력/control-plane**이 있지만 하나의 productio
 
 공개 “공식” 표시는 `GameCanonicalDocument.publisher.official` 메타데이터입니다. 소유권과 API 인가는
 D1의 서버 관리 관계만 사용하며 canonical/manifest 입력으로 판정하지 않습니다. Creator 경로는
-업로드 내용과 무관하게 항상 `official: false`를 기록하고, OWOGG 배포 bootstrap만 `true`를 기록합니다.
+업로드 내용과 무관하게 항상 `official: false`를 기록하고, 관리자 OWOGG endpoint만 `true`를 기록합니다.
 
 ## 1. 게임이 지켜야 하는 runtime 계약
 
@@ -49,32 +49,19 @@ Bridge는 일반 RPC가 아닙니다. `HOST_INIT`, `GAME_READY`, `GAME_STARTED`,
 score를 완료 메시지로 보낼 수 있지만, 최종 acceptance는 서버 canonical policy와 signed
 session이 결정합니다.
 
-## 2. OWOGG 소스 게임
+## 2. OWOGG 관리자 게임 게시
 
-OWOGG 소유 게임을 저장소에 추가하는 기본 흐름입니다.
+관리자 센터의 **게임 관리 및 심사** 화면(`/admin/games`)에서 Game Creator Center와 동일한
+drag-and-drop 또는 파일 선택 방식으로 standalone ZIP을 등록합니다. API는 elevated admin session과
+`games.moderate` permission을 확인한 뒤 publisher를 서버에서 `OWOGG`로 고정하고, bundle과 canonical을
+B2에 기록한 후 D1 live version을 활성화합니다. 같은 화면의 사용자 제작 게임 심사 기능은
+`sandbox_games.review` 권한을 별도로 검사합니다. 배포 workflow나 `games/*` source package를 사용하지
+않습니다.
 
-```bash
-pnpm generate:game <slug>
-# games/<slug>와 game-registry 입력 구현
-pnpm generate:registry
-pnpm registry:check
-```
-
-역할을 구분해야 합니다.
-
-- `games/<slug>`: 게임 source package와 build output 규칙
-- `game-registry/<slug>`: catalog/canonical 입력
-- `GAME_DEFINITIONS`: 위 입력에서 생성되어 bootstrap과 여러 기존 build/test 소비자에 제공되는
-  결정론적 데이터
-- `GAME_MANIFESTS` / `GAME_MANIFEST_MAP`: 현재 도전과제, 개인화, Discord 등에서 계속 사용되는
-  generated metadata
-
-배포의 `pnpm bootstrap:official-games`가 OWOGG identity, content hash, canonical document,
-immutable bundle, live version을 generic platform에 반영합니다. 같은 READY hash는 재사용하고,
-hash가 바뀌면 새 numeric version을 publication한 후 live pointer를 전환합니다.
-
-이 Git/bootstrap 흐름이 현재 OWOGG publication authority입니다. 향후 official-admin upload와의
-precedence는 결정되지 않았으므로 도구나 문서가 임의로 선택하면 안 됩니다.
+ZIP에는 `index.html`, `owogg.game.json`, `owogg.logo.*`가 필요합니다. 기본 manifest는 USER와 같으며,
+관리자 업로드에 한해 `policy`, `catalog`, `presentation`, `difficulty`, `supportsReplay`를 선택적으로
+추가할 수 있습니다. 누락한 policy는 score 없음, leaderboard 없음, XP 0, 로그인 불필요로 안전하게
+설정됩니다. archive가 publisher/official 값을 넣어도 권한에는 반영되지 않습니다.
 
 ## 3. USER bundle 등록
 

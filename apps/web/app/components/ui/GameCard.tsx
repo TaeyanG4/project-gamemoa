@@ -7,7 +7,7 @@ import type { PublicGameCard } from "../../features/catalog/publicGameAdapter";
 
 export type GameCardProps = Pick<
   PublicGameCard,
-  "slug" | "title" | "shortDescription" | "modes" | "thumbnail" | "accent"
+  "slug" | "title" | "shortDescription" | "modes" | "thumbnail" | "accent" | "publisherName"
 >;
 
 /** Every provider-neutral public game card enters the same generic GameHost route. */
@@ -17,20 +17,16 @@ export function gameCardHref(slug: string): string {
 
 export function GameCard({
   slug,
-  title: koTitle,
-  shortDescription: koShortDescription,
+  title,
+  shortDescription,
   modes,
   thumbnail,
+  publisherName,
   accent = "#6366f1",
 }: GameCardProps) {
   const { isFavorite, toggleFavorite } = usePersonalization();
   const { dict } = useI18n();
   const isFav = isFavorite(slug);
-
-  // API canonical text is the fallback; the web dictionary overlays known official translations.
-  const content = dict.gameContent[slug];
-  const title = content?.title ?? koTitle;
-  const shortDescription = content?.shortDescription ?? koShortDescription;
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -108,6 +104,9 @@ export function GameCard({
 
           <p className="break-keep text-[10px] sm:text-xs text-text-secondary line-clamp-2 leading-relaxed flex-1">
             {shortDescription}
+          </p>
+          <p className="truncate text-[9px] font-semibold text-text-muted sm:text-[10px]">
+            제작자 {publisherName}
           </p>
         </div>
       </Link>

@@ -1,12 +1,9 @@
 /**
  * What a game *is*, independent of how it is stored or who uploaded it.
  *
- * This is the type the unified Game Registry resolves (see ../ports/gameRegistry.ts). Two
- * sources feed it today:
- *
- *   game-registry/games/<slug>/{info,policy}.json  (SYSTEM, build-time, compiled to
- *                                                    registry/gameDefinitions.generated.ts)
- *   D1 identity/runtime + GameCanonicalDocument (USER metadata/policy)
+ * Legacy source-shape contract retained for compatibility with external core consumers. Runtime
+ * catalog resolution no longer consumes this type: every publisher resolves through D1 identity/
+ * version plus the B2 GameCanonicalDocument.
  *
  * Deliberately a discriminated union on `owner.type`, not one flat shape with optional fields on
  * both sides — the same reasoning `./publicGame.ts`'s `PublicGame` union already documents for the
@@ -48,7 +45,7 @@ export interface GamePolicy {
    * Scoring rules, or `null` for a game that isn't scored at all. Reuses the SDK's ScoreConfig so
    * that direction/min/max/unit/display formatting have exactly one definition across the
    * codebase — `formatScore` already reads this shape, and score validation will read it from
-   * here instead of from the build-time GAME_MANIFEST_MAP.
+   * from canonical metadata at runtime.
    */
   readonly score: ScoreConfig | null;
   /** Whether accepted submissions appear on a public leaderboard. */
@@ -98,8 +95,7 @@ export interface GameDefinitionCommon {
   readonly presentation?: GamePresentation | undefined;
 }
 
-/** An official game maintained in this repository — game-registry/, compiled at build time into
- * registry/gameDefinitions.generated.ts's `GAME_DEFINITIONS`. Fixed category/tag taxonomy, a
+/** An official-game source shape retained as a public core type. Fixed category/tag taxonomy, a
  * bundled thumbnail asset path, and the richer `GameMode`/`InputMethod` vocabulary — none of which
  * a CREATOR game has any equivalent for (see this file's own top doc comment). */
 export interface SystemGameDefinition extends GameDefinitionCommon {

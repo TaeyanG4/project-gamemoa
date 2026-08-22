@@ -34,11 +34,12 @@ import type {
   SandboxGameRecord,
 } from "@owogg/contracts";
 import { ApiClientError } from "../lib/api";
+import { OfficialGameManagement } from "../components/admin/OfficialGameManagement";
 
 export function meta() {
   return [
-    { title: "제작 게임 심사 | OwOGG" },
-    { name: "description", content: "샌드박스 게임 업로드 심사 및 공개 관리" },
+    { title: "게임 관리 및 심사 | OwOGG" },
+    { name: "description", content: "OWOGG 공식 게임 게시와 사용자 제작 게임 심사·공개 관리" },
     { name: "robots", content: "noindex,nofollow" },
   ];
 }
@@ -49,7 +50,7 @@ export default function AdminSandboxGamesRoute() {
   const [allGames, setAllGames] = useState<SandboxGameRecord[] | null>(null);
   const [togglingGameId, setTogglingGameId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [accessDenied, setAccessDenied] = useState(false);
+  const [reviewAccessDenied, setReviewAccessDenied] = useState(false);
   const [busyVersionId, setBusyVersionId] = useState<number | null>(null);
   const [rejectReasons, setRejectReasons] = useState<Record<number, string>>({});
 
@@ -66,14 +67,10 @@ export default function AdminSandboxGamesRoute() {
       ]);
       setQueue(queueRes);
       setAllGames(gamesRes.games);
+      setReviewAccessDenied(false);
     } catch (err) {
       if (err instanceof ApiClientError && (err.status === 401 || err.status === 403)) {
-        setAccessDenied(true);
-        setError(
-          err.code === "ADMIN_SESSION_REQUIRED"
-            ? "관리자 로그인이 필요합니다. /admin 에서 본인 확인을 먼저 완료해주세요."
-            : "이 페이지는 지정된 OwOGG 관리자만 사용할 수 있습니다.",
-        );
+        setReviewAccessDenied(true);
       } else {
         setError(err instanceof Error ? err.message : "심사 큐를 불러올 수 없습니다.");
       }
@@ -187,23 +184,6 @@ export default function AdminSandboxGamesRoute() {
     );
   }
 
-  if (accessDenied) {
-    return (
-      <PageMessage>
-        <h1 className="text-lg font-black text-text-primary">접근 권한이 없습니다</h1>
-        <p className="mt-2 text-sm text-text-muted">
-          지정된 OwOGG 관리자 계정만 게임을 심사할 수 있습니다.
-        </p>
-        <Link
-          to="/admin"
-          className="mt-6 inline-flex rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light focus:outline-none focus:ring-2 focus:ring-brand"
-        >
-          관리자 센터로 돌아가기
-        </Link>
-      </PageMessage>
-    );
-  }
-
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-8 md:px-8">
       <header>
@@ -211,10 +191,10 @@ export default function AdminSandboxGamesRoute() {
           <ShieldAlert className="h-5 w-5" />
           <span className="text-xs font-bold uppercase tracking-[0.2em]">Admin Safety</span>
         </div>
-        <h1 className="text-2xl font-black text-text-primary">제작 게임 심사</h1>
+        <h1 className="text-2xl font-black text-text-primary">게임 관리 및 심사</h1>
         <p className="mt-1 text-xs text-text-muted">
-          버전 승인은 게임을 공개하지 않습니다 — 승인 후에도 기본은 비공개이며, 아래 "공개 전환"을
-          별도로 눌러야 실제로 서비스가 시작됩니다.
+          OWOGG 공식 게임 게시와 사용자 제작 게임 심사를 한곳에서 관리합니다. 사용자 게임의 버전
+          승인은 공개와 별개이며, 승인 후 "공개 전환"을 해야 서비스가 시작됩니다.
         </p>
       </header>
 
@@ -224,204 +204,225 @@ export default function AdminSandboxGamesRoute() {
         </div>
       )}
 
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
-          <Package className="h-4 w-4" /> 심사 대기 ({queue?.total ?? 0})
-        </h2>
-        {!queue ? (
-          <PageMessage small>불러오는 중...</PageMessage>
-        ) : queue.entries.length === 0 ? (
-          <p className="rounded-2xl border border-border bg-surface-raised p-6 text-center text-xs text-text-muted">
-            대기 중인 심사가 없습니다.
+      <OfficialGameManagement />
+
+      {reviewAccessDenied ? (
+        <section className="rounded-2xl border border-border bg-surface-raised p-5">
+          <h2 className="text-sm font-black text-text-primary">사용자 제작 게임 심사</h2>
+          <p className="mt-2 text-xs text-text-muted">
+            심사 큐와 사용자 게임 공개 관리에는 sandbox_games.review 권한과 관리자 로그인이
+            필요합니다.
           </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {queue.entries.map((entry) => {
-              const busy = busyVersionId === entry.version.id;
-              return (
-                <div
-                  key={entry.version.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-4"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-bold text-text-primary">
-                        {entry.gameTitle}{" "}
-                        <span className="text-[10px] font-bold text-text-muted">
-                          #{entry.gameId} · {entry.gameSlug}
+          <Link
+            to="/admin"
+            className="mt-4 inline-flex rounded-xl border border-border px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+          >
+            관리자 센터로 돌아가기
+          </Link>
+        </section>
+      ) : (
+        <>
+          <section className="space-y-3">
+            <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
+              <Package className="h-4 w-4" /> 심사 대기 ({queue?.total ?? 0})
+            </h2>
+            {!queue ? (
+              <PageMessage small>불러오는 중...</PageMessage>
+            ) : queue.entries.length === 0 ? (
+              <p className="rounded-2xl border border-border bg-surface-raised p-6 text-center text-xs text-text-muted">
+                대기 중인 심사가 없습니다.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {queue.entries.map((entry) => {
+                  const busy = busyVersionId === entry.version.id;
+                  return (
+                    <div
+                      key={entry.version.id}
+                      className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-text-primary">
+                            {entry.gameTitle}{" "}
+                            <span className="text-[10px] font-bold text-text-muted">
+                              #{entry.gameId} · {entry.gameSlug}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-text-muted">
+                            제작자 #{entry.developerUserId} · 업로드{" "}
+                            {entry.version.uploadedAt.split("T")[0]} ·{" "}
+                            {(entry.version.bundleBytes / 1024 / 1024).toFixed(1)}MB
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-accent-yellow/10 px-2 py-0.5 text-[10px] font-bold text-accent-yellow">
+                          {entry.version.status === "PENDING_REVIEW"
+                            ? "심사 대기"
+                            : entry.version.status}
                         </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleApprove(entry.version.id)}
+                          className="flex items-center gap-1.5 rounded-xl border border-accent-green/30 bg-accent-green/10 px-3 py-2 text-xs font-bold text-accent-green hover:bg-accent-green/20 disabled:opacity-50"
+                        >
+                          {busy ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <Check className="h-3.5 w-3.5" />
+                          )}
+                          승인
+                        </button>
+                        <input
+                          type="text"
+                          placeholder="반려 사유 (필수)"
+                          value={rejectReasons[entry.version.id] ?? ""}
+                          onChange={(e) =>
+                            setRejectReasons((prev) => ({
+                              ...prev,
+                              [entry.version.id]: e.target.value,
+                            }))
+                          }
+                          className="min-w-[180px] flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
+                        />
+                        <button
+                          type="button"
+                          disabled={busy || !rejectReasons[entry.version.id]?.trim()}
+                          onClick={() => void handleReject(entry.version.id)}
+                          className="flex items-center gap-1.5 rounded-xl border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs font-bold text-accent-red hover:bg-accent-red/20 disabled:opacity-50"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          반려
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3 border-t border-border pt-6">
+            <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
+              <ListChecks className="h-4 w-4" /> 사용자 제작 게임 관리 ({allGames?.length ?? 0})
+            </h2>
+            {!allGames ? (
+              <PageMessage small>불러오는 중...</PageMessage>
+            ) : allGames.length === 0 ? (
+              <p className="rounded-2xl border border-border bg-surface-raised p-6 text-center text-xs text-text-muted">
+                등록된 게임이 없습니다.
+              </p>
+            ) : (
+              <div className="flex flex-col divide-y divide-border/60 rounded-2xl border border-border bg-surface-raised px-4">
+                {allGames.map((g) => (
+                  <div key={g.id} className="flex items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-text-primary">
+                        {g.title}{" "}
+                        <span className="text-[10px] font-bold text-text-muted">#{g.id}</span>
                       </p>
-                      <p className="text-[11px] text-text-muted">
-                        제작자 #{entry.developerUserId} · 업로드{" "}
-                        {entry.version.uploadedAt.split("T")[0]} ·{" "}
-                        {(entry.version.bundleBytes / 1024 / 1024).toFixed(1)}MB
+                      <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-muted">
+                        <span
+                          className={`rounded-full px-1.5 py-0.5 font-bold ${
+                            g.visibility === "PUBLIC"
+                              ? "bg-accent-green/10 text-accent-green"
+                              : "bg-surface-overlay text-text-muted"
+                          }`}
+                        >
+                          {g.visibility === "PUBLIC" ? "활성" : "비활성"}
+                        </span>
+                        {g.deletedAt && (
+                          <span className="rounded-full bg-accent-red/10 px-1.5 py-0.5 font-bold text-accent-red">
+                            삭제됨
+                          </span>
+                        )}
+                        <span>제작자 #{g.developerUserId}</span>
+                        <span>{g.slug}</span>
                       </p>
                     </div>
-                    <span className="rounded-full bg-accent-yellow/10 px-2 py-0.5 text-[10px] font-bold text-accent-yellow">
-                      {entry.version.status === "PENDING_REVIEW"
-                        ? "심사 대기"
-                        : entry.version.status}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={
+                          togglingGameId !== null ||
+                          g.deletedAt !== null ||
+                          (g.visibility === "PRIVATE" && g.liveVersionId === null)
+                        }
+                        onClick={() => void handleToggleGameVisibility(g)}
+                        title={
+                          g.deletedAt !== null
+                            ? "삭제된 게임입니다. 승인 이력이 없는 초안만 완전 삭제할 수 있습니다."
+                            : g.liveVersionId === null
+                              ? "승인된 버전이 있어야 활성화할 수 있습니다."
+                              : undefined
+                        }
+                        className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-40 ${
+                          g.visibility === "PUBLIC"
+                            ? "border-accent-green/30 bg-accent-green/10 text-accent-green hover:bg-accent-green/20"
+                            : "border-border bg-surface text-text-primary hover:border-brand"
+                        }`}
+                      >
+                        {togglingGameId === g.id ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : g.visibility === "PUBLIC" ? (
+                          <Eye className="h-3.5 w-3.5" />
+                        ) : (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        )}
+                        {g.visibility === "PUBLIC" ? "활성" : "비활성"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenGame(g.id)}
+                        className="rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
+                      >
+                        관리
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void handleApprove(entry.version.id)}
-                      className="flex items-center gap-1.5 rounded-xl border border-accent-green/30 bg-accent-green/10 px-3 py-2 text-xs font-bold text-accent-green hover:bg-accent-green/20 disabled:opacity-50"
-                    >
-                      {busy ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Check className="h-3.5 w-3.5" />
-                      )}
-                      승인
-                    </button>
-                    <input
-                      type="text"
-                      placeholder="반려 사유 (필수)"
-                      value={rejectReasons[entry.version.id] ?? ""}
-                      onChange={(e) =>
-                        setRejectReasons((prev) => ({
-                          ...prev,
-                          [entry.version.id]: e.target.value,
-                        }))
-                      }
-                      className="min-w-[180px] flex-1 rounded-xl border border-border bg-surface px-3 py-2 text-xs text-text-primary outline-none focus:ring-2 focus:ring-brand"
-                    />
-                    <button
-                      type="button"
-                      disabled={busy || !rejectReasons[entry.version.id]?.trim()}
-                      onClick={() => void handleReject(entry.version.id)}
-                      className="flex items-center gap-1.5 rounded-xl border border-accent-red/30 bg-accent-red/10 px-3 py-2 text-xs font-bold text-accent-red hover:bg-accent-red/20 disabled:opacity-50"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                      반려
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-3 border-t border-border pt-6">
-        <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
-          <ListChecks className="h-4 w-4" /> 게임 관리 ({allGames?.length ?? 0})
-        </h2>
-        {!allGames ? (
-          <PageMessage small>불러오는 중...</PageMessage>
-        ) : allGames.length === 0 ? (
-          <p className="rounded-2xl border border-border bg-surface-raised p-6 text-center text-xs text-text-muted">
-            등록된 게임이 없습니다.
-          </p>
-        ) : (
-          <div className="flex flex-col divide-y divide-border/60 rounded-2xl border border-border bg-surface-raised px-4">
-            {allGames.map((g) => (
-              <div key={g.id} className="flex items-center justify-between gap-3 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-text-primary">
-                    {g.title} <span className="text-[10px] font-bold text-text-muted">#{g.id}</span>
-                  </p>
-                  <p className="flex flex-wrap items-center gap-1.5 text-[10px] text-text-muted">
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 font-bold ${
-                        g.visibility === "PUBLIC"
-                          ? "bg-accent-green/10 text-accent-green"
-                          : "bg-surface-overlay text-text-muted"
-                      }`}
-                    >
-                      {g.visibility === "PUBLIC" ? "활성" : "비활성"}
-                    </span>
-                    {g.deletedAt && (
-                      <span className="rounded-full bg-accent-red/10 px-1.5 py-0.5 font-bold text-accent-red">
-                        삭제됨
-                      </span>
-                    )}
-                    <span>제작자 #{g.developerUserId}</span>
-                    <span>{g.slug}</span>
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    disabled={
-                      togglingGameId !== null ||
-                      g.deletedAt !== null ||
-                      (g.visibility === "PRIVATE" && g.liveVersionId === null)
-                    }
-                    onClick={() => void handleToggleGameVisibility(g)}
-                    title={
-                      g.deletedAt !== null
-                        ? "삭제된 게임입니다. 승인 이력이 없는 초안만 완전 삭제할 수 있습니다."
-                        : g.liveVersionId === null
-                          ? "승인된 버전이 있어야 활성화할 수 있습니다."
-                          : undefined
-                    }
-                    className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold disabled:opacity-40 ${
-                      g.visibility === "PUBLIC"
-                        ? "border-accent-green/30 bg-accent-green/10 text-accent-green hover:bg-accent-green/20"
-                        : "border-border bg-surface text-text-primary hover:border-brand"
-                    }`}
-                  >
-                    {togglingGameId === g.id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : g.visibility === "PUBLIC" ? (
-                      <Eye className="h-3.5 w-3.5" />
-                    ) : (
-                      <EyeOff className="h-3.5 w-3.5" />
-                    )}
-                    {g.visibility === "PUBLIC" ? "활성" : "비활성"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleOpenGame(g.id)}
-                    className="rounded-xl border border-border bg-surface px-3 py-2 text-xs font-bold text-text-primary hover:border-brand"
-                  >
-                    관리
-                  </button>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
 
-      <section className="space-y-3 border-t border-border pt-6">
-        <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
-          <Gamepad2 className="h-4 w-4" /> 게임 메타데이터 / 공개 관리
-        </h2>
-        <form onSubmit={(e) => void handleLoadGame(e)} className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-            <input
-              type="text"
-              inputMode="numeric"
-              value={gameIdInput}
-              onChange={(e) => setGameIdInput(e.target.value)}
-              placeholder="게임 ID (심사 큐의 # 뒤 번호)"
-              className="w-full rounded-xl border border-border bg-surface-raised py-2.5 pl-10 pr-4 text-sm text-text-primary outline-none focus:ring-2 focus:ring-brand"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loadingDetail}
-            className="rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light disabled:opacity-50"
-          >
-            {loadingDetail ? <Loader2 className="h-4 w-4 animate-spin" /> : "불러오기"}
-          </button>
-        </form>
+          <section className="space-y-3 border-t border-border pt-6">
+            <h2 className="flex items-center gap-1.5 text-sm font-bold text-text-primary">
+              <Gamepad2 className="h-4 w-4" /> 사용자 게임 메타데이터 / 공개 관리
+            </h2>
+            <form onSubmit={(e) => void handleLoadGame(e)} className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={gameIdInput}
+                  onChange={(e) => setGameIdInput(e.target.value)}
+                  placeholder="게임 ID (심사 큐의 # 뒤 번호)"
+                  className="w-full rounded-xl border border-border bg-surface-raised py-2.5 pl-10 pr-4 text-sm text-text-primary outline-none focus:ring-2 focus:ring-brand"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loadingDetail}
+                className="rounded-xl bg-brand px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-light disabled:opacity-50"
+              >
+                {loadingDetail ? <Loader2 className="h-4 w-4 animate-spin" /> : "불러오기"}
+              </button>
+            </form>
 
-        {detail && (
-          <GameDetailPanel
-            detail={detail}
-            onChanged={setDetail}
-            onPurged={handlePurged}
-            onError={setError}
-          />
-        )}
-      </section>
+            {detail && (
+              <GameDetailPanel
+                detail={detail}
+                onChanged={setDetail}
+                onPurged={handlePurged}
+                onError={setError}
+              />
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }

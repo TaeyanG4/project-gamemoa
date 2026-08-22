@@ -222,7 +222,7 @@ export const IMPORT_RULES: ImportRule[] = [
     forbidden: [
       {
         spec: "react",
-        hint: "React-bound contracts belong in packages/game-sdk/src/react, which only apps/web and games/* import",
+        hint: "React-bound contracts belong in packages/game-sdk/src/react; platform contracts stay framework-independent",
       },
       { spec: "react-dom" },
     ],
@@ -233,18 +233,6 @@ export const IMPORT_RULES: ImportRule[] = [
     forbidden: [
       { spec: "@owogg/db", hint: "the browser talks to apps/api over HTTP, never to D1" },
       { spec: "@owogg/auth" },
-    ],
-  },
-  {
-    scope: "games",
-    rule: "games/* must not depend on the database or the backend HTTP framework",
-    forbidden: [
-      { spec: "@owogg/db" },
-      { spec: "hono" },
-      {
-        spec: "@owogg/core",
-        hint: "a game only ever knows the SDK contract; platform policy is resolved host-side",
-      },
     ],
   },
   {
@@ -306,8 +294,8 @@ export const REQUIRED_TOKEN_RULES: RequiredTokenRule[] = [
     tokens: ["GamePublicationService"],
   },
   {
-    file: "packages/core/src/application/officialGameBootstrap.ts",
-    rule: "OWOGG publication must delegate to the provider-neutral publication core",
+    file: "packages/core/src/application/officialGameUploadUseCases.ts",
+    rule: "admin OWOGG publication must delegate to the provider-neutral publication core",
     tokens: ["GamePublicationService"],
   },
   {
@@ -330,7 +318,7 @@ export const REQUIRED_TOKEN_RULES: RequiredTokenRule[] = [
     ],
   },
   {
-    file: "scripts/official-game-bootstrap.ts",
+    file: "packages/db/src/d1/D1OfficialGameUploadRepository.ts",
     rule: "OWOGG D1 publication transitions must bind id, game_id, and content_hash",
     tokens: ["id = ? AND game_id = ? AND content_hash = ?"],
   },
@@ -351,15 +339,21 @@ export const TOKEN_RULES: TokenRule[] = [
   },
   {
     scope: "packages/core/src/application",
-    files: ["officialGameBootstrap.ts", "sandboxGameUseCases.ts"],
+    rule: "application use cases must resolve games through the injected public D1/B2 catalog",
+    tokens: ["GAME_MANIFEST_MAP", "GAME_MANIFESTS", "GAME_DEFINITIONS"],
+    extensions: [".ts"],
+  },
+  {
+    scope: "packages/core/src/application",
+    files: ["officialGameUploadUseCases.ts", "sandboxGameUseCases.ts"],
     rule: "publisher control planes must not implement generic object or manifest publication",
     tokens: ["publishedObjectKey", "publishedManifestObjectKey", "buildBundleManifest"],
     extensions: [".ts"],
   },
   {
     scope: "packages/core/src/application",
-    files: ["officialGameBootstrap.ts"],
-    rule: "official bootstrap must not create USER review or sandbox state",
+    files: ["officialGameUploadUseCases.ts"],
+    rule: "official admin publication must not create USER review or sandbox state",
     tokens: ["SandboxGameRepository", "sandbox_games", "sandbox_game_versions", "PENDING_REVIEW"],
     extensions: [".ts"],
   },
@@ -368,20 +362,6 @@ export const TOKEN_RULES: TokenRule[] = [
     files: ["sandboxGameUseCases.ts", "sandboxGameVersionPublicationRepository.ts"],
     rule: "USER publication must not assert OWOGG authority",
     tokens: ["ensureOwoggIdentity", 'type: "OWOGG"', "publisher_type = 'OWOGG'"],
-    extensions: [".ts"],
-  },
-  {
-    scope: "scripts",
-    files: ["official-game-bootstrap.ts"],
-    rule: "official deployment bootstrap must not create USER review or sandbox state",
-    tokens: ["sandbox_games", "sandbox_game_versions", "PENDING_REVIEW", "publisher_type = 'USER'"],
-    extensions: [".ts"],
-  },
-  {
-    scope: "scripts",
-    files: ["official-game-bootstrap.ts"],
-    rule: "official deployment bootstrap must delegate manifest and file publication to core",
-    tokens: ["publishedObjectKey", "publishedManifestObjectKey", "buildBundleManifest"],
     extensions: [".ts"],
   },
   {
@@ -417,6 +397,9 @@ export const TOKEN_RULES: TokenRule[] = [
       "B2CreatorGameDefinitionRepository",
       "CreatorGameDefinitionRepository",
       "creator-games/",
+      "GAME_MANIFEST_MAP",
+      "GAME_MANIFESTS",
+      "GAME_DEFINITIONS",
     ],
     extensions: [".ts"],
   },
@@ -435,6 +418,11 @@ export const TOKEN_RULES: TokenRule[] = [
       "@owogg/game-typing-test",
       "SYSTEM_GAME_RELEASES",
       "officialGameEntryUrl",
+      "GAME_MANIFEST_MAP",
+      "GAME_MANIFESTS",
+      "GAME_DEFINITIONS",
+      "features/catalog/registry",
+      "gameContent",
       '"/official-games',
       "'/official-games",
     ],
@@ -448,8 +436,14 @@ export const TOKEN_RULES: TokenRule[] = [
   },
   {
     scope: ".github/workflows",
-    rule: "deployment must bootstrap only generic official bundles, never legacy release paths",
-    tokens: ["publish:official-games", "systemGameReleaseMap", "official-games/"],
+    rule: "deployment must never rebuild or bootstrap game bundles from Git sources",
+    tokens: [
+      "bootstrap:official-games",
+      "official-game-bundle-builder",
+      "publish:official-games",
+      "systemGameReleaseMap",
+      "official-games/",
+    ],
     extensions: [".yml", ".yaml"],
   },
 ];

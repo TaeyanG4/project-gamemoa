@@ -14,6 +14,7 @@ import {
   AdminAccountAuditListResponseSchema,
   AdminGameListResponseSchema,
   AdminGameToggleResponseSchema,
+  AdminOfficialGameUploadResponseSchema,
   AdminUserSearchResponseSchema,
   AdminUserDetailResponseSchema,
   UserModerationRecordSchema,
@@ -37,6 +38,8 @@ import {
   type SandboxGameVisibility,
 } from "@owogg/contracts";
 import { apiFetch } from "../lib/api/client";
+import { API_URL } from "../lib/api/config";
+import { ApiClientError } from "../lib/api/errors";
 
 const AdminLogoutResponseSchema = z.object({ success: z.boolean() });
 const AdminSuccessResponseSchema = z.object({ success: z.boolean() });
@@ -192,6 +195,32 @@ export function postToggleAdminGame(gameId: string, enabled: boolean, reason: st
     method: "POST",
     body: JSON.stringify({ enabled, reason }),
   });
+}
+
+export async function uploadOfficialGame(file: File) {
+  const form = new FormData();
+  form.append("bundle", file);
+  const res = await fetch(`${API_URL}/api/admin/games/upload`, {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
+  if (!res.ok) {
+    let detail: string | undefined;
+    let code: string | undefined;
+    try {
+      const body = (await res.json()) as { error?: { code?: string; message?: string } };
+      detail = body.error?.message;
+      code = body.error?.code;
+    } catch {
+      // Keep the HTTP fallback below when the response is not JSON.
+    }
+    throw new ApiClientError("HttpError", detail || `업로드에 실패했습니다. (HTTP ${res.status})`, {
+      status: res.status,
+      ...(code ? { code } : {}),
+    });
+  }
+  return AdminOfficialGameUploadResponseSchema.parse(await res.json());
 }
 
 export interface AdminUserListParams {

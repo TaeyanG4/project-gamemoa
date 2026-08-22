@@ -1,11 +1,9 @@
-// Typechecks scripts/ and e2e/ — the build/test tooling (registry generation + validation, the
+// Typechecks scripts/ and e2e/ — the build/test tooling (the
 // architecture guard, the browser E2E harness) that `pnpm typecheck` cannot reach.
 //
 // `pnpm typecheck` is `turbo typecheck`, which runs each *workspace* package's own tsc. Neither
-// scripts/ nor e2e/ is a workspace member (see pnpm-workspace.yaml — only apps/*, packages/*,
-// games/*), so nothing under either was ever typechecked, even though scripts/ contains the
-// validator that decides whether a game registry entry is well-formed and e2e/ reuses
-// scripts/official-game-bundle-publisher.ts's own exports directly. Both run under tsx, which
+// scripts/ nor e2e/ is a workspace member (see pnpm-workspace.yaml — only apps/* and packages/*),
+// so nothing under either is reached automatically. Both run under tsx, which
 // strips types without checking them, so a type error in either would have surfaced only as a
 // runtime failure — or not at all.
 //

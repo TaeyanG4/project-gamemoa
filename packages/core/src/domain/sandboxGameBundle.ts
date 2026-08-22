@@ -75,6 +75,14 @@ export interface RawGameRegistrationManifest {
   /** "single" | "multi" (2026-08-18) — required, see SandboxGameMode's doc comment
    * (domain/sandboxGames.ts) for why only these two coarse values exist. */
   mode?: unknown;
+  /** Optional canonical metadata used by the trusted admin OWOGG publication path. Creator
+   * uploads keep using the smaller slug/title/genre/mode subset; these fields never grant
+   * official authority because the route, not the archive, selects the publisher. */
+  policy?: unknown;
+  catalog?: unknown;
+  presentation?: unknown;
+  difficulty?: unknown;
+  supportsReplay?: unknown;
 }
 
 /**

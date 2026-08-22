@@ -5,7 +5,7 @@ import { API_URL } from "../lib/api/config";
 
 /**
  * fetchLeaderboardApi used to resolve each row's display title itself, importing
- * GAME_MANIFEST_MAP from @owogg/core (a direct dependency on the generated build-time registry —
+ * a second client-side game metadata lookup
  * see apps/api/src/routes/scores.ts's matching change). The server now resolves `gameTitle`
  * once per request through the same RuntimeGameRegistry the leaderboard query itself used, so this file
  * only has to pass it through — these tests pin exactly that: no second request is made, and the

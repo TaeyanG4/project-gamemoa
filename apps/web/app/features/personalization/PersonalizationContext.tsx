@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import { GAME_MANIFEST_MAP } from "@owogg/core";
 import { useAuth } from "../auth";
 import {
   getGuestPersonalization,
@@ -26,9 +25,9 @@ export interface PersonalizationContextValue {
 const PersonalizationContext = createContext<PersonalizationContextValue | undefined>(undefined);
 
 function isValidGame(gameId: string): boolean {
-  if (!gameId || typeof gameId !== "string") return false;
-  const manifest = GAME_MANIFEST_MAP[gameId];
-  return Boolean(manifest && manifest.status === "published");
+  // The server filters against the D1/B2 public catalog. This client check only rejects malformed
+  // storage/request values and deliberately carries no second catalog.
+  return typeof gameId === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(gameId);
 }
 
 export function PersonalizationProvider({ children }: { children: React.ReactNode }) {

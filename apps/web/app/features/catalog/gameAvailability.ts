@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { PublicGameAvailabilityResponseSchema } from "@owogg/contracts";
 import { apiFetch } from "../../lib/api";
-import { gameManifests } from "./registry";
-import type { GameManifest } from "@owogg/game-sdk";
 
 // Module-level cache so every component calling the hook below shares one fetch instead of each
 // issuing its own request — the disabled set rarely changes and is cheap to keep around for the
@@ -32,17 +30,6 @@ export function useDisabledGameIds(): Set<string> {
   }, []);
 
   return ids;
-}
-
-/** Drop-in, live-filtered replacement for importing `gameManifests` directly wherever a page
- * lists "all games" (home sections, /games catalog, ranking's game picker) — admin-disabled
- * games (see adminGames.ts) never show up here. */
-export function useEnabledGameManifests(): GameManifest[] {
-  const disabled = useDisabledGameIds();
-  return useMemo(
-    () => (disabled.size === 0 ? gameManifests : gameManifests.filter((g) => !disabled.has(g.id))),
-    [disabled],
-  );
 }
 
 export function useIsGameDisabled(gameId: string): boolean {

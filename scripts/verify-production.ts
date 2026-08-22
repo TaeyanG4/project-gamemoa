@@ -8,7 +8,7 @@ const RETRY_INTERVAL_MS = 3000;
 const MAX_ATTEMPTS = 20;
 const HARD_TIMEOUT_MS = 90_000;
 
-const ROUTES_TO_CHECK = [
+const STATIC_ROUTES_TO_CHECK = [
   "/",
   "/games",
   "/ranking",
@@ -25,20 +25,17 @@ const ROUTES_TO_CHECK = [
   // are deployment-blocking here rather than something we'd notice weeks later.
   "/terms",
   "/privacy",
-  "/games/reaction-time",
-  "/games/memory-test",
-  "/games/aim-test",
-  "/games/typing-test",
-  "/games/reaction-time/thumbnail.svg",
-  "/games/memory-test/thumbnail.svg",
-  "/games/aim-test/thumbnail.svg",
-  "/games/typing-test/thumbnail.svg",
   "/favicon.svg",
   "/favicon.ico",
   "/apple-touch-icon.png",
   "/favicon-192x192.png",
   "/site.webmanifest",
 ];
+
+interface PublicGameDeploymentTarget {
+  slug: string;
+  mediaUrl: string | null;
+}
 
 interface VerifyOptions {
   apiOnly: boolean;
@@ -82,6 +79,63 @@ async function fetchWithTimeout(
   }
 }
 
+async function fetchPublicGameCatalog(): Promise<PublicGameDeploymentTarget[]> {
+  const res = await fetchWithTimeout(`${API_URL}/api/games?v=${Date.now()}`, FETCH_TIMEOUT_MS);
+  if (!res.ok) throw new Error(`GET /api/games returned HTTP ${res.status}`);
+
+  const body = (await res.json()) as { games?: unknown };
+  if (!Array.isArray(body.games) || body.games.length === 0) {
+    throw new Error("GET /api/games returned an empty or malformed public catalog");
+  }
+
+  const seen = new Set<string>();
+  return body.games.map((candidate, index) => {
+    if (!candidate || typeof candidate !== "object") {
+      throw new Error(`GET /api/games item ${index} is not an object`);
+    }
+    const { slug, mediaUrl } = candidate as { slug?: unknown; mediaUrl?: unknown };
+    if (typeof slug !== "string" || !slug.trim() || seen.has(slug)) {
+      throw new Error(`GET /api/games item ${index} has an invalid or duplicate slug`);
+    }
+    if (mediaUrl !== null && typeof mediaUrl !== "string") {
+      throw new Error(`GET /api/games item ${index} has an invalid mediaUrl`);
+    }
+    seen.add(slug);
+    return { slug, mediaUrl };
+  });
+}
+
+async function verifyPublicGameApi(): Promise<PublicGameDeploymentTarget[]> {
+  const games = await fetchPublicGameCatalog();
+  const targets = games.flatMap((game) => {
+    const detailUrl = `${API_URL}/api/games/${encodeURIComponent(game.slug)}`;
+    if (!game.mediaUrl) return [{ label: `${game.slug} detail`, url: detailUrl }];
+    const mediaUrl = new URL(game.mediaUrl, API_URL);
+    if (mediaUrl.origin !== API_URL) {
+      throw new Error(`Public game ${game.slug} mediaUrl points outside the API origin`);
+    }
+    return [
+      { label: `${game.slug} detail`, url: detailUrl },
+      { label: `${game.slug} media`, url: mediaUrl.toString() },
+    ];
+  });
+
+  const results = await Promise.allSettled(
+    targets.map(async ({ label, url }) => {
+      const res = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
+      if (!res.ok) throw new Error(`${label} returned HTTP ${res.status}`);
+      return label;
+    }),
+  );
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length > 0) {
+    throw new Error(failures.map((failure) => String(failure.reason)).join("; "));
+  }
+
+  console.log(`✅ Public game API verified ${games.length} D1/B2-backed games.`);
+  return games;
+}
+
 async function verifyApi(expectedSha?: string): Promise<boolean> {
   console.log("🔍 Starting API Health & Provenance Check...");
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
@@ -102,7 +156,8 @@ async function verifyApi(expectedSha?: string): Promise<boolean> {
             `⚠️ API commit (${data.commit}) does not match expected (${expectedSha}) yet. Retrying...`,
           );
         } else {
-          console.log("✅ API Health & Provenance Verified Successfully!");
+          await verifyPublicGameApi();
+          console.log("✅ API Health, Provenance & Public Game Catalog Verified Successfully!");
           return true;
         }
       }
@@ -223,9 +278,22 @@ async function verifyWeb(expectedSha?: string): Promise<boolean> {
     return false;
   }
 
+  let publicGames: PublicGameDeploymentTarget[];
+  try {
+    publicGames = await fetchPublicGameCatalog();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`❌ Public game catalog discovery failed: ${message}`);
+    return false;
+  }
+
   console.log("🔍 Checking Web Routes & Published Assets...");
+  const routesToCheck = [
+    ...STATIC_ROUTES_TO_CHECK,
+    ...publicGames.map((game) => `/games/${encodeURIComponent(game.slug)}`),
+  ];
   const routeResults = await Promise.allSettled(
-    ROUTES_TO_CHECK.map(async (route) => {
+    routesToCheck.map(async (route) => {
       const routeUrl = `${WEB_URL}${route}?v=${Date.now()}`;
       const res = await fetchWithTimeout(routeUrl, FETCH_TIMEOUT_MS, accessHeaders);
       if (!res.ok) {
@@ -241,7 +309,7 @@ async function verifyWeb(expectedSha?: string): Promise<boolean> {
   // else-branch narrow to the rejected case and reach `.reason`. allSettled preserves input order,
   // so the paired route is still the one at the same index.
   for (const [i, result] of routeResults.entries()) {
-    const route = ROUTES_TO_CHECK[i] ?? "(unknown route)";
+    const route = routesToCheck[i] ?? "(unknown route)";
     if (result.status === "fulfilled") {
       console.log(`  ✅ ${route} OK`);
     } else {

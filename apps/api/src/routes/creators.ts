@@ -4,8 +4,9 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { createContainer } from "../container.js";
 import type { ApiEnv } from "./auth.js";
 import { CreatorRankingQuerySchema, type CreatorPlatform } from "@owogg/contracts";
-import { GAME_MANIFEST_MAP, type CreatorPlatformType } from "@owogg/core";
+import type { CreatorPlatformType } from "@owogg/core";
 import { getCreatorProviderAdapters } from "../infrastructure/creators/index.js";
+import { readB2Config } from "./devGames.js";
 
 function isLocalhost(urlStr: string): boolean {
   try {
@@ -84,14 +85,21 @@ creatorsRouter.get("/rankings", async (c) => {
   }
 
   const { mode, gameId, platform, limit, offset } = queryParse.data;
-  if (gameId && gameId !== "all" && !GAME_MANIFEST_MAP[gameId]) {
+  if (gameId && gameId !== "all" && !c.env?.DB) {
+    return c.json(
+      { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
+      400,
+    );
+  }
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  if (gameId && gameId !== "all" && !(await container.publicGameCatalog.findBySlug(gameId))) {
     return c.json(
       { error: { code: "INVALID_GAME_ID", message: "존재하지 않는 게임 ID입니다." } },
       400,
     );
   }
 
-  const { creatorUseCases } = createContainer(c.env.DB);
+  const { creatorUseCases } = container;
 
   const queryOpts: {
     mode: "score" | "xp";

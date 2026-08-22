@@ -37,7 +37,7 @@ personalizationRouter.get("/", async (c) => {
     return c.json({ error: "Database unavailable" }, 500);
   }
 
-  const { personalizationUseCases } = createContainer(c.env.DB);
+  const { personalizationUseCases } = createContainer(c.env.DB, readB2Config(c.env));
   const state = await personalizationUseCases.getPersonalizationState(user.id);
   const validated = PersonalizationStateSchema.parse(state);
   return c.json(validated, 200);
@@ -84,7 +84,7 @@ personalizationRouter.delete("/favorites/:gameId", async (c) => {
   }
 
   const gameId = c.req.param("gameId");
-  const { personalizationUseCases } = createContainer(c.env.DB);
+  const { personalizationUseCases } = createContainer(c.env.DB, readB2Config(c.env));
   await personalizationUseCases.removeFavorite(user.id, gameId);
   return c.json({ success: true }, 200);
 });
@@ -101,7 +101,7 @@ personalizationRouter.post("/recent/:gameId", async (c) => {
   }
 
   const gameId = c.req.param("gameId");
-  const { personalizationUseCases } = createContainer(c.env.DB);
+  const { personalizationUseCases } = createContainer(c.env.DB, readB2Config(c.env));
 
   try {
     await personalizationUseCases.recordRecentPlay(user.id, gameId);
@@ -129,7 +129,7 @@ personalizationRouter.post("/import", async (c) => {
     return c.json({ error: "Invalid import payload" }, 400);
   }
 
-  const { personalizationUseCases } = createContainer(c.env.DB);
+  const { personalizationUseCases } = createContainer(c.env.DB, readB2Config(c.env));
   const updatedState = await personalizationUseCases.importGuestData(
     user.id,
     parsed.data.guestRecentPlays,

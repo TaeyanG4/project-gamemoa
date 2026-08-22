@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type DragEvent } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router";
 import {
   ArrowLeft,
@@ -6,7 +6,6 @@ import {
   Gamepad2,
   Trash2,
   Upload,
-  UploadCloud,
   XCircle,
   Send,
   Clock3,
@@ -25,6 +24,7 @@ import {
   countActiveSubmissions,
 } from "../features/devApi";
 import type { GameCreatorMeResponse, SandboxGameRecord } from "@owogg/contracts";
+import { GameBundleDropzone } from "../components/game/GameBundleDropzone";
 
 export function meta() {
   return [
@@ -256,7 +256,6 @@ function ManageGamesPanel({
   const [deletingGameId, setDeletingGameId] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
 
   // Drag-and-drop registration: a ZIP whose root contains owogg.game.json (slug/title/genre)
   // creates the game *and* its first version in one call — see devApi.uploadGameFromBundle. This
@@ -275,13 +274,6 @@ function ManageGamesPanel({
     } finally {
       setRegistering(false);
     }
-  };
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    setDragActive(false);
-    const file = e.dataTransfer.files[0];
-    if (file) void handleDropRegister(file);
   };
 
   const handleUploadVersion = async (gameId: number, file: File) => {
@@ -353,42 +345,11 @@ function ManageGamesPanel({
         </p>
       )}
 
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={handleDrop}
-        className={`flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed p-6 text-center transition-colors ${
-          dragActive
-            ? "border-brand bg-brand/5"
-            : "border-border bg-surface hover:border-brand-light"
-        }`}
-      >
-        {registering ? (
-          <Loader2 className="h-6 w-6 animate-spin text-brand" />
-        ) : (
-          <UploadCloud className="h-6 w-6 text-text-muted" />
-        )}
-        <p className="text-xs font-bold text-text-primary">
-          owogg.game.json이 포함된 ZIP을 여기로 끌어다 놓으면 자동 등록됩니다
-        </p>
-        <label className="cursor-pointer text-[11px] font-semibold text-brand hover:text-brand-light">
-          또는 파일 선택
-          <input
-            type="file"
-            accept=".zip"
-            className="hidden"
-            disabled={registering}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void handleDropRegister(file);
-            }}
-          />
-        </label>
-      </div>
+      <GameBundleDropzone
+        busy={registering}
+        title="owogg.game.json이 포함된 ZIP을 여기로 끌어다 놓으면 자동 등록됩니다"
+        onFile={handleDropRegister}
+      />
 
       <div className="flex flex-col divide-y divide-border/60">
         {(myGames ?? []).length === 0 ? (

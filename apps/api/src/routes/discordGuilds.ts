@@ -10,7 +10,8 @@ import {
   DiscordGuildRankingQuerySchema,
   DiscordGuildGameRankingQuerySchema,
 } from "@owogg/contracts";
-import { GAME_MANIFEST_MAP, type DiscordGuild } from "@owogg/core";
+import type { DiscordGuild } from "@owogg/core";
+import { readB2Config } from "./devGames.js";
 
 async function requireAuth(
   c: Context<ApiEnv>,
@@ -264,7 +265,7 @@ discordGuildsRouter.get("/by-slug/:slug/games/:gameId", async (c) => {
   const queryParse = DiscordGuildGameRankingQuerySchema.safeParse({
     limit: c.req.query("limit"),
   });
-  if (!queryParse.success || !GAME_MANIFEST_MAP[gameId]) {
+  if (!queryParse.success) {
     return c.json(
       { error: { code: "INVALID_QUERY", message: "존재하는 게임 ID와 limit을 입력해주세요." } },
       400,
@@ -273,7 +274,14 @@ discordGuildsRouter.get("/by-slug/:slug/games/:gameId", async (c) => {
   const { limit } = queryParse.data;
   const auth = await requireAuth(c);
 
-  const { discordGuildDirectoryUseCases, discordGuildXpUseCases } = createContainer(c.env.DB);
+  const container = createContainer(c.env.DB, readB2Config(c.env));
+  if (!(await container.publicGameCatalog.findBySlug(gameId))) {
+    return c.json(
+      { error: { code: "INVALID_QUERY", message: "존재하는 게임 ID와 limit을 입력해주세요." } },
+      400,
+    );
+  }
+  const { discordGuildDirectoryUseCases, discordGuildXpUseCases } = container;
   const pageResult = await discordGuildDirectoryUseCases.getGuildPageBySlug(slug, auth?.userId);
 
   if (pageResult.status === "NOT_FOUND") {

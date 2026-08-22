@@ -20,7 +20,7 @@ import {
   type GameSessionPayload,
   type RuntimeGame,
 } from "@owogg/core";
-import { createContainer, evaluateAchievementsForUser } from "../container.js";
+import { createContainer, evaluateAchievementsForUser, type AppContainer } from "../container.js";
 import { edgeCache } from "../middleware/edgeCache.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 import { readB2Config } from "./devGames.js";
@@ -69,25 +69,25 @@ gamesRouter.get("/availability", edgeCache({ ttlSeconds: 60 }), async (c) => {
 
 async function publicGameProjection(
   c: Context<ApiEnv>,
+  container: AppContainer,
   runtime: RuntimeGame | null,
 ): Promise<ReturnType<typeof toPublicGame> | null> {
   if (!runtime) return null;
-  const container = createContainer(c.env.DB, readB2Config(c.env));
   try {
-    if (
-      !(await container.runtimeGameAvailability.isVersionServable(
-        runtime.identity.id,
-        runtime.liveVersion.id,
-      ))
-    ) {
-      return null;
-    }
     const asset = await container.gameAssetRepo.findByGameId(runtime.identity.id, "LOGO");
+    const canonicalOfficial = runtime.canonical.publisher.official;
+    if (canonicalOfficial !== (runtime.identity.publisher.type === "OWOGG")) return null;
+    const publisherName =
+      runtime.identity.publisher.type === "OWOGG"
+        ? "OWOGG"
+        : ((await container.userRepo.findById(runtime.identity.publisher.userId))?.nickname ??
+          null);
+    if (!publisherName) return null;
     const endpoint = new URL(
       `/api/games/${encodeURIComponent(runtime.identity.slug)}/media/logo`,
       c.req.url,
     ).toString();
-    return toPublicGame(runtime, publicGameMediaUrl(runtime, asset, endpoint));
+    return toPublicGame(runtime, publicGameMediaUrl(runtime, asset, endpoint), publisherName);
   } catch {
     return null;
   }
@@ -99,10 +99,10 @@ gamesRouter.get("/", edgeCache({ ttlSeconds: 60 }), async (c) => {
   if (!c.env?.DB) return c.json(PublicGameListResponseSchema.parse({ games: [] }), 200);
 
   const container = createContainer(c.env.DB, readB2Config(c.env));
-  const runtimes = await container.runtimeGameRegistry.listPublic();
+  const runtimes = await container.publicGameCatalog.list();
   const games = await Promise.all(
     runtimes.map(async (runtime) => {
-      const projection = await publicGameProjection(c, runtime);
+      const projection = await publicGameProjection(c, container, runtime);
       return projection ? PublicGameSchema.parse(projection) : null;
     }),
   );
@@ -121,17 +121,9 @@ gamesRouter.get("/", edgeCache({ ttlSeconds: 60 }), async (c) => {
 gamesRouter.get("/:slug/media/logo", edgeCache({ ttlSeconds: 3600 }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
   const container = createContainer(c.env.DB, readB2Config(c.env));
-  const runtime = await container.runtimeGameRegistry.findBySlug(c.req.param("slug"));
+  const runtime = await container.publicGameCatalog.findBySlug(c.req.param("slug"));
   try {
-    if (
-      !runtime ||
-      !(await container.runtimeGameAvailability.isVersionServable(
-        runtime.identity.id,
-        runtime.liveVersion.id,
-      ))
-    ) {
-      return c.text("Not Found", 404);
-    }
+    if (!runtime) return c.text("Not Found", 404);
     const asset = await container.gameAssetRepo.findByGameId(runtime.identity.id, "LOGO");
     if (!asset) return c.text("Not Found", 404);
     const bytes = await container.gameBundleStorageRepo.getObject(asset.objectKey);
@@ -154,8 +146,8 @@ gamesRouter.get("/:slug", edgeCache({ ttlSeconds: 60 }), async (c) => {
   if (!c.env?.DB) return c.text("Not Found", 404);
 
   const container = createContainer(c.env.DB, readB2Config(c.env));
-  const runtime = await container.runtimeGameRegistry.findBySlug(c.req.param("slug"));
-  const game = await publicGameProjection(c, runtime);
+  const runtime = await container.publicGameCatalog.findBySlug(c.req.param("slug"));
+  const game = await publicGameProjection(c, container, runtime);
   if (!game) return c.text("Not Found", 404);
   return c.json(PublicGameSchema.parse(game), 200);
 });

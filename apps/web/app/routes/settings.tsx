@@ -212,7 +212,12 @@ export default function SettingsPage() {
   const handleLinkGoogle = () => {
     if (busyProvider) return;
     const clientId = providerStatus.google.clientId;
-    if (!clientId || !providerStatus.google.configured || !window.google?.accounts?.id) {
+    if (
+      providerStatus.availability !== "ready" ||
+      !clientId ||
+      !providerStatus.google.configured ||
+      !window.google?.accounts?.id
+    ) {
       setStatusMessage(dict.profile.googleScriptNotReady);
       return;
     }
@@ -654,6 +659,7 @@ export default function SettingsPage() {
                     onClick={provider === "google" ? handleLinkGoogle : handleLinkDiscord}
                     disabled={
                       busyProvider !== null ||
+                      providerStatus.availability !== "ready" ||
                       (provider === "google" && !providerStatus.google.configured) ||
                       (provider === "discord" && !providerStatus.discord.configured)
                     }

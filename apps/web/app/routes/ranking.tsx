@@ -39,8 +39,8 @@ export default function Ranking() {
   const { dict } = useI18n();
   const { games: publicGames } = usePublicGames();
   const gameManifests = useMemo(
-    () => publicGames.map((game) => publicGameToCard(game, dict)),
-    [publicGames, dict],
+    () => publicGames.map((game) => publicGameToCard(game)),
+    [publicGames],
   );
   const [mainTab, setMainTab] = useState<MainTab>("game");
 

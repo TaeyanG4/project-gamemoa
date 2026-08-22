@@ -204,10 +204,13 @@ test("D-1 legacy catalog/runtime removals are protected by source-token architec
 
   assert.ok(api?.tokens.includes("officialGameAssetsRouter"));
   assert.ok(api?.tokens.includes("StaticGameRegistry"));
+  assert.ok(api?.tokens.includes("GAME_MANIFESTS"));
   assert.ok(web?.tokens.includes("LegacyReactRuntime"));
   assert.ok(web?.tokens.includes("CreatorGameHost"));
   assert.ok(web?.tokens.includes("sandboxGameAdapter"));
   assert.ok(web?.tokens.includes("GAME_LOADERS"));
+  assert.ok(web?.tokens.includes("GAME_MANIFESTS"));
+  assert.ok(web?.tokens.includes("gameContent"));
   for (const packageName of [
     "@owogg/game-aim-test",
     "@owogg/game-memory-test",
@@ -217,6 +220,7 @@ test("D-1 legacy catalog/runtime removals are protected by source-token architec
     assert.ok(web?.tokens.includes(packageName));
   }
   assert.ok(host?.tokens.includes("submitScoreApi"));
+  assert.ok(deploy?.tokens.includes("bootstrap:official-games"));
   assert.ok(deploy?.tokens.includes("publish:official-games"));
   assert.ok(deploy?.tokens.includes("systemGameReleaseMap"));
 });
@@ -236,10 +240,10 @@ test("E-1 generic canonical authority is protected from old Creator repository c
 test("E-2 publication convergence guards both callers and keeps generic core publisher-neutral", () => {
   const user = REQUIRED_TOKEN_RULES.find((rule) => rule.file.endsWith("sandboxGameUseCases.ts"));
   const official = REQUIRED_TOKEN_RULES.find((rule) =>
-    rule.file.endsWith("officialGameBootstrap.ts"),
+    rule.file.endsWith("officialGameUploadUseCases.ts"),
   );
   const officialDuplicates = TOKEN_RULES.find((rule) =>
-    rule.files?.includes("officialGameBootstrap.ts"),
+    rule.files?.includes("officialGameUploadUseCases.ts"),
   );
   const genericCore = TOKEN_RULES.find((rule) => rule.files?.includes("gamePublicationService.ts"));
 
@@ -259,13 +263,15 @@ test("E-3 guards exact publication targets and publisher-specific authority boun
     rule.file.endsWith("sandboxGameVersionPublicationRepository.ts"),
   );
   const officialTarget = REQUIRED_TOKEN_RULES.find((rule) =>
-    rule.file.endsWith("official-game-bootstrap.ts"),
+    rule.file.endsWith("D1OfficialGameUploadRepository.ts"),
   );
   const userAuthority = TOKEN_RULES.find((rule) =>
     rule.files?.includes("sandboxGameVersionPublicationRepository.ts"),
   );
   const officialAuthority = TOKEN_RULES.find(
-    (rule) => rule.scope === "scripts" && rule.tokens.includes("sandbox_game_versions"),
+    (rule) =>
+      rule.files?.includes("officialGameUploadUseCases.ts") &&
+      rule.tokens.includes("sandbox_games"),
   );
 
   assert.ok(targetCore?.tokens.includes("GamePublicationTarget"));

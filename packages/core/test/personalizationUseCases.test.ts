@@ -5,6 +5,19 @@ import {
   MAX_FAVORITES,
 } from "../src/application/personalizationUseCases.js";
 import type { PersonalizationRepository } from "../src/ports/repositories.js";
+import type { PublicGameCatalog } from "../src/application/publicGameCatalog.js";
+import { runtimeGameFixture, TEST_GAME_SLUGS } from "./runtimeGameFixture.js";
+
+const games: PublicGameCatalog = {
+  async findBySlug(slug) {
+    return TEST_GAME_SLUGS.includes(slug as (typeof TEST_GAME_SLUGS)[number])
+      ? runtimeGameFixture(slug)
+      : null;
+  },
+  async list() {
+    return TEST_GAME_SLUGS.map((slug) => runtimeGameFixture(slug));
+  },
+};
 
 class MemoryPersonalizationRepository implements PersonalizationRepository {
   favorites = new Map<number, Set<string>>();
@@ -57,7 +70,7 @@ class MemoryPersonalizationRepository implements PersonalizationRepository {
 
 test("PersonalizationUseCases handles favorites idempotently and rejects unknown games", async () => {
   const repo = new MemoryPersonalizationRepository();
-  const useCases = new PersonalizationUseCases(repo);
+  const useCases = new PersonalizationUseCases(repo, games);
 
   // Add published game
   await useCases.addFavorite(1, "reaction-time");
@@ -75,7 +88,7 @@ test("PersonalizationUseCases handles favorites idempotently and rejects unknown
 
 test("PersonalizationUseCases handles recent plays deduplication and limit", async () => {
   const repo = new MemoryPersonalizationRepository();
-  const useCases = new PersonalizationUseCases(repo);
+  const useCases = new PersonalizationUseCases(repo, games);
 
   await useCases.recordRecentPlay(1, "reaction-time");
   await useCases.recordRecentPlay(1, "aim-test");
@@ -88,7 +101,7 @@ test("PersonalizationUseCases handles recent plays deduplication and limit", asy
 
 test("PersonalizationUseCases rejects a new favorite once at the cap, but re-favoriting an existing one still no-ops", async () => {
   const repo = new MemoryPersonalizationRepository();
-  const useCases = new PersonalizationUseCases(repo);
+  const useCases = new PersonalizationUseCases(repo, games);
 
   // Seed MAX_FAVORITES entries directly (bypasses isPublishedGame — the catalog only has 4 real
   // games today, so this is the only way to exercise a cap that's otherwise unreachable).
@@ -111,7 +124,7 @@ test("PersonalizationUseCases rejects a new favorite once at the cap, but re-fav
 
 test("PersonalizationUseCases imports guest recent plays but NOT guest favorites", async () => {
   const repo = new MemoryPersonalizationRepository();
-  const useCases = new PersonalizationUseCases(repo);
+  const useCases = new PersonalizationUseCases(repo, games);
 
   // Pre-existing account state
   await useCases.addFavorite(1, "reaction-time");

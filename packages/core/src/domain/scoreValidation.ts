@@ -3,11 +3,8 @@
  * a caller resolves the game through RuntimeGameRegistry and passes the canonical policy pieces
  * this file actually needs.
  *
- * This file used to do its own lookup, importing `GAME_MANIFEST_MAP` directly from the generated
- * build-time registry (see git history). That coupled score validation to exactly one registry
- * implementation and made it impossible to test without the real generated file. The generated
- * registry itself is untouched and still exported from `@owogg/core` as `validateScoreByManifest` —
- * this file simply no longer wraps it.
+ * Historical static-registry lookup was removed. Runtime callers resolve the game from D1/B2 and
+ * pass the exact canonical policy into these pure validators.
  */
 
 import type { GameDifficulty, GamePolicy } from "../modules/game/domain/gameDefinition.js";

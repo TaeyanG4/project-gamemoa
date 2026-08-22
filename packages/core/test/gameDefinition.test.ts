@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import type { GameManifest, GamePresentation } from "@owogg/game-sdk/contracts";
 import {
-  GAME_MANIFESTS,
   GAME_OWNER_TYPES,
   isCreatorOwned,
   isCreatorGameDefinition,
@@ -15,6 +14,31 @@ import {
   type SystemGameOwner,
   type SystemGameDefinition,
 } from "../src/index.js";
+
+const TEST_MANIFESTS: GameManifest[] = [
+  {
+    id: "fixture-game",
+    slug: "fixture-game",
+    title: "Fixture Game",
+    shortDescription: "Short fixture description",
+    description: "Fixture description",
+    modes: ["single"],
+    status: "published",
+    categories: ["test"],
+    tags: ["fixture"],
+    minPlayers: 1,
+    maxPlayers: 1,
+    thumbnail: "/fixture.svg",
+    accent: "#6366f1",
+    estimatedRoundSeconds: 30,
+    requiresAuth: false,
+    supportsLeaderboard: true,
+    inputMethods: ["mouse"],
+    supportsReplay: false,
+    version: "test",
+    scoreConfig: { unit: "pts", direction: "desc", min: 0, max: 100 },
+  },
+];
 
 /**
  * The Unified Game Platform foundation added in this PR is types plus one port — nothing produces
@@ -58,9 +82,9 @@ function asDefinition(manifest: GameManifest, owner: SystemGameOwner): SystemGam
 }
 
 test("every shipped built-in manifest is expressible as a GameDefinition without loss", () => {
-  assert.ok(GAME_MANIFESTS.length > 0, "the generated registry should not be empty");
+  assert.ok(TEST_MANIFESTS.length > 0);
 
-  for (const manifest of GAME_MANIFESTS) {
+  for (const manifest of TEST_MANIFESTS) {
     const definition = asDefinition(manifest, { type: "SYSTEM" });
 
     assert.equal(definition.slug, manifest.slug);
@@ -76,7 +100,7 @@ test("every shipped built-in manifest is expressible as a GameDefinition without
   }
 });
 
-// Deliberately does NOT assert anything about GAME_MANIFESTS' current presentation state (whether
+// Deliberately does NOT assert anything about a production catalog's presentation state (whether
 // it's present or absent for any real shipped game) — a platform contract test must not pin an
 // individual game's current metadata; see packages/game-sdk/test/presentation.test.ts's own
 // synthetic-manifest tests for the backward-compatibility guarantee ("GameManifest works with no
@@ -116,13 +140,13 @@ test("GameDefinition accepts a real presentation value, reusing GamePresentation
 test("a manifest's id and slug agree today, which is why a definition keeps only slug", () => {
   // GameDefinition drops `id` deliberately: slug is what scores, favorites and recent-plays are
   // keyed by. That is only safe while the two are interchangeable for every shipped game.
-  for (const manifest of GAME_MANIFESTS) {
+  for (const manifest of TEST_MANIFESTS) {
     assert.equal(manifest.id, manifest.slug, `${manifest.slug} has diverging id/slug`);
   }
 });
 
 test("built-in games carry a score policy, so score validation has something to read", () => {
-  const scored = GAME_MANIFESTS.filter((m) => m.scoreConfig).map((m) =>
+  const scored = TEST_MANIFESTS.filter((m) => m.scoreConfig).map((m) =>
     asDefinition(m, { type: "SYSTEM" }),
   );
   assert.ok(scored.length > 0);
@@ -177,7 +201,7 @@ function fakeCreatorDefinition(
 }
 
 test("a SYSTEM GameDefinition narrows via isSystemGameDefinition, keeping every existing field accessible unchanged", () => {
-  const manifest = GAME_MANIFESTS[0];
+  const manifest = TEST_MANIFESTS[0];
   assert.ok(manifest, "at least one built-in manifest must exist for this test to be meaningful");
   const definition: GameDefinition = asDefinition(manifest, { type: "SYSTEM" });
 
@@ -213,7 +237,7 @@ test("a CREATOR GameDefinition narrows via isCreatorGameDefinition, exposing gen
 });
 
 test("isSystemGameDefinition/isCreatorGameDefinition are mutually exclusive and exhaustive over the union", () => {
-  const manifest = GAME_MANIFESTS[0];
+  const manifest = TEST_MANIFESTS[0];
   assert.ok(manifest);
   const systemDef: GameDefinition = asDefinition(manifest, { type: "SYSTEM" });
   const creatorDef: GameDefinition = fakeCreatorDefinition();

@@ -1,9 +1,8 @@
 import { Link } from "react-router";
 import { ChevronRight, Clock } from "lucide-react";
-import type { GameManifest } from "@owogg/game-sdk";
+import type { PublicGameCard } from "../../features/catalog/publicGameAdapter";
 import { useI18n } from "../../features/i18n/I18nContext";
 import type { Dictionary } from "../../features/i18n/dictionary";
-import { getLocalizedGameContent } from "../../features/catalog/localizedGameContent";
 
 /** Shared compact "game + info row" card. Extracted from the old combined profile page when
  * favorites/recent-plays moved onto the unified profile page (/users/:id) while account
@@ -12,12 +11,11 @@ export function GameLinkCard({
   game,
   children,
 }: {
-  game: GameManifest;
+  game: PublicGameCard;
   children: React.ReactNode;
 }) {
-  const { dict } = useI18n();
   const accent = game.accent ?? "#6366f1";
-  const title = getLocalizedGameContent(dict, game).title;
+  const title = game.title;
 
   return (
     <Link
@@ -49,13 +47,10 @@ export function GameLinkCard({
   );
 }
 
-export function GameFavoriteCard({ game }: { game: GameManifest }) {
-  const { dict } = useI18n();
-  const shortDescription = getLocalizedGameContent(dict, game).shortDescription;
-
+export function GameFavoriteCard({ game }: { game: PublicGameCard }) {
   return (
     <GameLinkCard game={game}>
-      <p className="text-xs text-text-secondary line-clamp-1 mt-1">{shortDescription}</p>
+      <p className="text-xs text-text-secondary line-clamp-1 mt-1">{game.shortDescription}</p>
     </GameLinkCard>
   );
 }
@@ -77,7 +72,7 @@ export function GameActivityCard({
   game,
   lastPlayedAt,
 }: {
-  game: GameManifest;
+  game: PublicGameCard;
   lastPlayedAt: string;
 }) {
   const { dict } = useI18n();

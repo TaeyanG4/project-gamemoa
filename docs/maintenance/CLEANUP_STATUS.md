@@ -2,7 +2,7 @@
 
 상태: 현재 기준 문서
 
-마지막 검증: 2026-08-22
+마지막 검증: 2026-08-23
 
 - Completion Campaign 시작 기준 main: `8752dcf0409a02b75e5a4ed550dab4f5dae7fff2`
 - F-5 시작 기준 main: `2b77ca4509051305d31ecdf8839a25003a3456ed`
@@ -43,17 +43,17 @@
 | Dormant R2 adapter                              | export, binding, composition, workflow consumer가 없던 `R2GameBundleRepository`를 제거했습니다. B2 구현은 유지됩니다.                                                                                                                                                                       |
 | Web source game loader runtime                  | `gameLoaders.generated.ts`, `GAME_LOADERS`, `gameRegistry`, `loadGame()`, loader generator/check/test 책임과 네 official source game package의 Web dependency를 제거했습니다. Gameplay는 `GameHost` → `IframeRuntime` → generic versioned bundle만 사용합니다.                              |
 | 확정 가능한 `/profile` 내부 consumer            | `/owogg achievements`가 이미 확보한 OwOGG `user.id`로 `/users/:id`를 가리키도록 이동했습니다. `/owogg profile`도 같은 current 경로를 사용합니다.                                                                                                                                            |
+| Git/deploy official bootstrap authority         | 코드 배포가 게임 bytes와 live pointer를 덮어쓰던 bootstrap step과 package command를 제거했습니다. OWOGG publication authority는 관리자 센터의 인증된 ZIP 업로드입니다.                                                                                                                      |
+| Git game catalog와 남은 소비자                  | Discord, 도전과제, 개인화, Creator/서버 랭킹, 관리자 모니터링, 사용자 프로필을 D1/B2 public game catalog로 이전했습니다. `game-registry`, 생성 manifest/definition, registry generator/check/schema, 정적 Web registry를 삭제하고 재도입 guard를 추가했습니다.                              |
 
 ## KEEP_REQUIRED
 
-| 단위                                           | 현재 필요한 이유                                                                                                                               | 보존할 invariant / 재검토 조건                                                                                                              |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GAME_MANIFESTS`, `GAME_MANIFEST_MAP`          | Discord, XP, achievements, personalization, Web metadata와 registry tooling의 실제 consumer가 있습니다.                                        | Runtime authority로 사용하지 않고 Git/build metadata로만 유지합니다. 모든 consumer에 provider-neutral replacement가 생길 때만 재검토합니다. |
-| SYSTEM source와 `GAME_DEFINITIONS`             | `games/*`, `game-registry/*`, schema/check와 official bootstrap의 deterministic input입니다.                                                   | Runtime authority는 generic D1/B2이며, SYSTEM source는 bootstrap input이라는 경계를 유지합니다.                                             |
-| Negative architecture/test coverage            | 제거된 runtime, route, release-map, source loader의 복귀를 CI에서 막습니다.                                                                    | 더 강한 동등 guard가 생기기 전에는 token guard와 `/official-games` 404 test를 유지합니다.                                                   |
-| USER review/control plane                      | `sandbox_games`, `sandbox_game_versions`, developer/admin API가 신청, 두 review slot, approve/reject/revoke, audit, visibility를 담당합니다.   | `READY != APPROVED`를 유지하고 generic runtime state로 review 권한을 대체하지 않습니다.                                                     |
-| USER publication compatibility adapter         | `SandboxGameVersionPublicationRepository`가 현재 `GamePublicationService`의 USER write를 연결하며 `D1GameVersionRepository`는 read-only입니다. | Generic write adapter와 atomicity, review 독립성, rollback이 검증될 때까지 유지합니다.                                                      |
-| migrations `0029`~`0033`과 convergence trigger | old/new Worker deployment gap의 identity/version/asset write를 generic table로 수렴시키고 충돌 시 fail closed합니다.                           | 적용된 migration은 수정·삭제하지 않습니다. 제거가 필요하면 production cutover 증거, 새 forward migration, rollback plan이 모두 필요합니다.  |
+| 단위                                           | 현재 필요한 이유                                                                                                                                   | 보존할 invariant / 재검토 조건                                                                                                             |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Negative architecture/test coverage            | 제거된 runtime, route, release-map, source loader의 복귀를 CI에서 막습니다.                                                                        | 더 강한 동등 guard가 생기기 전에는 token guard와 `/official-games` 404 test를 유지합니다.                                                  |
+| USER review/control plane                      | generic `games`/`game_versions`/`game_assets`와 developer/admin API가 신청, 두 review slot, approve/reject/revoke, audit, visibility를 담당합니다. | `READY != APPROVED`를 유지하고 runtime readiness로 review 권한을 대체하지 않습니다.                                                        |
+| USER rolling-deploy compatibility mirror       | `sandbox_*` 물리 테이블은 이전 Worker revision과의 롤링 배포 호환을 위해 임시로 남아 있습니다.                                                     | Staging 전체 Creator smoke와 rollback window 종료 후 새 forward migration으로만 제거합니다.                                                |
+| migrations `0029`~`0034`과 convergence trigger | old/new Worker deployment gap의 identity/version/asset write를 generic table로 수렴시키고 충돌 시 fail closed합니다.                               | 적용된 migration은 수정·삭제하지 않습니다. 제거가 필요하면 production cutover 증거, 새 forward migration, rollback plan이 모두 필요합니다. |
 
 ## DEFER_PRODUCT_DECISION
 
@@ -66,8 +66,7 @@
   evidence만으로 결정할 수 없습니다.
 - 종료 조건: `@owogg/core`의 지원 범위와 CREATOR union의 제품 의도를 결정하고, 외부 consumer가
   없거나 migration 경로가 있음을 확인합니다.
-- 보존 invariant: SYSTEM `GameDefinition`과 deterministic bootstrap input은 이 결정과 무관하게
-  유지합니다.
+- 보존 invariant: 이 타입 surface를 정적 게임 목록이나 runtime/publication fallback으로 사용하지 않습니다.
 
 ### `examples/ball-dodge`와 manual deploy-smoke fixture
 
@@ -79,16 +78,6 @@
   두 artifact의 관계를 정리합니다.
 - 보존 invariant: CI 미사용만을 삭제 근거로 삼지 않으며 production deploy/smoke를 cleanup에서
   실행하지 않습니다.
-
-### Official-admin publication authority
-
-- 현재 상태: current official publication은 Git/deploy bootstrap 권한 모델이며 interactive admin
-  publication precedence는 선택되지 않았습니다.
-- 지금 제거하거나 구현하지 않는 이유: Git, Admin, provenance+precedence 중 하나를 선택하면 live
-  version authority가 바뀝니다.
-- 종료 조건: 권한 원천, precedence, provenance, rollback을 제품/architecture 결정으로 확정합니다.
-- 보존 invariant: slug, display name 또는 과거 `SYSTEM` label로 publisher authority를 추론하지
-  않습니다.
 
 ## DEFER_PRODUCTION_EVIDENCE
 

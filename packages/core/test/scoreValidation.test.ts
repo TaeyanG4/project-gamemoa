@@ -10,7 +10,7 @@ import type { GameDifficulty, GamePolicy } from "../src/modules/game/domain/game
  * Pure unit tests — no registry, no generated file, just policy objects in and a verdict out.
  * Equivalence with the real four official games (their actual score bounds and difficulty tiers,
  * exercised end-to-end through generic score acceptance) lives in gameScoreAcceptanceUseCases.test.ts, which runs these
- * same rules through the real, generated GAME_DEFINITIONS.
+ * same rules through explicit policy fixtures.
  */
 
 const REACTION_TIME_POLICY: GamePolicy = {

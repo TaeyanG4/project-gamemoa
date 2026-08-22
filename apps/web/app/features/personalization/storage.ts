@@ -1,5 +1,3 @@
-import { GAME_MANIFEST_MAP } from "@owogg/core";
-
 export const LOCAL_STORAGE_KEY = "owogg.personalization.v2";
 export const LEGACY_STORAGE_KEY = "owogg.personalization.v1";
 
@@ -9,9 +7,7 @@ export interface PersistedPersonalizationState {
 }
 
 function isValidGame(gameId: string): boolean {
-  if (!gameId || typeof gameId !== "string") return false;
-  const manifest = GAME_MANIFEST_MAP[gameId];
-  return Boolean(manifest && manifest.status === "published");
+  return typeof gameId === "string" && /^[a-z0-9][a-z0-9-]{0,63}$/.test(gameId);
 }
 
 function parseRecentPlays(parsed: unknown): { gameId: string; lastPlayedAt: string }[] {

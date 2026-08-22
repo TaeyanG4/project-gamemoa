@@ -6,6 +6,7 @@ import { publicGameToCard } from "../features/catalog/publicGameAdapter";
 function baseGame(overrides: Partial<PublicGame> = {}): PublicGame {
   return {
     publisherType: "OWOGG",
+    publisherName: "OWOGG",
     slug: "reaction-time",
     title: "반응속도 테스트",
     shortDescription: "빠르게 눌러보세요",
@@ -29,7 +30,7 @@ function baseGame(overrides: Partial<PublicGame> = {}): PublicGame {
     supportsReplay: false,
     mediaUrl: null,
     ...overrides,
-  };
+  } as PublicGame;
 }
 
 test("TAXONOMY public games preserve canonical catalog metadata in the card view model", () => {
@@ -45,6 +46,7 @@ test("GENRE_MODE USER games do not receive invented taxonomy metadata", () => {
   const card = publicGameToCard(
     baseGame({
       publisherType: "USER",
+      publisherName: "Taeyang",
       slug: "ball-dodge",
       title: "공 피하기",
       catalog: { type: "GENRE_MODE", genre: "arcade", mode: "multi" },

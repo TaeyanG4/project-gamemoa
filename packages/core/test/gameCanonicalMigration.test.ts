@@ -2,45 +2,36 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { systemGameDefinitionToGameCanonicalDocument } from "../src/modules/game/domain/gameCanonicalMigration.js";
 import type { SystemGameDefinition } from "../src/modules/game/domain/gameDefinition.js";
-import { GAME_MANIFESTS } from "../src/index.js";
 
 // ── SYSTEM -> generic ─────────────────────────────────────────────────────────
 
-function systemDefinitionFromManifest(slug: string): SystemGameDefinition {
-  const manifest = GAME_MANIFESTS.find((m) => m.slug === slug);
-  assert.ok(manifest, `expected a real built-in manifest for ${slug}`);
+function systemDefinitionFromManifest(): SystemGameDefinition {
   return {
-    slug: manifest.slug,
+    slug: "fixture-game",
     owner: { type: "SYSTEM" },
-    title: manifest.title,
-    shortDescription: manifest.shortDescription,
-    description: manifest.description,
-    status: manifest.status,
-    categories: manifest.categories,
-    tags: manifest.tags,
-    modes: manifest.modes,
-    inputMethods: manifest.inputMethods,
-    minPlayers: manifest.minPlayers,
-    maxPlayers: manifest.maxPlayers,
-    thumbnail: manifest.thumbnail,
-    ...(manifest.accent !== undefined ? { accent: manifest.accent } : {}),
-    ...(manifest.estimatedRoundSeconds !== undefined
-      ? { estimatedRoundSeconds: manifest.estimatedRoundSeconds }
-      : {}),
-    ...(manifest.difficulty !== undefined ? { difficulty: manifest.difficulty } : {}),
-    supportsReplay: manifest.supportsReplay,
-    ...(manifest.presentation !== undefined ? { presentation: manifest.presentation } : {}),
+    title: "Fixture Game",
+    shortDescription: "Short fixture description",
+    description: "Fixture description",
+    status: "published",
+    categories: ["test"],
+    tags: ["fixture"],
+    modes: ["single"],
+    inputMethods: ["mouse"],
+    minPlayers: 1,
+    maxPlayers: 1,
+    thumbnail: "/fixture.svg",
+    supportsReplay: false,
     policy: {
-      score: manifest.scoreConfig ?? null,
-      leaderboard: manifest.supportsLeaderboard,
+      score: { unit: "pts", direction: "desc", min: 0, max: 999 },
+      leaderboard: true,
       xpPerCompletion: 0,
-      requiresAuth: manifest.requiresAuth,
+      requiresAuth: false,
     },
   };
 }
 
 test("system->generic: categories/tags/modes/inputMethods are lossless", () => {
-  const definition = systemDefinitionFromManifest(GAME_MANIFESTS[0]!.slug);
+  const definition = systemDefinitionFromManifest();
   const result = systemGameDefinitionToGameCanonicalDocument(
     definition,
     "2026-01-01T00:00:00.000Z",
@@ -57,7 +48,7 @@ test("system->generic: categories/tags/modes/inputMethods are lossless", () => {
 
 test("system->generic: minPlayers/maxPlayers/thumbnail/accent are lossless", () => {
   const definition: SystemGameDefinition = {
-    ...systemDefinitionFromManifest(GAME_MANIFESTS[0]!.slug),
+    ...systemDefinitionFromManifest(),
     minPlayers: 1,
     maxPlayers: 4,
     thumbnail: "/thumb.svg",
@@ -86,7 +77,7 @@ test("system->generic: difficulty and supportsReplay are lossless", () => {
     defaultLevelId: "normal",
   };
   const definition: SystemGameDefinition = {
-    ...systemDefinitionFromManifest(GAME_MANIFESTS[0]!.slug),
+    ...systemDefinitionFromManifest(),
     difficulty,
     supportsReplay: false,
   };
@@ -105,7 +96,7 @@ test("system->generic: policy and presentation are lossless", () => {
     mobile: { support: "supported" as const, orientation: "any" as const },
   };
   const definition: SystemGameDefinition = {
-    ...systemDefinitionFromManifest(GAME_MANIFESTS[0]!.slug),
+    ...systemDefinitionFromManifest(),
     presentation,
     policy: {
       score: { unit: "pts", direction: "desc", min: 0, max: 999 },
@@ -124,7 +115,7 @@ test("system->generic: policy and presentation are lossless", () => {
 
 test("system->generic: definition.status never leaks into the canonical document", () => {
   const definition: SystemGameDefinition = {
-    ...systemDefinitionFromManifest(GAME_MANIFESTS[0]!.slug),
+    ...systemDefinitionFromManifest(),
     status: "beta",
   };
   const result = systemGameDefinitionToGameCanonicalDocument(
@@ -137,7 +128,7 @@ test("system->generic: definition.status never leaks into the canonical document
 });
 
 test("system->generic: updatedAt is exactly the caller-supplied timestamp, never generated internally", () => {
-  const definition = systemDefinitionFromManifest(GAME_MANIFESTS[0]!.slug);
+  const definition = systemDefinitionFromManifest();
   const result = systemGameDefinitionToGameCanonicalDocument(
     definition,
     "2019-03-03T03:03:03.000Z",
@@ -146,7 +137,7 @@ test("system->generic: updatedAt is exactly the caller-supplied timestamp, never
 });
 
 test("system->generic: title/shortDescription/description are lossless", () => {
-  const definition = systemDefinitionFromManifest(GAME_MANIFESTS[0]!.slug);
+  const definition = systemDefinitionFromManifest();
   const result = systemGameDefinitionToGameCanonicalDocument(
     definition,
     "2026-01-01T00:00:00.000Z",

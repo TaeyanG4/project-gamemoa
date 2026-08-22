@@ -67,7 +67,7 @@ export default function GameRankingRoute() {
 
   const [game, setGame] = useState<PublicGame | null>(null);
   const [gameLoading, setGameLoading] = useState(true);
-  const card = useMemo(() => (game ? publicGameToCard(game, dict) : null), [game, dict]);
+  const card = useMemo(() => (game ? publicGameToCard(game) : null), [game]);
   const content = card ? getLocalizedGameContent(dict, card) : null;
 
   const [records, setRecords] = useState<LeaderRecord[]>([]);

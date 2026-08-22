@@ -4,7 +4,7 @@
  * note on Game Bridge). Both `client.ts` (runs inside the game's iframe) and the host-side
  * controller (apps/web/app/features/game/runtime/) import these same validators, so there is
  * exactly one place that defines what a well-formed message looks like — hand-written rather than
- * built on a schema library (matching scripts/game-registry-schema.ts's own reasoning): this must
+ * built on a schema library: this must
  * stay importable into an arbitrary third-party game bundle with zero added dependencies, and the
  * validation is small enough that hand-writing it costs less than a library would.
  *

@@ -4,7 +4,6 @@ import {
   AchievementUseCases,
   evaluateEligibleAchievements,
 } from "../src/application/achievementUseCases.js";
-import { GAME_MANIFEST_MAP } from "../src/registry/gameRegistry.generated.js";
 import type { AchievementRepository, UnlockedAchievement } from "../src/ports/repositories.js";
 
 class FakeAchievementRepository implements AchievementRepository {
@@ -29,9 +28,7 @@ class FakeAchievementRepository implements AchievementRepository {
 }
 
 function publishedGameIds(): string[] {
-  return Object.values(GAME_MANIFEST_MAP)
-    .filter((m) => m.status === "published")
-    .map((m) => m.id);
+  return ["reaction-time", "memory-test"];
 }
 
 test("evaluateEligibleAchievements grants FIRST_PLAY at the first completion", () => {
@@ -114,20 +111,26 @@ test("evaluateEligibleAchievements grants ALL_GAMES only once every published ga
   const published = publishedGameIds();
   assert.ok(published.length > 0, "expected at least one published game in the registry");
 
-  const partial = evaluateEligibleAchievements({
-    eligibleCompletions: 0,
-    level: 1,
-    hasFavorite: false,
-    playedGameIds: published.slice(0, published.length - 1),
-  });
+  const partial = evaluateEligibleAchievements(
+    {
+      eligibleCompletions: 0,
+      level: 1,
+      hasFavorite: false,
+      playedGameIds: published.slice(0, published.length - 1),
+    },
+    published,
+  );
   assert.ok(!partial.includes("ALL_GAMES"));
 
-  const complete = evaluateEligibleAchievements({
-    eligibleCompletions: 0,
-    level: 1,
-    hasFavorite: false,
-    playedGameIds: published,
-  });
+  const complete = evaluateEligibleAchievements(
+    {
+      eligibleCompletions: 0,
+      level: 1,
+      hasFavorite: false,
+      playedGameIds: published,
+    },
+    published,
+  );
   assert.ok(complete.includes("ALL_GAMES"));
 });
 

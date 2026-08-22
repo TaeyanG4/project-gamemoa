@@ -95,9 +95,8 @@ ComposedRuntimeGameRegistry
 동일한 public/READY/live/canonical 불변식을 통과해야 합니다. generic 상태가 불완전하면 과거
 metadata로 fallback하지 않고 fail closed 합니다.
 
-Web은 `GAME_MANIFESTS`를 catalog/source metadata로만 사용합니다. Source game package dynamic
-loader는 gameplay 경로가 아니며, 게임 실행은 항상 generic versioned bundle을 iframe에서
-제공합니다.
+Web, Discord, 도전과제, 개인화와 랭킹을 포함한 모든 게임 소비자는 D1/B2를 조합하는 public game
+catalog를 사용합니다. Git 정적 registry나 생성 manifest로 fallback하지 않습니다.
 
 Publication target은 `(gameId, versionId, contentHash)`입니다. `GamePublicationService`가 상태를
 `PUBLISHING`으로 바꾸고 개별 파일을 기록한 뒤 `.owogg-manifest.json`을 마지막에 기록하고, 같은
@@ -121,18 +120,13 @@ Migration trigger와 repository compatibility write가 롤링 배포 중 구 Wor
 READY != APPROVED
 ```
 
-## OWOGG bootstrap 제어 영역
+## OWOGG 관리자 게시 제어 영역
 
-OWOGG 게임은 `games/*` 소스와 `game-registry/*` 입력에서 생성된 `GAME_DEFINITIONS`를 사용합니다.
-배포 중 `pnpm bootstrap:official-games`가 다음을 결정론적으로 보장합니다.
-
-- `{ type: "OWOGG" }` identity와 영구 slug 예약
-- source bundle의 SHA-256 content hash
-- generic numeric version과 B2 canonical/bundle
-- 동일한 READY hash 재사용, 변경 hash의 새 version publication 후 live activation
-
-이 경로는 USER/sandbox/review row를 만들지 않습니다. Git bootstrap과 향후 interactive
-official-admin publication의 우선순위는 아직 결정되지 않았으며 F-1에서 선택하지 않습니다.
+관리자 센터 `POST /api/admin/games/upload`가 standalone ZIP을 받아 `{ type: "OWOGG" }` identity,
+SHA-256 version, B2 canonical/bundle, logo asset과 live pointer를 generic control plane에 기록합니다.
+공식 표시는 canonical v2 `publisher.official: true`, 공개 제작자명은 `OWOGG`입니다. Archive 내용은
+publisher authority를 선택할 수 없으며 USER/sandbox/review row를 만들지 않습니다. 배포 workflow는
+게임을 Git에서 빌드하거나 live version을 다시 활성화하지 않습니다.
 
 ## runtime과 점수 경계
 
@@ -176,7 +170,6 @@ bootstrap이 Web build보다 먼저 실행되므로 배포된 카탈로그와 bu
 ## 자동 경계 검증
 
 - `pnpm architecture:check`: 레이어 의존성, 금지된 legacy runtime/route/release-map 패턴 검사
-- `pnpm registry:check`: generated game registry freshness 검사
 - `pnpm docs:check`: 상대 Markdown 링크, 인덱스, migration metadata 검사
 - `pnpm typecheck:scripts`와 `pnpm test:scripts`: scripts 자체의 타입과 테스트 검사
 

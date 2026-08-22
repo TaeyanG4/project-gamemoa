@@ -65,10 +65,10 @@ export function formatMetadataKey(key: string, dict: Dictionary["gamePlay"]): st
     targetsHit: dict.metadataTargetsHit,
     misses: dict.metadataMisses,
     level: dict.metadataLevel,
-    // aim-test: games/aim-test/src/game.tsx's runtime.complete metadata.
+    // Aim games can report hit/miss accuracy through runtime.complete metadata.
     targets: dict.metadataTargets,
     avgPerTargetMs: dict.metadataAvgPerTargetMs,
-    // memory-test: games/memory-test/src/ui/MemoryGameUI.tsx's runtime.complete metadata.
+    // Memory games can report their reached level through runtime.complete metadata.
     sequenceLength: dict.metadataSequenceLength,
     grade: dict.metadataGrade,
   };
@@ -427,7 +427,7 @@ export function GameHost({ slug }: GameHostProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [result, setResult] = useState<GameResult | null>(null);
-  // Reaction-time only: badge derived from metadata.tier (see games/reaction-time/src/game.tsx).
+  // Reaction-time games may provide a display badge through metadata.tier.
   // Other games don't set this metadata key, so this stays undefined for them.
   const resultTier = useMemo(() => {
     const tierId = result?.metadata?.tier;
@@ -445,8 +445,7 @@ export function GameHost({ slug }: GameHostProps) {
   const [resultLeaderboard, setResultLeaderboard] = useState<LeaderRecord[] | null>(null);
 
   const [game, setGame] = useState<PublicGame | null>(null);
-  const localizedTitle =
-    game?.publisherType === "OWOGG" ? (dict.gameContent[slug]?.title ?? game.title) : game?.title;
+  const localizedTitle = game?.title;
   const presentation = useMemo(() => toGamePresentation(game?.presentation), [game?.presentation]);
   const scoreConfig = useMemo(
     () => toScoreConfig(game?.policy.score ?? null),
@@ -1165,7 +1164,16 @@ export function GameHost({ slug }: GameHostProps) {
               className="h-6 w-6"
               rounded="rounded-md"
             />
-            <span className="font-bold">{localizedTitle ?? dict.gamePlay.loadingTitle}</span>
+            <div className="min-w-0">
+              <div className="truncate font-bold">
+                {localizedTitle ?? dict.gamePlay.loadingTitle}
+              </div>
+              {game && (
+                <div className="truncate text-[10px] font-semibold text-text-muted">
+                  제작자 {game.publisherName}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

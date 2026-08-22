@@ -19,7 +19,20 @@ import {
   type GlobalGuildRankEntry,
   type ServerGameLeaderboardEntry,
   type GuildSummaryData,
+  type PublicGameCatalog,
 } from "../src/index.js";
+import { runtimeGameFixture, TEST_GAME_SLUGS } from "./runtimeGameFixture.js";
+
+const games: PublicGameCatalog = {
+  async findBySlug(slug) {
+    return TEST_GAME_SLUGS.includes(slug as (typeof TEST_GAME_SLUGS)[number])
+      ? runtimeGameFixture(slug)
+      : null;
+  },
+  async list() {
+    return TEST_GAME_SLUGS.map((slug) => runtimeGameFixture(slug));
+  },
+};
 
 async function hashToken(token: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -486,7 +499,7 @@ test("Phase H1 Invariants & Play Context Tests", async (t) => {
     userRepo = new MockUserRepo();
     progressionRepo = new MockProgressionRepo();
 
-    guildXpUseCases = new DiscordGuildXpUseCases(guildRepo, userRepo);
+    guildXpUseCases = new DiscordGuildXpUseCases(guildRepo, userRepo, games);
     progressionUseCases = new ProgressionUseCases(progressionRepo);
 
     // Setup active Guild A & Guild B
@@ -605,7 +618,7 @@ test("Phase H2 Leaderboard, Time Boundary & Command Tests", async (t) => {
   t.beforeEach(async () => {
     guildRepo = new MockDiscordGuildRepo();
     userRepo = new MockUserRepo();
-    guildXpUseCases = new DiscordGuildXpUseCases(guildRepo, userRepo);
+    guildXpUseCases = new DiscordGuildXpUseCases(guildRepo, userRepo, games);
 
     // Register Guild A (PUBLIC), Guild B (UNLISTED), Guild C (PRIVATE)
     await guildRepo.registerGuild({

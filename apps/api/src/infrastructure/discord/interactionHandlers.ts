@@ -1,4 +1,4 @@
-import { GAME_MANIFEST_MAP, ACHIEVEMENT_DEFINITIONS, ALL_ACHIEVEMENT_CODES } from "@owogg/core";
+import { ACHIEVEMENT_DEFINITIONS, ALL_ACHIEVEMENT_CODES } from "@owogg/core";
 import type { AchievementCode } from "@owogg/core";
 import type { AppContainer } from "../../container.js";
 import { DISCORD_SUBCOMMANDS, OWOGG_DISCORD_COMMAND } from "./commands.js";
@@ -128,7 +128,7 @@ export async function handleOwoggCommand(
     case DISCORD_SUBCOMMANDS.HELP:
       return handleHelpCommand(frontendUrl);
     case DISCORD_SUBCOMMANDS.GAMES:
-      return handleGamesCommand(frontendUrl);
+      return handleGamesCommand(container, frontendUrl);
     case DISCORD_SUBCOMMANDS.LINK:
       return handleLinkCommand(container, discordUser, frontendUrl);
     case DISCORD_SUBCOMMANDS.PROFILE:
@@ -178,8 +178,11 @@ function handleHelpCommand(frontendUrl: string): DiscordInteractionResponse {
   });
 }
 
-function handleGamesCommand(frontendUrl: string): DiscordInteractionResponse {
-  const published = Object.values(GAME_MANIFEST_MAP).filter((m) => m.status === "published");
+async function handleGamesCommand(
+  container: AppContainer,
+  frontendUrl: string,
+): Promise<DiscordInteractionResponse> {
+  const published = await container.publicGameCatalog.list();
   const footer = owoggFooter(frontendUrl);
 
   if (published.length === 0) {
@@ -191,7 +194,10 @@ function handleGamesCommand(frontendUrl: string): DiscordInteractionResponse {
     });
   }
 
-  const lines = published.map((g) => `• [${g.title}](${frontendUrl}/games/${g.slug})`);
+  const lines = published.map(
+    (game) =>
+      `• [${game.canonical.title}](${frontendUrl}/games/${encodeURIComponent(game.identity.slug)})`,
+  );
   return publicEmbed({
     title: "🎮 OwOGG 게임 목록",
     description: lines.join("\n"),
@@ -297,16 +303,12 @@ async function handlePlayCommand(
       gameId: selectedGameId,
     });
 
-    const targetPath =
-      selectedGameId && GAME_MANIFEST_MAP[selectedGameId]
-        ? `/games/${GAME_MANIFEST_MAP[selectedGameId].slug}#play_token=${encodeURIComponent(playCtx.token)}`
-        : `/games#play_token=${encodeURIComponent(playCtx.token)}`;
+    const targetPath = playCtx.game
+      ? `/games/${encodeURIComponent(playCtx.game.identity.slug)}#play_token=${encodeURIComponent(playCtx.token)}`
+      : `/games#play_token=${encodeURIComponent(playCtx.token)}`;
 
     const playUrl = `${frontendUrl}${targetPath}`;
-    const gameTitle =
-      selectedGameId && GAME_MANIFEST_MAP[selectedGameId]
-        ? GAME_MANIFEST_MAP[selectedGameId].title
-        : "게임 선택";
+    const gameTitle = playCtx.game?.canonical.title ?? "게임 선택";
 
     return ephemeralEmbed({
       title: `🎮 ${escapeMarkdown(playCtx.guildName)} 플레이 링크 발급`,

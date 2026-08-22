@@ -9,7 +9,7 @@
  *
  * The React-bound half (GameModule, GameProps, GameRuntimeContext — all of which reference React's
  * `ComponentType`) lives at `@owogg/game-sdk/react` and is re-exported from the package root, so
- * `apps/web` and `games/*` keep importing `@owogg/game-sdk` exactly as before. The split exists so
+ * `apps/web` and standalone game build projects can import `@owogg/game-sdk`. The split exists so
  * that "core must not depend on React" is a rule a machine can check (see
  * scripts/architecture-rules.ts) rather than a convention that quietly eroded — before it, the
  * chain `@owogg/core → @owogg/game-sdk → @types/react` was real and invisible to the guard.

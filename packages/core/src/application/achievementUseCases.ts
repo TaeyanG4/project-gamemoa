@@ -1,6 +1,6 @@
 import type { AchievementRepository, UnlockedAchievement } from "../ports/repositories.js";
 import { ALL_ACHIEVEMENT_CODES, type AchievementCode } from "../domain/achievements.js";
-import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
+import type { PublicGameCatalog } from "./publicGameCatalog.js";
 
 export interface AchievementFacts {
   eligibleCompletions: number;
@@ -16,14 +16,11 @@ export interface AchievementSummary {
   recentlyUnlocked: UnlockedAchievement[];
 }
 
-function publishedGameIds(): string[] {
-  return Object.values(GAME_MANIFEST_MAP)
-    .filter((manifest) => manifest.status === "published")
-    .map((manifest) => manifest.id);
-}
-
 /** Pure evaluation: which achievement codes are currently satisfied by the given facts. */
-export function evaluateEligibleAchievements(facts: AchievementFacts): AchievementCode[] {
+export function evaluateEligibleAchievements(
+  facts: AchievementFacts,
+  publishedGameIds: readonly string[] = [],
+): AchievementCode[] {
   const codes: AchievementCode[] = [];
 
   if (facts.eligibleCompletions >= 1) codes.push("FIRST_PLAY");
@@ -33,8 +30,10 @@ export function evaluateEligibleAchievements(facts: AchievementFacts): Achieveme
   if (facts.level >= 5) codes.push("LEVEL_5");
   if (facts.level >= 10) codes.push("LEVEL_10");
 
-  const published = publishedGameIds();
-  if (published.length > 0 && published.every((id) => facts.playedGameIds.includes(id))) {
+  if (
+    publishedGameIds.length > 0 &&
+    publishedGameIds.every((id) => facts.playedGameIds.includes(id))
+  ) {
     codes.push("ALL_GAMES");
   }
 
@@ -42,7 +41,10 @@ export function evaluateEligibleAchievements(facts: AchievementFacts): Achieveme
 }
 
 export class AchievementUseCases {
-  constructor(private repo: AchievementRepository) {}
+  constructor(
+    private repo: AchievementRepository,
+    private games?: PublicGameCatalog,
+  ) {}
 
   /**
    * Evaluates the given facts and unlocks any achievements the user newly qualifies for.
@@ -50,7 +52,10 @@ export class AchievementUseCases {
    * uniqueness layer). Achievements never grant XP.
    */
   async evaluateAndUnlock(userId: number, facts: AchievementFacts): Promise<AchievementCode[]> {
-    const eligible = evaluateEligibleAchievements(facts);
+    const publishedGameIds = this.games
+      ? (await this.games.list()).map((game) => game.identity.slug)
+      : [];
+    const eligible = evaluateEligibleAchievements(facts, publishedGameIds);
     if (eligible.length === 0) return [];
 
     const existing = await this.repo.getUnlockedAchievements(userId);

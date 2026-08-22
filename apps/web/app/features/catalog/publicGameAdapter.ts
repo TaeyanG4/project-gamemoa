@@ -1,5 +1,4 @@
 import type { PublicGame } from "@owogg/contracts";
-import type { Dictionary } from "../i18n/dictionary";
 
 export interface PublicGameCard {
   readonly slug: string;
@@ -12,19 +11,20 @@ export interface PublicGameCard {
   readonly categories: readonly string[];
   readonly tags: readonly string[];
   readonly publisherType: PublicGame["publisherType"];
+  readonly publisherName: string;
   readonly catalogType: PublicGame["catalog"]["type"];
   readonly genre?: string | undefined;
+  readonly scoreUnit?: string | undefined;
 }
 
 /** Web-only view model. It preserves GENRE_MODE as a real shape: no fake taxonomy categories,
  * tags, thumbnail, or player counts are manufactured for USER games. */
-export function publicGameToCard(game: PublicGame, dict?: Dictionary): PublicGameCard {
-  const localized = game.publisherType === "OWOGG" ? dict?.gameContent[game.slug] : undefined;
+export function publicGameToCard(game: PublicGame): PublicGameCard {
   if (game.catalog.type === "TAXONOMY") {
     return {
       slug: game.slug,
-      title: localized?.title ?? game.title,
-      shortDescription: localized?.shortDescription ?? game.shortDescription,
+      title: game.title,
+      shortDescription: game.shortDescription,
       description: game.description,
       modes: game.catalog.modes,
       thumbnail: game.mediaUrl ?? game.catalog.thumbnail,
@@ -32,7 +32,9 @@ export function publicGameToCard(game: PublicGame, dict?: Dictionary): PublicGam
       categories: game.catalog.categories,
       tags: game.catalog.tags,
       publisherType: game.publisherType,
+      publisherName: game.publisherName,
       catalogType: game.catalog.type,
+      ...(game.policy.score ? { scoreUnit: game.policy.score.unit } : {}),
     };
   }
 
@@ -48,7 +50,9 @@ export function publicGameToCard(game: PublicGame, dict?: Dictionary): PublicGam
     categories: [],
     tags: [],
     publisherType: game.publisherType,
+    publisherName: game.publisherName,
     catalogType: game.catalog.type,
     genre: game.catalog.genre,
+    ...(game.policy.score ? { scoreUnit: game.policy.score.unit } : {}),
   };
 }

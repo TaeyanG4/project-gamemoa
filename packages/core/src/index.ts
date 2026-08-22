@@ -68,13 +68,9 @@ export * from "./application/userModerationUseCases.js";
 export * from "./application/gameCreatorUseCases.js";
 export * from "./application/sandboxGameUseCases.js";
 export * from "./application/gamePublicationService.js";
+export * from "./application/officialGameUploadUseCases.js";
 export * from "./application/sandboxGameVersionPublicationRepository.js";
 export * from "./application/jsonDeepEqual.js";
-export * from "./application/officialGameBootstrap.js";
 export * from "./application/runtimeGameAvailability.js";
+export * from "./application/publicGameCatalog.js";
 export * from "./application/gameScoreAcceptanceUseCases.js";
-export * from "./registry/gameRegistry.generated.js";
-// Compiled from game-registry/. GAME_DEFINITIONS is a build/bootstrap input for official generic
-// publication, while GAME_MANIFESTS remains source metadata for achievements, personalization,
-// creator/Discord, and build tooling. Neither is a production runtime registry.
-export * from "./registry/gameDefinitions.generated.js";

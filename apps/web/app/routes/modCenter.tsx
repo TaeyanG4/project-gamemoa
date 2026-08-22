@@ -52,10 +52,10 @@ function ModCenterContent() {
         )}
         {can("sandbox_games.review") && (
           <NavCard
-            to="/admin/sandbox-games"
+            to="/admin/games"
             icon={Gamepad2}
-            title="제작 게임 심사"
-            desc="업로드된 버전 승인/거절"
+            title="게임 관리 및 심사"
+            desc="사용자 제작 게임 버전 승인/거절"
           />
         )}
         {can("streamers.review") && (

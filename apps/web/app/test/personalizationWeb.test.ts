@@ -40,14 +40,14 @@ test("getGuestPersonalization handles empty or missing localStorage safely", () 
   assert.equal(state.version, 2);
 });
 
-test("saveGuestPersonalization persists valid published recent plays and filters invalid ones", () => {
+test("saveGuestPersonalization persists slug-shaped recent plays and filters malformed ones", () => {
   const mockStorage = new MockLocalStorage();
   mockWindow(mockStorage);
 
   saveGuestPersonalization({
     recentPlays: [
       { gameId: "aim-test", lastPlayedAt: "2026-08-13T00:00:00Z" },
-      { gameId: "deleted-game", lastPlayedAt: "2026-08-13T00:00:00Z" },
+      { gameId: "../deleted-game", lastPlayedAt: "2026-08-13T00:00:00Z" },
     ],
   });
 

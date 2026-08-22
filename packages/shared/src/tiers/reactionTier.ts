@@ -1,9 +1,8 @@
 /**
  * Reaction-time tier ladder (아이언 → 챌린저), purely a presentation aid derived from the
  * average reaction time (ms) of a completed attempt. Deliberately has zero effect on score
- * comparison, leaderboard ordering, or ranking integrity (games/reaction-time/src/scoring.ts is
- * the sole source of truth for that) — this only decides which badge to show on the result
- * screen. Shared between `games/reaction-time` (computes the tier) and `apps/web`
+ * comparison, leaderboard ordering, or ranking integrity — this only decides which badge to show
+ * on the result screen. Shared between uploaded game bundles (which compute the tier) and `apps/web`
  * (renders the badge) so the thresholds/labels/colors never drift between the two.
  */
 

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "../src/index.js";
-import { GAME_DEFINITIONS, systemGameDefinitionToGameCanonicalDocument } from "@owogg/core";
+import type { GameCanonicalDocument } from "@owogg/core";
 
 /**
  * GET /api/scores/:gameId — both identity/version and title/policy now resolve through the generic
@@ -109,14 +109,41 @@ async function requestLeaderboard(db: unknown, path: string) {
     const slug = Object.keys({ "reaction-time": true, "memory-test": true }).find((value) =>
       url.includes(`game-definitions/${value}/definition.json`),
     );
-    const definition = GAME_DEFINITIONS.find((item) => item.slug === slug);
+    const definition: GameCanonicalDocument | null = slug
+      ? {
+          schemaVersion: 2,
+          slug,
+          title: slug === "reaction-time" ? "반응속도 테스트" : "순서 기억력 테스트",
+          shortDescription: "fixture",
+          description: "fixture",
+          publisher: { official: true },
+          policy: {
+            score: {
+              unit: slug === "reaction-time" ? "ms" : "level",
+              direction: slug === "reaction-time" ? "asc" : "desc",
+              min: 0,
+              max: 60_000,
+            },
+            leaderboard: true,
+            xpPerCompletion: 10,
+            requiresAuth: false,
+          },
+          supportsReplay: false,
+          catalog: {
+            type: "TAXONOMY",
+            categories: ["test"],
+            tags: ["fixture"],
+            modes: ["single"],
+            inputMethods: ["mouse"],
+            minPlayers: 1,
+            maxPlayers: 1,
+            thumbnail: "/fixture.svg",
+          },
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }
+      : null;
     return definition
-      ? new Response(
-          JSON.stringify(
-            systemGameDefinitionToGameCanonicalDocument(definition, "2026-01-01T00:00:00.000Z"),
-          ),
-          { status: 200 },
-        )
+      ? new Response(JSON.stringify(definition), { status: 200 })
       : new Response("Not Found", { status: 404 });
   }) as typeof fetch;
   try {

@@ -18,8 +18,8 @@ import type { SystemGameDefinition } from "./gameDefinition.js";
  * doc comment on why `status` stays a D1/runtime concept this schema doesn't carry.
  *
  * `updatedAt` is a required caller-supplied argument, not generated inside this function — a
- * `SystemGameDefinition` has no timestamp of its own (game-registry/'s JSON files aren't
- * timestamped), so silently calling `new Date()` here would hide exactly when/why a converted
+ * `SystemGameDefinition` has no timestamp of its own, so silently calling `new Date()` here would
+ * hide exactly when/why a converted
  * document's provenance timestamp was actually set. A future caller (a real migration Stage) must
  * decide and state that source explicitly.
  */

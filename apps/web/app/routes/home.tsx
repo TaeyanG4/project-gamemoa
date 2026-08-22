@@ -25,8 +25,8 @@ export default function Home() {
   const { dict } = useI18n();
   const { games: publicGames } = usePublicGames();
   const gameManifests = useMemo(
-    () => publicGames.map((game) => publicGameToCard(game, dict)),
-    [publicGames, dict],
+    () => publicGames.map((game) => publicGameToCard(game)),
+    [publicGames],
   );
 
   const { favoriteGameIds, recentPlays } = usePersonalization();

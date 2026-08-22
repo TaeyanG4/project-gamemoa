@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "../src/index.js";
-import {
-  GAME_DEFINITIONS,
-  systemGameDefinitionToGameCanonicalDocument,
-  type GameCanonicalDocument,
-} from "@owogg/core";
+import type { GameCanonicalDocument } from "@owogg/core";
 import type { ApiEnv } from "../src/routes/auth.js";
 
 const B2_ENV = {
@@ -31,6 +27,7 @@ interface FakeGame {
 interface PublicGameJson {
   slug: string;
   publisherType: string;
+  publisherName: string;
   catalog: { type: string };
   mediaUrl: string | null;
   [key: string]: unknown;
@@ -77,6 +74,17 @@ function createDb(games: readonly FakeGame[]) {
         return this;
       },
       async first<T>() {
+        if (query.includes("FROM users WHERE id = ?")) {
+          const userId = Number(values[0]);
+          return {
+            id: userId,
+            nickname: userId === 42 ? "Taeyang" : `User ${userId}`,
+            email: null,
+            avatar_url: null,
+            created_at: "2026-08-01T00:00:00.000Z",
+            updated_at: "2026-08-01T00:00:00.000Z",
+          } as T;
+        }
         if (query.includes("FROM games WHERE slug")) {
           const game = games.find((candidate) => candidate.slug === values[0]);
           return (game ? rowFor(game) : null) as T | null;
@@ -113,6 +121,7 @@ function createDb(games: readonly FakeGame[]) {
             results: games.filter((game) => game.disabled).map((game) => ({ game_id: game.slug })),
           } as { results: T[] };
         }
+        if (query.includes("FROM oauth_accounts")) return { results: [] as T[] };
         return { results: [] as T[] };
       },
       async run() {
@@ -154,9 +163,6 @@ function request(path: string, db: unknown, games: readonly FakeGame[], init: Re
     });
 }
 
-const reactionDefinition = GAME_DEFINITIONS.find((game) => game.slug === "reaction-time");
-assert.ok(reactionDefinition, "fixture assumption: reaction-time exists");
-
 const OFFICIAL: FakeGame = {
   id: 9,
   slug: "reaction-time",
@@ -164,10 +170,32 @@ const OFFICIAL: FakeGame = {
   publisher_user_id: null,
   visibility: "PUBLIC",
   live_version_id: 901,
-  canonical: systemGameDefinitionToGameCanonicalDocument(
-    reactionDefinition,
-    "2026-08-01T00:00:00.000Z",
-  ),
+  canonical: {
+    schemaVersion: 2,
+    slug: "reaction-time",
+    title: "반응속도 테스트",
+    shortDescription: "반응속도를 측정합니다.",
+    description: "화면 신호에 빠르게 반응하세요.",
+    publisher: { official: true },
+    policy: {
+      score: { unit: "ms", direction: "asc", min: 0, max: 60_000, displaySuffix: " ms" },
+      leaderboard: true,
+      xpPerCompletion: 10,
+      requiresAuth: false,
+    },
+    supportsReplay: false,
+    catalog: {
+      type: "TAXONOMY",
+      categories: ["reflex"],
+      tags: ["reaction"],
+      modes: ["single"],
+      inputMethods: ["mouse"],
+      minPlayers: 1,
+      maxPlayers: 1,
+      thumbnail: "/reaction-time.svg",
+    },
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  },
 };
 
 const USER: FakeGame = {
@@ -216,7 +244,9 @@ test("GET /api/games lists generic OWOGG and USER projections and preserves cata
   const official = body.games.find((game) => game.slug === OFFICIAL.slug);
   const user = body.games.find((game) => game.slug === USER.slug);
   assert.equal(official?.publisherType, "OWOGG");
+  assert.equal(official?.publisherName, "OWOGG");
   assert.equal(user?.publisherType, "USER");
+  assert.equal(user?.publisherName, "Taeyang");
   assert.equal(official?.catalog.type, "TAXONOMY");
   assert.equal(user?.catalog.type, "GENRE_MODE");
   assert.equal(user?.mediaUrl, "https://api.example.test/api/games/ball-dodge/media/logo");

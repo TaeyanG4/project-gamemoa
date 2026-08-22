@@ -4,6 +4,7 @@ import { createContainer } from "../container.js";
 import { verifyDiscordSignature } from "../infrastructure/discord/signature.js";
 import { OWOGG_COMMAND_NAME } from "../infrastructure/discord/commands.js";
 import { handleOwoggCommand } from "../infrastructure/discord/interactionHandlers.js";
+import { readB2Config } from "./devGames.js";
 import {
   DISCORD_INTERACTION_TYPE,
   DISCORD_RESPONSE_TYPE,
@@ -87,7 +88,7 @@ discordRouter.post("/interactions", async (c) => {
       });
     }
 
-    const container = createContainer(c.env.DB);
+    const container = createContainer(c.env.DB, readB2Config(c.env));
     const frontendUrl = c.env.FRONTEND_URL || "https://owogg.com";
     // This route's own origin (api.owogg.com) — used to build the rendered rank-card image URL
     // Discord embeds reference, separate from frontendUrl (owogg.com) which everything else here

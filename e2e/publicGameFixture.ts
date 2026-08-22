@@ -8,6 +8,7 @@ import type { PublicGame } from "../packages/contracts/src/games.js";
 export const E2E_PUBLIC_GAMES: readonly PublicGame[] = [
   {
     publisherType: "OWOGG",
+    publisherName: "OWOGG",
     slug: "e2e-responsive",
     title: "Platform E2E fixture (e2e-responsive)",
     shortDescription: "Synthetic platform fixture.",
@@ -24,6 +25,7 @@ export const E2E_PUBLIC_GAMES: readonly PublicGame[] = [
   },
   {
     publisherType: "OWOGG",
+    publisherName: "OWOGG",
     slug: "e2e-fixed",
     title: "Platform E2E fixture (e2e-fixed)",
     shortDescription: "Synthetic platform fixture.",
@@ -40,6 +42,7 @@ export const E2E_PUBLIC_GAMES: readonly PublicGame[] = [
   },
   {
     publisherType: "OWOGG",
+    publisherName: "OWOGG",
     slug: "e2e-mobile-experimental",
     title: "Platform E2E fixture (e2e-mobile-experimental)",
     shortDescription: "Synthetic platform fixture.",

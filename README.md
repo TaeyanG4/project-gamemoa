@@ -2,7 +2,7 @@
 
 상태: 가이드
 
-마지막 검증: 2026-08-21
+마지막 검증: 2026-08-23
 
 OwOGG는 브라우저에서 바로 실행되는 미니게임 플랫폼입니다. React 기반 웹 셸, Hono 기반 API,
 Cloudflare D1, Backblaze B2를 사용하며 OWOGG 게임과 사용자 업로드 게임을 하나의 generic Game
@@ -28,30 +28,23 @@ packages/
 ├─ game-sdk/            game runtime contract and iframe Bridge
 ├─ shared/              shared validation and utilities
 └─ ui/                  shared UI components
-games/                  OWOGG-owned game source packages
-game-registry/          OWOGG game definition inputs
-scripts/                generators, bootstrap, validation, deployment helpers
+scripts/                validation and deployment helpers
 docs/                   architecture, guides, proposals, historical records
 ```
 
-`games/*`, `game-registry/*`, 생성된 `GAME_DEFINITIONS`는 OWOGG 게임의 Git/build/bootstrap
-입력입니다. 이 파일들이 프로덕션 요청의 런타임 권한 원천은 아닙니다.
+Git에는 게임 bundle, 등록자 목록, 정적 game registry를 저장하지 않습니다. 모든 소비자는 public game
+API를 사용하며, 게시·공식 여부·제작자 표시의 원천은 환경별 D1/B2입니다.
 
 ```text
-Git/build inputs
-games/* + game-registry/* → generated GAME_DEFINITIONS
-                              │
-                              ▼ deterministic deploy bootstrap
+Publication/runtime authority
+Admin Center OWOGG ZIP ─┐
+Game Creator USER ZIP ──┴→ D1/B2 publication
 
-Production runtime authority
 D1 games + game_versions + game_assets
   + B2 game-definitions/<slug>/definition.json
   + B2 games/<gameId>/<versionId>/...
   → RuntimeGameRegistry
 ```
-
-`GAME_MANIFESTS`와 `GAME_MANIFEST_MAP`도 생성된 현재 사용 데이터입니다. 도전과제, 개인화,
-Discord 등 기존 소비자가 있으므로 런타임 권한과 혼동해서도, 임의로 삭제해서도 안 됩니다.
 
 ## Game Platform 요약
 
@@ -82,13 +75,8 @@ pnpm --filter @owogg/web dev
 pnpm --filter @owogg/api dev
 ```
 
-OWOGG 소스 게임을 추가하거나 레지스트리를 갱신할 때:
-
-```bash
-pnpm generate:game <slug>
-pnpm generate:registry
-pnpm registry:check
-```
+공식 게임은 관리자 센터의 게임 관리 화면에서 standalone ZIP으로 게시합니다. repository registry를
+생성하거나 수정하는 절차는 없습니다.
 
 사용자 업로드 흐름은 소스 패키지를 추가하는 과정이 아닙니다. 완성된 standalone ZIP을 Game
 Creator Center에서 올리며, 자세한 규격은 [게임 제작 가이드](docs/GAME_CREATION_GUIDE.md)와
@@ -101,7 +89,6 @@ pnpm docs:check          # 상대 Markdown 링크, 문서 인덱스, 최신 migr
 pnpm staging:preflight   # Staging target tuple과 Production fallback 부재 검증
 pnpm format:check
 pnpm architecture:check # 레이어 및 제거된 런타임의 재도입 방지
-pnpm registry:check
 pnpm lint
 pnpm typecheck
 pnpm typecheck:scripts

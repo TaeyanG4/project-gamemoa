@@ -7,19 +7,27 @@ import type {
   ServerGameLeaderboardEntry,
   GuildSummaryData,
 } from "../ports/repositories.js";
-import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
+import type { PublicGameCatalog } from "./publicGameCatalog.js";
+import type { RuntimeGame } from "../modules/game/domain/runtimeGame.js";
 
 export class DiscordGuildXpUseCases {
   constructor(
     private guildRepo: DiscordGuildRepository,
     private userRepo: UserRepository,
+    private games?: PublicGameCatalog,
   ) {}
 
   async createPlayContextFromInteraction(input: {
     guildId: string;
     discordUserId: string;
     gameId?: string | null;
-  }): Promise<{ token: string; expiresAt: string; guildName: string; slug: string }> {
+  }): Promise<{
+    token: string;
+    expiresAt: string;
+    guildName: string;
+    slug: string;
+    game?: RuntimeGame;
+  }> {
     const guild = await this.guildRepo.findByGuildId(input.guildId);
     if (!guild || guild.registration_status !== "ACTIVE") {
       throw new Error(
@@ -34,9 +42,11 @@ export class DiscordGuildXpUseCases {
       );
     }
 
+    let game: RuntimeGame | null = null;
     if (input.gameId) {
       const trimmed = input.gameId.trim();
-      if (!GAME_MANIFEST_MAP[trimmed]) {
+      game = (await this.games?.findBySlug(trimmed)) ?? null;
+      if (!game) {
         throw new Error(`존재하지 않는 게임 ID입니다: ${trimmed}`);
       }
     }
@@ -53,6 +63,7 @@ export class DiscordGuildXpUseCases {
       expiresAt: playCtx.expiresAt,
       guildName: guild.name,
       slug: guild.slug,
+      ...(game ? { game } : {}),
     };
   }
 
@@ -152,8 +163,9 @@ export class DiscordGuildXpUseCases {
     gameId: string,
     limit = 20,
   ): Promise<ServerGameLeaderboardEntry[]> {
-    const manifest = GAME_MANIFEST_MAP[gameId];
-    const direction = manifest?.scoreConfig?.direction ?? "desc";
+    const game = (await this.games?.findBySlug(gameId)) ?? null;
+    if (!game) throw new Error(`존재하지 않는 게임 ID입니다: ${gameId}`);
+    const direction = game.canonical.policy.score?.direction ?? "desc";
     return this.guildRepo.getGuildGameLeaderboard(guildId, gameId, direction, limit);
   }
 

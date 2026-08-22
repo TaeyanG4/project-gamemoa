@@ -1,10 +1,16 @@
 # Legacy and Transitional Component Ledger
 
-Status: F-0 repository audit
+Status: 2026-08-21 historical repository audit snapshot
 
 Repository base: `origin/main` at `21c02595ce337b0ea878df9e2ee8ec487bb9ea9a`
 
 Audit date: 2026-08-21
+
+> 2026-08-23 update: the Git game sources, `game-registry`, generated manifest/definition outputs,
+> registry tooling, and all remaining production consumers were removed after migration to the
+> D1/B2 public game catalog. The table below is retained as point-in-time audit evidence and must
+> not be used as current implementation guidance. Current status is tracked in
+> [`CLEANUP_STATUS.md`](CLEANUP_STATUS.md).
 
 ## Method and scope
 

@@ -7,13 +7,8 @@ name: Browser E2E
 #   - pull_request/push to main, but only when the changed paths could plausibly affect what this
 #     suite actually runs — see each path's own comment below for why it's here. NOT included:
 #     apps/api/** (this suite never talks to it at all — see e2e/config.ts's own WEB_API_PORT
-#     comment: nothing listens there on purpose), game-registry/** (the two synthetic games this
-#     suite's own fixture registers never touch game-registry/ — see
-#     e2e/prepareLocalGameOrigin.ts's own doc comment — and for the four real SYSTEM games the
-#     harness reads the already-committed packages/core/**/*.generated.ts output, never
-#     regenerates it; a game-registry/ edit with no matching regen is exactly what
-#     `pnpm registry:check`, in the fast CI workflow, already exists to catch), and scripts/** as
-#     a whole (only four specific files under it are ever actually imported/executed by this
+#     comment: nothing listens there on purpose), and scripts/** as a whole (only the specific
+#     files under it that are actually imported/executed by this
 #     pipeline, listed individually below).
 #
 # Production Deploy (deploy.yml) and the reusable Staging deploy are gated on the fast "CI"
@@ -36,7 +31,6 @@ on:
       # The harness itself — prepare/run scripts, Playwright config, fixtures/, the spec files.
       - "e2e/**"
       # Build hooks executed by apps/web's own build script.
-      - "scripts/registry-builder.ts"
       - "scripts/prepare-web-build.ts"
       - "scripts/post-web-build.ts"
       - "pnpm-lock.yaml"

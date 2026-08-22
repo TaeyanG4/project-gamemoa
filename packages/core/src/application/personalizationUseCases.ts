@@ -1,11 +1,5 @@
 import type { PersonalizationRepository } from "../ports/repositories.js";
-import { GAME_MANIFEST_MAP } from "../registry/gameRegistry.generated.js";
-
-export function isPublishedGame(gameId: string): boolean {
-  if (!gameId || typeof gameId !== "string") return false;
-  const manifest = GAME_MANIFEST_MAP[gameId];
-  return Boolean(manifest && manifest.status === "published");
-}
+import type { PublicGameCatalog } from "./publicGameCatalog.js";
 
 export interface PersonalizationState {
   favoriteGameIds: string[];
@@ -18,14 +12,21 @@ export interface PersonalizationState {
 export const MAX_FAVORITES = 50;
 
 export class PersonalizationUseCases {
-  constructor(private repo: PersonalizationRepository) {}
+  constructor(
+    private repo: PersonalizationRepository,
+    private games: PublicGameCatalog,
+  ) {}
 
   async getPersonalizationState(userId: number): Promise<PersonalizationState> {
-    const rawFavorites = await this.repo.getFavorites(userId);
-    const rawRecent = await this.repo.getRecentPlays(userId, 12);
+    const [rawFavorites, rawRecent, publicGames] = await Promise.all([
+      this.repo.getFavorites(userId),
+      this.repo.getRecentPlays(userId, 12),
+      this.games.list(),
+    ]);
+    const publicIds = new Set(publicGames.map((game) => game.identity.slug));
 
-    const favoriteGameIds = rawFavorites.filter(isPublishedGame);
-    const recentPlays = rawRecent.filter((r) => isPublishedGame(r.gameId));
+    const favoriteGameIds = rawFavorites.filter((gameId) => publicIds.has(gameId));
+    const recentPlays = rawRecent.filter((record) => publicIds.has(record.gameId));
 
     return {
       favoriteGameIds,
@@ -34,7 +35,7 @@ export class PersonalizationUseCases {
   }
 
   async addFavorite(userId: number, gameId: string): Promise<void> {
-    if (!isPublishedGame(gameId)) {
+    if (!(await this.games.findBySlug(gameId))) {
       throw new Error(`Invalid or unpublished game ID: ${gameId}`);
     }
 
@@ -54,7 +55,7 @@ export class PersonalizationUseCases {
   }
 
   async recordRecentPlay(userId: number, gameId: string): Promise<void> {
-    if (!isPublishedGame(gameId)) {
+    if (!(await this.games.findBySlug(gameId))) {
       throw new Error(`Invalid or unpublished game ID: ${gameId}`);
     }
     await this.repo.recordRecentPlay(userId, gameId);
@@ -64,7 +65,10 @@ export class PersonalizationUseCases {
     userId: number,
     guestRecentPlays: { gameId: string; lastPlayedAt: string }[],
   ): Promise<PersonalizationState> {
-    const validRecent = (guestRecentPlays || []).filter((r) => r && isPublishedGame(r.gameId));
+    const publicIds = new Set((await this.games.list()).map((game) => game.identity.slug));
+    const validRecent = (guestRecentPlays || []).filter(
+      (record) => record && publicIds.has(record.gameId),
+    );
 
     await this.repo.importGuestData(userId, validRecent);
     return this.getPersonalizationState(userId);

@@ -1,5 +1,10 @@
 import { Hono } from "hono";
-import { AdminGameListResponseSchema, AdminGameToggleRequestSchema } from "@owogg/contracts";
+import {
+  AdminGameListResponseSchema,
+  AdminGameToggleRequestSchema,
+  AdminOfficialGameUploadResponseSchema,
+} from "@owogg/contracts";
+import { OfficialGameUploadFailure } from "@owogg/core";
 import { createContainer } from "../container.js";
 import { isTrustedAdminOrigin } from "../auth/admin.js";
 import {
@@ -8,6 +13,8 @@ import {
   requirePermission,
 } from "../auth/adminSession.js";
 import type { ApiEnv } from "./auth.js";
+import { readB2Config } from "./devGames.js";
+import { rateLimit } from "../middleware/rateLimit.js";
 
 export const adminGamesRouter = new Hono<ApiEnv>();
 
@@ -36,6 +43,68 @@ adminGamesRouter.get("/", async (c) => {
 
   return c.json(AdminGameListResponseSchema.parse({ games }), 200);
 });
+
+// POST /api/admin/games/upload — publishes a ZIP as an official OWOGG game. Authority comes only
+// from this elevated admin route; no archive field or public creator endpoint can select OWOGG.
+adminGamesRouter.post(
+  "/upload",
+  rateLimit({ name: "game-upload", binding: "GAME_UPLOAD_RATE_LIMITER" }),
+  async (c) => {
+    const admin = await requireElevatedAdmin(c);
+    if (isElevatedAdminResponse(admin)) return admin;
+    const denied = requirePermission(admin, "games.moderate");
+    if (denied) return denied;
+
+    const container = createContainer(c.env.DB, readB2Config(c.env));
+    if (!container.gameBundlesConfigured) {
+      return c.json(
+        {
+          error: {
+            code: "GAME_BUNDLES_NOT_CONFIGURED",
+            message: "번들 저장소(Backblaze B2)가 아직 이 환경에 구성되지 않았습니다.",
+          },
+        },
+        503,
+      );
+    }
+
+    let body: Record<string, string | File>;
+    try {
+      body = await c.req.parseBody();
+    } catch {
+      return c.json(
+        { error: { code: "INVALID_REQUEST", message: "multipart/form-data 요청이 아닙니다." } },
+        400,
+      );
+    }
+    const bundle = body.bundle;
+    if (!(bundle instanceof File)) {
+      return c.json(
+        { error: { code: "INVALID_REQUEST", message: "bundle ZIP 파일이 필요합니다." } },
+        400,
+      );
+    }
+
+    try {
+      const result = await container.officialGameUploadUseCases.upload({
+        bytes: await bundle.arrayBuffer(),
+        contentType: bundle.type || undefined,
+      });
+      return c.json(AdminOfficialGameUploadResponseSchema.parse(result), 201);
+    } catch (error) {
+      if (!(error instanceof OfficialGameUploadFailure)) throw error;
+      const status =
+        error.code === "SLUG_CONFLICT" ? 409 : error.code === "PUBLISH_FAILED" ? 500 : 400;
+      const message =
+        error.code === "SLUG_CONFLICT"
+          ? "동일한 slug가 사용자 게임 또는 삭제된 게임에 이미 사용되고 있습니다."
+          : error.code === "PUBLISH_FAILED"
+            ? "OWOGG 게임을 D1/B2에 게시하지 못했습니다."
+            : "게임 ZIP 또는 owogg.game.json이 올바르지 않습니다.";
+      return c.json({ error: { code: error.code, message } }, status);
+    }
+  },
+);
 
 // POST /api/admin/games/:gameId/toggle — enable/disable a game without a deploy. Disabling also
 // rejects new score submissions for it (see scores.ts) — this is a real kill switch, not just a

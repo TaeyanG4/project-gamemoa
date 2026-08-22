@@ -7,7 +7,6 @@ import {
   PRODUCTION,
   STAGING,
   STAGING_D1_ID_SENTINEL,
-  assertOfficialGameBootstrapTargets,
   materializeStagingWranglerConfig,
   parseJsonc,
   resolveSmokeTargets,
@@ -78,12 +77,14 @@ test("Staging environment preflight accepts only the exact isolated target tuple
     B2_BUCKET_NAME: PRODUCTION.b2Bucket,
     STAGING_D1_DATABASE_ID: PRODUCTION.d1Id,
     DISCORD_COMMAND_SYNC_ENABLED: "true",
+    STAGING_LEGACY_ADMIN_USER_IDS: "1",
   };
   const errors = validateStagingEnvironment(crossed).join("\n");
   assert.match(errors, /FRONTEND_URL/);
   assert.match(errors, /B2_BUCKET_NAME/);
   assert.match(errors, /Production D1/);
   assert.match(errors, /DISCORD_COMMAND_SYNC_ENABLED/);
+  assert.match(errors, /ADMIN_USER_IDS/);
 });
 
 test("Staging Web smoke requires both Cloudflare Access service-token values when enabled", () => {
@@ -121,36 +122,6 @@ test("verified D1 UUID replaces the fail-closed sentinel exactly once", () => {
   const config = parseJsonc<WranglerConfig>(generated);
   assert.equal(config.env?.staging?.d1_databases?.[0]?.database_id, STAGING_D1_ID);
   assert.equal(config.d1_databases?.[0]?.database_id, PRODUCTION.d1Id);
-});
-
-test("official game bootstrap rejects every crossed or ambiguous D1/B2 pairing", () => {
-  assert.equal(
-    assertOfficialGameBootstrapTargets({
-      OWOGG_DEPLOY_ENVIRONMENT: "staging",
-      D1_DATABASE_NAME: STAGING.d1Name,
-      B2_BUCKET_NAME: STAGING.b2Bucket,
-    }),
-    "staging",
-  );
-  assert.throws(
-    () =>
-      assertOfficialGameBootstrapTargets({
-        OWOGG_DEPLOY_ENVIRONMENT: "staging",
-        D1_DATABASE_NAME: PRODUCTION.d1Name,
-        B2_BUCKET_NAME: STAGING.b2Bucket,
-      }),
-    /D1_DATABASE_NAME/,
-  );
-  assert.throws(
-    () =>
-      assertOfficialGameBootstrapTargets({
-        OWOGG_DEPLOY_ENVIRONMENT: "production",
-        D1_DATABASE_NAME: PRODUCTION.d1Name,
-        B2_BUCKET_NAME: STAGING.b2Bucket,
-      }),
-    /B2_BUCKET_NAME/,
-  );
-  assert.throws(() => assertOfficialGameBootstrapTargets({}), /must be explicitly/);
 });
 
 test("smoke targets keep Production defaults and support explicit Staging overrides", () => {
@@ -203,10 +174,11 @@ test("Staging workflow is push-after-CI only and contains no Production variable
   assert.match(deploy, /environment: staging/);
   assert.match(deploy, /group: owogg-staging/);
   assert.doesNotMatch(deploy, /secrets:\s*inherit/);
-  assert.doesNotMatch(deploy, /vars\.ADMIN_USER_IDS/);
+  assert.match(deploy, /STAGING_LEGACY_ADMIN_USER_IDS:\s*\$\{\{ vars\.ADMIN_USER_IDS/);
+  assert.doesNotMatch(deploy, /^\s+ADMIN_USER_IDS:\s*\$\{\{ vars\.ADMIN_USER_IDS/gm);
   assert.doesNotMatch(deploy, /vars\.(?:YOUTUBE|TWITCH|CHZZK|SOOP)_/);
   assert.doesNotMatch(deploy, /publish:official-games/);
-  assert.match(deploy, /pnpm bootstrap:official-games/);
+  assert.doesNotMatch(deploy, /bootstrap:official-games/);
   assert.doesNotMatch(deploy, /pnpm discord:commands:register(?:\s|$)/m);
   assert.match(deploy, /pnpm discord:commands:register:guild/);
   assert.match(

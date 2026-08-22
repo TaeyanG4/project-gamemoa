@@ -2,7 +2,7 @@
 
 이 문서는 OwOGG 플랫폼에 순차적으로 추가될 신규 미니게임의 기획 의도, 게임 메커니즘, 스코어링 규칙 및 개발 우선순위를 체계적으로 관리하는 전용 명세서입니다.
 
-> 🛠️ **게임 개발 및 등록 DX**: 신규 게임 개발 시 `pnpm generate:game <game-slug>` 명령어로 스캐폴딩을 자동 생성하며, `src/manifest.ts`에 `GameManifest` 계약을 정의하고 `pnpm generate:registry`를 통해 중앙 코드 수정 없이 자동 등록됩니다 ([`docs/ARCHITECTURE.md`](file:///h:/dev/project-owogg/docs/ARCHITECTURE.md) 및 [`docs/GAME_CREATION_GUIDE.md`](file:///h:/dev/project-owogg/docs/GAME_CREATION_GUIDE.md) 참고).
+> 🛠️ **게임 등록 DX**: 완성된 standalone ZIP을 관리자 센터에서는 OWOGG 게임으로, Game Creator Center에서는 USER 게임으로 등록합니다. 두 경로 모두 D1/B2 generic publication을 사용하며 Git source 폴더나 코드 배포로 게임을 등록하지 않습니다 ([`docs/ARCHITECTURE.md`](ARCHITECTURE.md), [`docs/GAME_CREATION_GUIDE.md`](GAME_CREATION_GUIDE.md)).
 
 ---
 
@@ -66,31 +66,21 @@
 
 ---
 
-## 3. 📝 신규 게임 기획 및 매니페스트 템플릿
+## 3. 📝 신규 게임 기획 및 업로드 매니페스트 템플릿
 
 새로운 게임 아이디어를 구체화할 때 아래 표준 규격에 맞추어 작성합니다:
 
-```typescript
-// games/<game-slug>/src/manifest.ts
-export const manifest: GameManifest = {
-  id: "game-slug",
-  slug: "game-slug",
-  title: "게임 타이틀",
-  shortDescription: "게임 한 줄 요약",
-  description: "게임 상세 설명",
-  categories: ["reaction"], // reaction | brain | aim | typing
-  difficulty: "normal",
-  featured: false,
-  scoreConfig: {
-    unit: "score_unit", // ms | level | wpm | cps | digits ...
-    direction: "desc", // asc: 낮을수록 우수, desc: 높을수록 우수
-    min: 0,
-    max: 100000,
-    prefix: "",
-    suffix: "",
-  },
-  touchFriendly: true,
-  mobileFriendly: true,
-  thumbnailGradient: "from-purple-500 to-indigo-600",
-};
+```json
+{
+  "slug": "game-slug",
+  "title": "게임 타이틀",
+  "genre": "reaction",
+  "mode": "single",
+  "shortDescription": "게임 한 줄 요약",
+  "description": "게임 상세 설명"
+}
 ```
+
+같은 ZIP 루트에 `index.html`과 `owogg.logo.svg`(또는 png/jpg/jpeg/webp)를 넣습니다. 공식 여부와
+제작자명은 이 JSON에 쓰지 않습니다. 관리자 센터 업로드는 서버가 `OWOGG`, 사용자 업로드는 인증된
+사용자 닉네임으로 결정합니다. 점수·리더보드·XP 정책은 관리자 검토 대상 canonical metadata입니다.

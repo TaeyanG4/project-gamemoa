@@ -87,8 +87,16 @@ const PublicGameSchemaBase = {
 /** Provider authority is an explicit wire discriminant. No publisher user id or review fields
  * are part of either branch; the canonical catalog shape remains the only metadata union. */
 export const PublicGameSchema = z.discriminatedUnion("publisherType", [
-  z.object({ ...PublicGameSchemaBase, publisherType: z.literal("OWOGG") }),
-  z.object({ ...PublicGameSchemaBase, publisherType: z.literal("USER") }),
+  z.object({
+    ...PublicGameSchemaBase,
+    publisherType: z.literal("OWOGG"),
+    publisherName: z.literal("OWOGG"),
+  }),
+  z.object({
+    ...PublicGameSchemaBase,
+    publisherType: z.literal("USER"),
+    publisherName: z.string().min(1),
+  }),
 ]);
 export type PublicGame = z.infer<typeof PublicGameSchema>;
 
@@ -96,6 +104,17 @@ export const PublicGameListResponseSchema = z.object({
   games: z.array(PublicGameSchema),
 });
 export type PublicGameListResponse = z.infer<typeof PublicGameListResponseSchema>;
+
+export const AdminOfficialGameUploadResponseSchema = z.object({
+  gameId: z.number().int().positive(),
+  versionId: z.number().int().positive(),
+  slug: z.string().min(1),
+  title: z.string().min(1),
+  publisherName: z.literal("OWOGG"),
+  reusedReadyVersion: z.boolean(),
+  publishedAt: z.string().min(1),
+});
+export type AdminOfficialGameUploadResponse = z.infer<typeof AdminOfficialGameUploadResponseSchema>;
 
 /** POST /api/games/:slug/session — short-lived parent-side Game Session token. */
 export const GameSessionResponseSchema = z.object({

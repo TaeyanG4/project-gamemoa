@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { LeaderboardResponseSchema, LeaderRecordSchema } from "@owogg/contracts";
-import { gameManifests } from "../features/catalog/registry.js";
+import type { PublicGameCard } from "../features/catalog/publicGameAdapter.js";
 
 describe("Product Integrity & Web API Contracts", () => {
   it("LeaderRecordSchema correctly normalizes snake_case and camelCase items", () => {
@@ -56,18 +56,24 @@ describe("Product Integrity & Web API Contracts", () => {
     }
   });
 
-  it("Catalog category filtering strictly uses manifest.categories", () => {
-    const reactionGames = gameManifests.filter((g) => g.categories.includes("reaction"));
+  it("Catalog category filtering uses public API card categories", () => {
+    const games = [
+      { slug: "reaction-time", categories: ["reaction"] },
+      { slug: "aim-test", categories: ["reaction"] },
+      { slug: "memory-test", categories: ["brain"] },
+      { slug: "typing-test", categories: ["brain", "typing"] },
+    ] as Array<Pick<PublicGameCard, "slug" | "categories">>;
+    const reactionGames = games.filter((game) => game.categories.includes("reaction"));
     const reactionSlugs = reactionGames.map((g) => g.slug);
     assert.ok(reactionSlugs.includes("reaction-time"));
     assert.ok(reactionSlugs.includes("aim-test"));
 
-    const brainGames = gameManifests.filter((g) => g.categories.includes("brain"));
+    const brainGames = games.filter((game) => game.categories.includes("brain"));
     const brainSlugs = brainGames.map((g) => g.slug);
     assert.ok(brainSlugs.includes("memory-test"));
     assert.ok(brainSlugs.includes("typing-test"));
 
-    const typingGames = gameManifests.filter((g) => g.categories.includes("typing"));
+    const typingGames = games.filter((game) => game.categories.includes("typing"));
     assert.deepEqual(
       typingGames.map((g) => g.slug),
       ["typing-test"],

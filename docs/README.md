@@ -31,7 +31,6 @@
 
 - [게임 제작 가이드](GAME_CREATION_GUIDE.md) — **가이드**, OWOGG source와 USER bundle 흐름
 - [게임 업로드 가이드](GAME_UPLOAD_GUIDE.md) — **가이드**, Game Creator Center 업로드 절차
-- [Game Registry 안내](../game-registry/README.md) — **가이드**, OWOGG bootstrap 입력 생성
 - [Ball Dodge 예제](../examples/ball-dodge/README.md) — **가이드**, 예제 상태는 문서 내부의 주의사항 확인
 - [게임 라인업](GAME_LINEUP.md) — **제안**, 후보 게임 기획
 - [멀티플레이 게임 설계](MULTIPLAYER_GAME_DESIGN.md) — **제안**, 구현 전 멀티플레이 설계
@@ -57,6 +56,8 @@
 
 ## 유지보수
 
+- [브랜치 감사 및 정리](BRANCH_MANAGEMENT.md) — **가이드**, local/remote 브랜치 자동 조사,
+  3단계 분류 및 안전한 정리 절차
 - [Cleanup Status](maintenance/CLEANUP_STATUS.md) — **기준 문서**, F-0~F-5 정리 결과와 현재
   compatibility/defer 상태
 - [Legacy Ledger](maintenance/LEGACY_LEDGER.md) — **기록**, F-0 시점의 저장소/legacy 판정 기록
