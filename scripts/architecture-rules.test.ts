@@ -196,7 +196,7 @@ test("every import rule carries at least one forbidden specifier and a stated ru
   }
 });
 
-test("D-1 legacy runtime removals are protected by source-token architecture guards", () => {
+test("D-1 legacy catalog/runtime removals are protected by source-token architecture guards", () => {
   const api = TOKEN_RULES.find((rule) => rule.scope === "apps/api/src");
   const web = TOKEN_RULES.find((rule) => rule.scope === "apps/web/app");
   const host = TOKEN_RULES.find((rule) => rule.scope === "apps/web/app/features/game");
@@ -206,6 +206,7 @@ test("D-1 legacy runtime removals are protected by source-token architecture gua
   assert.ok(api?.tokens.includes("StaticGameRegistry"));
   assert.ok(web?.tokens.includes("LegacyReactRuntime"));
   assert.ok(web?.tokens.includes("CreatorGameHost"));
+  assert.ok(web?.tokens.includes("sandboxGameAdapter"));
   assert.ok(web?.tokens.includes("GAME_LOADERS"));
   for (const packageName of [
     "@owogg/game-aim-test",

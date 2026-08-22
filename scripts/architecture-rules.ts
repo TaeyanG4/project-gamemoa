@@ -422,11 +422,12 @@ export const TOKEN_RULES: TokenRule[] = [
   },
   {
     scope: "apps/web/app",
-    rule: "the web runtime must not restore transitional Creator/System runtime selection",
+    rule: "the web must not restore transitional Creator/System catalog or runtime selection",
     tokens: [
       "LegacyReactRuntime",
       "CreatorGameHost",
       "transitionalCreatorGameResolver",
+      "sandboxGameAdapter",
       "GAME_LOADERS",
       "@owogg/game-aim-test",
       "@owogg/game-memory-test",
