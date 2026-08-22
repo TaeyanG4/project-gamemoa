@@ -9,6 +9,8 @@ Cloudflare D1, Backblaze B2를 사용하며 OWOGG 게임과 사용자 업로드 
 Platform 런타임으로 제공합니다.
 
 - 서비스: [owogg.com](https://owogg.com)
+- Staging: `https://stg.owogg.com` (Cloudflare Access 보호), API `api-stg.owogg.com`, 게임
+  `play-stg.owogg.com`
 - 문서 탐색: [docs/README.md](docs/README.md)
 - 현재 아키텍처: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 게임 플랫폼: [docs/GAME_PLATFORM_ARCHITECTURE.md](docs/GAME_PLATFORM_ARCHITECTURE.md)
@@ -96,6 +98,7 @@ Creator Center에서 올리며, 자세한 규격은 [게임 제작 가이드](do
 
 ```bash
 pnpm docs:check          # 상대 Markdown 링크, 문서 인덱스, 최신 migration 메타데이터
+pnpm staging:preflight   # Staging target tuple과 Production fallback 부재 검증
 pnpm format:check
 pnpm architecture:check # 레이어 및 제거된 런타임의 재도입 방지
 pnpm registry:check
@@ -116,16 +119,18 @@ pnpm verify              # 저장소 전체 통합 검증
 정상 배포는 GitHub Actions가 검증된 SHA를 대상으로 수행합니다.
 
 ```text
-CI 성공
-→ D1 migration
-→ API Worker 배포 및 provenance 확인
-→ OWOGG generic game bootstrap
-→ Web build/deploy 및 smoke/provenance 확인
-→ 설정된 경우 Discord command 동기화
+staging 기준 작업 브랜치 → 로컬 검증 → staging push
+→ Staging CI/CD → 전용 D1 migration → API/Web custom-domain deploy
+→ stg.owogg.com 실제 접속 + API 배포 SHA 확인
+→ Staging 배포 완료(테스트 가능) → 기능 acceptance
+→ Staging 검증 완료(Production 승격 대기)
+→ 릴리스별 명시적 승인 후 동일 tree를 main으로 승격
+→ Production CI/CD + smoke/provenance
 ```
 
 수동 프로덕션 쓰기나 배포는 일반 개발 절차가 아닙니다. 데이터 구조는
-[Database](docs/DATABASE.md), 권한 모델은 [Authorization](docs/AUTHORIZATION.md)을 참조하세요.
+[Database](docs/DATABASE.md), 권한 모델은 [Authorization](docs/AUTHORIZATION.md), 격리된 배포 절차는
+[Staging runbook](docs/STAGING.md)을 참조하세요.
 
 ## 라이선스
 

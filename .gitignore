@@ -44,6 +44,8 @@ docs/archive/
 apps/api/.b2-secret.env
 apps/api/.dev.vars
 apps/api/b2-smoke-test.txt
+# Generated only after CI verifies the remote Staging D1 name and UUID. It must never be committed.
+apps/api/wrangler.staging.generated.jsonc
 
 # Generated from apps/api/test/fixtures/game-deploy-smoke-test/ball-dodge/ by
 # build-ball-dodge-zip.mjs — a build artifact (the sandbox-game pipeline smoke-test upload

@@ -2,7 +2,11 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { buildOfficialGameBundles, readB2ConfigFromEnv } from "./official-game-bundle-builder.js";
-import { createOfficialGenericBundleConsumer } from "./official-game-bootstrap.js";
+import {
+  createOfficialGenericBundleConsumer,
+  resolveOfficialD1ExecutionTarget,
+} from "./official-game-bootstrap.js";
+import { assertOfficialGameBootstrapTargets } from "./staging-contract.js";
 
 /**
  * Builds every OWOGG standalone iframe bundle deterministically and converges it into generic D1
@@ -20,6 +24,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, "..");
 
 async function main(): Promise<void> {
+  const deployment = assertOfficialGameBootstrapTargets(process.env);
+  const d1Target = resolveOfficialD1ExecutionTarget(process.env, deployment);
   const b2Config = readB2ConfigFromEnv();
   if (!b2Config) {
     throw new Error(
@@ -30,7 +36,7 @@ async function main(): Promise<void> {
 
   await buildOfficialGameBundles(
     REPO_ROOT,
-    createOfficialGenericBundleConsumer({ repoRoot: REPO_ROOT, b2Config }),
+    createOfficialGenericBundleConsumer({ repoRoot: REPO_ROOT, b2Config, d1Target }),
   );
 }
 

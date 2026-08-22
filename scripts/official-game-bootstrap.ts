@@ -19,6 +19,7 @@ import {
   type BackblazeB2Config,
 } from "@owogg/db";
 import type { OfficialBundlePreparedConsumer } from "./official-game-bundle-builder.js";
+import type { DeployEnvironment } from "./staging-contract.js";
 
 type SqlValue = string | number | null;
 
@@ -29,34 +30,96 @@ export interface D1SqlExecutor {
   ): Promise<readonly T[]>;
 }
 
-/** Production-only D1 executor used by the deploy workflow. The runner never runs in local
- * development: it delegates to the repository's configured Wrangler binding with --remote and
- * receives Cloudflare credentials only from the deploy step's environment. */
+export interface OfficialD1ExecutionTarget {
+  database: string;
+  config: string;
+  environment?: "staging";
+  disableProvisioning: boolean;
+}
+
+function requiredEnvironmentValue(env: NodeJS.ProcessEnv, name: string, expected: string): string {
+  const value = env[name]?.trim();
+  if (value !== expected) {
+    throw new Error(`${name} must equal ${expected} for isolated Staging bootstrap`);
+  }
+  return value;
+}
+
+export function resolveOfficialD1ExecutionTarget(
+  env: NodeJS.ProcessEnv,
+  deployment: DeployEnvironment,
+): OfficialD1ExecutionTarget {
+  if (deployment === "production") {
+    for (const name of [
+      "OFFICIAL_GAME_WRANGLER_CONFIG",
+      "OFFICIAL_GAME_WRANGLER_ENV",
+      "OFFICIAL_GAME_D1_DATABASE",
+    ]) {
+      if (env[name]?.trim()) {
+        throw new Error(`Production official bootstrap must not use Staging override ${name}`);
+      }
+    }
+    return {
+      database: "DB",
+      config: "apps/api/wrangler.jsonc",
+      disableProvisioning: false,
+    };
+  }
+
+  return {
+    database: requiredEnvironmentValue(env, "OFFICIAL_GAME_D1_DATABASE", "owogg-d1-staging"),
+    config: requiredEnvironmentValue(
+      env,
+      "OFFICIAL_GAME_WRANGLER_CONFIG",
+      "apps/api/wrangler.staging.generated.jsonc",
+    ),
+    environment: requiredEnvironmentValue(
+      env,
+      "OFFICIAL_GAME_WRANGLER_ENV",
+      "staging",
+    ) as "staging",
+    disableProvisioning: true,
+  };
+}
+
+/** Deploy-only remote D1 executor. Production uses the checked-in DB binding; Staging must pass
+ * the verified generated config, exact database name, explicit environment and disabled
+ * provisioning flags. */
 export class WranglerRemoteD1Executor implements D1SqlExecutor {
-  constructor(private readonly repoRoot: string) {}
+  constructor(
+    private readonly repoRoot: string,
+    private readonly target: OfficialD1ExecutionTarget = {
+      database: "DB",
+      config: "apps/api/wrangler.jsonc",
+      disableProvisioning: false,
+    },
+  ) {}
 
   async query<T extends Record<string, unknown>>(
     sql: string,
     values: readonly SqlValue[] = [],
   ): Promise<readonly T[]> {
     const command = renderD1Sql(sql, values);
-    const stdout = execFileSync(
-      process.platform === "win32" ? "pnpm.cmd" : "pnpm",
-      [
-        "exec",
-        "wrangler",
-        "d1",
-        "execute",
-        "DB",
-        "--remote",
-        "--config",
-        "apps/api/wrangler.jsonc",
-        "--json",
-        "--command",
-        command,
-      ],
-      { cwd: this.repoRoot, encoding: "utf8", env: process.env },
-    );
+    const args = [
+      "exec",
+      "wrangler",
+      "d1",
+      "execute",
+      this.target.database,
+      "--remote",
+      "--config",
+      this.target.config,
+    ];
+    if (this.target.environment) args.push("--env", this.target.environment);
+    if (this.target.disableProvisioning) {
+      args.push("--x-provision=false", "--x-auto-create=false");
+    }
+    args.push("--json", "--command", command);
+    const stdout = execFileSync(process.platform === "win32" ? "pnpm.cmd" : "pnpm", args, {
+      cwd: this.repoRoot,
+      encoding: "utf8",
+      env: process.env,
+    });
     const parsed = JSON.parse(stdout) as Array<{
       success?: boolean;
       results?: T[];
@@ -226,10 +289,11 @@ export class D1OfficialGameBootstrapRepository implements OfficialGameBootstrapR
 export function createOfficialGenericBundleConsumer(input: {
   repoRoot: string;
   b2Config: BackblazeB2Config;
+  d1Target?: OfficialD1ExecutionTarget;
 }): OfficialBundlePreparedConsumer {
   const storage = new BackblazeB2GameBundleRepository(input.b2Config);
   const repository = new D1OfficialGameBootstrapRepository(
-    new WranglerRemoteD1Executor(input.repoRoot),
+    new WranglerRemoteD1Executor(input.repoRoot, input.d1Target),
   );
   const bootstrap = new OfficialGameBootstrap(
     repository,

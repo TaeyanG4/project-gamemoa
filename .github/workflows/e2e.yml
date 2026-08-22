@@ -16,9 +16,10 @@ name: Browser E2E
 #     a whole (only four specific files under it are ever actually imported/executed by this
 #     pipeline, listed individually below).
 #
-# Deploy (deploy.yml) is gated on the "CI" workflow only, not this one — production's own
-# post-deploy "Smoke Test Web Frontend & Provenance" step is the safety net that still runs on
-# every deploy; this suite is a slower, parallel signal on top of that, not a merge/deploy gate.
+# Production Deploy (deploy.yml) and the reusable Staging deploy are gated on the fast "CI"
+# workflow only, not this one. Each environment's own post-deploy smoke/provenance step is the
+# safety net that still runs on every deploy; this suite is a slower, parallel signal, not a
+# merge/deploy gate.
 
 on:
   workflow_dispatch: {}

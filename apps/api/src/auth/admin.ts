@@ -52,12 +52,9 @@ export function isTrustedAdminOrigin(origin: string | undefined, frontendUrl?: s
 
   const configuredFrontendUrl = frontendUrl || DEFAULT_FRONTEND_URL;
 
-  const allowedOrigins = new Set(
-    [safeOrigin(configuredFrontendUrl), safeOrigin(DEFAULT_FRONTEND_URL)].filter(
-      (value): value is string => value !== null,
-    ),
-  );
-  if (allowedOrigins.has(originValue)) return true;
+  const configuredOrigin = safeOrigin(configuredFrontendUrl);
+  if (!configuredOrigin) return false;
+  if (originValue === configuredOrigin) return true;
 
   // Development-only exception: the request origin and the *configured* frontend URL must
   // both be localhost/127.0.0.1 — a production FRONTEND_URL never enables this branch.

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, test } from "node:test";
 import {
+  findMarkdownFiles,
   latestMigrationFilename,
   validateDocumentationIndex,
   validateMigrationMetadata,
@@ -42,6 +43,20 @@ test("relative Markdown links must resolve", () => {
       message: "Relative link does not resolve: MISSING.md",
     },
   ]);
+});
+
+test("ignored local logs and archives are excluded from repository documentation checks", () => {
+  const root = createRepository();
+  write(root, "README.md", "# Root\n");
+  write(root, "docs/GUIDE.md", "# Guide\n");
+  write(root, "docs/logs/local.md", "[example](evil.url)\n");
+  write(root, "docs/archive/old.md", "[example](missing.md)\n");
+
+  assert.deepEqual(
+    findMarkdownFiles(root).map((file) => path.relative(root, file).replaceAll(path.sep, "/")),
+    ["README.md", "docs/GUIDE.md"],
+  );
+  assert.deepEqual(validateRelativeMarkdownLinks(root), []);
 });
 
 test("the documentation index must link existing required documents", () => {

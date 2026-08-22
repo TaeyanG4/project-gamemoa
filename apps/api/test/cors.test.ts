@@ -50,6 +50,31 @@ test("CORS preflight still advertises the other standard methods (no regression 
   }
 });
 
+test("Staging CORS never echoes the Production origin as trusted", async () => {
+  const res = await app.request(
+    "/api/profile",
+    {
+      method: "OPTIONS",
+      headers: {
+        Origin: "https://owogg.com",
+        "Access-Control-Request-Method": "PATCH",
+      },
+    },
+    { FRONTEND_URL: "https://stg.owogg.com" } as any,
+  );
+  assert.equal(res.headers.get("Access-Control-Allow-Origin"), "https://stg.owogg.com");
+});
+
+test("Production origin cannot perform a state-changing request against Staging API", async () => {
+  const res = await app.request(
+    "/api/auth/logout",
+    { method: "POST", headers: { Origin: "https://owogg.com" } },
+    { FRONTEND_URL: "https://stg.owogg.com" } as any,
+  );
+  assert.equal(res.status, 403);
+  assert.deepEqual(await res.json(), { error: "Forbidden: Origin verification failed" });
+});
+
 // ── credentialed API CORS must not reach game-asset routes (2026-08-18 CORS/asset bug) ──────
 //
 // A sandboxed game iframe (no allow-same-origin — see GameFrame.tsx) sends `Origin: null`

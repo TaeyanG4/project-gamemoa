@@ -15,6 +15,7 @@ export interface DocsCheckIssue {
 }
 
 const IGNORED_DIRECTORIES = new Set([".git", ".turbo", "coverage", "dist", "node_modules"]);
+const IGNORED_REPOSITORY_DIRECTORIES = new Set(["docs/archive", "docs/logs"]);
 
 export const INDEXED_DOCUMENTS = [
   "README.md",
@@ -37,15 +38,18 @@ function toRepoPath(filePath: string): string {
   return filePath.split(path.sep).join("/");
 }
 
-function walkMarkdownFiles(directory: string, files: string[]): void {
+function walkMarkdownFiles(repositoryRoot: string, directory: string, files: string[]): void {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) {
+    const entryPath = path.join(directory, entry.name);
+    const repositoryPath = toRepoPath(path.relative(repositoryRoot, entryPath));
+    if (
+      entry.isDirectory() &&
+      (IGNORED_DIRECTORIES.has(entry.name) || IGNORED_REPOSITORY_DIRECTORIES.has(repositoryPath))
+    ) {
       continue;
     }
-
-    const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
-      walkMarkdownFiles(entryPath, files);
+      walkMarkdownFiles(repositoryRoot, entryPath, files);
     } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
       files.push(entryPath);
     }
@@ -54,7 +58,7 @@ function walkMarkdownFiles(directory: string, files: string[]): void {
 
 export function findMarkdownFiles(repositoryRoot: string): string[] {
   const files: string[] = [];
-  walkMarkdownFiles(repositoryRoot, files);
+  walkMarkdownFiles(repositoryRoot, repositoryRoot, files);
   return files.sort();
 }
 

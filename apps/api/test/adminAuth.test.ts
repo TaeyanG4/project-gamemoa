@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { isAdminUserId, isTrustedAdminOrigin } from "../src/auth/admin.js";
 
 const PROD_FRONTEND = "https://owogg.com";
+const STAGING_FRONTEND = "https://stg.owogg.com";
 
 test("isTrustedAdminOrigin: exact production origin is allowed", () => {
   assert.equal(isTrustedAdminOrigin(PROD_FRONTEND, PROD_FRONTEND), true);
@@ -16,6 +17,13 @@ test("isTrustedAdminOrigin: evil lookalike host is denied (no startsWith/prefix 
 test("isTrustedAdminOrigin: localhost is denied when FRONTEND_URL is production", () => {
   assert.equal(isTrustedAdminOrigin("http://localhost:5173", PROD_FRONTEND), false);
   assert.equal(isTrustedAdminOrigin("http://127.0.0.1:5173", PROD_FRONTEND), false);
+});
+
+test("isTrustedAdminOrigin: Staging trusts only Staging, never Production or localhost", () => {
+  assert.equal(isTrustedAdminOrigin(STAGING_FRONTEND, STAGING_FRONTEND), true);
+  assert.equal(isTrustedAdminOrigin(PROD_FRONTEND, STAGING_FRONTEND), false);
+  assert.equal(isTrustedAdminOrigin("http://localhost:5173", STAGING_FRONTEND), false);
+  assert.equal(isTrustedAdminOrigin("http://127.0.0.1:5173", STAGING_FRONTEND), false);
 });
 
 test("isTrustedAdminOrigin: localhost is allowed only when FRONTEND_URL itself is localhost", () => {

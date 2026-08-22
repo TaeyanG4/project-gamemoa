@@ -1,7 +1,7 @@
 import process from "node:process";
+import { resolveSmokeTargets } from "./staging-contract.js";
 
-const API_URL = "https://api.owogg.com";
-const WEB_URL = "https://owogg.com";
+const { apiUrl: API_URL, webUrl: WEB_URL } = resolveSmokeTargets(process.env);
 
 const FETCH_TIMEOUT_MS = 5000;
 const RETRY_INTERVAL_MS = 3000;
@@ -65,11 +65,17 @@ function parseArgs(): VerifyOptions {
   return { apiOnly, webOnly, expectedSha: expectedSha.trim() };
 }
 
-async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(
+  url: string,
+  timeoutMs: number,
+  headers?: Record<string, string>,
+): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const init: RequestInit = { signal: controller.signal };
+    if (headers) init.headers = headers;
+    const res = await fetch(url, init);
     return res;
   } finally {
     clearTimeout(timeoutId);
@@ -181,11 +187,12 @@ async function verifyCreatorProviders(): Promise<boolean> {
 async function verifyWeb(expectedSha?: string): Promise<boolean> {
   console.log("🔍 Starting Web Version & Route Provenance Check...");
   let shaVerified = false;
+  const accessHeaders = cloudflareAccessHeaders();
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       const url = `${WEB_URL}/version.json?v=${Date.now()}`;
-      const res = await fetchWithTimeout(url, FETCH_TIMEOUT_MS);
+      const res = await fetchWithTimeout(url, FETCH_TIMEOUT_MS, accessHeaders);
       if (!res.ok) {
         throw new Error(`HTTP status ${res.status}`);
       }
@@ -220,7 +227,7 @@ async function verifyWeb(expectedSha?: string): Promise<boolean> {
   const routeResults = await Promise.allSettled(
     ROUTES_TO_CHECK.map(async (route) => {
       const routeUrl = `${WEB_URL}${route}?v=${Date.now()}`;
-      const res = await fetchWithTimeout(routeUrl, FETCH_TIMEOUT_MS);
+      const res = await fetchWithTimeout(routeUrl, FETCH_TIMEOUT_MS, accessHeaders);
       if (!res.ok) {
         throw new Error(`Route ${route} returned HTTP ${res.status}`);
       }
@@ -252,12 +259,25 @@ async function verifyWeb(expectedSha?: string): Promise<boolean> {
   return true;
 }
 
+function cloudflareAccessHeaders(): Record<string, string> | undefined {
+  const clientId = process.env.CF_ACCESS_CLIENT_ID?.trim();
+  const clientSecret = process.env.CF_ACCESS_CLIENT_SECRET?.trim();
+  if (!clientId && !clientSecret) return undefined;
+  if (!clientId || !clientSecret) {
+    throw new Error("CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET must be configured together");
+  }
+  return {
+    "CF-Access-Client-Id": clientId,
+    "CF-Access-Client-Secret": clientSecret,
+  };
+}
+
 async function main() {
   const options = parseArgs();
 
   const hardTimeout = setTimeout(() => {
     console.error(
-      `\n💥 HARD TIMEOUT EXCEEDED (${HARD_TIMEOUT_MS / 1000}s)! Aborting production check.`,
+      `\n💥 HARD TIMEOUT EXCEEDED (${HARD_TIMEOUT_MS / 1000}s)! Aborting deployment check.`,
     );
     process.exit(1);
   }, HARD_TIMEOUT_MS);
@@ -281,7 +301,7 @@ async function main() {
     if (!success) {
       process.exit(1);
     }
-    console.log("\n🎉 All requested production verification checks passed cleanly!");
+    console.log("\n🎉 All requested deployment verification checks passed cleanly!");
     process.exit(0);
   } catch (err) {
     clearTimeout(hardTimeout);

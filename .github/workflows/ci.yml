@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
-    branches: [main]
+    branches: [main, staging]
 
 jobs:
   ci:
@@ -63,3 +63,10 @@ jobs:
       # Browser E2E (Playwright) is a separate workflow (.github/workflows/e2e.yml) — Chromium
       # install + a real browser run add several minutes this fast feedback loop doesn't need on
       # every push/PR. See that workflow's own doc comment for when it runs instead.
+
+  deploy-staging:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/staging' }}
+    needs: ci
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy-staging.yml

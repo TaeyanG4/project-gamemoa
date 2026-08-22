@@ -12,4 +12,12 @@
     "not_found_handling": "single-page-application",
     "html_handling": "none",
   },
+  "env": {
+    "staging": {
+      // `owogg-web` + Wrangler environment suffix => `owogg-web-staging`.
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "stg.owogg.com", "custom_domain": true }],
+    },
+  },
 }

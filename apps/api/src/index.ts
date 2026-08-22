@@ -45,12 +45,35 @@ app.use(
 
 const DEFAULT_FRONTEND_URL = "https://owogg.com";
 
+function safeOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function isLocalhostOrigin(value: string): boolean {
+  const normalized = safeOrigin(value);
+  if (!normalized) return false;
+  const hostname = new URL(normalized).hostname;
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
 function isAllowedOrigin(origin: string | undefined, frontendUrl?: string): boolean {
   if (!origin) return true;
-  const allowed = frontendUrl || DEFAULT_FRONTEND_URL;
-  if (origin === allowed || origin === DEFAULT_FRONTEND_URL) return true;
-  if (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:")) return true;
-  return false;
+  const configured = safeOrigin(frontendUrl || DEFAULT_FRONTEND_URL);
+  const requestOrigin = safeOrigin(origin);
+  if (!configured || !requestOrigin) return false;
+  if (requestOrigin === configured) return true;
+
+  // Preserve the existing top-level Production/default localhost behavior used by local API
+  // development. A non-Production remote frontend (notably Staging) does not inherit it; local
+  // origins are accepted there only when FRONTEND_URL itself is local.
+  return (
+    (configured === DEFAULT_FRONTEND_URL || isLocalhostOrigin(configured)) &&
+    isLocalhostOrigin(requestOrigin)
+  );
 }
 
 // Scoped to /api/* only — NOT global. This is the credentialed, cookie-aware CORS policy for the

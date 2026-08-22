@@ -3,8 +3,41 @@ import test from "node:test";
 import {
   D1OfficialGameBootstrapRepository,
   renderD1Sql,
+  resolveOfficialD1ExecutionTarget,
   type D1SqlExecutor,
 } from "./official-game-bootstrap.js";
+
+test("official D1 target keeps Production defaults and requires exact fail-closed Staging overrides", () => {
+  assert.deepEqual(resolveOfficialD1ExecutionTarget({}, "production"), {
+    database: "DB",
+    config: "apps/api/wrangler.jsonc",
+    disableProvisioning: false,
+  });
+  assert.throws(
+    () => resolveOfficialD1ExecutionTarget({ OFFICIAL_GAME_WRANGLER_ENV: "staging" }, "production"),
+    /must not use Staging override/,
+  );
+
+  const staging = {
+    OFFICIAL_GAME_D1_DATABASE: "owogg-d1-staging",
+    OFFICIAL_GAME_WRANGLER_CONFIG: "apps/api/wrangler.staging.generated.jsonc",
+    OFFICIAL_GAME_WRANGLER_ENV: "staging",
+  };
+  assert.deepEqual(resolveOfficialD1ExecutionTarget(staging, "staging"), {
+    database: "owogg-d1-staging",
+    config: "apps/api/wrangler.staging.generated.jsonc",
+    environment: "staging",
+    disableProvisioning: true,
+  });
+  assert.throws(
+    () =>
+      resolveOfficialD1ExecutionTarget(
+        { ...staging, OFFICIAL_GAME_D1_DATABASE: "owogg-d1" },
+        "staging",
+      ),
+    /OFFICIAL_GAME_D1_DATABASE/,
+  );
+});
 
 test("remote D1 executor renders bound values safely and always terminates a Wrangler command", () => {
   assert.equal(
