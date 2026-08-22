@@ -18,11 +18,13 @@ import {
   type ConfirmAccountMergeResponse,
 } from "@owogg/contracts";
 import { API_URL, apiFetch } from "../../lib/api";
+import { ApiClientError } from "../../lib/api/errors.js";
 
 export type { AuthUser, AuthMeResponse, SocialProvider };
 export type AuthProviderName = SocialProvider;
 
 export interface ProviderStatus {
+  availability: "loading" | "ready" | "unavailable";
   google: {
     configured: boolean;
     clientId?: string;
@@ -33,20 +35,17 @@ export interface ProviderStatus {
 }
 
 export async function fetchProviderStatus(): Promise<ProviderStatus> {
-  try {
-    const data = await apiFetch("/api/auth/providers", AuthProvidersResponseSchema);
-    return {
-      google: {
-        configured: data.google.configured,
-        ...(data.google.clientId !== undefined ? { clientId: data.google.clientId } : {}),
-      },
-      discord: {
-        configured: data.discord.configured,
-      },
-    };
-  } catch {
-    return { google: { configured: false }, discord: { configured: false } };
-  }
+  const data = await apiFetch("/api/auth/providers", AuthProvidersResponseSchema);
+  return {
+    availability: "ready",
+    google: {
+      configured: data.google.configured,
+      ...(data.google.clientId !== undefined ? { clientId: data.google.clientId } : {}),
+    },
+    discord: {
+      configured: data.discord.configured,
+    },
+  };
 }
 
 export async function fetchCurrentUser(): Promise<AuthUser | null> {
@@ -56,8 +55,9 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
       return data.user;
     }
     return null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 401) return null;
+    throw error;
   }
 }
 

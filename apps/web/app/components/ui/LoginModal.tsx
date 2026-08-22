@@ -12,6 +12,7 @@ export function LoginModal() {
     providerStatus,
     error,
     clearError,
+    refreshUser,
   } = useAuth();
   const { dict } = useI18n();
 
@@ -71,11 +72,38 @@ export function LoginModal() {
 
         {/* Login Buttons Stack */}
         <div className="flex flex-col gap-3.5 w-full">
+          {providerStatus.availability !== "ready" && (
+            <div className="flex items-center justify-center gap-2 text-[11px] text-text-muted text-center font-medium">
+              {providerStatus.availability === "loading" ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>{dict.loginModal.providerChecking}</span>
+                </>
+              ) : (
+                <>
+                  <span>{dict.loginModal.providerUnavailable}</span>
+                  <button
+                    type="button"
+                    onClick={() => void refreshUser()}
+                    className="text-brand-light hover:text-brand font-bold underline underline-offset-2 cursor-pointer"
+                  >
+                    {dict.loginModal.retry}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Google Login Button */}
           <div className="flex flex-col gap-1 w-full">
             <button
               onClick={handleGoogleLogin}
-              disabled={isGoogleLoading || isDiscordLoading || !providerStatus.google.configured}
+              disabled={
+                isGoogleLoading ||
+                isDiscordLoading ||
+                providerStatus.availability !== "ready" ||
+                !providerStatus.google.configured
+              }
               className="flex items-center justify-center gap-3 w-full py-4 px-4 bg-white hover:bg-slate-100 text-slate-900 font-extrabold rounded-2xl transition-all shadow-lg hover:scale-[1.02] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isGoogleLoading ? (
@@ -104,7 +132,7 @@ export function LoginModal() {
                 {isGoogleLoading ? dict.loginModal.googleLoading : dict.loginModal.googleButton}
               </span>
             </button>
-            {!providerStatus.google.configured && (
+            {providerStatus.availability === "ready" && !providerStatus.google.configured && (
               <span className="text-[11px] text-text-muted text-center font-medium">
                 {dict.loginModal.googleUnconfigured}
               </span>
@@ -115,7 +143,12 @@ export function LoginModal() {
           <div className="flex flex-col gap-1 w-full">
             <button
               onClick={handleDiscordLogin}
-              disabled={isGoogleLoading || isDiscordLoading || !providerStatus.discord.configured}
+              disabled={
+                isGoogleLoading ||
+                isDiscordLoading ||
+                providerStatus.availability !== "ready" ||
+                !providerStatus.discord.configured
+              }
               className="flex items-center justify-center gap-3 w-full py-4 px-4 bg-[#5865F2] hover:bg-[#4752C4] text-white font-extrabold rounded-2xl transition-all shadow-lg hover:scale-[1.02] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {isDiscordLoading ? (
@@ -129,7 +162,7 @@ export function LoginModal() {
                 {isDiscordLoading ? dict.loginModal.discordLoading : dict.loginModal.discordButton}
               </span>
             </button>
-            {!providerStatus.discord.configured && (
+            {providerStatus.availability === "ready" && !providerStatus.discord.configured && (
               <span className="text-[11px] text-text-muted text-center font-medium">
                 {dict.loginModal.discordUnconfigured}
               </span>

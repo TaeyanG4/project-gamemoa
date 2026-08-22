@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from "react";
 import {
   type AuthUser,
   type ProviderStatus,
@@ -8,6 +16,7 @@ import {
   getDiscordLoginUrl,
   logoutFromServer,
 } from "./authService.js";
+import { retryAsync } from "../../lib/api/retry.js";
 
 export interface AuthContextValue {
   user: AuthUser | null;
@@ -56,31 +65,70 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [providerStatus, setProviderStatus] = useState<ProviderStatus>({
+    availability: "loading",
     google: { configured: false },
     discord: { configured: false },
   });
+  const [authUnavailable, setAuthUnavailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const refreshGeneration = useRef(0);
 
   const refreshUser = useCallback(async () => {
-    try {
-      const [currentUser, status] = await Promise.all([fetchCurrentUser(), fetchProviderStatus()]);
-      setUser(currentUser);
-      setProviderStatus(status);
-    } catch {
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+    const generation = ++refreshGeneration.current;
+    setIsLoading(true);
+    const [currentUserResult, providerStatusResult] = await Promise.allSettled([
+      retryAsync(fetchCurrentUser),
+      retryAsync(fetchProviderStatus),
+    ]);
+    if (generation !== refreshGeneration.current) return;
+
+    if (currentUserResult.status === "fulfilled") {
+      setUser(currentUserResult.value);
+      setAuthUnavailable(false);
+    } else {
+      // A transient API outage must not actively log out a user who was already restored in this
+      // SPA session. A hard reload has no trustworthy cached identity, so it remains unknown/null
+      // until the focus/online retry below succeeds.
+      setAuthUnavailable(true);
     }
+
+    if (providerStatusResult.status === "fulfilled") {
+      setProviderStatus(providerStatusResult.value);
+    } else {
+      // "unavailable" is deliberately distinct from configured=false. The latter is a real
+      // operator setting; the former is a retryable network/server failure and must never be
+      // presented to users as "OAuth is not configured".
+      setProviderStatus((previous) => ({ ...previous, availability: "unavailable" }));
+    }
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
     void refreshUser();
   }, [refreshUser]);
 
+  useEffect(() => {
+    const retryAfterReconnect = () => {
+      if (authUnavailable || providerStatus.availability === "unavailable") {
+        void refreshUser();
+      }
+    };
+    window.addEventListener("online", retryAfterReconnect);
+    window.addEventListener("focus", retryAfterReconnect);
+    return () => {
+      window.removeEventListener("online", retryAfterReconnect);
+      window.removeEventListener("focus", retryAfterReconnect);
+    };
+  }, [authUnavailable, providerStatus.availability, refreshUser]);
+
   const openLoginModal = () => {
     setError(null);
     setIsLoginModalOpen(true);
+    if (authUnavailable || providerStatus.availability === "unavailable") {
+      setProviderStatus((previous) => ({ ...previous, availability: "loading" }));
+      void refreshUser();
+    }
   };
   const closeLoginModal = () => {
     setError(null);
@@ -97,6 +145,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? ((import.meta as unknown as { env?: { VITE_GOOGLE_CLIENT_ID?: string } }).env
             ?.VITE_GOOGLE_CLIENT_ID ?? "")
         : "");
+
+    if (providerStatus.availability !== "ready") {
+      setError("로그인 서버 상태를 확인하고 있습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
 
     if (!clientId || !providerStatus.google.configured) {
       setError("Google 로그인이 아직 설정되지 않았습니다.");
@@ -148,16 +201,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTimeout(() => document.body.removeChild(tempDiv), 5000);
       }
     });
-  }, [providerStatus.google]);
+  }, [providerStatus]);
 
   const loginWithDiscord = useCallback(() => {
     setError(null);
+    if (providerStatus.availability !== "ready") {
+      setError("로그인 서버 상태를 확인하고 있습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
     if (!providerStatus.discord.configured) {
       setError("Discord 로그인이 아직 설정되지 않았습니다.");
       return;
     }
     window.location.href = getDiscordLoginUrl();
-  }, [providerStatus.discord]);
+  }, [providerStatus]);
 
   const logout = useCallback(async () => {
     setIsLoading(true);

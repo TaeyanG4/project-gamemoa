@@ -1,13 +1,14 @@
-export function getApiUrl(): string {
-  if (typeof window !== "undefined") {
-    const envUrl = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env
-      ?.VITE_API_URL;
-    if (envUrl) return envUrl;
-    if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
-      return "http://localhost:8787";
-    }
-  }
+export function resolveApiUrl(envUrl: string | undefined, hostname: string | undefined): string {
+  if (envUrl) return envUrl;
+  if (hostname === "stg.owogg.com") return "https://api-stg.owogg.com";
+  if (hostname === "localhost" || hostname === "127.0.0.1") return "http://localhost:8787";
   return "https://api.owogg.com";
+}
+
+export function getApiUrl(): string {
+  const envUrl = (import.meta as unknown as { env?: { VITE_API_URL?: string } }).env?.VITE_API_URL;
+  const hostname = typeof window !== "undefined" ? window.location.hostname : undefined;
+  return resolveApiUrl(envUrl, hostname);
 }
 
 export const API_URL = getApiUrl();
@@ -29,6 +30,7 @@ export function getGameOrigin(): string {
     const envUrl = (import.meta as unknown as { env?: { VITE_GAME_ORIGIN?: string } }).env
       ?.VITE_GAME_ORIGIN;
     if (envUrl) return envUrl;
+    if (window.location.hostname === "stg.owogg.com") return "https://play-stg.owogg.com";
   }
   return API_URL;
 }

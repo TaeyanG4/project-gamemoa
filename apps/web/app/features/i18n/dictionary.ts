@@ -90,6 +90,9 @@ export interface Dictionary {
     discordButton: string;
     discordLoading: string;
     discordUnconfigured: string;
+    providerChecking: string;
+    providerUnavailable: string;
+    retry: string;
   };
   games: {
     eyebrow: string;
@@ -1213,6 +1216,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       discordButton: "Discord 계정으로 로그인",
       discordLoading: "Discord 로그인 중...",
       discordUnconfigured: "Discord 로그인이 아직 설정되지 않았습니다.",
+      providerChecking: "로그인 서버 설정을 확인하고 있습니다.",
+      providerUnavailable: "로그인 서버에 연결할 수 없습니다.",
+      retry: "다시 확인",
     },
     games: {
       eyebrow: "Game Collection",
@@ -2490,6 +2496,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       discordButton: "Continue with Discord",
       discordLoading: "Signing in with Discord...",
       discordUnconfigured: "Discord sign-in isn't configured yet.",
+      providerChecking: "Checking the sign-in server configuration.",
+      providerUnavailable: "The sign-in server is temporarily unavailable.",
+      retry: "Retry",
     },
     games: {
       eyebrow: "Game Collection",
@@ -3788,6 +3797,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       discordButton: "Discordアカウントでログイン",
       discordLoading: "Discordでログイン中...",
       discordUnconfigured: "Discordログインはまだ設定されていません。",
+      providerChecking: "ログインサーバーの設定を確認しています。",
+      providerUnavailable: "ログインサーバーに接続できません。",
+      retry: "再確認",
     },
     games: {
       eyebrow: "Game Collection",
@@ -5084,6 +5096,9 @@ export const DICTIONARIES: Record<SupportedLocale, Dictionary> = {
       discordButton: "使用 Discord 账号登录",
       discordLoading: "正在使用 Discord 登录...",
       discordUnconfigured: "Discord 登录尚未配置。",
+      providerChecking: "正在检查登录服务器配置。",
+      providerUnavailable: "暂时无法连接登录服务器。",
+      retry: "重试",
     },
     games: {
       eyebrow: "Game Collection",
