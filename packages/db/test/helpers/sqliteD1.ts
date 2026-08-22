@@ -683,6 +683,14 @@ END;
   fs.readFileSync(
     new URL("../../migrations/0031_game_version_write_convergence.sql", import.meta.url),
     "utf8",
+  ) +
+  fs.readFileSync(
+    new URL("../../migrations/0033_generic_game_assets.sql", import.meta.url),
+    "utf8",
+  ) +
+  fs.readFileSync(
+    new URL("../../migrations/0034_unified_game_control_plane.sql", import.meta.url),
+    "utf8",
   );
 
 /** Schema for generic games table tests (migration 0029) — includes users, sandbox_games, and games. */

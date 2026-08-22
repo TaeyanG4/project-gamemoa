@@ -12,6 +12,27 @@ import type {
 } from "@owogg/core";
 import type { D1Database } from "./D1UserRepository.js";
 
+const USER_GAME_SELECT = `
+  SELECT
+    g.id, g.slug, g.publisher_user_id AS developer_user_id,
+    g.title, g.short_description, g.description, g.genre, g.mode,
+    a.object_key AS logo_key,
+    g.xp_per_completion, g.score_unit, g.score_direction, g.score_min, g.score_max,
+    g.score_display_prefix, g.score_display_suffix,
+    g.visibility, g.live_version_id, g.review_slot, g.deleted_at, g.deleted_by_admin_id,
+    g.created_at, g.updated_at
+  FROM games g
+  LEFT JOIN game_assets a ON a.game_id = g.id AND a.kind = 'LOGO'`;
+
+const USER_VERSION_SELECT = `
+  SELECT
+    gv.id, gv.game_id, gv.object_key, gv.content_hash, gv.bundle_bytes,
+    gv.moderation_status AS status, gv.reviewed_by_admin_id, gv.reviewed_at, gv.reject_reason,
+    gv.uploaded_at, gv.publish_status, gv.publish_error, gv.published_at, gv.manifest_key,
+    gv.published_size_bytes, gv.file_count
+  FROM game_versions gv
+  JOIN games g ON g.id = gv.game_id AND g.publisher_type = 'USER'`;
+
 function mapGameRow(row: Record<string, unknown>): SandboxGameRecord {
   return {
     id: Number(row.id),
@@ -129,7 +150,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
 
   async findById(id: number): Promise<SandboxGameRecord | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM sandbox_games WHERE id = ?`)
+      .prepare(`${USER_GAME_SELECT} WHERE g.id = ? AND g.publisher_type = 'USER'`)
       .bind(id)
       .first<Record<string, unknown>>();
     return row ? mapGameRow(row) : null;
@@ -139,7 +160,9 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
   // deleted game's slug must stop resolving immediately, not just stop being servable once found.
   async findBySlug(slug: string): Promise<SandboxGameRecord | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM sandbox_games WHERE slug = ? AND deleted_at IS NULL`)
+      .prepare(
+        `${USER_GAME_SELECT} WHERE g.slug = ? AND g.publisher_type = 'USER' AND g.deleted_at IS NULL`,
+      )
       .bind(slug)
       .first<Record<string, unknown>>();
     return row ? mapGameRow(row) : null;
@@ -166,7 +189,9 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
   // version stays visible rather than disappearing.
   async listByDeveloper(developerUserId: number): Promise<SandboxGameRecord[]> {
     const res = await this.db
-      .prepare(`SELECT * FROM sandbox_games WHERE developer_user_id = ? ORDER BY created_at DESC`)
+      .prepare(
+        `${USER_GAME_SELECT} WHERE g.publisher_type = 'USER' AND g.publisher_user_id = ? ORDER BY g.created_at DESC`,
+      )
       .bind(developerUserId)
       .all<Record<string, unknown>>();
     return (res.results || []).map(mapGameRow);
@@ -177,7 +202,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
   // admins need to be able to find one here without already knowing its id.
   async listAll(): Promise<SandboxGameRecord[]> {
     const res = await this.db
-      .prepare(`SELECT * FROM sandbox_games ORDER BY created_at DESC`)
+      .prepare(`${USER_GAME_SELECT} WHERE g.publisher_type = 'USER' ORDER BY g.created_at DESC`)
       .all<Record<string, unknown>>();
     return (res.results || []).map(mapGameRow);
   }
@@ -187,17 +212,25 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     deletedByAdminId: number,
     nowIso: string,
   ): Promise<SandboxGameRecord> {
-    const row = await this.db
-      .prepare(
-        `UPDATE sandbox_games
-         SET deleted_at = ?, deleted_by_admin_id = ?, visibility = 'PRIVATE', updated_at = ?
-         WHERE id = ?
-         RETURNING *`,
-      )
-      .bind(nowIso, deletedByAdminId, nowIso, id)
-      .first<Record<string, unknown>>();
-    if (!row) throw new Error(`sandbox_games row ${id} vanished mid-delete`);
-    return mapGameRow(row);
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE games
+           SET deleted_at = ?, deleted_by_admin_id = ?, visibility = 'PRIVATE', updated_at = ?
+           WHERE id = ? AND publisher_type = 'USER'`,
+        )
+        .bind(nowIso, deletedByAdminId, nowIso, id),
+      this.db
+        .prepare(
+          `UPDATE sandbox_games
+           SET deleted_at = ?, deleted_by_admin_id = ?, visibility = 'PRIVATE', updated_at = ?
+           WHERE id = ?`,
+        )
+        .bind(nowIso, deletedByAdminId, nowIso, id),
+    ]);
+    const updated = await this.findById(id);
+    if (!updated) throw new Error(`games row ${id} vanished mid-delete`);
+    return updated;
   }
 
   async hardDelete(id: number): Promise<void> {
@@ -211,6 +244,8 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
       this.db.prepare(`DELETE FROM sandbox_game_review_audit_log WHERE game_id = ?`).bind(id),
       this.db.prepare(`DELETE FROM sandbox_game_versions WHERE game_id = ?`).bind(id),
       this.db.prepare(`DELETE FROM sandbox_games WHERE id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM game_versions WHERE game_id = ?`).bind(id),
+      this.db.prepare(`DELETE FROM games WHERE id = ? AND publisher_type = 'USER'`).bind(id),
     ]);
   }
 
@@ -227,8 +262,8 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     // Shared numeric ID namespace allocation:
     // 1. Statement 1 inserts into generic `games` table, allocating the shared primary key `id`
     //    while verifying developer review slot availability atomically in a single statement.
-    // 2. Statement 2 inserts into `sandbox_games` referencing the allocated `games.id` and claiming
-    //    the lowest available review slot (1 or 2).
+    // 2. Statement 2 mirrors that exact identity and claimed slot into `sandbox_games` for the
+    //    previous Worker revision during the rolling-deploy compatibility window.
     // 3. If both slots are already held, both statements write 0 rows atomically and create() returns null.
     // 4. Executed in a single db.batch() call so that no interleaving is possible and failure in either
     //    statement rolls back the entire batch.
@@ -236,33 +271,39 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
       this.db
         .prepare(
           `INSERT INTO games
-             (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at)
-           SELECT ?, 'USER', ?, 'PRIVATE', NULL, ?, ?
-           WHERE EXISTS (
-             SELECT 1
+             (slug, publisher_type, publisher_user_id, visibility, live_version_id, created_at, updated_at,
+              title, short_description, description, genre, mode, xp_per_completion, review_slot)
+           SELECT ?, 'USER', ?, 'PRIVATE', NULL, ?, ?, ?, ?, ?, ?, ?, 0, available.slot
+           FROM (
+             SELECT MIN(s.slot) AS slot
              FROM (SELECT 1 AS slot UNION ALL SELECT 2) s
              WHERE s.slot NOT IN (
-               SELECT review_slot FROM sandbox_games
-               WHERE developer_user_id = ? AND review_slot IS NOT NULL
+               SELECT review_slot FROM games
+               WHERE publisher_type = 'USER' AND publisher_user_id = ? AND review_slot IS NOT NULL
              )
-           )`,
+           ) available
+           WHERE available.slot IS NOT NULL`,
         )
-        .bind(input.slug, input.developerUserId, input.nowIso, input.nowIso, input.developerUserId),
+        .bind(
+          input.slug,
+          input.developerUserId,
+          input.nowIso,
+          input.nowIso,
+          input.title,
+          input.shortDescription,
+          input.description,
+          input.genre,
+          input.mode,
+          input.developerUserId,
+        ),
       this.db
         .prepare(
           `INSERT INTO sandbox_games
              (id, slug, developer_user_id, title, short_description, description, genre, mode,
               review_slot, created_at, updated_at)
-           SELECT g.id, ?, ?, ?, ?, ?, ?, ?, avail.slot, ?, ?
-           FROM games g, (
-             SELECT MIN(s.slot) AS slot
-             FROM (SELECT 1 AS slot UNION ALL SELECT 2) s
-             WHERE s.slot NOT IN (
-               SELECT review_slot FROM sandbox_games
-               WHERE developer_user_id = ? AND review_slot IS NOT NULL
-             )
-           ) avail
-           WHERE g.slug = ? AND g.publisher_type = 'USER' AND avail.slot IS NOT NULL`,
+           SELECT g.id, ?, ?, ?, ?, ?, ?, ?, g.review_slot, ?, ?
+           FROM games g
+           WHERE g.slug = ? AND g.publisher_type = 'USER' AND g.review_slot IS NOT NULL`,
         )
         .bind(
           input.slug,
@@ -274,7 +315,6 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
           input.mode,
           input.nowIso,
           input.nowIso,
-          input.developerUserId,
           input.slug,
         ),
     ]);
@@ -289,7 +329,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     // connection. `slug` is UNIQUE and was just written by this exact call, so filtering on it is
     // race-proof without needing a connection-scoped identifier at all.
     const row = await this.db
-      .prepare(`SELECT * FROM sandbox_games WHERE slug = ?`)
+      .prepare(`${USER_GAME_SELECT} WHERE g.slug = ? AND g.publisher_type = 'USER'`)
       .bind(input.slug)
       .first<Record<string, unknown>>();
     if (!row) throw new Error("sandbox_games row vanished immediately after insert");
@@ -297,13 +337,20 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
   }
 
   async releaseReviewSlot(id: number, nowIso: string): Promise<SandboxGameRecord> {
-    await this.db
-      .prepare(
-        `UPDATE sandbox_games SET review_slot = NULL, updated_at = ?
-         WHERE id = ? AND review_slot IS NOT NULL`,
-      )
-      .bind(nowIso, id)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE games SET review_slot = NULL, updated_at = ?
+           WHERE id = ? AND publisher_type = 'USER' AND review_slot IS NOT NULL`,
+        )
+        .bind(nowIso, id),
+      this.db
+        .prepare(
+          `UPDATE sandbox_games SET review_slot = NULL, updated_at = ?
+           WHERE id = ? AND review_slot IS NOT NULL`,
+        )
+        .bind(nowIso, id),
+    ]);
     const updated = await this.findById(id);
     if (!updated) throw new Error(`sandbox_games row ${id} not found after slot release`);
     return updated;
@@ -316,10 +363,17 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
   ): Promise<SandboxGameRecord> {
     const { sets, params } = buildMetadataAssignments(input);
     if (sets.length > 0) {
-      await this.db
-        .prepare(`UPDATE sandbox_games SET ${sets.join(", ")}, updated_at = ? WHERE id = ?`)
-        .bind(...params, nowIso, id)
-        .run();
+      await this.db.batch([
+        this.db
+          .prepare(
+            `UPDATE games SET ${sets.join(", ")}, updated_at = ?
+             WHERE id = ? AND publisher_type = 'USER'`,
+          )
+          .bind(...params, nowIso, id),
+        this.db
+          .prepare(`UPDATE sandbox_games SET ${sets.join(", ")}, updated_at = ? WHERE id = ?`)
+          .bind(...params, nowIso, id),
+      ]);
     }
     const updated = await this.findById(id);
     if (!updated) throw new Error(`sandbox_games row ${id} not found after metadata update`);
@@ -331,30 +385,50 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     visibility: SandboxGameVisibility,
     nowIso: string,
   ): Promise<SandboxGameRecord> {
-    await this.db
-      .prepare(`UPDATE sandbox_games SET visibility = ?, updated_at = ? WHERE id = ?`)
-      .bind(visibility, nowIso, id)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE games SET visibility = ?, updated_at = ? WHERE id = ? AND publisher_type = 'USER'`,
+        )
+        .bind(visibility, nowIso, id),
+      this.db
+        .prepare(`UPDATE sandbox_games SET visibility = ?, updated_at = ? WHERE id = ?`)
+        .bind(visibility, nowIso, id),
+    ]);
     const updated = await this.findById(id);
     if (!updated) throw new Error(`sandbox_games row ${id} not found after visibility update`);
     return updated;
   }
 
   async setLogo(id: number, logoKey: string, nowIso: string): Promise<SandboxGameRecord> {
-    await this.db
-      .prepare(`UPDATE sandbox_games SET logo_key = ?, updated_at = ? WHERE id = ?`)
-      .bind(logoKey, nowIso, id)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `INSERT INTO game_assets (game_id, kind, object_key, updated_at)
+           SELECT id, 'LOGO', ?, ? FROM games WHERE id = ? AND publisher_type = 'USER'
+           ON CONFLICT(game_id, kind) DO UPDATE SET object_key = excluded.object_key, updated_at = excluded.updated_at`,
+        )
+        .bind(logoKey, nowIso, id),
+      this.db
+        .prepare(`UPDATE sandbox_games SET logo_key = ?, updated_at = ? WHERE id = ?`)
+        .bind(logoKey, nowIso, id),
+    ]);
     const updated = await this.findById(id);
     if (!updated) throw new Error(`sandbox_games row ${id} not found after logo update`);
     return updated;
   }
 
   async setLiveVersion(id: number, versionId: number, nowIso: string): Promise<SandboxGameRecord> {
-    await this.db
-      .prepare(`UPDATE sandbox_games SET live_version_id = ?, updated_at = ? WHERE id = ?`)
-      .bind(versionId, nowIso, id)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE games SET live_version_id = ?, updated_at = ? WHERE id = ? AND publisher_type = 'USER'`,
+        )
+        .bind(versionId, nowIso, id),
+      this.db
+        .prepare(`UPDATE sandbox_games SET live_version_id = ?, updated_at = ? WHERE id = ?`)
+        .bind(versionId, nowIso, id),
+    ]);
     const updated = await this.findById(id);
     if (!updated) throw new Error(`sandbox_games row ${id} not found after live-version update`);
     return updated;
@@ -370,14 +444,22 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     // untouched rather than this racing a concurrent setLiveVersion call. visibility -> PRIVATE in
     // the same statement satisfies the CHECK (visibility = 'PRIVATE' OR live_version_id IS NOT
     // NULL) constraint — same reasoning as softDelete.
-    await this.db
-      .prepare(
-        `UPDATE sandbox_games
-         SET live_version_id = NULL, visibility = 'PRIVATE', updated_at = ?
-         WHERE id = ? AND live_version_id = ?`,
-      )
-      .bind(nowIso, id, versionId)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE games
+           SET live_version_id = NULL, visibility = 'PRIVATE', updated_at = ?
+           WHERE id = ? AND publisher_type = 'USER' AND live_version_id = ?`,
+        )
+        .bind(nowIso, id, versionId),
+      this.db
+        .prepare(
+          `UPDATE sandbox_games
+           SET live_version_id = NULL, visibility = 'PRIVATE', updated_at = ?
+           WHERE id = ? AND live_version_id = ?`,
+        )
+        .bind(nowIso, id, versionId),
+    ]);
     const updated = await this.findById(id);
     if (!updated) throw new Error(`sandbox_games row ${id} not found after live-version clear`);
     return updated;
@@ -401,8 +483,10 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
         .prepare(
           `INSERT INTO game_versions (
              game_id, object_key, content_hash, bundle_bytes, publish_status, publish_error,
-             published_at, manifest_key, published_size_bytes, file_count, uploaded_at
-           ) VALUES (?, ?, ?, ?, 'UPLOADED', NULL, NULL, NULL, NULL, NULL, ?)`,
+             published_at, manifest_key, published_size_bytes, file_count, uploaded_at,
+             moderation_status, reviewed_by_admin_id, reviewed_at, reject_reason
+           ) VALUES (?, ?, ?, ?, 'UPLOADED', NULL, NULL, NULL, NULL, NULL, ?,
+             'PENDING_REVIEW', NULL, NULL, NULL)`,
         )
         .bind(input.gameId, input.objectKey, input.contentHash, input.bundleBytes, input.nowIso),
       this.db
@@ -422,7 +506,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
 
   async findVersionById(id: number): Promise<SandboxGameVersionRecord | null> {
     const row = await this.db
-      .prepare(`SELECT * FROM sandbox_game_versions WHERE id = ?`)
+      .prepare(`${USER_VERSION_SELECT} WHERE gv.id = ?`)
       .bind(id)
       .first<Record<string, unknown>>();
     return row ? mapVersionRow(row) : null;
@@ -439,23 +523,33 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
       fileCount: number | null;
     },
   ): Promise<SandboxGameVersionRecord> {
-    await this.db
-      .prepare(
-        `UPDATE sandbox_game_versions
-         SET publish_status = ?, publish_error = ?, published_at = ?, manifest_key = ?,
-             published_size_bytes = ?, file_count = ?
-         WHERE id = ?`,
-      )
-      .bind(
-        state.publishStatus,
-        state.publishError,
-        state.publishedAt,
-        state.manifestKey,
-        state.publishedSizeBytes,
-        state.fileCount,
-        id,
-      )
-      .run();
+    const params = [
+      state.publishStatus,
+      state.publishError,
+      state.publishedAt,
+      state.manifestKey,
+      state.publishedSizeBytes,
+      state.fileCount,
+      id,
+    ] as const;
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE game_versions
+           SET publish_status = ?, publish_error = ?, published_at = ?, manifest_key = ?,
+               published_size_bytes = ?, file_count = ?
+           WHERE id = ?`,
+        )
+        .bind(...params),
+      this.db
+        .prepare(
+          `UPDATE sandbox_game_versions
+           SET publish_status = ?, publish_error = ?, published_at = ?, manifest_key = ?,
+               published_size_bytes = ?, file_count = ?
+           WHERE id = ?`,
+        )
+        .bind(...params),
+    ]);
     const updated = await this.findVersionById(id);
     if (!updated) throw new Error(`sandbox_game_versions row ${id} not found after publish update`);
     return updated;
@@ -463,7 +557,7 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
 
   async listVersionsByGame(gameId: number): Promise<SandboxGameVersionRecord[]> {
     const res = await this.db
-      .prepare(`SELECT * FROM sandbox_game_versions WHERE game_id = ? ORDER BY uploaded_at DESC`)
+      .prepare(`${USER_VERSION_SELECT} WHERE gv.game_id = ? ORDER BY gv.uploaded_at DESC`)
       .bind(gameId)
       .all<Record<string, unknown>>();
     return (res.results || []).map(mapVersionRow);
@@ -474,12 +568,16 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     offset: number,
   ): Promise<SandboxGamePendingVersionsPage> {
     const countRow = await this.db
-      .prepare(`SELECT COUNT(*) as c FROM sandbox_game_versions WHERE status = 'PENDING_REVIEW'`)
+      .prepare(
+        `SELECT COUNT(*) as c FROM game_versions gv
+         JOIN games g ON g.id = gv.game_id AND g.publisher_type = 'USER'
+         WHERE gv.moderation_status = 'PENDING_REVIEW'`,
+      )
       .first<{ c: number }>();
     const res = await this.db
       .prepare(
-        `SELECT * FROM sandbox_game_versions WHERE status = 'PENDING_REVIEW'
-         ORDER BY uploaded_at ASC LIMIT ? OFFSET ?`,
+        `${USER_VERSION_SELECT} WHERE gv.moderation_status = 'PENDING_REVIEW'
+         ORDER BY gv.uploaded_at ASC LIMIT ? OFFSET ?`,
       )
       .bind(limit, offset)
       .all<Record<string, unknown>>();
@@ -497,41 +595,64 @@ export class D1SandboxGameRepository implements SandboxGameRepository {
     reason: string | null,
     nowIso: string,
   ): Promise<SandboxGameVersionRecord> {
-    await this.db
-      .prepare(
-        `UPDATE sandbox_game_versions
-         SET status = ?, reviewed_by_admin_id = ?, reviewed_at = ?, reject_reason = ?
-         WHERE id = ?`,
-      )
-      .bind(status, adminId, nowIso, reason, id)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE game_versions
+           SET moderation_status = ?, reviewed_by_admin_id = ?, reviewed_at = ?, reject_reason = ?
+           WHERE id = ?`,
+        )
+        .bind(status, adminId, nowIso, reason, id),
+      this.db
+        .prepare(
+          `UPDATE sandbox_game_versions
+           SET status = ?, reviewed_by_admin_id = ?, reviewed_at = ?, reject_reason = ?
+           WHERE id = ?`,
+        )
+        .bind(status, adminId, nowIso, reason, id),
+    ]);
     const updated = await this.findVersionById(id);
     if (!updated) throw new Error(`sandbox_game_versions row ${id} not found after decision`);
     return updated;
   }
 
   async revokeVersionApproval(id: number): Promise<SandboxGameVersionRecord> {
-    await this.db
-      .prepare(
-        `UPDATE sandbox_game_versions
-         SET status = 'PENDING_REVIEW', reviewed_by_admin_id = NULL, reviewed_at = NULL, reject_reason = NULL
-         WHERE id = ?`,
-      )
-      .bind(id)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE game_versions
+           SET moderation_status = 'PENDING_REVIEW', reviewed_by_admin_id = NULL,
+               reviewed_at = NULL, reject_reason = NULL WHERE id = ?`,
+        )
+        .bind(id),
+      this.db
+        .prepare(
+          `UPDATE sandbox_game_versions
+           SET status = 'PENDING_REVIEW', reviewed_by_admin_id = NULL,
+               reviewed_at = NULL, reject_reason = NULL WHERE id = ?`,
+        )
+        .bind(id),
+    ]);
     const updated = await this.findVersionById(id);
     if (!updated) throw new Error(`sandbox_game_versions row ${id} not found after revoke`);
     return updated;
   }
 
   async withdrawVersion(id: number): Promise<SandboxGameVersionRecord> {
-    await this.db
-      .prepare(
-        `UPDATE sandbox_game_versions SET status = 'WITHDRAWN'
-         WHERE id = ? AND status = 'PENDING_REVIEW'`,
-      )
-      .bind(id)
-      .run();
+    await this.db.batch([
+      this.db
+        .prepare(
+          `UPDATE game_versions SET moderation_status = 'WITHDRAWN'
+           WHERE id = ? AND moderation_status = 'PENDING_REVIEW'`,
+        )
+        .bind(id),
+      this.db
+        .prepare(
+          `UPDATE sandbox_game_versions SET status = 'WITHDRAWN'
+           WHERE id = ? AND status = 'PENDING_REVIEW'`,
+        )
+        .bind(id),
+    ]);
     const updated = await this.findVersionById(id);
     if (!updated) throw new Error(`sandbox_game_versions row ${id} not found after withdrawal`);
     return updated;

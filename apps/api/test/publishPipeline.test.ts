@@ -80,7 +80,10 @@ function createDb() {
           } as T;
         }
         if (query.includes("FROM admin_accounts WHERE user_id")) return null;
-        if (query.includes("FROM sandbox_games WHERE id")) {
+        if (
+          query.includes("FROM sandbox_games WHERE id") ||
+          (query.includes("FROM games g") && query.includes("g.id = ?"))
+        ) {
           return {
             id: GAME_ID,
             slug: "my-game",
@@ -112,14 +115,19 @@ function createDb() {
           return { ...versionRow } as T;
         }
         // Read-back for every findVersionById during publishing.
-        if (query.includes("FROM sandbox_game_versions")) return { ...versionRow } as T;
+        if (query.includes("FROM sandbox_game_versions") || query.includes("FROM game_versions gv"))
+          return { ...versionRow } as T;
         return null;
       },
       async all<T>() {
         return { results: [] } as { results: T[] };
       },
       async run() {
-        if (query.includes("UPDATE sandbox_game_versions") && query.includes("publish_status")) {
+        if (
+          (query.includes("UPDATE sandbox_game_versions") ||
+            query.includes("UPDATE game_versions")) &&
+          query.includes("publish_status")
+        ) {
           versionRow.publish_status = values[0];
           versionRow.publish_error = values[1];
           versionRow.published_at = values[2];

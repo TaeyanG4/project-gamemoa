@@ -396,13 +396,15 @@ function createDevGamesDb(options: { existingGames?: Array<{ slug: string; revie
         if (query.includes("FROM admin_accounts WHERE user_id")) return null;
         if (
           query.includes("FROM sandbox_games WHERE slug") ||
-          query.includes("FROM games WHERE slug")
+          query.includes("FROM games WHERE slug") ||
+          (query.includes("FROM games g") && query.includes("g.slug = ?"))
         ) {
           return (games.get(String(values[0])) ?? null) as T;
         }
         if (
           query.includes("FROM sandbox_games WHERE id") ||
-          query.includes("FROM games WHERE id")
+          query.includes("FROM games WHERE id") ||
+          (query.includes("FROM games g") && query.includes("g.id = ?"))
         ) {
           const match = [...games.values()].find((g) => g.id === Number(values[0]));
           return (match ?? null) as T;

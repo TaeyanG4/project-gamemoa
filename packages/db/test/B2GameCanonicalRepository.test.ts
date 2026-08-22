@@ -57,6 +57,7 @@ function genreModeDoc(overrides: Partial<GameCanonicalDocument> = {}): GameCanon
     title: "My Game",
     shortDescription: "short",
     description: "long",
+    publisher: { official: false },
     policy: {
       score: { unit: "pts", direction: "desc", min: 0, max: 100 },
       leaderboard: true,
@@ -77,6 +78,7 @@ function taxonomyDoc(overrides: Partial<GameCanonicalDocument> = {}): GameCanoni
     title: "System Game",
     shortDescription: "short",
     description: "long",
+    publisher: { official: true },
     policy: {
       score: { unit: "pts", direction: "desc", min: 0, max: 100 },
       leaderboard: true,

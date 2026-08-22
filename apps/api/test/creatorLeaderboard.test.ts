@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { app } from "../src/index.js";
-import type { GameCanonicalDocument } from "@owogg/core";
+import { GAME_CANONICAL_SCHEMA_VERSION, type GameCanonicalDocument } from "@owogg/core";
 
 // GET /api/scores/:gameId now resolves every publisher through the generic runtime projection.
 // This file covers a USER-owned generic identity and the availability gate. The underlying
@@ -147,11 +147,12 @@ function canonicalFor(game: FakeGame): GameCanonicalDocument {
     game.score_max !== undefined;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: GAME_CANONICAL_SCHEMA_VERSION,
     slug: game.slug,
     title: game.title,
     shortDescription: game.title,
     description: game.title,
+    publisher: { official: false },
     policy: {
       score: scoreConfigured
         ? {

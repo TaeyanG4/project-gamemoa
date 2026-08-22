@@ -2,9 +2,9 @@
 
 상태: 기준 문서
 
-마지막 검증: 2026-08-21
+마지막 검증: 2026-08-22
 
-최신 마이그레이션: `0033_generic_game_assets.sql`
+최신 마이그레이션: `0034_unified_game_control_plane.sql`
 
 기준 소스:
 
@@ -15,7 +15,7 @@
 - `.github/workflows/deploy.yml`
 
 Cloudflare D1의 실제 schema와 제약조건은 migration 파일이 유일한 권한 원천입니다. 이 문서는
-현재 `0000_initial_schema.sql`부터 `0033_generic_game_assets.sql`까지의 역할을 설명합니다.
+현재 `0000_initial_schema.sql`부터 `0034_unified_game_control_plane.sql`까지의 역할을 설명합니다.
 
 ## 마이그레이션 범위
 
@@ -32,6 +32,7 @@ Cloudflare D1의 실제 schema와 제약조건은 migration 파일이 유일한 
 | `0031`        | 공통 `game_versions`, slug/live-version 불변식, version 수렴             |
 | `0032`        | generic score acceptance에 필요한 relational binding                     |
 | `0033`        | generic `game_assets`, USER logo convergence                             |
+| `0034`        | USER control/review 필드의 generic authority 전환과 구 Worker 호환 미러  |
 
 기존 migration은 변경, squash, 삭제하지 않습니다. 프로덕션 배포는 API보다 먼저
 `pnpm d1:migrate:prod`를 실행합니다.
@@ -60,6 +61,7 @@ Generic game identity의 권한 원천입니다.
 - USER publisher의 relational `publisher_user_id`
 - visibility와 soft-deletion 상태
 - 현재 `live_version_id`
+- USER control-plane metadata와 review slot
 
 DB trigger는 live version이 같은 game의 `game_versions` row를 가리키도록 강제합니다. OWOGG
 publisher authority는 서버/배포 과정이 기록하는 relational fact이며 이름이나 slug로 추론하지
@@ -72,6 +74,7 @@ Publisher-neutral bundle identity와 publication 사실을 저장합니다.
 - `id`, `game_id`, source/object identity, `content_hash`, bundle bytes
 - `UPLOADED | PUBLISHING | READY | FAILED`
 - publication된 manifest key, 크기, 파일 수, timestamp/error
+- USER moderation status, reviewer, review timestamp/reason
 
 불변 publication target은 `(gameId, versionId, contentHash)`입니다. `READY`만 runtime 제공 후보가
 되며 live pointer, visibility, kill switch, canonical/manifest validation도 모두 통과해야 합니다.
@@ -81,11 +84,12 @@ Publisher-neutral bundle identity와 publication 사실을 저장합니다.
 게임 단위 provider-neutral 자산 메타데이터입니다. 현재 `LOGO`가 사용되며 object bytes는 B2에
 있습니다. 자산은 game 단위이고 version bundle과 분리됩니다.
 
-## USER 제어 영역 테이블
+## USER 제어 영역과 호환 테이블
 
 ### `sandbox_games`
 
-USER upload/review workflow의 제어 데이터입니다.
+`0034` 이후 권한 원천이 아닙니다. 이전 Worker revision이 migration과 새 Worker 배포 사이에도
+동작하도록 남겨 둔 배포 호환 미러입니다.
 
 - developer user ownership
 - review slot과 editable metadata
@@ -95,15 +99,16 @@ USER upload/review workflow의 제어 데이터입니다.
 
 ### `sandbox_game_versions`
 
-USER 버전의 심사와 원본 upload 정보를 저장합니다.
+`0034` 이후 심사 상태의 권한 원천은 `game_versions`입니다. 이 테이블은 이전 Worker용 호환
+미러이며 audit 관계와 contract migration 전환 기간 때문에 물리적으로만 남아 있습니다.
 
 - review status: `PENDING_REVIEW | APPROVED | REJECTED | WITHDRAWN`
 - reviewer, reject/revoke 사유, audit 관계
 - source archive와 publication compatibility fields
 
-USER version은 generic `game_versions`와 같은 숫자 ID를 공유합니다. `0029`–`0033`의 backfill과
-trigger는 기존/현재 USER write를 generic tables로 수렴시킵니다. control plane row를 runtime이
-직접 권한 원천으로 사용하는 구조는 아닙니다.
+`D1SandboxGameRepository`라는 기존 class/API 이름은 외부 계약 호환을 위해 유지하지만 조회와 신규
+권한 쓰기는 `games`, `game_versions`, `game_assets`를 사용합니다. 구 테이블 쓰기도 같은 D1 batch에
+미러링하며, 이전 Worker의 구 테이블 쓰기는 trigger가 generic authority로 수렴시킵니다.
 
 ## 두 개의 독립 상태축
 
@@ -123,20 +128,15 @@ READY != APPROVED
 실패한 publication은 같은 numeric version과 source archive를 사용해 republish할 수 있습니다.
 검토 결정과 publication failure는 별도입니다.
 
-## `0033` logo 수렴은 현재 필요함
+## `0034` expand/switch와 후속 contract
 
-`0033_generic_game_assets.sql`은 기존 `sandbox_games.logo_key`를 `game_assets(LOGO)`로
-backfill하고 insert/update/clear를 동기화하는 trigger를 추가합니다. 이 compatibility layer는
-retired 상태가 아닙니다.
+`0034_unified_game_control_plane.sql`은 USER metadata/review 상태를 generic rows에 backfill하고 parity
+guard를 통과시킨 뒤 application read authority를 전환합니다. `sandbox_*`는 별도 게임 모델이 아니라
+이전 배포 호환 미러입니다.
 
-현재 `D1SandboxGameRepository.setLogo()`가 여전히 다음 write를 수행합니다.
-
-```sql
-UPDATE sandbox_games SET logo_key = ?, updated_at = ? WHERE id = ?
-```
-
-따라서 trigger 제거, `sandbox_games.logo_key` 제거, migration history 수정은 먼저 write path를
-이전하고 검증하는 별도 작업 없이는 안전하지 않습니다.
+구 테이블과 동기화 trigger를 삭제하는 contract migration은 이 변경의 Staging 배포·Creator
+등록/심사/공개/rollback smoke가 끝난 다음 릴리스에서만 추가합니다. expand와 drop을 한 배포에 넣으면
+D1 migration이 새 Worker보다 먼저 실행되는 동안 이전 Worker가 깨지므로 금지합니다.
 
 ## 주요 비게임 도메인
 

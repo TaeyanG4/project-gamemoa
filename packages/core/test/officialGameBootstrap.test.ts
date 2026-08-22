@@ -354,3 +354,16 @@ test("USER authority and conflicting canonical state fail closed before activati
   await assert.rejects(() => run(service, definition, testHash(15)), /canonical conflict/);
   assert.equal(repo.activated.length, 0);
 });
+
+test("trusted official bootstrap upgrades legacy non-official canonical metadata only when all other fields match", async () => {
+  const { canonicals, service } = bootstrap();
+  const definition = OFFICIAL[0] as SystemGameDefinition;
+  canonicals.documents.set(definition.slug, {
+    ...systemGameDefinitionToGameCanonicalDocument(definition, "2026-08-21T00:00:00.000Z"),
+    publisher: { official: false },
+  });
+
+  const result = await run(service, definition, testHash(16));
+  assert.equal(result.canonicalCreated, true);
+  assert.deepEqual(canonicals.documents.get(definition.slug)?.publisher, { official: true });
+});

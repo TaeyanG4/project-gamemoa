@@ -16,6 +16,7 @@ function genreModeDoc(overrides: Partial<GameCanonicalDocument> = {}): GameCanon
     title: "My Game",
     shortDescription: "short",
     description: "long",
+    publisher: { official: false },
     policy: {
       score: { unit: "pts", direction: "desc", min: 0, max: 100 },
       leaderboard: true,
@@ -36,6 +37,7 @@ function taxonomyDoc(overrides: Partial<GameCanonicalDocument> = {}): GameCanoni
     title: "System Game",
     shortDescription: "short",
     description: "long",
+    publisher: { official: true },
     policy: {
       score: { unit: "pts", direction: "desc", min: 0, max: 100 },
       leaderboard: true,
@@ -253,6 +255,36 @@ test("difficulty is preserved through round-trip", () => {
 test("supportsReplay is preserved through round-trip", () => {
   const doc = genreModeDoc({ supportsReplay: false });
   assert.equal(roundTrip(doc).supportsReplay, false);
+});
+
+test("publisher.official round-trips as public presentation metadata", () => {
+  assert.equal(roundTrip(genreModeDoc()).publisher.official, false);
+  assert.equal(roundTrip(taxonomyDoc()).publisher.official, true);
+});
+
+test("legacy schema v1 normalizes fail-safe to non-official", () => {
+  const raw = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  raw.schemaVersion = 1;
+  delete raw.publisher;
+  const parsed = parseGameCanonicalDocument(JSON.stringify(raw), "my-game");
+  assert.equal(parsed.schemaVersion, GAME_CANONICAL_SCHEMA_VERSION);
+  assert.deepEqual(parsed.publisher, { official: false });
+});
+
+test("schema v2 requires a strict publisher metadata object", () => {
+  const missing = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  delete missing.publisher;
+  assert.throws(
+    () => parseGameCanonicalDocument(JSON.stringify(missing), "my-game"),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
+
+  const unknown = JSON.parse(serializeGameCanonicalDocument(genreModeDoc()));
+  unknown.publisher.displayName = "OwOGG";
+  assert.throws(
+    () => parseGameCanonicalDocument(JSON.stringify(unknown), "my-game"),
+    (err: unknown) => err instanceof GameCanonicalDocumentError && err.code === "INVALID_DOCUMENT",
+  );
 });
 
 // ── fail-closed ───────────────────────────────────────────────────────────────

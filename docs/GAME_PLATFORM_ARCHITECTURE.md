@@ -2,7 +2,7 @@
 
 상태: 기준 문서
 
-마지막 검증: 2026-08-21
+마지막 검증: 2026-08-22
 
 기준 소스:
 
@@ -16,6 +16,7 @@
 - `packages/db/migrations/0031_game_version_write_convergence.sql`
 - `packages/db/migrations/0032_generic_score_acceptance.sql`
 - `packages/db/migrations/0033_generic_game_assets.sql`
+- `packages/db/migrations/0034_unified_game_control_plane.sql`
 
 이 문서는 현재 production의 게임 identity, publication, runtime, score 경계를 설명합니다. USER와
 OWOGG는 같은 runtime/storage 모델을 사용하지만 authorization과 publication control plane은 서로
@@ -41,14 +42,16 @@ OwOGG Game Platform
 
 ## 공통 플랫폼
 
-- `games`는 숫자 identity, 명시적 `OWOGG | USER(userId)` publisher authority, visibility, 삭제 상태,
-  현재 live-version pointer를 소유합니다.
+- `games`는 숫자 identity, 서버가 관리하는 소유 관계, visibility, 삭제 상태, 현재 live-version pointer와
+  USER control-plane 상태를 소유합니다.
 - `game_versions`는 provider-neutral bundle identity와 publication 사실을 소유합니다. publication
   target은 불변 tuple `(gameId, versionId, contentHash)`입니다.
 - `game_assets`는 provider-neutral 게임 단위 asset metadata를 소유합니다. Bundle bytes는 B2에서
   불변이며 version 범위로 유지됩니다.
-- `GameCanonicalDocument`는 title, description, policy, presentation, difficulty, catalog 의미를
-  소유합니다. publisher identity, live-version 상태, 환경 URL, secret은 소유하지 않습니다.
+- `GameCanonicalDocument` v2는 title, description, policy, presentation, difficulty, catalog와 public
+  `publisher.official` 표시 메타데이터를 소유합니다. 소유권/인가, live-version 상태, 환경 URL,
+  secret은 소유하지 않습니다. USER 경로는 항상 `official: false`, 신뢰된 OWOGG bootstrap만
+  `official: true`를 기록합니다.
 - `GamePublicationService`는 유일한 file/manifest publication loop입니다. manifest를 마지막에 쓰고,
   검증한 동일 publication target에만 READY를 표시합니다.
 - `RuntimeGameRegistry`, `GameHost`, `IframeRuntime`, Bridge, signed Game Session, generic score
@@ -56,10 +59,15 @@ OwOGG Game Platform
 
 ## USER 제어 영역
 
-USER workflow는 `sandbox_games`, `sandbox_game_versions`, review queue, 두 개의 review slot,
-approval/reject/revoke, audit trail, creator entitlement를 의도적으로 유지합니다. sandbox version row는
-공통 숫자 version ID를 공유하고 provider-neutral publication 사실을 `game_versions`로 수렴하지만,
-review status는 독립적입니다. READY는 APPROVED가 아니며 READY가 아닌 version은 승인할 수 없습니다.
+USER workflow의 identity/control metadata/review slot 권한 원천은 `games`, 심사 상태 권한 원천은
+`game_versions`, logo 권한 원천은 `game_assets`입니다. review queue, approval/reject/revoke, audit trail,
+creator entitlement는 계속 유지합니다. `sandbox_games`, `sandbox_game_versions` 이름의 물리 테이블은
+이전 Worker revision을 위한 임시 배포 호환 미러일 뿐 별도 게임 모델이 아닙니다. READY는 APPROVED가
+아니며 READY가 아닌 version은 승인할 수 없습니다.
+
+`0034`는 expand/switch 단계입니다. 호환 미러 drop은 이 tree가 Staging에서 Creator 전체 smoke를
+통과한 뒤 다음 contract migration으로만 수행합니다. D1 migration이 Worker보다 먼저 적용되므로 같은
+배포에서 expand와 drop을 함께 수행하지 않습니다.
 실패한 publication은 동일한 숫자 version과 source archive로 다시 시도합니다.
 
 ## OWOGG bootstrap 제어 영역

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ComposedRuntimeGameRegistry,
+  GAME_CANONICAL_SCHEMA_VERSION,
   RuntimeGameAvailability,
   type GameCanonicalDocument,
   type GameCanonicalRepository,
@@ -56,11 +57,12 @@ function requiredLiveVersionId(game: GameIdentity): number {
 
 function canonical(slug: string, catalog: GameCanonicalDocument["catalog"]): GameCanonicalDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: GAME_CANONICAL_SCHEMA_VERSION,
     slug,
     title: slug,
     shortDescription: `${slug} short`,
     description: `${slug} description`,
+    publisher: { official: false },
     policy: {
       score: { unit: "points", direction: "desc", min: 0, max: 1000 },
       leaderboard: true,

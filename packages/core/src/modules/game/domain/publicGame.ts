@@ -20,7 +20,9 @@ export interface PublicGame {
 
 export function toPublicGame(runtime: RuntimeGame, mediaUrl: string | null): PublicGame {
   return {
-    publisherType: runtime.identity.publisher.type,
+    // Public official presentation comes from canonical metadata. D1 publisher identity remains
+    // the authorization fact and is intentionally not exposed as the badge source.
+    publisherType: runtime.canonical.publisher.official ? "OWOGG" : "USER",
     slug: runtime.identity.slug,
     title: runtime.canonical.title,
     shortDescription: runtime.canonical.shortDescription,

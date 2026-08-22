@@ -28,6 +28,10 @@ OwOGG에는 두 개의 **입력/control-plane**이 있지만 하나의 productio
 사용합니다. `StaticGameRegistry`, publisher별 host/runtime, `/official-games/*`는 현재 production
 경로가 아닙니다.
 
+공개 “공식” 표시는 `GameCanonicalDocument.publisher.official` 메타데이터입니다. 소유권과 API 인가는
+D1의 서버 관리 관계만 사용하며 canonical/manifest 입력으로 판정하지 않습니다. Creator 경로는
+업로드 내용과 무관하게 항상 `official: false`를 기록하고, OWOGG 배포 bootstrap만 `true`를 기록합니다.
+
 ## 1. 게임이 지켜야 하는 runtime 계약
 
 업로드 bundle은 자체 실행 가능한 정적 Web build여야 합니다.

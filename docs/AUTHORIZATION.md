@@ -172,7 +172,9 @@ type GamePublisher = { type: "OWOGG" } | { type: "USER"; userId: number };
 
 - `OWOGG`는 server/bootstrap이 assertion하는 authority이며 public caller가 선택하는 값이 아닙니다.
 - `USER.userId`는 정확한 OwOGG user identity입니다.
-- slug, title, developer display name, canonical text는 publisher 판정에 사용하지 않습니다.
+- slug, title, developer display name, canonical text는 소유권/인가 판정에 사용하지 않습니다.
+- public “공식” 배지는 canonical v2의 `publisher.official` 메타데이터입니다. 이것은 표시값일 뿐
+  권한 원천이 아니며 Creator 요청/manifest가 선택할 수 없습니다.
 - runtime registry는 publisher에 따라 다른 serving 구현을 선택하지 않습니다.
 
 현재 결정론적 Git deployment bootstrap이 OWOGG publication을 관리합니다. 향후 interactive

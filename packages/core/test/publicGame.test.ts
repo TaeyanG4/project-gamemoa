@@ -61,6 +61,20 @@ test("toPublicGame exposes the provider-neutral canonical projection only", () =
   }
 });
 
+test("the public official badge follows canonical metadata, never the D1 owner discriminant", () => {
+  const userOwnedOfficialMetadata: RuntimeGame = {
+    ...runtime,
+    identity: { ...identity, publisher: { type: "USER", userId: 77 } },
+  };
+  assert.equal(toPublicGame(userOwnedOfficialMetadata, null).publisherType, "OWOGG");
+
+  const systemOwnedNonOfficialMetadata: RuntimeGame = {
+    ...runtime,
+    canonical: { ...runtime.canonical, publisher: { official: false } },
+  };
+  assert.equal(toPublicGame(systemOwnedNonOfficialMetadata, null).publisherType, "USER");
+});
+
 test("TAXONOMY games keep their canonical thumbnail instead of a storage-backed logo URL", () => {
   const asset: GameAsset = {
     gameId: identity.id,

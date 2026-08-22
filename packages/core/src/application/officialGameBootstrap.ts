@@ -153,6 +153,19 @@ export class OfficialGameBootstrap {
       definition,
       existing.updatedAt,
     );
+    // Schema v1 documents normalize to official:false because the old format did not carry this
+    // metadata. Only this trusted OWOGG bootstrap path may upgrade that presentation fact.
+    if (!existing.publisher.official) {
+      const normalizedAsOfficial = { ...existing, publisher: { official: true as const } };
+      if (jsonDeepEqual(normalizedAsOfficial, expected)) {
+        await this.canonicals.save(expected);
+        const readBack = await this.canonicals.findBySlug(definition.slug);
+        if (readBack === null || !jsonDeepEqual(readBack, expected)) {
+          throw new Error(`Official canonical upgrade parity failed for ${definition.slug}`);
+        }
+        return true;
+      }
+    }
     if (!jsonDeepEqual(existing, expected)) {
       throw new Error(`Official canonical conflict for ${definition.slug}`);
     }

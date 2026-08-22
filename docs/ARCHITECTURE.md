@@ -79,8 +79,8 @@ adapter이며 게임 정책이나 생성 registry를 runtime authority로 사용
 
 ```text
 D1
-├─ games: identity, publisher authority, visibility, live_version_id
-├─ game_versions: immutable version/publication facts
+├─ games: identity/ownership, USER control state, visibility, live_version_id
+├─ game_versions: immutable version/publication facts + USER moderation state
 └─ game_assets: provider-neutral game asset metadata
 
 B2
@@ -105,14 +105,15 @@ target에 대해서만 `READY`를 기록합니다. 실패하거나 일부만 기
 
 ## USER 제어 영역
 
-USER 게임은 generic runtime과 별도로 아래 제어 데이터를 유지합니다.
+USER 게임도 generic tables를 제어 권한 원천으로 사용합니다.
 
-- `sandbox_games`: developer 소유권, review slot, 편집 가능한 control-plane metadata, visibility
-- `sandbox_game_versions`: 원본 archive, 심사 상태, reviewer/reason, upload workflow
+- `games`: developer 소유권, review slot, 편집 가능한 control-plane metadata, visibility
+- `game_versions`: 원본 archive/publication 사실과 심사 상태, reviewer/reason
+- `sandbox_games`, `sandbox_game_versions`: 이전 Worker를 위한 임시 호환 미러(별도 모델 아님)
 - creator 프로그램 자격, review queue, audit trail, approve/reject/revoke/republish
 - 사용자별 동시 심사 slot 최대 2개
 
-Migration trigger와 repository write가 USER identity/version/assets를 generic tables로
+Migration trigger와 repository compatibility write가 롤링 배포 중 구 Worker와 generic authority를
 수렴시킵니다. 수렴은 심사를 제거하지 않습니다. Publication `READY`는 bundle이 완전하게 기록된
 상태이고 moderation `APPROVED`는 관리자가 버전을 승인한 상태입니다.
 

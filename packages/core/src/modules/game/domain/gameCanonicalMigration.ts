@@ -33,6 +33,7 @@ export function systemGameDefinitionToGameCanonicalDocument(
     title: definition.title,
     shortDescription: definition.shortDescription,
     description: definition.description,
+    publisher: { official: true },
     policy: definition.policy,
     ...(definition.presentation !== undefined ? { presentation: definition.presentation } : {}),
     ...(definition.difficulty !== undefined ? { difficulty: definition.difficulty } : {}),

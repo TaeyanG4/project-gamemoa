@@ -1321,3 +1321,38 @@ test("Stage A-3: concurrent create by different developers allocates distinct ID
     assert.equal(gRow.publisher_user_id, r!.developerUserId);
   }
 });
+
+test("0034: Creator reads use generic games/game_versions as the authority", async () => {
+  const { db, raw } = createSqliteD1(SANDBOX_GAMES_TEST_SCHEMA);
+  seedUser(raw, 1, "Dev");
+  const repo = new D1SandboxGameRepository(db);
+  const game = await seedGame(repo, "generic-authority", 1);
+
+  raw.prepare("UPDATE games SET title = 'Generic title' WHERE id = ?").run(game.id);
+  assert.equal((await repo.findById(game.id))?.title, "Generic title");
+  assert.notEqual(
+    (raw.prepare("SELECT title FROM sandbox_games WHERE id = ?").get(game.id) as { title: string })
+      .title,
+    "Generic title",
+    "legacy mirror may be stale without changing the repository read authority",
+  );
+
+  raw.prepare("UPDATE sandbox_games SET title = 'Old Worker title' WHERE id = ?").run(game.id);
+  assert.equal(
+    (raw.prepare("SELECT title FROM games WHERE id = ?").get(game.id) as { title: string }).title,
+    "Old Worker title",
+    "deployment-gap trigger must converge an old Worker write into games",
+  );
+
+  const version = await repo.createVersion({
+    gameId: game.id,
+    objectKey: "uploads/generic-authority.zip",
+    contentHash: "generic-authority-hash",
+    bundleBytes: 10,
+    nowIso: "2026-08-22T00:00:00.000Z",
+  });
+  raw
+    .prepare("UPDATE game_versions SET moderation_status = 'APPROVED' WHERE id = ?")
+    .run(version.id);
+  assert.equal((await repo.findVersionById(version.id))?.status, "APPROVED");
+});

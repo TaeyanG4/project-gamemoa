@@ -167,6 +167,9 @@ export function mapUserGameRecordToCanonical(
     title: record.title,
     shortDescription: record.shortDescription ?? "",
     description: record.description ?? "",
+    // This value never comes from a user manifest/request. The USER control plane is the trusted
+    // writer and always stamps a non-official public presentation fact.
+    publisher: { official: false },
     policy: {
       score: scoreConfig({
         unit: record.scoreUnit,

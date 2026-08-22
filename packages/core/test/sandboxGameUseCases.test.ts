@@ -850,6 +850,7 @@ function fixtureCanonicalDoc(
     title: "Canonical Title",
     shortDescription: "Canonical short",
     description: "Canonical long",
+    publisher: { official: false },
     policy: {
       score: { unit: "pts", direction: "desc", min: 0, max: 100 },
       leaderboard: true,

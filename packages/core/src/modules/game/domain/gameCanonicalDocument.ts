@@ -36,10 +36,9 @@
  *
  * D1-only, never duplicated here:
  *   - **identity**: the D1 row id, slug uniqueness enforcement.
- *   - **publisher**: {@link GamePublisher} — a relational/authority fact, not a game description.
- *     An OWOGG-published game and the same game republished (hypothetically) by a different
- *     process would still have byte-identical canonical documents; publisher isn't part of "what
- *     the game is".
+ *   - **publisher ownership/authorization**: {@link GamePublisher} remains relational D1 state.
+ *     Canonical carries only `publisher.official`, a public badge/presentation fact that must
+ *     never be consulted for ownership or write permission.
  *   - **review/publish status, visibility, liveVersionId**: transactional axes that change
  *     independently of the game's own description.
  *   - **attempts/scores**: submission data, D1-transactional by nature.
@@ -61,7 +60,13 @@ import type {
 } from "@owogg/game-sdk/contracts";
 import type { SandboxGameMode } from "../../../domain/sandboxGames.js";
 
-export const GAME_CANONICAL_SCHEMA_VERSION = 1 as const;
+export const GAME_CANONICAL_SCHEMA_VERSION = 2 as const;
+
+/** Public publisher presentation metadata. This is deliberately not an authorization fact:
+ * ownership and write permission remain server-controlled relational state in D1. */
+export interface GameCanonicalPublisher {
+  readonly official: boolean;
+}
 
 /** Same shape as `GameDefinition.policy` — see this file's own top
  * doc comment for the field-by-field meaning. `parseGameCanonicalDocument` enforces, as
@@ -127,6 +132,8 @@ export interface GameCanonicalDocument {
   readonly title: string;
   readonly shortDescription: string;
   readonly description: string;
+  /** Controls the public "official" badge only. USER control-plane writes always force false. */
+  readonly publisher: GameCanonicalPublisher;
   readonly policy: GameCanonicalPolicy;
   readonly presentation?: GamePresentation | undefined;
   readonly difficulty?: DifficultyConfig | undefined;
@@ -279,6 +286,7 @@ const TOP_LEVEL_KEYS = [
   "title",
   "shortDescription",
   "description",
+  "publisher",
   "policy",
   "presentation",
   "difficulty",
@@ -287,6 +295,7 @@ const TOP_LEVEL_KEYS = [
   "updatedAt",
 ] as const;
 const POLICY_KEYS = ["score", "leaderboard", "xpPerCompletion", "requiresAuth"] as const;
+const PUBLISHER_KEYS = ["official"] as const;
 const SCORE_KEYS = ["unit", "direction", "min", "max", "displayPrefix", "displaySuffix"] as const;
 const SCORE_DIRECTIONS = ["asc", "desc"] as const;
 // Same bound scripts/game-registry-schema.ts's own SYSTEM parser and packages/contracts's Creator
@@ -645,8 +654,22 @@ export function parseGameCanonicalDocument(
   rejectUnknownKeys(obj, TOP_LEVEL_KEYS, "document");
 
   const schemaVersion = obj.schemaVersion;
-  if (schemaVersion !== GAME_CANONICAL_SCHEMA_VERSION) {
+  if (schemaVersion !== 1 && schemaVersion !== GAME_CANONICAL_SCHEMA_VERSION) {
     fail("UNSUPPORTED_SCHEMA_VERSION", `got ${JSON.stringify(schemaVersion)}`);
+  }
+
+  let publisher: GameCanonicalPublisher;
+  if (schemaVersion === 1) {
+    // Legacy documents predate publisher presentation metadata. They are normalized fail-safe as
+    // non-official; the trusted official bootstrap upgrades OWOGG documents to schema v2.
+    if (obj.publisher !== undefined) {
+      fail("INVALID_DOCUMENT", "schemaVersion 1 must not contain publisher");
+    }
+    publisher = { official: false };
+  } else {
+    const rawPublisher = asRecord(obj.publisher, "publisher");
+    rejectUnknownKeys(rawPublisher, PUBLISHER_KEYS, "publisher");
+    publisher = { official: requireBoolean(rawPublisher, "official") };
   }
 
   const slug = requireString(obj, "slug");
@@ -670,6 +693,7 @@ export function parseGameCanonicalDocument(
     title: requireString(obj, "title"),
     shortDescription: requireString(obj, "shortDescription"),
     description: requireString(obj, "description"),
+    publisher,
     policy,
     ...(presentation !== undefined ? { presentation } : {}),
     ...(difficulty !== undefined ? { difficulty } : {}),
